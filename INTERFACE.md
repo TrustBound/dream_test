@@ -18,22 +18,22 @@ This is the **intended** interface for test authors: minimal ceremony, close to 
 ```gleam
 import gleam/int
 import dream_test/unit.{describe, it}
-import dream_test/assertions/should
+import dream_test/assertions/should.{or_fail_with}
 
 pub fn tests() {
   describe("Math & Parsing", [
     it("adds numbers", fn() {
       let sum = 1 + 2
 
-      sum
-      |> should.equal(3)
-      |> should.or_fail_with("1 + 2 should equal 3")
+  sum
+  |> should.equal(3)
+  |> or_fail_with("1 + 2 should equal 3")
     }),
 
     it("parses integers", fn() {
       int.parse("123")
       |> should.equal(123)
-      |> should.or_fail_with("Should parse 123 from string")
+      |> or_fail_with("Should parse 123 from string")
     }),
   ])
 }
@@ -69,13 +69,13 @@ pub fn tests() {
     it("adds numbers", fn() {
       add(1, 2)
       |> should.equal(3)
-      |> should.or_fail_with("1 + 2 should equal 3")
+      |> or_fail_with("1 + 2 should equal 3")
     }),
 
     it("subtracts numbers", fn() {
       subtract(4, 1)
       |> should.equal(3)
-      |> should.or_fail_with("4 - 1 should equal 3")
+      |> or_fail_with("4 - 1 should equal 3")
     }),
   ])
 }
@@ -90,7 +90,7 @@ pub fn tests() {
       it("adds positive numbers", fn(context: TestContext(Int)) {
         add(1, 2)
         |> should.equal(context, 3)
-        |> should.or_fail_with("1 + 2 should equal 3")
+        |> or_fail_with("1 + 2 should equal 3")
       }),
     ]),
   ])
@@ -108,7 +108,7 @@ Assertions are provided by `dream_test/assertions/should` and operate on values,
 Following the project standards:
 
 ```gleam
-import dream_test/assertions/should
+import dream_test/assertions/should.{or_fail_with}
 ```
 
 ### 3.2 Pattern: equal + or_fail_with
@@ -119,7 +119,7 @@ fn greets_user(name: String) {
 
   greeting
   |> should.equal("Hello, " <> name)
-  |> should.or_fail_with("Should greet the user by name")
+  |> or_fail_with("Should greet the user by name")
 }
 ```
 
@@ -550,13 +550,13 @@ fn parses_int(context: TestContext(Int)) -> TestContext(Int) {
   case parsed {
     Ok(value) ->
       value
-      |> should.equal(context, 123)
+      |> should.equal(123)
       |> or_fail_with("Should parse 123 from string")
 
     Error(_) ->
       // Force a failure by comparing mismatched values
       0
-      |> should.equal(context, 1)
+      |> should.equal(1)
       |> or_fail_with("Parsing int from string failed unexpectedly")
   }
 }

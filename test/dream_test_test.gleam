@@ -3,6 +3,7 @@ import dream_test/types_test
 import dream_test/assertions/should_test
 import dream_test/runner_test
 import dream_test/unit_test
+import dream_test/reporter/bdd_test
 
 pub fn main() {
   assertions_test.main()
@@ -10,4 +11,5 @@ pub fn main() {
   should_test.main()
   runner_test.main()
   unit_test.main()
+  bdd_test.main()
 }

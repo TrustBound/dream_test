@@ -1,6 +1,6 @@
 import dream_test/bootstrap/assertions
 import dream_test/types.{type AssertionResult, AssertionOk, AssertionFailed}
-import dream_test/assertions/should
+import dream_test/assertions/should.{or_fail_with}
 
 /// Bootstrap checks for the minimal should assertion helpers.
 ///
@@ -25,7 +25,7 @@ pub fn main() {
   let custom_result: AssertionResult =
     3
     |> should.equal(4)
-    |> should.or_fail_with("Custom failure message")
+    |> or_fail_with("Custom failure message")
 
   case custom_result {
     AssertionFailed(failure) ->

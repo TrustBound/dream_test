@@ -178,7 +178,7 @@ pub fn add_failure(context, failure) {
 ```gleam
 value
 |> should.equal(context, expected)
-|> should.or_fail_with("message")
+|> or_fail_with("message")
 ```
 
 **Discouraged**
@@ -186,7 +186,7 @@ value
 ```gleam
 value
 |> should.equal(expected)(context)
-|> should.or_fail_with("message")
+|> or_fail_with("message")
 ```
 
 ## 7. Import Style for Piped Helpers

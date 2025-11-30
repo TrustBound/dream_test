@@ -195,7 +195,7 @@ pub fn creates_greeting(ctx: TestContext(String)) -> TestContext(String) {
 
   greeting
   |> should.equal("Hello, Gleam")(ctx)
-  |> should.or_fail_with("Should have shown Hello, Gleam")
+  |> or_fail_with("Should have shown Hello, Gleam")
 }
 ```
 
@@ -344,7 +344,7 @@ pub fn tests() {
 
       user.name
       |> should.equal("Alice")(ctx)
-      |> should.or_fail_with("User name should be Alice")
+      |> or_fail_with("User name should be Alice")
     })
     |> tag("unit")
     |> tag("user"),
@@ -354,7 +354,7 @@ pub fn tests() {
 
       result.is_error
       |> should.equal(True)(ctx)
-      |> should.or_fail_with("Invalid email should be rejected")
+      |> or_fail_with("Invalid email should be rejected")
     })
     |> tag("unit")
   ])
@@ -445,7 +445,7 @@ pub fn steps() {
 
         response.body
         |> should.equal(expected)(ctx)
-        |> should.or_fail_with("Response body did not contain expected text")
+        |> or_fail_with("Response body did not contain expected text")
       },
     ),
   ]
@@ -583,14 +583,14 @@ gleam run -m dream_test_runner/cli --reporter json > results.json
 
    ```gleam
    import dream_test.{describe, it}
-   import should
+   import should.{or_fail_with}
 
    pub fn tests() {
      describe("Math", [
        it("adds numbers", fn(ctx) {
          add(1, 2)
          |> should.equal(3)(ctx)
-         |> should.or_fail_with("1 + 2 should equal 3")
+         |> or_fail_with("1 + 2 should equal 3")
        }),
      ])
    }

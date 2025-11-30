@@ -52,8 +52,9 @@ The system is structured in **layers**, each depending only on the layer(s) belo
 - Examples:
 -  - `Location` (module, file, line).
 -  - `Status` (`Passed`, `Failed`, `Skipped`, `Pending`, `TimedOut`).
--  - `AssertionFailure` (actual, expected, operator, message, location).
--  - `AssertionResult` (Ok/Failed wrapper around values and failures).
+-  - `FailurePayload` (currently `EqualityFailure(actual: String, expected: String)`).
+-  - `AssertionFailure` (operator, message, location, payload).
+-  - `AssertionResult` (`AssertionOk` / `AssertionFailed(AssertionFailure)`).
 -  - `TestResult` (name, status, duration, tags, failures, location, kind).
 - Responsibilities:
 -  - Represent test and assertion outcomes in a structured way.
@@ -66,22 +67,22 @@ The system is structured in **layers**, each depending only on the layer(s) belo
 - First version of our real assertion system.
 - Introduces:
 -  - Core `should` functions (pipe-first style), e.g.:
--    - `should.equal(actual, expected)`
--    - `should.or_fail_with(result, message)`
+-    - `should.equal(actual, expected) -> AssertionResult`
+-    - `or_fail_with(result, message) -> AssertionResult`
 - Design principles:
 -  - **Pipe-first** API: value under test is on the left of the pipe.
 -    - `value |> should.equal(expected) |> should.or_fail_with("message")`
 -  - Assertions operate on values and return `AssertionResult`, not raise directly.
--  - Failures are **data** (`AssertionFailure`), not just strings.
+-  - Failures are **data** (`AssertionFailure` with optional `FailurePayload`), not just strings.
 - Tested with:
 -  - `dream_test/bootstrap/assertions` by inspecting `AssertionResult` and `AssertionFailure` values.
 
 ### Layer 4 – Runner Core
 - Responsible for **executing** tests and collecting results.
 - Concepts:
-  - `TestCase` – a runnable test with:
-    - `name`, `full_name` (hierarchical), `tags`, `location`, `kind` (unit/integration/Gherkin), and a `run` function.
-  - `TestSuite` – a collection/tree of `TestCase`s.
+-  - `TestCase` – a runnable test with:
+-    - `name`, `full_name` (hierarchical), `tags`, `location`, `kind` (unit/integration/Gherkin), and a `run: fn() -> AssertionResult` function.
+-  - `TestSuite` – a collection/tree of `TestCase`s.
 - Responsibilities:
   - Execute `TestCase`s and produce `TestResult`s.
   - Enforce timeouts.
@@ -162,7 +163,7 @@ We explicitly avoid depending on `gleeunit`. Instead, we bootstrap our framework
 
 1. **Layer 0**: Use raw `assert` / `let assert` to implement `dream_test/bootstrap/assertions`.
 2. **Layer 1**: Use `dream_test/bootstrap/assertions` to test:
-   - Core types in `dream_test/types` (`Status`, `AssertionFailure`, `AssertionResult`, `TestResult`).
+   - Core types in `dream_test/types` (`Status`, `FailurePayload`, `AssertionFailure`, `AssertionResult`, `TestResult`).
    - Low-level helpers (e.g. `status_from_failures`, timing helpers).
 3. **Layer 3**: Implement the `should` assertion engine and test it via `dream_test/bootstrap/assertions` by inspecting `AssertionResult` and `AssertionFailure` values.
 4. **Layer 4**: Implement the runner core and test it via `dream_test/bootstrap/assertions` by examining `TestResult`s and behavior (timeouts, status, etc.).
@@ -180,7 +181,7 @@ This gives us:
 
 - **Pipe-first assertions**:
   - Value under test on the left, assertion functions on the right.
-  - Example: `value |> should.equal(expected)(ctx) |> should.or_fail_with("msg")`.
+  - Example: `value |> should.equal(expected) |> or_fail_with("msg")`.
 - **Real `.feature` files for Gherkin**:
   - Use standard Gherkin syntax and semantics.
   - `.feature` files live under a conventional directory (e.g. `test/features/`).
