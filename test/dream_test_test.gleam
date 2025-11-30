@@ -1,13 +1,13 @@
-import gleeunit
+import dream_test/bootstrap/assertions_test
+import dream_test/types_test
+import dream_test/assertions/should_test
+import dream_test/runner_test
+import dream_test/unit_test
 
-pub fn main() -> Nil {
-  gleeunit.main()
-}
-
-// gleeunit test functions end in `_test`
-pub fn hello_world_test() {
-  let name = "Joe"
-  let greeting = "Hello, " <> name <> "!"
-
-  assert greeting == "Hello, Joe!"
+pub fn main() {
+  assertions_test.main()
+  types_test.main()
+  should_test.main()
+  runner_test.main()
+  unit_test.main()
 }

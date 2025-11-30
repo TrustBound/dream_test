@@ -1,31 +1,31 @@
 # Simple Makefile for dream_test
 
-.PHONY: test bootstrap bootstrap-core bootstrap-core-types bootstrap-should bootstrap-runner-core bootstrap-runner-suite bootstrap-unit-dsl all
+.PHONY: test bootstrap bootstrap-assertions bootstrap-types bootstrap-should bootstrap-runner-core bootstrap-runner-suite bootstrap-unit all
 
 # Run gleeunit tests
 test:
 	gleam test
 
 # Run all bootstrap checks
-bootstrap: bootstrap-core bootstrap-core-types bootstrap-should bootstrap-runner-core bootstrap-runner-suite bootstrap-unit-dsl
+bootstrap: bootstrap-assertions bootstrap-types bootstrap-should bootstrap-runner-core bootstrap-runner-suite bootstrap-unit
 
-bootstrap-core:
-	gleam run -m dream_test/bootstrap/bootstrap_core_assert
+bootstrap-assertions:
+	gleam run -m dream_test/bootstrap/assertions_test
 
-bootstrap-core-types:
-	gleam run -m dream_test/bootstrap/bootstrap_core_types
+bootstrap-types:
+	gleam run -m dream_test/types_test
 
 bootstrap-should:
-	gleam run -m dream_test/bootstrap/bootstrap_should
+	gleam run -m dream_test/assertions/should_test
 
 bootstrap-runner-core:
-	gleam run -m dream_test/bootstrap/bootstrap_runner_core
+	gleam run -m dream_test/runner_test
 
 bootstrap-runner-suite:
-	gleam run -m dream_test/bootstrap/bootstrap_runner_suite
+	gleam run -m dream_test/runner_test
 
-bootstrap-unit-dsl:
-	gleam run -m dream_test/bootstrap/bootstrap_unit_dsl
+bootstrap-unit:
+	gleam run -m dream_test/unit_test
 
 # Run everything: unit tests + all bootstraps
 all: test bootstrap

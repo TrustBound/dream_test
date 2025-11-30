@@ -154,8 +154,10 @@ pub fn add_failure(context, failure) {
 - Prefer clear, descriptive module paths such as:
   - `dream_test/assertions/context`
   - `dream_test/assertions/should`
-  - `dream_test/core/types`
-  - `dream_test/bootstrap/bootstrap_core_assert`
+  - `dream_test/types`
+  - `dream_test/runner`
+  - `dream_test/unit`
+  - `dream_test/bootstrap/assertions`
 
 **Rationale**
 - Avoiding reserved words prevents confusing syntax errors.

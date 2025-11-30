@@ -1,49 +1,58 @@
-import dream_test/core/types.{AssertionFailure, Location}
-import dream_test/assertions/context.{type TestContext, TestContext, add_failure, failures}
+import gleam/string
+import gleam/option.{Some}
+import dream_test/types.{type AssertionResult, EqualityFailure, AssertionFailure, AssertionOk, AssertionFailed, Location}
 
 /// Pipe-first assertion helpers.
 ///
-/// These functions operate on a TestContext and a value under test,
-/// building up a list of AssertionFailure values without throwing.
+/// These functions operate on plain values and return an AssertionResult,
+/// which the runner converts into structured failures.
 
-/// Assert that `actual` equals `expected`, returning an updated context.
+/// Assert that `actual` equals `expected`, returning an AssertionResult.
 ///
 /// Intended usage with pipes:
-///   value |> should.equal(context, expected)
-pub fn equal(actual: a, context: TestContext(a), expected: a) -> TestContext(a) {
+///   value |> should.equal(expected)
+pub fn equal(actual: a, expected: a) -> AssertionResult {
   case actual == expected {
     True ->
-      context
+      AssertionOk
 
     False -> {
-      let failure = AssertionFailure(
-        actual: actual,
-        expected: expected,
-        operator: "equal",
-        message: "",
-        // For now, callers must supply a Location-aware wrapper if they
-        // want accurate locations. We'll improve this later.
-        location: Location("unknown", "unknown", 0),
+      let payload = EqualityFailure(
+        actual: inspect_value(actual),
+        expected: inspect_value(expected),
       )
 
-      add_failure(context, failure)
+      AssertionFailed(
+        AssertionFailure(
+          operator: "equal",
+          message: "",
+          // For now we use a placeholder Location; runners may wrap
+          // should.equal in a location-aware helper later.
+          location: Location("unknown", "unknown", 0),
+          payload: Some(payload),
+        ),
+      )
     }
   }
 }
 
-/// Override the message on the most recent failure in the context.
-/// If there are no failures, the context is returned unchanged.
+/// Override the message on a failed assertion.
+/// If the result is already Ok, it is returned unchanged.
 ///
 /// Intended usage with pipes:
-///   context |> should.or_fail_with("message")
-pub fn or_fail_with(test_context: TestContext(a), message: String) -> TestContext(a) {
-  case failures(test_context) {
-    [] ->
-      test_context
+///   value |> should.equal(expected) |> should.or_fail_with("message")
+pub fn or_fail_with(result: AssertionResult, message: String) -> AssertionResult {
+  case result {
+    AssertionOk ->
+      AssertionOk
 
-    [first, ..rest] -> {
-      let updated = AssertionFailure(..first, message: message)
-      TestContext(failures: [updated, ..rest])
-    }
+    AssertionFailed(failure) ->
+      AssertionFailed(AssertionFailure(..failure, message: message))
   }
+}
+
+fn inspect_value(value: a) -> String {
+  // For now we rely on Gleam's built-in debug representation via string.inspect.
+  // This can be refined later for prettier diffs.
+  string.inspect(value)
 }

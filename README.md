@@ -17,8 +17,7 @@ pub fn main() -> Nil {
 Further documentation can be found at <https://hexdocs.pm/dream_test>.
 
 ## Development
-
-```sh
-gleam run   # Run the project
-gleam test  # Run the tests
-```
++
++```sh
++make all   # Run unit tests and all bootstrap checks
++```

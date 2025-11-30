@@ -32,47 +32,49 @@ The system is structured in **layers**, each depending only on the layer(s) belo
 - Example:
   - `assert some_condition as "message"`.
 
-### Layer 1 – `core_assert`: Minimal Internal Assertions
+### Layer 1 – `dream_test/bootstrap/assertions`: Minimal Internal Assertions
 - Very small, internal-only assertion helpers.
 - No runner, no reporters, no tags.
 - Responsibilities:
-  - Provide simple functions like:
-    - `core_assert.equal(expected, actual, message)`
-    - `core_assert.is_true(cond, message)`
-  - Wrap raw `assert` with clearer semantics and reusable messages.
+-  - Provide simple functions like:
+-    - `assertions.equal(expected, actual, message)`
+-    - `assertions.is_true(cond, message)`
+-  - Wrap raw `assert` with clearer semantics and reusable messages.
 - Used to test:
-  - Core types and helpers in higher layers (e.g. status derivation, result shaping).
+-  - Core types and helpers in higher layers (e.g. status derivation, result shaping).
 - Never rewired.
-  - Always implemented in terms of Gleam built-ins.
-  - Later layers are free to evolve without changing these tests.
+-  - Always implemented in terms of Gleam built-ins.
+-  - Later layers are free to evolve without changing these tests.
 
 ### Layer 2 – Core Types & Low-Level Helpers
 - Defines core data structures and helpers that do **not** depend on the runner yet.
+- Implemented in the `dream_test/types` module.
 - Examples:
-  - `Location` (module, file, line).
-  - `Status` (`Passed`, `Failed`, `Skipped`, `Pending`, `TimedOut`).
-  - `AssertionFailure` (actual, expected, operator, message, location).
-  - `TestResult` (name, status, duration, tags, failures, location, kind).
+-  - `Location` (module, file, line).
+-  - `Status` (`Passed`, `Failed`, `Skipped`, `Pending`, `TimedOut`).
+-  - `AssertionFailure` (actual, expected, operator, message, location).
+-  - `AssertionResult` (Ok/Failed wrapper around values and failures).
+-  - `TestResult` (name, status, duration, tags, failures, location, kind).
 - Responsibilities:
-  - Represent test and assertion outcomes in a structured way.
-  - Provide helpers such as `derive_status(failures) -> Status`.
+-  - Represent test and assertion outcomes in a structured way.
+-  - Provide helpers such as `status_from_failures(failures) -> Status`.
 - Tested with:
-  - `core_assert` functions (Layer 1).
+-  - `dream_test/bootstrap/assertions` functions (Layer 1).
+-  - `core_assert` functions (Layer 1).
 
 ### Layer 3 – Assertion Engine (`should` Core)
 - First version of our real assertion system.
 - Introduces:
-  - `TestContext` – holds failures and other per-test data.
-  - Core `should` functions (pipe-first style), e.g.:
-    - `should.equal(expected)`
-    - `should.or_fail_with(message)`
+-  - Core `should` functions (pipe-first style), e.g.:
+-    - `should.equal(actual, expected)`
+-    - `should.or_fail_with(result, message)`
 - Design principles:
-  - **Pipe-first** API: value under test is on the left of the pipe.
-    - `value |> should.equal(expected)(ctx) |> should.or_fail_with("message")`
-  - Assertions produce/modify a `TestContext`, not raise directly.
-  - Failures are **data** (`AssertionFailure`), not just strings.
+-  - **Pipe-first** API: value under test is on the left of the pipe.
+-    - `value |> should.equal(expected) |> should.or_fail_with("message")`
+-  - Assertions operate on values and return `AssertionResult`, not raise directly.
+-  - Failures are **data** (`AssertionFailure`), not just strings.
 - Tested with:
-  - `core_assert` by inspecting `TestContext` and `AssertionFailure` values.
+-  - `dream_test/bootstrap/assertions` by inspecting `AssertionResult` and `AssertionFailure` values.
 
 ### Layer 4 – Runner Core
 - Responsible for **executing** tests and collecting results.
@@ -158,12 +160,12 @@ Initially, coverage may be stubbed or minimal, but the architecture and types wi
 
 We explicitly avoid depending on `gleeunit`. Instead, we bootstrap our framework in **one direction** using our own code:
 
-1. **Layer 0**: Use raw `assert` / `let assert` to test `core_assert`.
-2. **Layer 1**: Use `core_assert` to test:
-   - Core types (`Status`, `AssertionFailure`, `TestResult`).
-   - Low-level helpers (e.g. status derivation, timing helpers).
-3. **Layer 3**: Implement the `should` assertion engine and test it via `core_assert` by inspecting `TestContext`.
-4. **Layer 4**: Implement the runner core and test it via `core_assert` by examining `TestResult`s and behavior (timeouts, status, etc.).
+1. **Layer 0**: Use raw `assert` / `let assert` to implement `dream_test/bootstrap/assertions`.
+2. **Layer 1**: Use `dream_test/bootstrap/assertions` to test:
+   - Core types in `dream_test/types` (`Status`, `AssertionFailure`, `AssertionResult`, `TestResult`).
+   - Low-level helpers (e.g. `status_from_failures`, timing helpers).
+3. **Layer 3**: Implement the `should` assertion engine and test it via `dream_test/bootstrap/assertions` by inspecting `AssertionResult` and `AssertionFailure` values.
+4. **Layer 4**: Implement the runner core and test it via `dream_test/bootstrap/assertions` by examining `TestResult`s and behavior (timeouts, status, etc.).
 5. **Layer 5+**: Once the runner and basic assertions are stable, write tests for higher layers (DSL, Gherkin, reporters) **using the framework itself**:
    - `describe` / `it` / `should`.
    - Gherkin scenarios executed by our runner.

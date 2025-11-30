@@ -1,6 +1,5 @@
 import gleam/list
-import dream_test/assertions/context.{type TestContext}
-import dream_test/core/types.{Location, Unit}
+import dream_test/types.{Location, Unit, type AssertionResult}
 import dream_test/runner.{type TestCase, TestCase, SingleTestConfig}
 
 /// Unit test DSL types and helpers.
@@ -9,24 +8,27 @@ import dream_test/runner.{type TestCase, TestCase, SingleTestConfig}
 /// convenient to write, and then translating them into runner TestCase
 /// values.
 
-pub type UnitTest(a) {
+pub type UnitTest {
   ItTest(
     name: String,
-    run: fn(TestContext(a)) -> TestContext(a),
+    run: fn() -> AssertionResult,
   )
   DescribeGroup(
     name: String,
-    children: List(UnitTest(a)),
+    children: List(UnitTest),
   )
 }
 
 /// Define a single test with a name and a body function.
-pub fn it(name: String, run: fn(TestContext(a)) -> TestContext(a)) -> UnitTest(a) {
+///
+/// From the test author's perspective this is typically invoked with an
+/// anonymous `fn()` that uses `should` assertions.
+pub fn it(name: String, run: fn() -> AssertionResult) -> UnitTest {
   ItTest(name, run)
 }
 
 /// Group tests under a common name.
-pub fn describe(name: String, children: List(UnitTest(a))) -> UnitTest(a) {
+pub fn describe(name: String, children: List(UnitTest)) -> UnitTest {
   DescribeGroup(name, children)
 }
 
@@ -34,15 +36,15 @@ pub fn describe(name: String, children: List(UnitTest(a))) -> UnitTest(a) {
 ///
 /// `module_name` is used for the Location.module_ field; in the future we may
 /// compute this automatically.
-pub fn to_test_cases(module_name: String, root: UnitTest(a)) -> List(TestCase(a)) {
+pub fn to_test_cases(module_name: String, root: UnitTest) -> List(TestCase) {
   to_test_cases_from_unit_test(module_name, [], root, [])
 }
 
 fn to_test_cases_from_unit_test(module_name: String,
   name_prefix: List(String),
-  node: UnitTest(a),
-  accumulated: List(TestCase(a)),
-) -> List(TestCase(a)) {
+  node: UnitTest,
+  accumulated: List(TestCase),
+) -> List(TestCase) {
   case node {
     ItTest(name, run) ->
       build_it_test_case(module_name, name_prefix, name, run, accumulated)
@@ -57,9 +59,9 @@ fn to_test_cases_from_unit_test(module_name: String,
 fn build_it_test_case(module_name: String,
   name_prefix: List(String),
   name: String,
-  run: fn(TestContext(a)) -> TestContext(a),
-  accumulated: List(TestCase(a)),
-) -> List(TestCase(a)) {
+  run: fn() -> AssertionResult,
+  accumulated: List(TestCase),
+) -> List(TestCase) {
   let full_name = list.append(name_prefix, [name])
   let location = Location(module_name, "", 0)
   let config = SingleTestConfig(
@@ -76,9 +78,9 @@ fn build_it_test_case(module_name: String,
 
 fn to_test_cases_from_list(module_name: String,
   name_prefix: List(String),
-  remaining: List(UnitTest(a)),
-  accumulated: List(TestCase(a)),
-) -> List(TestCase(a)) {
+  remaining: List(UnitTest),
+  accumulated: List(TestCase),
+) -> List(TestCase) {
   case remaining {
     [] ->
       list.reverse(accumulated)

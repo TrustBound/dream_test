@@ -14,8 +14,10 @@ This document expands on `DESIGN.md` with **concrete shapes and examples** for t
 ---
 
 ## 1. Core Types
-
-### 1.1 Location, status, tags
++
++Core types live in the `dream_test/types` module.
++
++### 1.1 Location, status, tags
 
 ```gleam
 pub type Location {
