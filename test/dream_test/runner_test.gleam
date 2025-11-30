@@ -1,66 +1,120 @@
-import dream_test/bootstrap/assertions
-import gleam/option.{Some}
-import dream_test/types.{type AssertionResult, AssertionFailure, AssertionOk, AssertionFailed, EqualityFailure, Location, Unit, Passed, Failed}
+import dream_test/assertions/should.{or_fail_with}
 import dream_test/runner.{SingleTestConfig, run_single_test}
-
-fn passing_test() -> AssertionResult {
-  AssertionOk
+import dream_test/types.{
+  AssertionFailed, AssertionFailure, AssertionOk, EqualityFailure, Failed,
+  Location, Passed, Unit,
 }
+import dream_test/unit.{describe, it}
+import gleam/option.{Some}
 
-fn failing_test() -> AssertionResult {
-  let failure = AssertionFailure(
-    operator: "equal",
-    message: "",
-    location: Location("bootstrap_runner_core", "bootstrap_runner_core.gleam", 0),
-    payload: Some(EqualityFailure(
-      actual: "1",
-      expected: "2",
-    )),
-  )
+pub fn tests() {
+  describe("Runner", [
+    describe("run_single_test", [
+      it("produces Passed status for passing test", fn() {
+        // Arrange
+        let config =
+          SingleTestConfig(
+            name: "passing test",
+            full_name: ["bootstrap", "runner_core"],
+            tags: ["bootstrap", "runner"],
+            kind: Unit,
+            location: Location("test", "test.gleam", 0),
+            run: fn() { AssertionOk },
+          )
+        let expected = Passed
 
-  AssertionFailed(failure)
-}
+        // Act
+        let result = run_single_test(config)
 
-/// Bootstrap checks for the minimal runner core.
-///
-/// Verifies that a passing test produces a Passed status with no failures,
-/// and a failing test produces a Failed status with at least one failure.
-pub fn main() {
-  let common_full_name = ["bootstrap", "runner_core"]
-  let common_tags = ["bootstrap", "runner"]
-  let common_location = Location("bootstrap_runner_core", "bootstrap_runner_core.gleam", 0)
+        // Assert
+        result.status
+        |> should.equal(expected)
+        |> or_fail_with("Passing test should have Passed status")
+      }),
 
-  let passing_config = SingleTestConfig(
-    name: "passing test",
-    full_name: common_full_name,
-    tags: common_tags,
-    kind: Unit,
-    location: common_location,
-    run: passing_test,
-  )
+      it("produces empty failures list for passing test", fn() {
+        // Arrange
+        let config =
+          SingleTestConfig(
+            name: "passing test",
+            full_name: ["bootstrap", "runner_core"],
+            tags: ["bootstrap", "runner"],
+            kind: Unit,
+            location: Location("test", "test.gleam", 0),
+            run: fn() { AssertionOk },
+          )
+        let expected = []
 
-  let passing_result = run_single_test(passing_config)
+        // Act
+        let result = run_single_test(config)
 
-  assertions.equal(Passed, passing_result.status, "Passing test should have Passed status")
-  assertions.equal([], passing_result.failures, "Passing test should have no failures")
+        // Assert
+        result.failures
+        |> should.equal(expected)
+        |> or_fail_with("Passing test should have no failures")
+      }),
 
-  let failing_config = SingleTestConfig(
-    name: "failing test",
-    full_name: common_full_name,
-    tags: common_tags,
-    kind: Unit,
-    location: common_location,
-    run: failing_test,
-  )
+      it("produces Failed status for failing test", fn() {
+        // Arrange
+        let failure =
+          AssertionFailure(
+            operator: "equal",
+            message: "",
+            location: Location("test", "test.gleam", 0),
+            payload: Some(EqualityFailure(actual: "1", expected: "2")),
+          )
+        let config =
+          SingleTestConfig(
+            name: "failing test",
+            full_name: ["bootstrap", "runner_core"],
+            tags: ["bootstrap", "runner"],
+            kind: Unit,
+            location: Location("test", "test.gleam", 0),
+            run: fn() { AssertionFailed(failure) },
+          )
+        let expected = Failed
 
-  let failing_result = run_single_test(failing_config)
+        // Act
+        let result = run_single_test(config)
 
-  assertions.equal(Failed, failing_result.status, "Failing test should have Failed status")
+        // Assert
+        result.status
+        |> should.equal(expected)
+        |> or_fail_with("Failing test should have Failed status")
+      }),
 
-  case failing_result.failures {
-    [] ->
-      assertions.is_true(False, "Failing test should have at least one failure")
-    [_, .._] ->
-      assertions.is_true(True, "Failing test recorded at least one failure")
-  }
+      it("records at least one failure for failing test", fn() {
+        // Arrange
+        let failure =
+          AssertionFailure(
+            operator: "equal",
+            message: "",
+            location: Location("test", "test.gleam", 0),
+            payload: Some(EqualityFailure(actual: "1", expected: "2")),
+          )
+        let config =
+          SingleTestConfig(
+            name: "failing test",
+            full_name: ["bootstrap", "runner_core"],
+            tags: ["bootstrap", "runner"],
+            kind: Unit,
+            location: Location("test", "test.gleam", 0),
+            run: fn() { AssertionFailed(failure) },
+          )
+
+        // Act
+        let result = run_single_test(config)
+
+        // Assert
+        case result.failures {
+          [] -> {
+            False
+            |> should.equal(True)
+            |> or_fail_with("Failing test should have at least one failure")
+          }
+          [_, ..] -> AssertionOk
+        }
+      }),
+    ]),
+  ])
 }

@@ -1,15 +1,23 @@
-import dream_test/bootstrap/assertions_test
 import dream_test/types_test
 import dream_test/assertions/should_test
 import dream_test/runner_test
 import dream_test/unit_test
 import dream_test/reporter/bdd_test
+import dream_test/unit.{describe, to_test_cases}
+import dream_test/runner.{run_all}
+import dream_test/reporter/bdd.{report}
+import gleam/io
 
 pub fn main() {
-  assertions_test.main()
-  types_test.main()
-  should_test.main()
-  runner_test.main()
-  unit_test.main()
-  bdd_test.main()
+  let all_tests = describe("dream_test", [
+    types_test.tests(),
+    should_test.tests(),
+    runner_test.tests(),
+    unit_test.tests(),
+    bdd_test.tests(),
+  ])
+  
+  let test_cases = to_test_cases("dream_test_test", all_tests)
+  let results = run_all(test_cases)
+  report(results, io.print)
 }

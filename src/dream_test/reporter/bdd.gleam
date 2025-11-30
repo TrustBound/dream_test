@@ -1,8 +1,11 @@
-import gleam/list
-import gleam/string
+import dream_test/types.{
+  type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
+  Passed, Pending, Skipped, TimedOut,
+}
 import gleam/int
+import gleam/list
 import gleam/option.{Some}
-import dream_test/types.{type TestResult, type AssertionFailure, type Status, EqualityFailure, Passed, Failed, Skipped, Pending, TimedOut}
+import gleam/string
 
 /// BDD-style reporter for dream_test.
 ///
@@ -16,118 +19,111 @@ import dream_test/types.{type TestResult, type AssertionFailure, type Status, Eq
 /// `report` applies a user-provided writer function to the formatted String, so
 /// the caller decides whether to print to stdout, log, buffer, etc.
 pub fn format(results: List(TestResult)) -> String {
-  let suites = group_by_suite(results)
-  let suites_text = format_suites(suites)
+  let formatted_results = format_all_results(results, [], "")
   let summary_text = format_summary(results)
-  string.concat([suites_text, summary_text])
+  string.concat([formatted_results, "\n", summary_text])
 }
 
 pub fn report(results: List(TestResult), write: fn(String) -> Nil) {
   write(format(results))
 }
 
-fn group_by_suite(results: List(TestResult)) -> List(#(String, List(TestResult))) {
-  let suite_names =
-    results
-    |> list.map(first_full_name_segment)
-    |> list.filter(fn(name) { name != "" })
-
-  let unique_suites = unique_strings(suite_names, [])
-
-  build_grouped_results(unique_suites, results, [])
-}
-
-fn first_full_name_segment(result: TestResult) -> String {
-  case result.full_name {
-    [head, .._] -> head
-    [] -> ""
-  }
-}
-
-fn unique_strings(values: List(String),
-  accumulated: List(String),
-) -> List(String) {
-  case values {
-    [] ->
-      list.reverse(accumulated)
-
-    [head, ..tail] -> {
-      case list.contains(accumulated, head) {
-        True ->
-          unique_strings(tail, accumulated)
-
-        False ->
-          unique_strings(tail, [head, ..accumulated])
-      }
-    }
-  }
-}
-
-fn build_grouped_results(suites: List(String),
+fn format_all_results(
   results: List(TestResult),
-  accumulated: List(#(String, List(TestResult))),
-) -> List(#(String, List(TestResult))) {
-  case suites {
-    [] ->
-      list.reverse(accumulated)
-
-    [suite, ..tail] -> {
-      let suite_results = list.filter(results, fn(result) {
-        case result.full_name {
-          [head, .._] -> head == suite
-          [] -> False
-        }
-      })
-
-      build_grouped_results(tail, results, [#(suite, suite_results), ..accumulated])
-    }
-  }
-}
-
-fn format_suites(suites: List(#(String, List(TestResult)))) -> String {
-  case suites {
-    [] -> ""
-
-    [head, ..tail] -> {
-      let suite_name = case head { #(name, _) -> name }
-      let suite_results = case head { #(_, results) -> results }
-
-      let this_block =
-        string.concat([
-          suite_name,
-          "\n",
-          format_specs_in_suite(suite_results),
-          "\n",
-        ])
-
-      string.concat([this_block, format_suites(tail)])
-    }
-  }
-}
-
-fn format_specs_in_suite(results: List(TestResult)) -> String {
+  previous_path: List(String),
+  accumulated: String,
+) -> String {
   case results {
-    [] -> ""
-
-    [head, ..tail] -> {
-      let name = spec_name_from_full_name(head.full_name)
-      let marker = status_marker(head.status)
-
-      let this_line = string.concat(["  ", marker, " ", name, "\n"])
-      let failure_text = format_failure_details(head)
-
-      string.concat([
-        this_line,
-        failure_text,
-        format_specs_in_suite(tail),
-      ])
+    [] -> accumulated
+    [result, ..rest] -> {
+      let formatted = format_one_result(result, previous_path)
+      let updated = string.concat([accumulated, formatted])
+      let new_path = extract_describe_segments(result.full_name)
+      format_all_results(rest, new_path, updated)
     }
   }
 }
 
-fn spec_name_from_full_name(full_name: List(String)) -> String {
+fn format_one_result(result: TestResult, previous_path: List(String)) -> String {
+  let current_path = extract_describe_segments(result.full_name)
+  let common_depth = count_common_prefix(previous_path, current_path, 0)
+  let new_segments = list.drop(current_path, common_depth)
+  let headers = format_header_segments(new_segments, common_depth, "")
+  let test_line = format_test_line(result)
+  string.concat([headers, test_line])
+}
+
+fn count_common_prefix(
+  previous: List(String),
+  current: List(String),
+  depth: Int,
+) -> Int {
+  case previous, current {
+    [prev_head, ..prev_rest], [curr_head, ..curr_rest] ->
+      case prev_head == curr_head {
+        True -> count_common_prefix(prev_rest, curr_rest, depth + 1)
+        False -> depth
+      }
+    _, _ -> depth
+  }
+}
+
+fn extract_describe_segments(full_name: List(String)) -> List(String) {
   case list.reverse(full_name) {
-    [last, .._] -> last
+    [] -> []
+    [_] -> []
+    [_, ..rest] -> list.reverse(rest)
+  }
+}
+
+fn format_header_segments(
+  segments: List(String),
+  depth: Int,
+  accumulated: String,
+) -> String {
+  case segments {
+    [] -> accumulated
+    [segment, ..rest] -> {
+      let indent = build_indent(depth)
+      let header = string.concat([indent, segment, "\n"])
+      let updated = string.concat([accumulated, header])
+      format_header_segments(rest, depth + 1, updated)
+    }
+  }
+}
+
+fn format_test_line(result: TestResult) -> String {
+  let depth = calculate_test_depth(result.full_name)
+  let indent = build_indent(depth)
+  let marker = status_marker(result.status)
+  let name = extract_test_name(result.full_name)
+  let test_line = string.concat([indent, marker, " ", name, "\n"])
+  let failure_text = format_failure_details(result, depth)
+  string.concat([test_line, failure_text])
+}
+
+fn calculate_test_depth(full_name: List(String)) -> Int {
+  case full_name {
+    [] -> 0
+    [_] -> 0
+    _ -> list.length(full_name) - 1
+  }
+}
+
+fn build_indent(level: Int) -> String {
+  build_indent_recursive(level, "")
+}
+
+fn build_indent_recursive(level: Int, accumulated: String) -> String {
+  case level {
+    0 -> accumulated
+    n -> build_indent_recursive(n - 1, string.concat([accumulated, "  "]))
+  }
+}
+
+fn extract_test_name(full_name: List(String)) -> String {
+  case list.reverse(full_name) {
+    [last, ..] -> last
     [] -> ""
   }
 }
@@ -142,107 +138,130 @@ fn status_marker(status: Status) -> String {
   }
 }
 
-fn format_failure_details(result: TestResult) -> String {
+fn format_failure_details(result: TestResult, indent_level: Int) -> String {
   case result.status {
-    Failed ->
-      format_failure_list(result.failures)
-
-    _ ->
-      ""
+    Failed -> format_all_failures(result.failures, indent_level, "")
+    _ -> ""
   }
 }
 
-fn format_failure_list(failures: List(AssertionFailure)) -> String {
+fn format_all_failures(
+  failures: List(AssertionFailure),
+  indent_level: Int,
+  accumulated: String,
+) -> String {
   case failures {
-    [] -> ""
-
-    [first, ..tail] -> {
-      string.concat([
-        format_one_failure(first),
-        format_failure_list(tail),
-      ])
+    [] -> accumulated
+    [failure, ..rest] -> {
+      let formatted = format_one_failure(failure, indent_level)
+      let updated = string.concat([accumulated, formatted])
+      format_all_failures(rest, indent_level, updated)
     }
   }
 }
 
-fn format_one_failure(failure: AssertionFailure) -> String {
-  let header = string.concat(["    ", failure.operator, "\n"]) 
+fn format_one_failure(failure: AssertionFailure, indent_level: Int) -> String {
+  let base_indent = build_indent(indent_level)
 
-  let message_text =
-    case failure.message {
-      "" -> ""
-      message -> string.concat(["      Message: ", message, "\n"])
-    }
-
-  let payload_text =
-    case failure.payload {
-      Some(EqualityFailure(actual, expected)) ->
-        string.concat([
-          "      Expected: ", expected, "\n",
-          "      Actual:   ", actual, "\n",
-        ])
-
-      _ -> ""
-    }
+  let header = string.concat([base_indent, "  ", failure.operator, "\n"])
+  let message_text = format_failure_message(failure.message, base_indent)
+  let payload_text = format_failure_payload(failure.payload, base_indent)
 
   string.concat([header, message_text, payload_text])
 }
 
+fn format_failure_message(message: String, base_indent: String) -> String {
+  case message {
+    "" -> ""
+    _ -> string.concat([base_indent, "    Message: ", message, "\n"])
+  }
+}
+
+fn format_failure_payload(
+  payload: option.Option(types.FailurePayload),
+  base_indent: String,
+) -> String {
+  case payload {
+    Some(EqualityFailure(actual, expected)) ->
+      string.concat([
+        base_indent,
+        "    Expected: ",
+        expected,
+        "\n",
+        base_indent,
+        "    Actual:   ",
+        actual,
+        "\n",
+      ])
+    _ -> ""
+  }
+}
+
 fn format_summary(results: List(TestResult)) -> String {
   let total = list.length(results)
-  let failed = count_status(results, Failed)
-  let skipped = count_status(results, Skipped)
-  let pending = count_status(results, Pending)
-  let timed_out = count_status(results, TimedOut)
+  let failed = count_by_status(results, Failed)
+  let skipped = count_by_status(results, Skipped)
+  let pending = count_by_status(results, Pending)
+  let timed_out = count_by_status(results, TimedOut)
   let passed = total - failed - skipped - pending - timed_out
 
   string.concat([
     "Summary: ",
-    int.to_string(total), " run, ",
-    int.to_string(failed), " failed, ",
-    int.to_string(passed), " passed",
-    summary_suffix(skipped, pending, timed_out),
+    int.to_string(total),
+    " run, ",
+    int.to_string(failed),
+    " failed, ",
+    int.to_string(passed),
+    " passed",
+    build_summary_suffix(skipped, pending, timed_out),
     "\n",
   ])
 }
 
-fn count_status(results: List(TestResult), wanted: Status) -> Int {
-  count_status_from_list(results, wanted, 0)
+fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
+  count_matching_status(results, wanted, 0)
 }
 
-fn count_status_from_list(results: List(TestResult),
+fn count_matching_status(
+  results: List(TestResult),
   wanted: Status,
   count: Int,
 ) -> Int {
   case results {
     [] -> count
-
-    [head, ..tail] -> {
-      let next_count =
-        case head.status == wanted {
-          True -> count + 1
-          False -> count
-        }
-
-      count_status_from_list(tail, wanted, next_count)
+    [result, ..rest] -> {
+      let next_count = increment_if_matches(result.status, wanted, count)
+      count_matching_status(rest, wanted, next_count)
     }
   }
 }
 
-fn summary_suffix(skipped: Int, pending: Int, timed_out: Int) -> String {
+fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
+  case status == wanted {
+    True -> count + 1
+    False -> count
+  }
+}
+
+fn build_summary_suffix(skipped: Int, pending: Int, timed_out: Int) -> String {
   let parts =
     []
-    |> add_summary_part(skipped, " skipped")
-    |> add_summary_part(pending, " pending")
-    |> add_summary_part(timed_out, " timed out")
+    |> add_summary_part_if_nonzero(skipped, " skipped")
+    |> add_summary_part_if_nonzero(pending, " pending")
+    |> add_summary_part_if_nonzero(timed_out, " timed out")
 
+  format_summary_parts(parts)
+}
+
+fn format_summary_parts(parts: List(String)) -> String {
   case parts {
     [] -> ""
     _ -> string.concat([", ", string.join(parts, ", ")])
   }
 }
 
-fn add_summary_part(parts: List(String),
+fn add_summary_part_if_nonzero(
+  parts: List(String),
   count: Int,
   label: String,
 ) -> List(String) {

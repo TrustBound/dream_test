@@ -1,27 +1,44 @@
-import dream_test/bootstrap/assertions
-import gleam/option.{None}
+import dream_test/unit.{describe, it}
+import dream_test/assertions/should.{or_fail_with}
 import dream_test/types.{type AssertionFailure, AssertionFailure, Location, Passed, Failed, status_from_failures}
+import gleam/option.{None}
 
-/// Bootstrap checks for core types using core_assert.
-///
-/// This is a small sanity-check module to ensure the basic behaviour of
-/// Status, AssertionFailure, and status_from_failures before we build
-/// higher layers on top.
-pub fn main() {
-  // status_from_failures: empty failures => Passed
-  let empty_failures: List(AssertionFailure) = []
-  let empty_status = status_from_failures(empty_failures)
-  assertions.equal(Passed, empty_status, "Empty failures should yield Passed status")
-
-  // status_from_failures: non-empty failures => Failed
-  let failure = AssertionFailure(
-    operator: "equal",
-    message: "",
-    location: Location("mod", "file.gleam", 10),
-    payload: None,
-  )
-
-  let non_empty_failures = [failure]
-  let non_empty_status = status_from_failures(non_empty_failures)
-  assertions.equal(Failed, non_empty_status, "Non-empty failures should yield Failed status")
+pub fn tests() {
+  describe("Types", [
+    describe("status_from_failures", [
+      it("returns Passed for empty failures", fn() {
+        // Arrange
+        let empty_failures: List(AssertionFailure) = []
+        let expected = Passed
+        
+        // Act
+        let result = status_from_failures(empty_failures)
+        
+        // Assert
+        result
+        |> should.equal(expected)
+        |> or_fail_with("Empty failures should yield Passed status")
+      }),
+      
+      it("returns Failed for non-empty failures", fn() {
+        // Arrange
+        let failure = AssertionFailure(
+          operator: "equal",
+          message: "",
+          location: Location("mod", "file.gleam", 10),
+          payload: None,
+        )
+        let non_empty_failures = [failure]
+        let expected = Failed
+        
+        // Act
+        let result = status_from_failures(non_empty_failures)
+        
+        // Assert
+        result
+        |> should.equal(expected)
+        |> or_fail_with("Non-empty failures should yield Failed status")
+      }),
+    ]),
+  ])
 }

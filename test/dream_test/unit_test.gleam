@@ -1,47 +1,122 @@
-import dream_test/bootstrap/assertions
-import dream_test/types.{type AssertionResult, AssertionOk}
-import dream_test/unit.{describe, it, type UnitTest, to_test_cases}
-import dream_test/runner.{type TestCase, run_all}
+import dream_test/assertions/should.{or_fail_with}
+import dream_test/runner.{run_all}
+import dream_test/types.{AssertionOk}
+import dream_test/unit.{type UnitTest, describe, it, to_test_cases}
 
-/// Bootstrap checks for the unit test DSL.
-///
-/// Verifies that describe/it trees are translated into TestCase values with
-/// the expected names and full_name paths.
-pub fn main() {
-  let tests: UnitTest =
-    describe("Math", [
-      it("adds numbers", adds_numbers_test),
-      it("subtracts numbers", subtracts_numbers_test),
-    ])
+pub fn tests() {
+  describe("Unit DSL", [
+    describe("to_test_cases", [
+      it("creates first test case with correct name", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Math", [
+            it("adds numbers", fn() { AssertionOk }),
+            it("subtracts numbers", fn() { AssertionOk }),
+          ])
+        let expected = "adds numbers"
 
-  let test_cases = run_all(
-    runner_test_cases_from_unit_tests("bootstrap_unit_dsl", tests),
-  )
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
 
-  case test_cases {
-    [first, second] -> {
-      assertions.equal("adds numbers", first.name, "First test name should match it label")
-      assertions.equal(["Math", "adds numbers"], first.full_name, "First full_name should include describe and it")
+        // Assert
+        case results {
+          [first, ..] -> {
+            first.name
+            |> should.equal(expected)
+            |> or_fail_with("First test name should match it label")
+          }
+          _ -> {
+            False
+            |> should.equal(True)
+            |> or_fail_with("Expected at least one test case")
+          }
+        }
+      }),
 
-      assertions.equal("subtracts numbers", second.name, "Second test name should match it label")
-      assertions.equal(["Math", "subtracts numbers"], second.full_name, "Second full_name should include describe and it")
-    }
+      it("creates second test case with correct name", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Math", [
+            it("adds numbers", fn() { AssertionOk }),
+            it("subtracts numbers", fn() { AssertionOk }),
+          ])
+        let expected = "subtracts numbers"
 
-    _ ->
-      assertions.is_true(False, "Expected exactly two translated test cases from unit DSL")
-  }
-}
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
 
-fn runner_test_cases_from_unit_tests(module_name: String,
-  root: UnitTest,
-) -> List(TestCase) {
-  to_test_cases(module_name, root)
-}
+        // Assert
+        case results {
+          [_, second] -> {
+            second.name
+            |> should.equal(expected)
+            |> or_fail_with("Second test name should match it label")
+          }
+          _ -> {
+            False
+            |> should.equal(True)
+            |> or_fail_with("Expected at least two test cases")
+          }
+        }
+      }),
 
-fn adds_numbers_test() -> AssertionResult {
-  AssertionOk
-}
+      it("creates first test case with correct full_name path", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Math", [
+            it("adds numbers", fn() { AssertionOk }),
+            it("subtracts numbers", fn() { AssertionOk }),
+          ])
+        let expected = ["Math", "adds numbers"]
 
-fn subtracts_numbers_test() -> AssertionResult {
-  AssertionOk
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
+
+        // Assert
+        case results {
+          [first, ..] -> {
+            first.full_name
+            |> should.equal(expected)
+            |> or_fail_with("First full_name should include describe and it")
+          }
+          _ -> {
+            False
+            |> should.equal(True)
+            |> or_fail_with("Expected at least one test case")
+          }
+        }
+      }),
+
+      it("creates second test case with correct full_name path", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Math", [
+            it("adds numbers", fn() { AssertionOk }),
+            it("subtracts numbers", fn() { AssertionOk }),
+          ])
+        let expected = ["Math", "subtracts numbers"]
+
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
+
+        // Assert
+        case results {
+          [_, second] -> {
+            second.full_name
+            |> should.equal(expected)
+            |> or_fail_with("Second full_name should include describe and it")
+          }
+          _ -> {
+            False
+            |> should.equal(True)
+            |> or_fail_with("Expected at least two test cases")
+          }
+        }
+      }),
+    ]),
+  ])
 }
