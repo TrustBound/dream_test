@@ -190,11 +190,18 @@ value
 ## 7. Import Style for Piped Helpers
 
 **Rule**
+- In Gleam, when you import specific values from a module using `{...}`, the module name itself is also brought into scope.
+-  - For example, `import some/example/module_name.{do_something}` imports both `module_name` and `do_something`.
 - Use **qualified imports** for primary namespaces (e.g. `should.equal`, `gherkin.define_step`).
 - Use **unqualified imports** for small, piped helpers that act on a value or context, such as `or_fail_with`.
+- Use **unqualified imports** for core types when the module name does not add clarity.
+  - Prefer the explicit type-import syntax, for example:
+    - `import dream_test/assertions/context.{type TestContext, add_failure}`
+    - Then use `TestContext` and `add_failure` directly in the module.
 - This means a typical test file will:
   - Call `should.equal` when introducing an assertion.
   - Pipe into `or_fail_with` imported unqualified for readability.
+  - Refer to `TestContext` directly via a `{type ...}` import when the meaning is obvious.
 
 **Rationale**
 - Keeping `should.equal` qualified makes the origin of the main assertion clear.
@@ -205,7 +212,6 @@ value
 
 ```gleam
 import dream_test/assertions/should.{or_fail_with}
-import dream_test/assertions/should as should
 
 value
 |> should.equal(context, expected)
@@ -220,6 +226,38 @@ import dream_test/assertions/should as should
 value
 |> should.equal(context, expected)
 |> should.or_fail_with("message")
+```
+
+## 8. Named Arguments & Config Records
+
+**Rule**
+- When a function conceptually has many parameters (especially of similar types), prefer a **config record** with named fields over a long positional parameter list.
+- For simpler functions with only one or two parameters, positional arguments are acceptable.
+
+**Rationale**
+- Named fields on a config record make construction sites self-documenting.
+- They reduce errors from argument reordering and make refactors safer.
+- They are particularly important in a test framework, where functions often accept many configuration options.
+
+**Example (preferred)**
+
+```gleam
+let config = SingleTestConfig(
+  name: "passing test",
+  full_name: ["bootstrap", "runner_core"],
+  tags: ["bootstrap", "runner"],
+  kind: types.Unit,
+  location: location,
+  run: passing_test,
+)
+
+run_single_test(config)
+```
+
+**Discouraged**
+
+```gleam
+run_single_test("passing test", full_name, tags, types.Unit, location, passing_test)
 ```
 
 ---

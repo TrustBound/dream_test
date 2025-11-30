@@ -1,5 +1,5 @@
-import dream_test/core/types as types
-import dream_test/assertions/context as context
+import dream_test/core/types.{AssertionFailure, Location}
+import dream_test/assertions/context.{type TestContext, TestContext, add_failure, failures}
 
 /// Pipe-first assertion helpers.
 ///
@@ -10,23 +10,23 @@ import dream_test/assertions/context as context
 ///
 /// Intended usage with pipes:
 ///   value |> should.equal(context, expected)
-pub fn equal(actual: a, context: context.TestContext(a), expected: a) -> context.TestContext(a) {
+pub fn equal(actual: a, context: TestContext(a), expected: a) -> TestContext(a) {
   case actual == expected {
     True ->
       context
 
     False -> {
-      let failure = types.AssertionFailure(
+      let failure = AssertionFailure(
         actual: actual,
         expected: expected,
         operator: "equal",
         message: "",
         // For now, callers must supply a Location-aware wrapper if they
         // want accurate locations. We'll improve this later.
-        location: types.Location("unknown", "unknown", 0),
+        location: Location("unknown", "unknown", 0),
       )
 
-      context.add_failure(context, failure)
+      add_failure(context, failure)
     }
   }
 }
@@ -36,14 +36,14 @@ pub fn equal(actual: a, context: context.TestContext(a), expected: a) -> context
 ///
 /// Intended usage with pipes:
 ///   context |> should.or_fail_with("message")
-pub fn or_fail_with(test_context: context.TestContext(a), message: String) -> context.TestContext(a) {
-  case context.failures(test_context) {
+pub fn or_fail_with(test_context: TestContext(a), message: String) -> TestContext(a) {
+  case failures(test_context) {
     [] ->
       test_context
 
     [first, ..rest] -> {
-      let updated = types.AssertionFailure(..first, message: message)
-      context.TestContext(failures: [updated, ..rest])
+      let updated = AssertionFailure(..first, message: message)
+      TestContext(failures: [updated, ..rest])
     }
   }
 }

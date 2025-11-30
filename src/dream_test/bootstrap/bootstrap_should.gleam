@@ -1,6 +1,6 @@
 import dream_test/bootstrap/core_assert
 import dream_test/assertions/context as context
-import dream_test/assertions/should as should
+import dream_test/assertions/should.{or_fail_with}
 
 /// Bootstrap checks for the minimal should assertion helpers.
 ///
@@ -31,7 +31,7 @@ pub fn main() {
   let context_with_custom_message =
     3
     |> should.equal(initial_context, 4)
-    |> should.or_fail_with("Custom failure message")
+    |> or_fail_with("Custom failure message")
 
   let failures_after_custom_message = context.failures(context_with_custom_message)
 

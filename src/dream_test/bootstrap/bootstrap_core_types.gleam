@@ -1,5 +1,5 @@
 import dream_test/bootstrap/core_assert
-import dream_test/core/types
+import dream_test/core/types.{type AssertionFailure, AssertionFailure, Location, Passed, Failed, status_from_failures}
 
 /// Bootstrap checks for core types using core_assert.
 ///
@@ -8,20 +8,20 @@ import dream_test/core/types
 /// higher layers on top.
 pub fn main() {
   // status_from_failures: empty failures => Passed
-  let empty_failures: List(types.AssertionFailure(Int)) = []
-  let empty_status = types.status_from_failures(empty_failures)
-  core_assert.equal(types.Passed, empty_status, "Empty failures should yield Passed status")
+  let empty_failures: List(AssertionFailure(Int)) = []
+  let empty_status = status_from_failures(empty_failures)
+  core_assert.equal(Passed, empty_status, "Empty failures should yield Passed status")
 
   // status_from_failures: non-empty failures => Failed
-  let failure = types.AssertionFailure(
+  let failure = AssertionFailure(
     actual: 1,
     expected: 2,
     operator: "equal",
     message: "",
-    location: types.Location("mod", "file.gleam", 10),
+    location: Location("mod", "file.gleam", 10),
   )
 
   let non_empty_failures = [failure]
-  let non_empty_status = types.status_from_failures(non_empty_failures)
-  core_assert.equal(types.Failed, non_empty_status, "Non-empty failures should yield Failed status")
+  let non_empty_status = status_from_failures(non_empty_failures)
+  core_assert.equal(Failed, non_empty_status, "Non-empty failures should yield Failed status")
 }
