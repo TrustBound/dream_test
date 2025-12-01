@@ -16,22 +16,45 @@
 
 <br>
 
-> 📄 **[See full example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/string_app/test/string_app_test.gleam)**
+```gleam
+import dream_test/unit.{describe, it}
+import dream_test/assertions/should.{be_error, be_ok, equal, or_fail_with, should}
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/string_app/test/string_app_test.gleam#L10-L58
+pub fn tests() {
+  describe("Calculator", [
+    it("adds two numbers", fn() {
+      add(2, 3)
+      |> should()
+      |> equal(5)
+      |> or_fail_with("2 + 3 should equal 5")
+    }),
+    it("handles division", fn() {
+      divide(10, 2)
+      |> should()
+      |> be_ok()
+      |> equal(5)
+      |> or_fail_with("10 / 2 should equal 5")
+    }),
+    it("returns error for division by zero", fn() {
+      divide(1, 0)
+      |> should()
+      |> be_error()
+      |> or_fail_with("Division by zero should error")
+    }),
+  ])
+}
+```
 
 ```
-String utilities
-  ✓ shouts a message
-  ✓ whispers a message
-  ✓ cleans up whitespace
-  greet
-    ✓ greets by name
-    ✓ rejects empty names
-    ✓ trims name before greeting
+Calculator
+  ✓ adds two numbers
+  ✓ handles division
+  ✓ returns error for division by zero
 
-6 tests, 0 failures
+3 tests, 0 failures
 ```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L25-L46)</sub>
 
 ---
 
@@ -64,9 +87,41 @@ dream_test = "~> 1.0"
 
 ### 1. Write tests with `describe` and `it`
 
-> 📄 **[See full working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam)**
+```gleam
+// test/my_app_test.gleam
+import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/runner.{run_all}
+import dream_test/reporter/bdd.{report}
+import dream_test/assertions/should.{should, equal, be_some, or_fail_with}
+import gleam/io
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L1-L35
+pub fn main() {
+  tests()
+  |> to_test_cases("my_app_test")
+  |> run_all()
+  |> report(io.println)
+}
+
+pub fn tests() {
+  describe("String utilities", [
+    it("trims whitespace", fn() {
+      "  hello  "
+      |> string.trim()
+      |> should()
+      |> equal("hello")
+      |> or_fail_with("Should remove surrounding whitespace")
+    }),
+
+    it("finds substrings", fn() {
+      "hello world"
+      |> string.find("world")
+      |> should()
+      |> be_some()
+      |> or_fail_with("Should find 'world' in string")
+    }),
+  ])
+}
+```
 
 ### 2. Run with gleam test
 
@@ -77,12 +132,11 @@ gleam test
 ### 3. See readable output
 
 ```
-MathApp
-  ✓ adds numbers
-  ✓ parses integers from valid strings
-  ✓ returns an error for invalid strings
+String utilities
+  ✓ trims whitespace
+  ✓ finds substrings
 
-3 tests, 0 failures
+2 tests, 0 failures
 ```
 
 ---
@@ -99,9 +153,23 @@ value |> should() |> matcher() |> or_fail_with("message")
 
 Matchers can be chained. Each one passes its unwrapped value to the next:
 
-> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L34-L48)** — Unwrap `Some`, then check the value
+```gleam
+// Unwrap Some, then check the value
+Some(42)
+|> should()
+|> be_some()
+|> equal(42)
+|> or_fail_with("Should contain 42")
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L43-L47
+// Unwrap Ok, then check the value
+Ok("success")
+|> should()
+|> be_ok()
+|> equal("success")
+|> or_fail_with("Should be Ok with 'success'")
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L55-L70)</sub>
 
 ### Available matchers
 
@@ -128,6 +196,8 @@ case result {
 }
 ```
 
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L119-L125)</sub>
+
 ---
 
 ## Lifecycle Hooks
@@ -135,9 +205,37 @@ case result {
 Setup and teardown logic for your tests. Dream_test supports four lifecycle hooks
 that let you run code before and after tests.
 
-> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L410-L452)** — All four hooks in action
+```gleam
+import dream_test/unit.{describe, it, before_each, after_each, before_all, after_all}
+import dream_test/types.{AssertionOk}
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L410-L452
+describe("Database tests", [
+  before_all(fn() {
+    start_database()
+    AssertionOk
+  }),
+
+  before_each(fn() {
+    begin_transaction()
+    AssertionOk
+  }),
+
+  it("creates a user", fn() { ... }),
+  it("deletes a user", fn() { ... }),
+
+  after_each(fn() {
+    rollback_transaction()
+    AssertionOk
+  }),
+
+  after_all(fn() {
+    stop_database()
+    AssertionOk
+  }),
+])
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L80-L109)</sub>
 
 ### Hook Types
 
@@ -159,26 +257,62 @@ Choose the mode based on which hooks you need:
 
 **Flat mode** — simpler, faster; use when you only need per-test setup:
 
-> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L37-L42)**
+```gleam
+import dream_test/unit.{describe, it, before_each, to_test_cases}
+import dream_test/runner.{run_all}
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L37-L42
+to_test_cases("my_test", tests())
+|> run_all()
+|> report(io.print)
+```
 
 **Suite mode** — preserves group structure; use when you need once-per-group setup:
 
-> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L497-L507)**
+```gleam
+import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
+import dream_test/runner.{run_suite}
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L497-L507
+to_test_suite("my_test", tests())
+|> run_suite()
+|> report(io.print)
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L209-L221)</sub>
 
 ### Hook Inheritance
 
 Nested `describe` blocks inherit parent hooks. Hooks run outer-to-inner for
 setup, inner-to-outer for teardown:
 
-> 📄 **[See nested describe example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L457-L489)**
-
 ```gleam
-// Output order: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
+describe("Outer", [
+  before_each(fn() {
+    io.println("1. outer setup")
+    AssertionOk
+  }),
+  after_each(fn() {
+    io.println("4. outer teardown")
+    AssertionOk
+  }),
+  describe("Inner", [
+    before_each(fn() {
+      io.println("2. inner setup")
+      AssertionOk
+    }),
+    after_each(fn() {
+      io.println("3. inner teardown")
+      AssertionOk
+    }),
+    it("test", fn() {
+      io.println("(test)")
+      AssertionOk
+    }),
+  ]),
+])
+// Output: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
 ```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L134-L157)</sub>
 
 ### Hook Failure Behavior
 
@@ -200,10 +334,12 @@ describe("Handles failures", [
     }
   }),
   // If before_all fails, these tests are marked SetupFailed (not run)
-  it("test1", fn() { ... }),
-  it("test2", fn() { ... }),
+  it("test1", fn() { AssertionOk }),
+  it("test2", fn() { AssertionOk }),
 ])
 ```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L169-L179)</sub>
 
 ---
 
@@ -235,16 +371,17 @@ it("fetches data", fn() {
 ```gleam
 import dream_test/runner.{run_all_with_config, RunnerConfig}
 
-// Custom settings
 let config = RunnerConfig(
-  max_concurrency: 8,         // Run up to 8 tests at once
-  default_timeout_ms: 10_000, // 10 second timeout per test
+  max_concurrency: 8,
+  default_timeout_ms: 10_000,
 )
 
-test_cases
-|> run_all_with_config(config)
-|> report(io.println)
+let test_cases = to_test_cases("my_test", tests())
+run_all_with_config(config, test_cases)
+|> report(io.print)
 ```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets_test.gleam#L187-L194)</sub>
 
 ---
 
