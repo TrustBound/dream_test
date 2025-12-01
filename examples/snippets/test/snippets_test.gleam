@@ -4,7 +4,7 @@
 
 import chaining
 import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_all}
+import dream_test/runner.{exit_on_failure, run_all}
 import dream_test/unit.{describe, to_test_cases}
 import execution_modes
 import explicit_failures
@@ -15,6 +15,7 @@ import hook_inheritance
 import lifecycle_hooks
 import quick_start
 import runner_config
+import skipping_tests
 
 pub fn tests() {
   describe("README Snippets", [
@@ -27,11 +28,15 @@ pub fn tests() {
     hook_failure.tests(),
     runner_config.tests(),
     execution_modes.tests(),
+    skipping_tests.tests(),
   ])
 }
 
 pub fn main() {
-  to_test_cases("snippets_test", tests())
-  |> run_all()
-  |> report(io.print)
+  let results =
+    to_test_cases("snippets_test", tests())
+    |> run_all()
+
+  report(results, io.print)
+  exit_on_failure(results)
 }

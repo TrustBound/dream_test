@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-12-01
+
+### Added
+
+- **Test Skipping**
+
+  - New `skip` function as an analog to `it` for temporarily disabling tests
+  - Simply change `it` to `skip` to skip a test; the body is preserved but not executed
+  - Skipped tests appear with `-` marker in output and are counted in summary
+
+- **Exit Code Handling**
+
+  - New `exit_on_failure` function exits with code 1 if any tests failed
+  - New `has_failures` function to check if test results contain failures
+  - Proper CI integration: test suites now fail builds when tests fail
+
+- **AssertionSkipped Result Type**
+  - New `AssertionSkipped` variant in `AssertionResult` for skip support
+
+### Documentation
+
+- Added "Skipping tests" section to README with examples
+- Added new `skipping_tests.gleam` snippet in `examples/snippets/test/`
+
 ## [1.0.1] - 2025-12-01
 
 ### Changed
@@ -84,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.0.1...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.0.2...HEAD
+[1.0.2]: https://github.com/TrustBound/dream_test/compare/1.0.1...1.0.2
 [1.0.1]: https://github.com/TrustBound/dream_test/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/TrustBound/dream_test/releases/tag/1.0.0

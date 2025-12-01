@@ -1,7 +1,7 @@
 import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
 import dream_test/runner.{run_all}
-import dream_test/types.{AssertionOk}
-import dream_test/unit.{type UnitTest, describe, it, to_test_cases}
+import dream_test/types.{AssertionOk, Skipped}
+import dream_test/unit.{type UnitTest, describe, it, skip, to_test_cases}
 
 pub fn tests() {
   describe("Unit DSL", [
@@ -103,6 +103,48 @@ pub fn tests() {
             |> or_fail_with("Second full_name should include describe and it")
           }
           _ -> fail_with("Expected at least two test cases")
+        }
+      }),
+    ]),
+    describe("skip", [
+      it("produces Skipped status", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Feature", [skip("not ready yet", fn() { AssertionOk })])
+
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
+
+        // Assert
+        case results {
+          [first] -> {
+            first.status
+            |> should()
+            |> equal(Skipped)
+            |> or_fail_with("skip should produce Skipped status")
+          }
+          _ -> fail_with("Expected exactly one test case")
+        }
+      }),
+      it("preserves the test name", fn() {
+        // Arrange
+        let test_tree: UnitTest =
+          describe("Feature", [skip("work in progress", fn() { AssertionOk })])
+
+        // Act
+        let test_cases = to_test_cases("test_module", test_tree)
+        let results = run_all(test_cases)
+
+        // Assert
+        case results {
+          [first] -> {
+            first.name
+            |> should()
+            |> equal("work in progress")
+            |> or_fail_with("skip should preserve the test name")
+          }
+          _ -> fail_with("Expected exactly one test case")
         }
       }),
     ]),

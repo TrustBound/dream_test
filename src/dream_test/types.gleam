@@ -152,6 +152,7 @@ pub type AssertionFailure {
 ///
 /// - `AssertionOk` - The assertion chain passed
 /// - `AssertionFailed(failure)` - The assertion chain failed with details
+/// - `AssertionSkipped` - The test was skipped (used by `skip` function)
 ///
 /// ## Example
 ///
@@ -169,6 +170,7 @@ pub type AssertionFailure {
 pub type AssertionResult {
   AssertionOk
   AssertionFailed(AssertionFailure)
+  AssertionSkipped
 }
 
 /// Intermediate result during assertion chaining.

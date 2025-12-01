@@ -5,8 +5,9 @@
 /// using the sandbox module.
 import dream_test/types.{
   type AssertionResult, type SingleTestConfig, type TestCase, type TestResult,
-  type TestSuite, type TestSuiteItem, AssertionFailed, AssertionOk, Failed,
-  SetupFailed, SuiteGroup, SuiteTest, TestCase, TestResult, TimedOut,
+  type TestSuite, type TestSuiteItem, AssertionFailed, AssertionOk,
+  AssertionSkipped, Failed, SetupFailed, Skipped, SuiteGroup, SuiteTest,
+  TestCase, TestResult, TimedOut,
 }
 import gleam/erlang/process.{
   type Pid, type Selector, type Subject, kill, monitor, new_selector,
@@ -181,6 +182,8 @@ fn spawn_test_worker(
 type TestRunResult {
   /// Test passed (all hooks and test body passed)
   TestPassed
+  /// Test was skipped
+  TestSkipped
   /// A before_each hook failed (test was not run)
   SetupFailure(failure: types.AssertionFailure)
   /// The test body failed
@@ -208,7 +211,8 @@ fn run_with_hooks(config: SingleTestConfig) -> TestRunResult {
 
   case before_result {
     AssertionFailed(failure) -> SetupFailure(failure)
-    AssertionOk -> run_test_and_after(config)
+    // Hooks returning AssertionSkipped are treated as passing
+    AssertionOk | AssertionSkipped -> run_test_and_after(config)
   }
 }
 
@@ -221,9 +225,12 @@ fn run_test_and_after(config: SingleTestConfig) -> TestRunResult {
 
   // Determine final result
   case test_result, after_result {
+    AssertionSkipped, _ -> TestSkipped
     AssertionFailed(failure), _ -> TestFailure(failure)
     AssertionOk, AssertionFailed(failure) -> TeardownFailure(failure)
+    // Hooks returning AssertionSkipped are treated as passing
     AssertionOk, AssertionOk -> TestPassed
+    AssertionOk, AssertionSkipped -> TestPassed
   }
 }
 
@@ -240,7 +247,8 @@ fn run_hooks_from_list(
     [hook, ..rest] -> {
       let result = hook()
       case result {
-        AssertionOk -> run_hooks_from_list(rest)
+        // Hooks returning AssertionSkipped are treated as passing
+        AssertionOk | AssertionSkipped -> run_hooks_from_list(rest)
         AssertionFailed(_) -> result
       }
     }
@@ -383,6 +391,7 @@ fn test_run_result_to_test_result(
 ) -> TestResult {
   case test_run_result {
     TestPassed -> make_passed_result(config)
+    TestSkipped -> make_skipped_result(config)
     SetupFailure(failure) -> make_setup_failed_result(config, failure)
     TestFailure(failure) -> make_failed_result(config, failure)
     TeardownFailure(failure) -> make_failed_result(config, failure)
@@ -394,6 +403,18 @@ fn make_passed_result(config: SingleTestConfig) -> TestResult {
     name: config.name,
     full_name: config.full_name,
     status: types.Passed,
+    duration_ms: 0,
+    tags: config.tags,
+    failures: [],
+    kind: config.kind,
+  )
+}
+
+fn make_skipped_result(config: SingleTestConfig) -> TestResult {
+  TestResult(
+    name: config.name,
+    full_name: config.full_name,
+    status: Skipped,
     duration_ms: 0,
     tags: config.tags,
     failures: [],
@@ -549,7 +570,8 @@ fn run_suite_group(config: ParallelConfig, suite: TestSuite) -> List(TestResult)
   case before_all_result {
     AssertionFailed(failure) ->
       mark_all_items_as_setup_failed(suite.items, failure)
-    AssertionOk -> {
+    // Hooks returning AssertionSkipped are treated as passing
+    AssertionOk | AssertionSkipped -> {
       // Run all items (tests and nested groups)
       let results = run_suite_items(config, suite.items)
 

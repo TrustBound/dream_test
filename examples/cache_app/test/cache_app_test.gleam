@@ -13,7 +13,7 @@ import dream_test/assertions/should.{
   be_true, contain, equal, have_length, or_fail_with, should,
 }
 import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
+import dream_test/runner.{exit_on_failure, run_suite}
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, it, to_test_suite,
@@ -501,7 +501,10 @@ pub fn main() {
   io.println("")
 
   // Use suite mode for full lifecycle hook support
-  to_test_suite("cache_app_test", tests())
-  |> run_suite()
-  |> report(io.print)
+  let results =
+    to_test_suite("cache_app_test", tests())
+    |> run_suite()
+
+  report(results, io.print)
+  exit_on_failure(results)
 }

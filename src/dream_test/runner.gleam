@@ -60,8 +60,9 @@
 
 import dream_test/parallel
 import dream_test/types.{
-  type SingleTestConfig, type TestCase, type TestResult, type TestSuite,
-  AssertionFailed, AssertionOk, TestCase, TestResult, status_from_failures,
+  type SingleTestConfig, type Status, type TestCase, type TestResult,
+  type TestSuite, AssertionFailed, AssertionOk, AssertionSkipped, Failed, Passed,
+  SetupFailed, Skipped, TestCase, TestResult, TimedOut,
 }
 import gleam/list
 
@@ -414,12 +415,11 @@ pub fn run_all_sequential(test_cases: List(TestCase)) -> List(TestResult) {
 pub fn run_single_test(config: SingleTestConfig) -> TestResult {
   let assertion_result = config.run()
 
-  let failures = case assertion_result {
-    AssertionOk -> []
-    AssertionFailed(failure) -> [failure]
+  let #(status, failures) = case assertion_result {
+    AssertionOk -> #(Passed, [])
+    AssertionFailed(failure) -> #(Failed, [failure])
+    AssertionSkipped -> #(Skipped, [])
   }
-
-  let status = status_from_failures(failures)
 
   TestResult(
     name: config.name,
@@ -455,3 +455,85 @@ fn run_all_from_list(
     }
   }
 }
+
+// =============================================================================
+// Exit Code Handling
+// =============================================================================
+
+/// Check if any test results indicate failure.
+///
+/// Returns `True` if any test has status `Failed`, `TimedOut`, or `SetupFailed`.
+/// Returns `False` if all tests passed, were skipped, or are pending.
+///
+/// ## Example
+///
+/// ```gleam
+/// let results = run_all(test_cases)
+/// case has_failures(results) {
+///   True -> io.println("Some tests failed!")
+///   False -> io.println("All tests passed!")
+/// }
+/// ```
+///
+pub fn has_failures(results: List(TestResult)) -> Bool {
+  check_for_failures(results)
+}
+
+fn check_for_failures(results: List(TestResult)) -> Bool {
+  case results {
+    [] -> False
+    [result, ..rest] -> check_result_for_failure(result.status, rest)
+  }
+}
+
+fn check_result_for_failure(status: Status, rest: List(TestResult)) -> Bool {
+  case status {
+    Failed -> True
+    TimedOut -> True
+    SetupFailed -> True
+    Passed -> check_for_failures(rest)
+    _ -> check_for_failures(rest)
+  }
+}
+
+/// Exit the process with an appropriate exit code based on test results.
+///
+/// Exits with code 1 if any test failed, timed out, or had setup failures.
+/// Exits with code 0 if all tests passed, were skipped, or are pending.
+///
+/// **Important:** This function terminates the BEAM process. Code after this
+/// call will not execute.
+///
+/// ## Usage
+///
+/// Call this after reporting results to ensure CI systems detect test failures:
+///
+/// ```gleam
+/// pub fn main() {
+///   let results =
+///     tests()
+///     |> to_test_cases("my_test")
+///     |> run_all()
+///
+///   report(results, io.print)
+///   exit_on_failure(results)
+/// }
+/// ```
+///
+/// ## Exit Codes
+///
+/// | Condition                          | Exit Code |
+/// |------------------------------------|-----------|
+/// | All tests passed/skipped/pending   | 0         |
+/// | Any test failed/timed out/setup failed | 1     |
+///
+pub fn exit_on_failure(results: List(TestResult)) -> Nil {
+  let code = case has_failures(results) {
+    True -> 1
+    False -> 0
+  }
+  halt(code)
+}
+
+@external(erlang, "erlang", "halt")
+fn halt(code: Int) -> Nil

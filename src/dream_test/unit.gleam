@@ -121,7 +121,8 @@
 
 import dream_test/types.{
   type AssertionResult, type TestCase, type TestSuite, type TestSuiteItem,
-  SingleTestConfig, SuiteGroup, SuiteTest, TestCase, TestSuite, Unit,
+  AssertionSkipped, SingleTestConfig, SuiteGroup, SuiteTest, TestCase, TestSuite,
+  Unit,
 }
 import gleam/list
 import gleam/option.{None}
@@ -176,6 +177,52 @@ pub type UnitTest {
 ///
 pub fn it(name: String, run: fn() -> AssertionResult) -> UnitTest {
   ItTest(name, run)
+}
+
+/// Skip a test case.
+///
+/// Use `skip` to temporarily disable a test without removing it. The test
+/// will appear in reports with a `-` marker and won't affect the pass/fail
+/// outcome.
+///
+/// This is designed to be a drop-in replacement for `it` — just change `it`
+/// to `skip` to disable a test, and change it back when ready to run again.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Feature", [
+///   it("works correctly", fn() { ... }),           // Runs normally
+///   skip("needs fixing", fn() { ... }),            // Skipped
+///   it("handles edge cases", fn() { ... }),        // Runs normally
+/// ])
+/// ```
+///
+/// ## Output
+///
+/// ```text
+/// Feature
+///   ✓ works correctly
+///   - needs fixing
+///   ✓ handles edge cases
+///
+/// Summary: 3 run, 0 failed, 2 passed, 1 skipped
+/// ```
+///
+/// ## When to Use
+///
+/// - Test is broken and you need to fix it later
+/// - Test depends on unimplemented functionality
+/// - Test is flaky and needs investigation
+/// - Temporarily disable slow tests during development
+///
+/// ## Note
+///
+/// The test body is preserved but not executed. This makes it easy to
+/// toggle between `it` and `skip` without losing your test code.
+///
+pub fn skip(name: String, _run: fn() -> AssertionResult) -> UnitTest {
+  ItTest(name, fn() { AssertionSkipped })
 }
 
 /// Group related tests under a common description.

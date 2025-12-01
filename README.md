@@ -199,6 +199,33 @@ case result {
 
 <sub>🧪 [Tested source](examples/snippets/test/explicit_failures.gleam)</sub>
 
+### Skipping tests
+
+Use `skip` instead of `it` to temporarily disable a test:
+
+```gleam
+import dream_test/unit.{describe, it, skip}
+
+describe("Feature", [
+  it("works correctly", fn() { ... }),
+  skip("not implemented yet", fn() { ... }),  // Skipped
+  it("handles edge cases", fn() { ... }),
+])
+```
+
+```
+Feature
+  ✓ works correctly
+  - not implemented yet
+  ✓ handles edge cases
+
+Summary: 3 run, 0 failed, 2 passed, 1 skipped
+```
+
+The test body is preserved but not executed—just change `skip` back to `it` when ready.
+
+<sub>🧪 [Tested source](examples/snippets/test/skipping_tests.gleam)</sub>
+
 ---
 
 ## Lifecycle Hooks
@@ -451,17 +478,17 @@ Benefits:
 
 **Stable** — v1.0 release. API is stable and ready for production use.
 
-| Feature                    | Status    |
-| -------------------------- | --------- |
-| Core DSL (`describe`/`it`) | ✅ Stable |
-| Lifecycle hooks            | ✅ Stable |
-| Assertions (`should.*`)    | ✅ Stable |
-| BDD Reporter               | ✅ Stable |
-| Parallel execution         | ✅ Stable |
-| Process isolation          | ✅ Stable |
-| Crash handling             | ✅ Stable |
-| Timeout handling           | ✅ Stable |
-| Polling helpers            | ✅ Stable |
+| Feature                           | Status    |
+| --------------------------------- | --------- |
+| Core DSL (`describe`/`it`/`skip`) | ✅ Stable |
+| Lifecycle hooks                   | ✅ Stable |
+| Assertions (`should.*`)           | ✅ Stable |
+| BDD Reporter                      | ✅ Stable |
+| Parallel execution                | ✅ Stable |
+| Process isolation                 | ✅ Stable |
+| Crash handling                    | ✅ Stable |
+| Timeout handling                  | ✅ Stable |
+| Polling helpers                   | ✅ Stable |
 
 ---
 

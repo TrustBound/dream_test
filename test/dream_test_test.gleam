@@ -3,7 +3,7 @@ import dream_test/lifecycle_test
 import dream_test/process_test
 import dream_test/reporter/bdd.{report}
 import dream_test/reporter/bdd_test
-import dream_test/runner.{run_all}
+import dream_test/runner.{exit_on_failure, run_all}
 import dream_test/runner_test
 import dream_test/sandbox_test
 import dream_test/types_test
@@ -27,4 +27,5 @@ pub fn main() {
   let test_cases = to_test_cases("dream_test_test", all_tests)
   let results = run_all(test_cases)
   report(results, io.print)
+  exit_on_failure(results)
 }

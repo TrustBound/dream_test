@@ -1,5 +1,7 @@
 import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
-import dream_test/types.{AssertionFailed, AssertionOk, MatchFailed, MatchOk}
+import dream_test/types.{
+  AssertionFailed, AssertionOk, AssertionSkipped, MatchFailed, MatchOk,
+}
 import dream_test/unit.{describe, it}
 
 pub fn tests() {
@@ -56,7 +58,8 @@ pub fn tests() {
             |> equal(custom_message)
             |> or_fail_with("or_fail_with should override the failure message")
           }
-          AssertionOk -> fail_with("Expected a failed assertion")
+          AssertionOk | AssertionSkipped ->
+            fail_with("Expected a failed assertion")
         }
       }),
     ]),
