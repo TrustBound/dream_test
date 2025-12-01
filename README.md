@@ -16,35 +16,21 @@
 
 <br>
 
-```gleam
-import dream_test/unit.{describe, it}
-import dream_test/assertions/should.{should, equal, be_ok, or_fail_with}
+> 📄 **[See full example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/string_app/test/string_app_test.gleam)**
 
-pub fn tests() {
-  describe("User authentication", [
-    it("accepts valid credentials", fn() {
-      authenticate("alice", "correct-password")
-      |> should()
-      |> be_ok()
-      |> or_fail_with("Valid credentials should authenticate")
-    }),
-
-    it("rejects invalid passwords", fn() {
-      authenticate("alice", "wrong-password")
-      |> should()
-      |> equal(Error("Invalid credentials"))
-      |> or_fail_with("Wrong password should fail")
-    }),
-  ])
-}
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/string_app/test/string_app_test.gleam#L8-L52
 
 ```
-User authentication
-  ✓ accepts valid credentials
-  ✓ rejects invalid passwords
+String utilities
+  ✓ shouts a message
+  ✓ whispers a message
+  ✓ cleans up whitespace
+  greet
+    ✓ greets by name
+    ✓ rejects empty names
+    ✓ trims name before greeting
 
-2 tests, 0 failures
+6 tests, 0 failures
 ```
 
 ---
@@ -78,41 +64,9 @@ dream_test = "~> 1.0"
 
 ### 1. Write tests with `describe` and `it`
 
-```gleam
-// test/my_app_test.gleam
-import dream_test/unit.{describe, it, to_test_cases}
-import dream_test/runner.{run_all}
-import dream_test/reporter/bdd.{report}
-import dream_test/assertions/should.{should, equal, be_some, or_fail_with}
-import gleam/io
+> 📄 **[See full working example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/math_app/test/math_app_test.gleam)**
 
-pub fn main() {
-  tests()
-  |> to_test_cases("my_app_test")
-  |> run_all()
-  |> report(io.println)
-}
-
-pub fn tests() {
-  describe("String utilities", [
-    it("trims whitespace", fn() {
-      "  hello  "
-      |> string.trim()
-      |> should()
-      |> equal("hello")
-      |> or_fail_with("Should remove surrounding whitespace")
-    }),
-
-    it("finds substrings", fn() {
-      "hello world"
-      |> string.find("world")
-      |> should()
-      |> be_some()
-      |> or_fail_with("Should find 'world' in string")
-    }),
-  ])
-}
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/math_app/test/math_app_test.gleam#L1-L39
 
 ### 2. Run with gleam test
 
@@ -123,11 +77,12 @@ gleam test
 ### 3. See readable output
 
 ```
-String utilities
-  ✓ trims whitespace
-  ✓ finds substrings
+MathApp
+  ✓ adds numbers
+  ✓ parses integers from valid strings
+  ✓ returns an error for invalid strings
 
-2 tests, 0 failures
+3 tests, 0 failures
 ```
 
 ---
@@ -144,21 +99,9 @@ value |> should() |> matcher() |> or_fail_with("message")
 
 Matchers can be chained. Each one passes its unwrapped value to the next:
 
-```gleam
-// Unwrap Some, then check the value
-Some(42)
-|> should()
-|> be_some()
-|> equal(42)
-|> or_fail_with("Should contain 42")
+> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L34-L48)** — Unwrap `Some`, then check the value
 
-// Unwrap Ok, then check the value
-Ok("hello")
-|> should()
-|> be_ok()
-|> equal("hello")
-|> or_fail_with("Should be Ok with 'hello'")
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L42-L47
 
 ### Available matchers
 
@@ -192,35 +135,9 @@ case result {
 Setup and teardown logic for your tests. Dream_test supports four lifecycle hooks
 that let you run code before and after tests.
 
-```gleam
-import dream_test/unit.{describe, it, before_each, after_each, before_all, after_all}
-import dream_test/types.{AssertionOk}
+> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L410-L452)** — All four hooks in action
 
-describe("Database tests", [
-  before_all(fn() {
-    start_database()
-    AssertionOk
-  }),
-
-  before_each(fn() {
-    begin_transaction()
-    AssertionOk
-  }),
-
-  it("creates a user", fn() { ... }),
-  it("deletes a user", fn() { ... }),
-
-  after_each(fn() {
-    rollback_transaction()
-    AssertionOk
-  }),
-
-  after_all(fn() {
-    stop_database()
-    AssertionOk
-  }),
-])
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L410-L452
 
 ### Hook Types
 
@@ -242,46 +159,25 @@ Choose the mode based on which hooks you need:
 
 **Flat mode** — simpler, faster; use when you only need per-test setup:
 
-```gleam
-import dream_test/unit.{describe, it, before_each, to_test_cases}
-import dream_test/runner.{run_all}
+> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/math_app/test/math_app_test.gleam#L34-L39)**
 
-tests()
-|> to_test_cases("my_test")
-|> run_all()
-|> report(io.print)
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/math_app/test/math_app_test.gleam#L34-L39
 
 **Suite mode** — preserves group structure; use when you need once-per-group setup:
 
-```gleam
-import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
-import dream_test/runner.{run_suite}
+> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L497-L507)**
 
-tests()
-|> to_test_suite("my_test")
-|> run_suite()
-|> report(io.print)
-```
+https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L497-L507
 
 ### Hook Inheritance
 
 Nested `describe` blocks inherit parent hooks. Hooks run outer-to-inner for
 setup, inner-to-outer for teardown:
 
+> 📄 **[See nested describe example](https://github.com/TrustBound/dream_test/blob/feature/example-snippets/examples/cache_app/test/cache_app_test.gleam#L457-L489)**
+
 ```gleam
-describe("Outer", [
-  before_each(fn() { io.println("1. outer setup"); AssertionOk }),
-  after_each(fn() { io.println("4. outer teardown"); AssertionOk }),
-
-  describe("Inner", [
-    before_each(fn() { io.println("2. inner setup"); AssertionOk }),
-    after_each(fn() { io.println("3. inner teardown"); AssertionOk }),
-
-    it("test", fn() { ... }),
-  ]),
-])
-// Output: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
+// Output order: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
 ```
 
 ### Hook Failure Behavior
