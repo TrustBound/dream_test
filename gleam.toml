@@ -1,5 +1,5 @@
 name = "dream_test"
-version = "1.0.0"
+version = "1.0.1"
 description = "A testing framework for Gleam that gets out of your way"
 licences = ["MIT"]
 repository = { type = "github", user = "TrustBound", repo = "dream_test" }
