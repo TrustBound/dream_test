@@ -18,7 +18,7 @@
 
 > 📄 **[See full example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/string_app/test/string_app_test.gleam)**
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/string_app/test/string_app_test.gleam#L8-L52
+https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/string_app/test/string_app_test.gleam#L10-L58
 
 ```
 String utilities
@@ -66,7 +66,7 @@ dream_test = "~> 1.0"
 
 > 📄 **[See full working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam)**
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L1-L39
+https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L1-L35
 
 ### 2. Run with gleam test
 
@@ -101,7 +101,7 @@ Matchers can be chained. Each one passes its unwrapped value to the next:
 
 > 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L34-L48)** — Unwrap `Some`, then check the value
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L42-L47
+https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/cache_app/test/cache_app_test.gleam#L43-L47
 
 ### Available matchers
 
@@ -159,9 +159,9 @@ Choose the mode based on which hooks you need:
 
 **Flat mode** — simpler, faster; use when you only need per-test setup:
 
-> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L34-L39)**
+> 📄 **[See working example](https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L37-L42)**
 
-https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L34-L39
+https://github.com/TrustBound/dream_test/blob/b74c954ecc4e00444f6d5c72317af4d8d88b6812/examples/math_app/test/math_app_test.gleam#L37-L42
 
 **Suite mode** — preserves group structure; use when you need once-per-group setup:
 
