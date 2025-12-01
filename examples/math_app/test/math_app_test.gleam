@@ -1,9 +1,9 @@
-import math_app
-import gleam/io
-import dream_test/unit.{describe, it, to_test_cases}
 import dream_test/assertions/should.{or_fail_with}
-import dream_test/runner.{run_all}
 import dream_test/reporter/bdd.{report}
+import dream_test/runner.{run_all}
+import dream_test/unit.{describe, it, to_test_cases}
+import gleam/io
+import math_app
 
 /// Example tests showing how a user of dream_test might test a simple app.
 ///

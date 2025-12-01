@@ -5,9 +5,7 @@ import dream_test/types.{type AssertionFailure}
 ///
 /// This is the core state threaded through assertions.
 pub type TestContext {
-  TestContext(
-    failures: List(AssertionFailure),
-  )
+  TestContext(failures: List(AssertionFailure))
 }
 
 pub fn new() -> TestContext {
@@ -18,9 +16,9 @@ pub fn failures(context: TestContext) -> List(AssertionFailure) {
   context.failures
 }
 
-pub fn add_failure(context: TestContext, failure: AssertionFailure) -> TestContext {
+pub fn add_failure(
+  context: TestContext,
+  failure: AssertionFailure,
+) -> TestContext {
   TestContext(failures: [failure, ..context.failures])
 }
-
-
-

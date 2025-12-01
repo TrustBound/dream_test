@@ -16,8 +16,7 @@ pub fn tests() {
         // Assert
         case result {
           MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("equal should not fail for equal values")
+          MatchFailed(_) -> fail_with("equal should not fail for equal values")
         }
       }),
       it("returns MatchFailed for unequal values", fn() {
@@ -31,8 +30,7 @@ pub fn tests() {
         // Assert
         case result {
           MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("equal should fail for non-matching values")
+          MatchOk(_) -> fail_with("equal should fail for non-matching values")
         }
       }),
     ]),

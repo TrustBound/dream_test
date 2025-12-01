@@ -73,7 +73,9 @@ pub fn stop(cache: Cache(k, v)) -> Nil {
 ///
 /// Returns `Some(value)` if the key exists, `None` otherwise.
 pub fn get(cache: Cache(k, v), key: k) -> Option(v) {
-  actor.call(cache.subject, waiting: 1000, sending: fn(reply) { Get(key, reply) })
+  actor.call(cache.subject, waiting: 1000, sending: fn(reply) {
+    Get(key, reply)
+  })
 }
 
 /// Set a value in the cache.

@@ -71,8 +71,7 @@ pub fn tests() {
 
         case result {
           MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_at_least should fail when value is less")
+          MatchOk(_) -> fail_with("be_at_least should fail when value is less")
         }
       }),
     ]),

@@ -70,8 +70,7 @@ pub fn tests() {
 
         case result {
           MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("have_length should work with empty list")
+          MatchFailed(_) -> fail_with("have_length should work with empty list")
         }
       }),
     ]),
@@ -89,8 +88,7 @@ pub fn tests() {
 
         case result {
           MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_empty should fail for non-empty list")
+          MatchOk(_) -> fail_with("be_empty should fail for non-empty list")
         }
       }),
     ]),

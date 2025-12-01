@@ -615,7 +615,10 @@ fn collect_hook_from_node(node: UnitTest, context: HookContext) -> HookContext {
     }
     AfterEach(teardown) -> {
       // Prepend to maintain inner-to-outer order
-      HookContext(..context, after_each_hooks: [teardown, ..context.after_each_hooks])
+      HookContext(..context, after_each_hooks: [
+        teardown,
+        ..context.after_each_hooks
+      ])
     }
     // Other nodes don't affect hooks
     _ -> context
@@ -664,7 +667,13 @@ fn to_test_cases_from_list(
           head,
           accumulated,
         )
-      to_test_cases_from_list(module_name, name_prefix, hook_context, tail, updated)
+      to_test_cases_from_list(
+        module_name,
+        name_prefix,
+        hook_context,
+        tail,
+        updated,
+      )
     }
   }
 }
@@ -767,13 +776,19 @@ fn to_suite_from_unit_test(
   case node {
     DescribeGroup(name, children) -> {
       let full_name = list.append(name_prefix, [name])
-      build_suite_from_describe(module_name, full_name, inherited_hooks, children)
+      build_suite_from_describe(
+        module_name,
+        full_name,
+        inherited_hooks,
+        children,
+      )
     }
 
     // If root is not a describe, wrap it in a synthetic suite
     ItTest(name, run) -> {
       let full_name = list.append(name_prefix, [name])
-      let test_case = build_single_test_case(full_name, name, run, inherited_hooks)
+      let test_case =
+        build_single_test_case(full_name, name, run, inherited_hooks)
       TestSuite(
         name: module_name,
         full_name: [module_name],
@@ -806,7 +821,8 @@ fn build_suite_from_describe(
   let group_hooks = collect_hooks_from_children(children, inherited_hooks)
 
   // Build items from children
-  let items = build_suite_items(module_name, full_name, group_hooks, children, [])
+  let items =
+    build_suite_items(module_name, full_name, group_hooks, children, [])
 
   // Extract name from full_name
   let name = extract_last_name(full_name)
@@ -829,7 +845,10 @@ type SuiteHooks {
 }
 
 fn collect_suite_hooks(children: List(UnitTest)) -> SuiteHooks {
-  collect_suite_hooks_from_list(children, SuiteHooks(before_all: [], after_all: []))
+  collect_suite_hooks_from_list(
+    children,
+    SuiteHooks(before_all: [], after_all: []),
+  )
 }
 
 fn collect_suite_hooks_from_list(
@@ -837,10 +856,11 @@ fn collect_suite_hooks_from_list(
   hooks: SuiteHooks,
 ) -> SuiteHooks {
   case remaining {
-    [] -> SuiteHooks(
-      before_all: list.reverse(hooks.before_all),
-      after_all: list.reverse(hooks.after_all),
-    )
+    [] ->
+      SuiteHooks(
+        before_all: list.reverse(hooks.before_all),
+        after_all: list.reverse(hooks.after_all),
+      )
     [head, ..tail] -> {
       let updated = collect_suite_hook(head, hooks)
       collect_suite_hooks_from_list(tail, updated)
@@ -868,7 +888,8 @@ fn build_suite_items(
   case remaining {
     [] -> list.reverse(accumulated)
     [head, ..tail] -> {
-      let new_items = build_suite_item(module_name, name_prefix, hook_context, head)
+      let new_items =
+        build_suite_item(module_name, name_prefix, hook_context, head)
       let updated = list.append(list.reverse(new_items), accumulated)
       build_suite_items(module_name, name_prefix, hook_context, tail, updated)
     }
@@ -890,7 +911,13 @@ fn build_suite_item(
 
     DescribeGroup(name, children) -> {
       let full_name = list.append(name_prefix, [name])
-      let nested_suite = build_suite_from_describe(module_name, full_name, hook_context, children)
+      let nested_suite =
+        build_suite_from_describe(
+          module_name,
+          full_name,
+          hook_context,
+          children,
+        )
       [SuiteGroup(nested_suite)]
     }
 

@@ -32,8 +32,7 @@
 //// ```
 
 import dream_test/types.{
-  type MatchResult, AssertionFailure, ComparisonFailure, MatchFailed,
-  MatchOk,
+  type MatchResult, AssertionFailure, ComparisonFailure, MatchFailed, MatchOk,
 }
 import gleam/float
 import gleam/int
@@ -278,9 +277,7 @@ fn check_in_range(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
       let payload =
         ComparisonFailure(
           actual: int.to_string(actual),
-          expected: int.to_string(min)
-            <> " <= value <= "
-            <> int.to_string(max),
+          expected: int.to_string(min) <> " <= value <= " <> int.to_string(max),
           operator: "be_in_range",
         )
 
@@ -314,7 +311,10 @@ pub fn be_greater_than_float(
   }
 }
 
-fn check_greater_than_float(actual: Float, threshold: Float) -> MatchResult(Float) {
+fn check_greater_than_float(
+  actual: Float,
+  threshold: Float,
+) -> MatchResult(Float) {
   case actual >. threshold {
     True -> MatchOk(actual)
     False -> {

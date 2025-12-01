@@ -1,7 +1,6 @@
 import gleam/int
 
 /// A tiny mock application module used to demonstrate dream_test usage.
-
 pub fn add(a: Int, b: Int) -> Int {
   a + b
 }

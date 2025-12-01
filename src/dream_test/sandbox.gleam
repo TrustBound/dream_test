@@ -120,5 +120,3 @@ fn handle_timeout(worker_pid: Pid) -> SandboxResult {
 pub fn default_config() -> SandboxConfig {
   SandboxConfig(timeout_ms: 5000)
 }
-
-

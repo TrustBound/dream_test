@@ -32,8 +32,7 @@ pub fn tests() {
 
         case result {
           MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("start_with should pass for empty prefix")
+          MatchFailed(_) -> fail_with("start_with should pass for empty prefix")
         }
       }),
     ]),
@@ -92,8 +91,7 @@ pub fn tests() {
         }
       }),
       it("finds substring at end of string", fn() {
-        let result =
-          "Hello, world!" |> should() |> contain_string("world!")
+        let result = "Hello, world!" |> should() |> contain_string("world!")
 
         case result {
           MatchOk(_) -> AssertionOk

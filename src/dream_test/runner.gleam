@@ -52,6 +52,11 @@
 //// |> run_all_with_config(fast_config)
 //// |> report(io.print)
 //// ```
+////   tests()
+////   |> to_test_cases("my_test")
+////   |> run_all()
+////   |> report(io.print)
+//// }
 
 import dream_test/parallel
 import dream_test/types.{
@@ -188,11 +193,6 @@ pub fn run_all_with_config(
 ///
 /// ```gleam
 /// pub fn main() {
-////   tests()
-////   |> to_test_cases("my_test")
-////   |> run_all()
-////   |> report(io.print)
-//// }
 /// ```
 ///
 pub fn run_all(test_cases: List(TestCase)) -> List(TestResult) {
@@ -455,4 +455,3 @@ fn run_all_from_list(
     }
   }
 }
-
