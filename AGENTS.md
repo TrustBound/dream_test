@@ -1,4 +1,4 @@
-# AGENTS notes for dream_test
+# AGENTS notes for Dream Test
 
 This file is a reminder of things the AI agent (and future maintainers) tends to get wrong or forget, especially around Gleam and this codebase.
 

@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/TrustBound/dream/main/ricky_and_lucy.png" alt="Dream Logo" width="180">
-  <h1>dream_test</h1>
+  <h1>Dream Test</h1>
   <p><strong>A testing framework for Gleam that gets out of your way.</strong></p>
 
   <a href="https://hex.pm/packages/dream_test">
@@ -59,7 +59,7 @@ dream_test = "~> 1.0"
 
 ---
 
-## Why dream_test?
+## Why Dream Test?
 
 | Feature                 | What you get                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------ |
@@ -70,7 +70,7 @@ dream_test = "~> 1.0"
 | **Gleam-native**        | Pipe-first assertions that feel natural; no macros, no reflection, no magic    |
 | **Familiar syntax**     | If you've used Jest, RSpec, or Mocha, you already know the basics              |
 | **Type-safe**           | Your tests are just Gleam code; the compiler catches mistakes early            |
-| **Self-hosting**        | dream_test tests itself; we eat our own cooking                                |
+| **Self-hosting**        | Dream Test tests itself; we eat our own cooking                                |
 
 ---
 
@@ -286,7 +286,7 @@ describe("Outer", [
 
 ### Hook Failure Behavior
 
-If a hook fails, dream_test handles it gracefully:
+If a hook fails, Dream Test handles it gracefully:
 
 | Failure in    | Result                                            |
 | ------------- | ------------------------------------------------- |
@@ -456,4 +456,6 @@ MIT — see [LICENSE.md](LICENSE.md)
 
 <div align="center">
   <sub>Part of the <a href="https://github.com/TrustBound/dream">Dream</a> ecosystem for Gleam</sub>
+  <br>
+  <sub>Built in Gleam, on the BEAM, by the Dream Team ❤️</sub>
 </div>

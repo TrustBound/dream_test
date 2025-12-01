@@ -1,6 +1,6 @@
 # Coding Standards
 
-This document defines the coding conventions for `dream_test`. These are **project-specific rules**, not general Gleam guidelines—they may be stricter than typical Gleam style.
+This document defines the coding conventions for Dream Test. These are **project-specific rules**, not general Gleam guidelines—they may be stricter than typical Gleam style.
 
 **Goals**: clarity, explicitness, debuggability.
 
@@ -301,7 +301,7 @@ Gleam supports labeled arguments only when the function is _defined_ with labele
 
 ## Summary
 
-These standards exist to make `dream_test` predictable and debuggable. When in doubt:
+These standards exist to make Dream Test predictable and debuggable. When in doubt:
 
 1. **Be explicit** — pass data, don't capture it
 2. **Be flat** — extract helpers, don't nest

@@ -1,4 +1,4 @@
-# Contributing to dream_test
+# Contributing to Dream Test
 
 Thank you for your interest in contributing! This guide covers everything you need to get started.
 
@@ -6,17 +6,35 @@ Thank you for your interest in contributing! This guide covers everything you ne
 
 ## Quick Reference
 
-| Need to know...    | Read...                                   |
-| ------------------ | ----------------------------------------- |
-| API reference      | [Hexdocs](https://hexdocs.pm/dream_test/) |
-| Quick start        | [README.md](README.md)                    |
-| Coding conventions | [STANDARDS.md](STANDARDS.md)              |
+| Need to know...      | Read...                                   |
+| -------------------- | ----------------------------------------- |
+| API reference        | [Hexdocs](https://hexdocs.pm/dream_test/) |
+| Quick start          | [README.md](README.md)                    |
+| Coding conventions   | [STANDARDS.md](STANDARDS.md)              |
+| Community guidelines | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)  |
+| Security policy      | [SECURITY.md](SECURITY.md)                |
+| Version history      | [CHANGELOG.md](CHANGELOG.md)              |
+| Project funding      | [FUNDING.md](FUNDING.md)                  |
 
 ---
 
 ## Code of Conduct
 
-Be respectful. Be inclusive. Focus on what's best for the project. Accept constructive criticism gracefully.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to uphold a welcoming, harassment-free environment for everyone.
+
+**TL;DR:** Be respectful. Be inclusive. Focus on what's best for the project.
+
+---
+
+## First-Time Contributors
+
+New to Dream Test or open source? Welcome! Here's how to get started:
+
+1. **Look for `good first issue`** labels on [GitHub Issues](https://github.com/TrustBound/dream_test/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+2. **Start small** — documentation fixes, typo corrections, and test additions are great first PRs
+3. **Ask questions** — open an issue if you're unsure about anything; we don't bite
+
+All contributions are valued, no matter how small.
 
 ---
 
@@ -77,25 +95,69 @@ make format       # Format code
 
 ### 4. Commit
 
-```bash
-git add .
-git commit -m "Add feature: brief description"
-```
+We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-**Commit message format:**
-
-- Present tense ("Add" not "Added")
-- Imperative mood ("Move cursor to..." not "Moves cursor to...")
-- First line ≤ 50 characters
-- Reference issues with `#123`
+**Format:**
 
 ```
-Add timeout support to test runner
+<type>[optional scope]: <description>
 
-Implements configurable timeouts for individual tests.
-Tests that exceed their timeout are marked as failed.
+## Why This Change Was Made
+- Explain the reasoning so future engineers understand the context
 
-Closes #123
+## What Was Changed
+- Technical explanation of the changes
+
+## Note to Future Engineer
+- Gotchas, non-obvious details, or anything that might trip someone up
+- A bit of humor is welcome here
+```
+
+**Types:**
+
+| Type       | When to use                                             |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | New feature                                             |
+| `fix`      | Bug fix                                                 |
+| `docs`     | Documentation only                                      |
+| `style`    | Formatting, whitespace (no code change)                 |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `perf`     | Performance improvement                                 |
+| `test`     | Adding or updating tests                                |
+| `build`    | Build system or dependencies                            |
+| `ci`       | CI configuration                                        |
+| `chore`    | Other changes that don't modify src or test             |
+
+**Scope:** If your branch has an issue number (e.g., `feature/SVC-123`), use it as the scope:
+
+```
+feat(SVC-123): add timeout support to test runner
+```
+
+**Example:**
+
+```
+feat: add timeout support to test runner
+
+## Why This Change Was Made
+- Tests that hang indefinitely block CI pipelines
+- Users requested configurable timeouts per-test
+
+## What Was Changed
+- Added `timeout_ms` option to `RunnerConfig`
+- Tests exceeding timeout are killed and marked as failed
+- Default timeout remains 5 seconds
+
+## Note to Future Engineer
+- The timeout uses `process.kill` under the hood, not a graceful shutdown
+- If you're debugging a hanging test locally, set timeout to a large value
+- Yes, we considered using a monad for this. No, we didn't.
+```
+
+**Breaking changes:** Add `!` after type:
+
+```
+feat!: remove deprecated assertion API
 ```
 
 ### 5. Push and open PR
@@ -150,14 +212,52 @@ See [hexdocs](https://hexdocs.pm/dream_test/) for the complete assertion API.
 
 ## Documentation
 
-### Code comments
+Dream Test maintains high documentation standards. Contributions must match the quality of existing docs.
 
-All public functions need `///` doc comments:
+### Module-level docs (`////`)
+
+New modules need comprehensive module docs at the top of the file:
+
+````gleam
+//// Brief description of what this module does.
+////
+//// Longer explanation of the module's purpose and how it fits
+//// into the overall API.
+////
+//// ## Basic Pattern
+////
+//// ```gleam
+//// example_usage()
+//// |> with_typical_pattern()
+//// ```
+////
+//// ## Available Functions
+////
+//// | Category    | Functions                    |
+//// |-------------|------------------------------|
+//// | **Core**    | `foo`, `bar`                 |
+//// | **Helpers** | `baz`, `qux`                 |
+////
+//// ## Import Style
+////
+//// ```gleam
+//// import dream_test/your_module.{foo, bar}
+//// ```
+````
+
+### Function-level docs (`///`)
+
+Every public function needs:
+
+1. **One-line summary** — what it does
+2. **Behavior details** — what it returns, edge cases
+3. **Example** — runnable code showing typical usage
 
 ````gleam
 /// Checks if the value equals the expected value.
 ///
-/// Returns `MatchOk` if equal, `MatchFailed` with details otherwise.
+/// Returns `MatchOk` if equal, `MatchFailed` with a diff otherwise.
+/// Works with any type that supports equality comparison.
 ///
 /// ## Example
 ///
@@ -171,6 +271,14 @@ pub fn equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
   // ...
 }
 ````
+
+### Reference examples
+
+See these files for documentation quality standards:
+
+- `src/dream_test/assertions/should.gleam` — module docs with tables, chaining examples
+- `src/dream_test/unit.gleam` — DSL usage patterns
+- `src/dream_test/runner.gleam` — configuration examples
 
 ### Updating docs
 
@@ -254,14 +362,49 @@ Open an issue before starting work on:
 
 ---
 
-## Questions?
+## Versioning
 
-| Type              | Where                              |
-| ----------------- | ---------------------------------- |
-| General questions | GitHub Discussions                 |
-| Bug reports       | GitHub Issues                      |
-| Feature requests  | GitHub Issues (label: enhancement) |
-| Security issues   | Email maintainers directly         |
+We follow [Semantic Versioning](https://semver.org/) strictly.
+
+| Change type                       | Version bump | Example         |
+| --------------------------------- | ------------ | --------------- |
+| Breaking API change               | **Major**    | `1.0.0 → 2.0.0` |
+| New feature (backward-compatible) | **Minor**    | `1.0.0 → 1.1.0` |
+| Bug fix (backward-compatible)     | **Patch**    | `1.0.0 → 1.0.1` |
+
+**What counts as breaking:**
+
+- Removing or renaming public functions
+- Changing function signatures (parameters, return types)
+- Changing behavior that existing code depends on
+- Removing or renaming public types
+
+**What doesn't count as breaking:**
+
+- Adding new functions
+- Adding new optional parameters
+- Improving error messages
+- Performance improvements
+- Internal refactors
+
+When in doubt, ask in your PR — we'd rather discuss than accidentally ship a breaking change.
+
+---
+
+## Questions & Support
+
+| Type                     | Where                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| General questions        | [GitHub Issues](https://github.com/TrustBound/dream_test/issues)                        |
+| Bug reports              | [GitHub Issues](https://github.com/TrustBound/dream_test/issues) (use bug template)     |
+| Feature requests         | [GitHub Issues](https://github.com/TrustBound/dream_test/issues) (use feature template) |
+| Security vulnerabilities | [SECURITY.md](SECURITY.md) — **do not use public issues**                               |
+
+---
+
+## License
+
+By contributing to Dream Test, you agree that your contributions will be licensed under the [MIT License](LICENSE.md).
 
 ---
 

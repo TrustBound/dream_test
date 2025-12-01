@@ -10,7 +10,7 @@ We release patches for security vulnerabilities in the following versions:
 
 ## Reporting a Vulnerability
 
-We take security seriously at dream_test. If you discover a security vulnerability, please report it responsibly.
+We take security seriously at Dream Test. If you discover a security vulnerability, please report it responsibly.
 
 ### How to Report
 
@@ -45,11 +45,11 @@ We will not pursue civil action or initiate a complaint with law enforcement for
 
 ## Security Best Practices
 
-When using dream_test in your projects:
+When using Dream Test in your projects:
 
 1. **Keep dependencies updated**: Regularly update to the latest version to receive security patches.
 2. **Review test code**: Even in test environments, be mindful of what external resources tests may access.
-3. **Sandbox appropriately**: Use dream_test's sandbox features when testing code that interacts with external systems.
+3. **Sandbox appropriately**: Use Dream Test's sandbox features when testing code that interacts with external systems.
 
 ## Contact
 
