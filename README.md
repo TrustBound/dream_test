@@ -381,23 +381,18 @@ Suite mode preserves the group hierarchy so hooks can run at group boundaries.
 
 Each test runs in its own BEAM process:
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Test Runner (main process)                                      │
-│                                                                  │
-│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐                  │
-│  │ Test 1 │  │ Test 2 │  │ Test 3 │  │ Test 4 │  ← parallel     │
-│  │ (proc) │  │ (proc) │  │ (proc) │  │ (proc) │    processes    │
-│  └────────┘  └────────┘  └────────┘  └────────┘                  │
-│       │           │           │           │                      │
-│       └───────────┴───────────┴───────────┘                      │
-│                         │                                        │
-│                    Collect Results                               │
-│                         │                                        │
-│                    ┌────────┐                                    │
-│                    │ Report │                                    │
-│                    └────────┘                                    │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    runner[Test Runner]
+    runner --> t1[Test 1]
+    runner --> t2[Test 2]
+    runner --> t3[Test 3]
+    runner --> t4[Test 4]
+    t1 --> collect[Collect Results]
+    t2 --> collect
+    t3 --> collect
+    t4 --> collect
+    collect --> report[Report]
 ```
 
 Benefits:
