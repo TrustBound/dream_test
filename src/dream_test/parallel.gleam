@@ -3,6 +3,7 @@
 /// This module provides concurrent test execution while maintaining
 /// deterministic result ordering. Tests run in isolated processes
 /// using the sandbox module.
+import dream_test/timing
 import dream_test/types.{
   type AssertionResult, type SingleTestConfig, type TestCase, type TestResult,
   type TestSuite, type TestSuiteItem, AssertionFailed, AssertionOk,
@@ -61,7 +62,7 @@ type IndexedResult {
 
 /// Message from a worker process.
 type WorkerResult {
-  WorkerCompleted(index: Int, test_run_result: TestRunResult)
+  WorkerCompleted(index: Int, test_run_result: TestRunResult, duration_ms: Int)
   WorkerDown(index: Int, reason: String)
 }
 
@@ -163,8 +164,13 @@ fn spawn_test_worker(
 
   let worker_pid =
     spawn_unlinked(fn() {
+      let start_time = timing.now_ms()
       let test_run_result = run_test_directly(test_case)
-      send(results_subject, WorkerCompleted(test_index, test_run_result))
+      let duration_ms = timing.now_ms() - start_time
+      send(
+        results_subject,
+        WorkerCompleted(test_index, test_run_result, duration_ms),
+      )
     })
 
   let worker_monitor = monitor(worker_pid)
@@ -328,7 +334,7 @@ fn handle_worker_result(
 /// Extract the index from a worker result.
 fn get_worker_result_index(result: WorkerResult) -> Int {
   case result {
-    WorkerCompleted(index, _) -> index
+    WorkerCompleted(index, _, _) -> index
     WorkerDown(index, _) -> index
   }
 }
@@ -378,9 +384,9 @@ fn convert_worker_result_with_config(
   worker_result: WorkerResult,
 ) -> TestResult {
   case worker_result {
-    WorkerCompleted(_, test_run_result) ->
-      test_run_result_to_test_result(config, test_run_result)
-    WorkerDown(_, reason) -> make_crashed_result(config, reason)
+    WorkerCompleted(_, test_run_result, duration_ms) ->
+      test_run_result_to_test_result(config, test_run_result, duration_ms)
+    WorkerDown(_, reason) -> make_crashed_result(config, reason, 0)
   }
 }
 
@@ -388,34 +394,36 @@ fn convert_worker_result_with_config(
 fn test_run_result_to_test_result(
   config: SingleTestConfig,
   test_run_result: TestRunResult,
+  duration_ms: Int,
 ) -> TestResult {
   case test_run_result {
-    TestPassed -> make_passed_result(config)
-    TestSkipped -> make_skipped_result(config)
-    SetupFailure(failure) -> make_setup_failed_result(config, failure)
-    TestFailure(failure) -> make_failed_result(config, failure)
-    TeardownFailure(failure) -> make_failed_result(config, failure)
+    TestPassed -> make_passed_result(config, duration_ms)
+    TestSkipped -> make_skipped_result(config, duration_ms)
+    SetupFailure(failure) ->
+      make_setup_failed_result(config, failure, duration_ms)
+    TestFailure(failure) -> make_failed_result(config, failure, duration_ms)
+    TeardownFailure(failure) -> make_failed_result(config, failure, duration_ms)
   }
 }
 
-fn make_passed_result(config: SingleTestConfig) -> TestResult {
+fn make_passed_result(config: SingleTestConfig, duration_ms: Int) -> TestResult {
   TestResult(
     name: config.name,
     full_name: config.full_name,
     status: types.Passed,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [],
     kind: config.kind,
   )
 }
 
-fn make_skipped_result(config: SingleTestConfig) -> TestResult {
+fn make_skipped_result(config: SingleTestConfig, duration_ms: Int) -> TestResult {
   TestResult(
     name: config.name,
     full_name: config.full_name,
     status: Skipped,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [],
     kind: config.kind,
@@ -425,12 +433,13 @@ fn make_skipped_result(config: SingleTestConfig) -> TestResult {
 fn make_setup_failed_result(
   config: SingleTestConfig,
   failure: types.AssertionFailure,
+  duration_ms: Int,
 ) -> TestResult {
   TestResult(
     name: config.name,
     full_name: config.full_name,
     status: SetupFailed,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [failure],
     kind: config.kind,
@@ -440,12 +449,13 @@ fn make_setup_failed_result(
 fn make_failed_result(
   config: SingleTestConfig,
   failure: types.AssertionFailure,
+  duration_ms: Int,
 ) -> TestResult {
   TestResult(
     name: config.name,
     full_name: config.full_name,
     status: Failed,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [failure],
     kind: config.kind,
@@ -453,12 +463,12 @@ fn make_failed_result(
 }
 
 /// Create a TestResult for a timed-out test.
-fn make_timeout_result(config: SingleTestConfig) -> TestResult {
+fn make_timeout_result(config: SingleTestConfig, duration_ms: Int) -> TestResult {
   TestResult(
     name: config.name,
     full_name: config.full_name,
     status: TimedOut,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [],
     kind: config.kind,
@@ -466,7 +476,11 @@ fn make_timeout_result(config: SingleTestConfig) -> TestResult {
 }
 
 /// Create a TestResult for a crashed test.
-fn make_crashed_result(config: SingleTestConfig, reason: String) -> TestResult {
+fn make_crashed_result(
+  config: SingleTestConfig,
+  reason: String,
+  duration_ms: Int,
+) -> TestResult {
   let failure =
     types.AssertionFailure(
       operator: "crash",
@@ -478,7 +492,7 @@ fn make_crashed_result(config: SingleTestConfig, reason: String) -> TestResult {
     name: config.name,
     full_name: config.full_name,
     status: Failed,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: [failure],
     kind: config.kind,
@@ -494,9 +508,10 @@ fn handle_selector_timeout(state: ExecutionState) -> ExecutionState {
     list.map(state.running, fn(running_test) {
       case running_test.test_case {
         TestCase(config) -> {
+          // Use the configured timeout as the duration for timed-out tests
           IndexedResult(
             index: running_test.index,
-            result: make_timeout_result(config),
+            result: make_timeout_result(config, state.config.default_timeout_ms),
           )
         }
       }
@@ -613,7 +628,8 @@ fn mark_item_as_setup_failed(
   case item {
     SuiteTest(test_case) -> {
       let TestCase(config) = test_case
-      [make_setup_failed_result(config, failure)]
+      // Duration is 0 for setup failures since the test never ran
+      [make_setup_failed_result(config, failure, 0)]
     }
     SuiteGroup(nested_suite) ->
       mark_all_items_as_setup_failed(nested_suite.items, failure)

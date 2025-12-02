@@ -6,7 +6,10 @@ description = "Example app demonstrating Dream Test features"
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
 gleam_erlang = ">= 0.25.0 and < 2.0.0"
 gleam_otp = ">= 1.2.0 and < 2.0.0"
+gleam_regexp = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]
 dream_test = { path = "../.." }
+
+
 

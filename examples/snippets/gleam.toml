@@ -4,6 +4,7 @@ description = "README code examples - these are tested to ensure they compile"
 
 [dependencies]
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_regexp = ">= 1.0.0 and < 2.0.0"
 dream_test = { path = "../.." }
 
 [dev-dependencies]

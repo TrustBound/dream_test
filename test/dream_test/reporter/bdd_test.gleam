@@ -51,7 +51,7 @@ pub fn tests() {
           <> "      Expected: 3\n"
           <> "      Actual:   4\n"
           <> "\n"
-          <> "Summary: 2 run, 1 failed, 1 passed\n"
+          <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n"
 
         // Act
         let result = format(results)

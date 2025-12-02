@@ -59,6 +59,7 @@
 //// }
 
 import dream_test/parallel
+import dream_test/timing
 import dream_test/types.{
   type SingleTestConfig, type Status, type TestCase, type TestResult,
   type TestSuite, AssertionFailed, AssertionOk, AssertionSkipped, Failed, Passed,
@@ -413,7 +414,9 @@ pub fn run_all_sequential(test_cases: List(TestCase)) -> List(TestResult) {
 /// ```
 ///
 pub fn run_single_test(config: SingleTestConfig) -> TestResult {
+  let start_time = timing.now_ms()
   let assertion_result = config.run()
+  let duration_ms = timing.now_ms() - start_time
 
   let #(status, failures) = case assertion_result {
     AssertionOk -> #(Passed, [])
@@ -425,7 +428,7 @@ pub fn run_single_test(config: SingleTestConfig) -> TestResult {
     name: config.name,
     full_name: config.full_name,
     status: status,
-    duration_ms: 0,
+    duration_ms: duration_ms,
     tags: config.tags,
     failures: failures,
     kind: config.kind,

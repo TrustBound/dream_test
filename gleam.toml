@@ -1,5 +1,5 @@
 name = "dream_test"
-version = "1.0.3"
+version = "1.1.0"
 description = "A testing framework for Gleam that gets out of your way"
 licences = ["MIT"]
 repository = { type = "github", user = "TrustBound", repo = "dream_test" }
@@ -9,6 +9,8 @@ links = [{ title = "Documentation", href = "https://hexdocs.pm/dream_test" }]
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
 gleam_otp = ">= 1.2.0 and < 2.0.0"
 gleam_erlang = ">= 0.25.0 and < 2.0.0"
+dream_ets = ">= 1.0.0 and < 2.0.0"
+gleam_regexp = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -8,16 +8,16 @@ This document defines the coding conventions for Dream Test. These are **project
 
 ## Quick Reference
 
-| Rule                                                                | Summary                                       |
-| ------------------------------------------------------------------- | --------------------------------------------- |
-| [No nested `case`](#1-no-nested-case-expressions)                   | One `case` per function; extract helpers      |
-| [No closures](#2-no-closures)                                       | All functions defined at module level         |
-| [No anonymous functions](#3-no-anonymous-functions-in-library-code) | Every function gets a name                    |
-| [No abbreviations](#4-no-abbreviated-identifiers)                   | `context` not `ctx`, `failure` not `f`        |
-| [Reserved words](#5-directory-and-module-naming)                    | Don't use `assert` in paths                   |
-| [Pipes over builders](#6-pipes-over-fluent-builders)                | Return values, not functions                  |
-| [Import style](#7-import-style)                                     | Unqualified for DSL, qualified for namespaces |
-| [Config records](#8-config-records-for-multi-parameter-functions)   | Named fields over long parameter lists        |
+| Rule                                                                | Summary                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------ |
+| [No nested `case`](#1-no-nested-case-expressions)                   | One `case` per function; extract helpers         |
+| [No closures](#2-no-closures)                                       | All functions defined at module level            |
+| [No anonymous functions](#3-no-anonymous-functions-in-library-code) | Every function gets a name                       |
+| [No abbreviations](#4-no-abbreviated-identifiers)                   | `context` not `ctx`, `failure` not `f`           |
+| [Reserved words](#5-directory-and-module-naming)                    | Don't use `assert` in paths                      |
+| [Pipes over builders](#6-pipes-over-fluent-builders)                | Return values, not functions                     |
+| [Import style](#7-import-style)                                     | Unqualified preferred; alias conflicting modules |
+| [Config records](#8-config-records-for-multi-parameter-functions)   | Named fields over long parameter lists           |
 
 ---
 
@@ -238,6 +238,84 @@ import dream_test/context.{type TestContext, add_failure}
 ```
 
 This imports `TestContext` as a type and `add_failure` as a function.
+
+### Handling module name conflicts
+
+When two modules have the same final name (e.g., `dream_test/types` and `dream_test/gherkin/types`), both would create a `types` module reference. Use a combination of type aliasing and module aliasing to resolve conflicts.
+
+**Choose which to alias based on the file's subject**:
+
+- The module most relevant to the file's purpose gets unqualified imports
+- Secondary/supporting modules: alias conflicting types inline, alias the module for qualified access
+
+```gleam
+// Primary module: unqualified imports
+import some/primary/module.{type Feature, type Scenario}
+
+// Secondary module: alias conflicting types, alias module for qualified access
+import some/other/module.{
+  type Feature as OtherFeature, type Step,
+} as other_module
+
+// Now you can use:
+let feature: Feature = ...           // from primary
+let other: OtherFeature = ...        // aliased type from secondary
+let step: Step = ...                 // non-conflicting from secondary
+let thing = other_module.something() // qualified access to secondary
+```
+
+**Real example in a gherkin module**:
+
+```gleam
+// Gherkin types are the primary subject → unqualified
+import dream_test/gherkin/types.{type Feature, type Scenario}
+
+// Core test types are supporting → alias conflicts, alias module
+import dream_test/types.{
+  type TestSuite, TestSuite, SuiteGroup,
+} as test_types
+
+let feature: Feature = ...
+let suite = TestSuite(name: "test", items: [SuiteGroup(...)])
+```
+
+If there are no conflicting names, you can use unqualified imports from both without aliasing:
+
+```gleam
+// ✅ No conflicts: unqualified from both
+import dream_test/gherkin/types.{type Feature}
+import dream_test/types.{type TestSuite, TestSuite}
+
+// Both Feature and TestSuite are unqualified
+```
+
+**Key points**:
+
+1. **Prefer unqualified imports** — they read better in code
+2. **Alias based on subject** — the file's primary domain gets unqualified; supporting modules get aliased
+3. **Alias conflicting types inline** — use `type Foo as OtherFoo` for individual type conflicts
+4. **Alias the module** — use `as module_name` when you need qualified access to the secondary module
+5. **Import both type and constructor** — if a type has a constructor with the same name (e.g., `TestSuite`), import both: `type TestSuite, TestSuite`
+
+❌ **Don't** use fully qualified references when unqualified would work:
+
+```gleam
+// Bad: Noisy qualified references
+let suite = dream_types.TestSuite(
+  name: name,
+  items: dream_types.SuiteGroup(nested),
+)
+```
+
+✅ **Do** use unqualified imports:
+
+```gleam
+// Good: Clean unqualified usage
+let suite = TestSuite(
+  name: name,
+  items: SuiteGroup(nested),
+)
+```
 
 ---
 
