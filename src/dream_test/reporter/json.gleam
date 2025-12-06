@@ -66,7 +66,7 @@ import dream_test/types.{
   type TestResult, BooleanFailure, CollectionFailure, ComparisonFailure,
   CustomMatcherFailure, EqualityFailure, Failed, GherkinScenario, Integration,
   OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
-  StringMatchFailure, TimedOut, Unit,
+  SnapshotFailure, StringMatchFailure, TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -265,6 +265,12 @@ fn build_payload_fields(
       #("pattern", json.string(pattern)),
       #("actual", json.string(actual)),
       #("operation", json.string(operation)),
+    ]
+    Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) -> [
+      #("expected", json.string(expected)),
+      #("actual", json.string(actual)),
+      #("snapshot_path", json.string(snapshot_path)),
+      #("is_missing", json.bool(is_missing)),
     ]
     Some(CustomMatcherFailure(actual, description)) -> [
       #("actual", json.string(actual)),

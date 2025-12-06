@@ -112,6 +112,7 @@ pub type TestKind {
 /// - `CollectionFailure` - For `contain`/`have_length`/`be_empty`
 /// - `ComparisonFailure` - For `be_greater_than`/`be_less_than`/etc.
 /// - `StringMatchFailure` - For `start_with`/`end_with`/`contain_string`
+/// - `SnapshotFailure` - For `match_snapshot` comparisons
 /// - `CustomMatcherFailure` - For user-defined matchers
 ///
 pub type FailurePayload {
@@ -122,6 +123,12 @@ pub type FailurePayload {
   CollectionFailure(actual: String, expected: String, operation: String)
   ComparisonFailure(actual: String, expected: String, operator: String)
   StringMatchFailure(actual: String, pattern: String, operation: String)
+  SnapshotFailure(
+    actual: String,
+    expected: String,
+    snapshot_path: String,
+    is_missing: Bool,
+  )
   CustomMatcherFailure(actual: String, description: String)
 }
 

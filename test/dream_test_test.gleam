@@ -1,4 +1,5 @@
 import dream_test/assertions/should_test
+import dream_test/file_test
 import dream_test/gherkin/feature_test
 import dream_test/gherkin/parser_test
 import dream_test/gherkin/step_trie_test
@@ -6,6 +7,7 @@ import dream_test/gherkin/steps_test
 import dream_test/gherkin/types_test as gherkin_types_test
 import dream_test/gherkin/world_test
 import dream_test/lifecycle_test
+import dream_test/matchers/snapshot_test
 import dream_test/process_test
 import dream_test/reporter/bdd.{report}
 import dream_test/reporter/bdd_test
@@ -29,6 +31,8 @@ pub fn main() {
     sandbox_test.tests(),
     process_test.tests(),
     lifecycle_test.tests(),
+    file_test.tests(),
+    snapshot_test.tests(),
     // Gherkin module tests
     gherkin_types_test.tests(),
     step_trie_test.tests(),

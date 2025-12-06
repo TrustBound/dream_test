@@ -23,6 +23,7 @@
 //// | **Collections**| `contain`, `not_contain`, `have_length`, `be_empty`         |
 //// | **Comparison** | `be_greater_than`, `be_less_than`, `be_at_least`, `be_at_most`, `be_between`, `be_in_range` |
 //// | **String**     | `start_with`, `end_with`, `contain_string`                  |
+//// | **Snapshot**   | `match_snapshot`, `match_snapshot_inspect`                  |
 ////
 //// ## Chaining Matchers
 ////
@@ -84,6 +85,7 @@ import dream_test/matchers/comparison
 import dream_test/matchers/equality
 import dream_test/matchers/option
 import dream_test/matchers/result
+import dream_test/matchers/snapshot
 import dream_test/matchers/string
 import dream_test/types.{
   type AssertionResult, type MatchResult, AssertionFailed, AssertionFailure,
@@ -470,6 +472,69 @@ pub const end_with = string.end_with
 /// ```
 ///
 pub const contain_string = string.contain_string
+
+// =============================================================================
+// Snapshot Matchers
+// =============================================================================
+
+/// Assert that a string matches the content of a snapshot file.
+///
+/// - If snapshot **doesn't exist**: creates it and passes
+/// - If snapshot **exists and matches**: passes
+/// - If snapshot **exists but doesn't match**: fails
+///
+/// **To update a snapshot:** delete the file and re-run the test.
+///
+/// ## Example
+///
+/// ```gleam
+/// render_html()
+/// |> should()
+/// |> match_snapshot("./test/snapshots/page.snap")
+/// |> or_fail_with("HTML should match snapshot")
+/// ```
+///
+pub const match_snapshot = snapshot.match_snapshot
+
+/// Assert that any value matches a snapshot (using string.inspect).
+///
+/// Serializes the value using `string.inspect` and compares against
+/// the stored snapshot. Useful for testing complex data structures.
+///
+/// ## Example
+///
+/// ```gleam
+/// build_config()
+/// |> should()
+/// |> match_snapshot_inspect("./test/snapshots/config.snap")
+/// |> or_fail_with("Config should match snapshot")
+/// ```
+///
+pub const match_snapshot_inspect = snapshot.match_snapshot_inspect
+
+/// Delete a snapshot file.
+///
+/// Use this to force regeneration of a snapshot on the next test run.
+///
+/// ## Example
+///
+/// ```gleam
+/// let _ = clear_snapshot("./test/snapshots/old.snap")
+/// ```
+///
+pub const clear_snapshot = snapshot.clear_snapshot
+
+/// Delete all snapshot files in a directory.
+///
+/// Deletes all files with the `.snap` extension in the given directory.
+///
+/// ## Example
+///
+/// ```gleam
+/// let _ = clear_snapshots_in_directory("./test/snapshots")
+/// ```
+///
+pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 
 // =============================================================================
 // Terminal Operations

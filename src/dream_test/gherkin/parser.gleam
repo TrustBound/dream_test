@@ -33,6 +33,7 @@
 //// }
 //// ```
 
+import dream_test/file
 import dream_test/gherkin/types.{
   type Background, type ExamplesTable, type Feature, type Scenario, type Step,
   type StepKeyword, And, Background, But, DataTable, DocString, ExamplesTable,
@@ -60,9 +61,10 @@ import gleam/string
 /// - `Error(String)`: Parse error with description
 ///
 pub fn parse_file(path: String) -> Result(Feature, String) {
-  case read_file(path) {
+  case file.read(path) {
     Ok(content) -> parse_string(content)
-    Error(_) -> Error("Failed to read file: " <> path)
+    Error(error) ->
+      Error("Failed to read feature file: " <> file.error_to_string(error))
   }
 }
 
@@ -560,10 +562,3 @@ fn finalize_feature(state: ParserState) -> Result(Feature, String) {
       ))
   }
 }
-
-// ============================================================================
-// File I/O FFI
-// ============================================================================
-
-@external(erlang, "dream_test_gherkin_parser_ffi", "read_file")
-fn read_file(path: String) -> Result(String, Nil)
