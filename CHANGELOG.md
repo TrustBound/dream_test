@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-12-04
+
+### Added
+
+- **Snapshot Testing** (`dream_test/matchers/snapshot`, `dream_test/assertions/should`)
+
+  - `match_snapshot()` matcher for comparing string output against stored files
+  - `match_snapshot_inspect()` for testing non-string values via `string.inspect`
+  - Auto-creates snapshots on first run; compares on subsequent runs
+  - Delete snapshot file to regenerate (no magic flags or environment variables)
+  - `clear_snapshot()` to programmatically delete individual snapshots
+  - `clear_snapshots_in_directory()` to bulk-delete `.snap` files
+  - `SnapshotFailure` payload for rich error reporting with diffs
+
+- **File Module** (`dream_test/file`)
+
+  - Generalized file I/O module for internal use
+  - `read()`, `write()`, `delete()`, `delete_files_matching()` functions
+  - Structured `Error` type with variants: `NotFound`, `PermissionDenied`, `IsDirectory`, `NoSpace`, `FileSystemError`
+  - `error_to_string()` for human-readable error messages
+  - Auto-creates parent directories on write
+
+### Changed
+
+- **Gherkin Parser** now uses the generalized `dream_test/file` module
+- **README restructured** with table of contents and teaching-optimized section order
+
+### Documentation
+
+- Added "Snapshot Testing" section to README with usage examples
+- Added table of contents under hero for quick navigation
+- Reordered sections for optimal learning flow
+- Added "Snapshot" to available matchers table
+- Added "Snapshot testing" to feature status table
+- Added `snapshot_testing.gleam` example in `examples/snippets/test/`
+- World-class hexdocs for all new public functions and types
+
 ## [1.1.0] - 2025-12-02
 
 ### Added
@@ -191,7 +228,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/TrustBound/dream_test/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/TrustBound/dream_test/compare/1.0.3...1.1.0
 [1.0.3]: https://github.com/TrustBound/dream_test/compare/1.0.2...1.0.3
 [1.0.2]: https://github.com/TrustBound/dream_test/compare/1.0.1...1.0.2

@@ -53,7 +53,7 @@ import dream_test/reporter/gherkin as gherkin_reporter
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
-  Passed, Pending, SetupFailed, Skipped, TimedOut,
+  Passed, Pending, SetupFailed, Skipped, SnapshotFailure, TimedOut,
 }
 import gleam/int
 import gleam/list
@@ -404,7 +404,48 @@ fn format_failure_payload(
         actual,
         "\n",
       ])
+    Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) ->
+      format_snapshot_failure(
+        actual,
+        expected,
+        snapshot_path,
+        is_missing,
+        base_indent,
+      )
     _ -> ""
+  }
+}
+
+fn format_snapshot_failure(
+  actual: String,
+  expected: String,
+  snapshot_path: String,
+  is_missing: Bool,
+  base_indent: String,
+) -> String {
+  case is_missing {
+    True ->
+      string.concat([
+        base_indent,
+        "    Snapshot missing: ",
+        snapshot_path,
+        "\n",
+      ])
+    False ->
+      string.concat([
+        base_indent,
+        "    Snapshot: ",
+        snapshot_path,
+        "\n",
+        base_indent,
+        "    Expected: ",
+        expected,
+        "\n",
+        base_indent,
+        "    Actual:   ",
+        actual,
+        "\n",
+      ])
   }
 }
 

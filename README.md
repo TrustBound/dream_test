@@ -58,12 +58,27 @@ Summary: 3 run, 0 failed, 3 passed in 2ms
 
 ---
 
+## Contents
+
+- [Installation](#installation)
+- [Why Dream Test?](#why-dream-test)
+- [Quick Start](#quick-start)
+- [The Assertion Pattern](#the-assertion-pattern)
+- [Lifecycle Hooks](#lifecycle-hooks)
+- [Snapshot Testing](#snapshot-testing)
+- [Gherkin / BDD Testing](#gherkin--bdd-testing)
+- [BEAM-Powered Test Isolation](#beam-powered-test-isolation)
+- [Tagging, CI & Reporters](#tagging-ci--reporters)
+- [How It Works](#how-it-works)
+
+---
+
 ## Installation
 
 ```toml
 # gleam.toml
 [dev-dependencies]
-dream_test = "~> 1.1"
+dream_test = "~> 1.2"
 ```
 
 ---
@@ -77,6 +92,7 @@ dream_test = "~> 1.1"
 | **Crash-proof**         | Each test runs in an isolated BEAM process; one crash doesn't kill the suite |
 | **Timeout-protected**   | Hanging tests get killed automatically; no more stuck CI pipelines           |
 | **Lifecycle hooks**     | `before_all`, `before_each`, `after_each`, `after_all` for setup/teardown    |
+| **Snapshot testing**    | Compare output against golden files; auto-create on first run                |
 | **Tagging & filtering** | Tag tests and run subsets with custom filter predicates                      |
 | **Gleam-native**        | Pipe-first assertions that feel natural; no macros, no reflection, no magic  |
 | **Multiple reporters**  | BDD-style human output or JSON for CI/tooling integration                    |
@@ -188,6 +204,7 @@ Ok("success")
 | **Collections** | `contain`, `not_contain`, `have_length`, `be_empty`                                         |
 | **Comparison**  | `be_greater_than`, `be_less_than`, `be_at_least`, `be_at_most`, `be_between`, `be_in_range` |
 | **String**      | `start_with`, `end_with`, `contain_string`                                                  |
+| **Snapshot**    | `match_snapshot`, `match_snapshot_inspect`                                                  |
 
 ### Custom matchers
 
@@ -272,109 +289,203 @@ The test body is preserved but not executed—just change `skip` back to `it` wh
 
 <sub>🧪 [Tested source](examples/snippets/test/skipping_tests.gleam)</sub>
 
-### Tagging and filtering
+---
 
-Add tags to tests for selective execution:
+## Lifecycle Hooks
+
+Setup and teardown logic for your tests. Dream_test supports four lifecycle hooks
+that let you run code before and after tests.
 
 ```gleam
-import dream_test/unit.{describe, it, with_tags}
+import dream_test/unit.{describe, it, before_each, after_each, before_all, after_all}
+import dream_test/assertions/should.{succeed}
 
-describe("Calculator", [
-  it("adds numbers", fn() { ... })
-    |> with_tags(["unit", "fast"]),
-  it("complex calculation", fn() { ... })
-    |> with_tags(["integration", "slow"]),
+describe("Database tests", [
+  before_all(fn() {
+    start_database()
+    succeed()
+  }),
+
+  before_each(fn() {
+    begin_transaction()
+    succeed()
+  }),
+
+  it("creates a user", fn() { ... }),
+  it("deletes a user", fn() { ... }),
+
+  after_each(fn() {
+    rollback_transaction()
+    succeed()
+  }),
+
+  after_all(fn() {
+    stop_database()
+    succeed()
+  }),
 ])
 ```
 
-Filter which tests run via `RunnerConfig.test_filter`:
+<sub>🧪 [Tested source](examples/snippets/test/lifecycle_hooks.gleam)</sub>
+
+### Hook Types
+
+| Hook          | Runs                              | Use case                          |
+| ------------- | --------------------------------- | --------------------------------- |
+| `before_all`  | Once before all tests in group    | Start services, create temp files |
+| `before_each` | Before each test                  | Reset state, begin transaction    |
+| `after_each`  | After each test (even on failure) | Rollback, cleanup temp data       |
+| `after_all`   | Once after all tests in group     | Stop services, remove temp files  |
+
+### Two Execution Modes
+
+Choose the mode based on which hooks you need:
+
+| Mode  | Function                      | Hooks supported             |
+| ----- | ----------------------------- | --------------------------- |
+| Flat  | `to_test_cases` → `run_all`   | `before_each`, `after_each` |
+| Suite | `to_test_suite` → `run_suite` | All four hooks              |
+
+**Flat mode** — simpler, faster; use when you only need per-test setup:
 
 ```gleam
-import dream_test/runner.{RunnerConfig, run_all_with_config}
-import gleam/list
+import dream_test/unit.{describe, it, before_each, to_test_cases}
+import dream_test/runner.{run_all}
 
-let config = RunnerConfig(
-  max_concurrency: 4,
-  default_timeout_ms: 5000,
-  test_filter: Some(fn(c) { list.contains(c.tags, "unit") }),
-)
-
-test_cases |> run_all_with_config(config)
+to_test_cases("my_test", tests())
+|> run_all()
+|> report(io.print)
 ```
 
-The filter is a predicate function receiving `SingleTestConfig`, so you can filter by tags, name, or any other field. You control how to populate the filter—from environment variables, CLI args, or hardcoded for debugging.
-
-| Use case           | Filter example                             |
-| ------------------ | ------------------------------------------ |
-| Run tagged "unit"  | `fn(c) { list.contains(c.tags, "unit") }`  |
-| Exclude "slow"     | `fn(c) { !list.contains(c.tags, "slow") }` |
-| Match name pattern | `fn(c) { string.contains(c.name, "add") }` |
-| Run all (default)  | `None`                                     |
-
-For Gherkin scenarios, use `dream_test/gherkin/feature.with_tags` instead.
-
-### CI integration
-
-Use `exit_on_failure` to ensure your CI pipeline fails when tests fail:
+**Suite mode** — preserves group structure; use when you need once-per-group setup:
 
 ```gleam
-import dream_test/runner.{exit_on_failure, run_all}
+import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
+import dream_test/runner.{run_suite}
 
-pub fn main() {
-  to_test_cases("my_test", tests())
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()  // Exits with code 1 if any tests failed
-}
+to_test_suite("my_test", tests())
+|> run_suite()
+|> report(io.print)
 ```
 
-| Result                                           | Exit Code |
-| ------------------------------------------------ | --------- |
-| All tests passed                                 | 0         |
-| Any test failed, timed out, or had setup failure | 1         |
+<sub>🧪 [Tested source](examples/snippets/test/execution_modes.gleam)</sub>
 
-<sub>🧪 [Tested source](examples/snippets/test/quick_start.gleam)</sub>
+### Hook Inheritance
 
-### JSON reporter
-
-Output test results as JSON for CI/CD integration, test aggregation, or tooling:
+Nested `describe` blocks inherit parent hooks. Hooks run outer-to-inner for
+setup, inner-to-outer for teardown:
 
 ```gleam
-import dream_test/reporter/json
-import dream_test/reporter/bdd.{report}
-
-pub fn main() {
-  to_test_cases("my_test", tests())
-  |> run_all()
-  |> report(io.print)           // Human-readable to stdout
-  |> json.report(write_to_file) // JSON to file
-  |> exit_on_failure()
-}
+describe("Outer", [
+  before_each(fn() {
+    io.println("1. outer setup")
+    succeed()
+  }),
+  after_each(fn() {
+    io.println("4. outer teardown")
+    succeed()
+  }),
+  describe("Inner", [
+    before_each(fn() {
+      io.println("2. inner setup")
+      succeed()
+    }),
+    after_each(fn() {
+      io.println("3. inner teardown")
+      succeed()
+    }),
+    it("test", fn() {
+      io.println("(test)")
+      succeed()
+    }),
+  ]),
+])
+// Output: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
 ```
 
-The JSON output includes system info, timing, and detailed failure data:
+<sub>🧪 [Tested source](examples/snippets/test/hook_inheritance.gleam)</sub>
 
-```json
-{
-  "version": "1.0",
-  "timestamp_ms": 1733151045123,
-  "duration_ms": 315,
-  "system": { "os": "darwin", "otp_version": "27", "gleam_version": "0.67.0" },
-  "summary": { "total": 3, "passed": 2, "failed": 1, ... },
-  "tests": [
-    {
-      "name": "adds numbers",
-      "full_name": ["Calculator", "add", "adds numbers"],
-      "status": "passed",
-      "duration_ms": 2,
-      "kind": "unit",
-      "failures": []
+### Hook Failure Behavior
+
+If a hook fails, Dream Test handles it gracefully:
+
+| Failure in    | Result                                            |
+| ------------- | ------------------------------------------------- |
+| `before_all`  | All tests in group marked `SetupFailed`, skipped  |
+| `before_each` | That test marked `SetupFailed`, skipped           |
+| `after_each`  | Test result preserved; hook failure recorded      |
+| `after_all`   | Hook failure recorded; all test results preserved |
+
+```gleam
+describe("Handles failures", [
+  before_all(fn() {
+    case connect_to_database() {
+      Ok(_) -> succeed()
+      Error(e) -> fail_with("Database connection failed: " <> e)
     }
-  ]
-}
+  }),
+  // If before_all fails, these tests are marked SetupFailed (not run)
+  it("test1", fn() { succeed() }),
+  it("test2", fn() { succeed() }),
+])
 ```
 
-<sub>🧪 [Tested source](examples/snippets/test/json_reporter.gleam)</sub>
+<sub>🧪 [Tested source](examples/snippets/test/hook_failure.gleam)</sub>
+
+---
+
+## Snapshot Testing
+
+Snapshot tests compare output against stored "golden" files. On first run, the snapshot is created automatically. On subsequent runs, any difference is a failure.
+
+```gleam
+import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
+
+it("renders user profile", fn() {
+  render_profile(user)
+  |> should()
+  |> match_snapshot("./test/snapshots/user_profile.snap")
+  |> or_fail_with("Profile should match snapshot")
+})
+```
+
+| Scenario         | Behavior                    |
+| ---------------- | --------------------------- |
+| Snapshot missing | Creates it, test **passes** |
+| Snapshot matches | Test **passes**             |
+| Snapshot differs | Test **fails** with diff    |
+
+**Updating snapshots** — delete the file and re-run the test:
+
+```sh
+rm ./test/snapshots/user_profile.snap
+gleam test
+```
+
+**Testing non-strings** — use `match_snapshot_inspect` for complex data:
+
+```gleam
+build_config()
+|> should()
+|> match_snapshot_inspect("./test/snapshots/config.snap")
+|> or_fail_with("Config should match snapshot")
+```
+
+This serializes values using `string.inspect`, so you can snapshot records, lists, tuples, etc.
+
+**Clearing snapshots programmatically:**
+
+```gleam
+import dream_test/matchers/snapshot
+
+// Clear one snapshot
+let _ = snapshot.clear_snapshot("./test/snapshots/old.snap")
+
+// Clear all .snap files in a directory
+let _ = snapshot.clear_snapshots_in_directory("./test/snapshots")
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snapshot_testing.gleam)</sub>
 
 ---
 
@@ -580,149 +691,6 @@ See [examples/shopping_cart](examples/shopping_cart) for a complete Gherkin BDD 
 
 ---
 
-## Lifecycle Hooks
-
-Setup and teardown logic for your tests. Dream_test supports four lifecycle hooks
-that let you run code before and after tests.
-
-```gleam
-import dream_test/unit.{describe, it, before_each, after_each, before_all, after_all}
-import dream_test/assertions/should.{succeed}
-
-describe("Database tests", [
-  before_all(fn() {
-    start_database()
-    succeed()
-  }),
-
-  before_each(fn() {
-    begin_transaction()
-    succeed()
-  }),
-
-  it("creates a user", fn() { ... }),
-  it("deletes a user", fn() { ... }),
-
-  after_each(fn() {
-    rollback_transaction()
-    succeed()
-  }),
-
-  after_all(fn() {
-    stop_database()
-    succeed()
-  }),
-])
-```
-
-<sub>🧪 [Tested source](examples/snippets/test/lifecycle_hooks.gleam)</sub>
-
-### Hook Types
-
-| Hook          | Runs                              | Use case                          |
-| ------------- | --------------------------------- | --------------------------------- |
-| `before_all`  | Once before all tests in group    | Start services, create temp files |
-| `before_each` | Before each test                  | Reset state, begin transaction    |
-| `after_each`  | After each test (even on failure) | Rollback, cleanup temp data       |
-| `after_all`   | Once after all tests in group     | Stop services, remove temp files  |
-
-### Two Execution Modes
-
-Choose the mode based on which hooks you need:
-
-| Mode  | Function                      | Hooks supported             |
-| ----- | ----------------------------- | --------------------------- |
-| Flat  | `to_test_cases` → `run_all`   | `before_each`, `after_each` |
-| Suite | `to_test_suite` → `run_suite` | All four hooks              |
-
-**Flat mode** — simpler, faster; use when you only need per-test setup:
-
-```gleam
-import dream_test/unit.{describe, it, before_each, to_test_cases}
-import dream_test/runner.{run_all}
-
-to_test_cases("my_test", tests())
-|> run_all()
-|> report(io.print)
-```
-
-**Suite mode** — preserves group structure; use when you need once-per-group setup:
-
-```gleam
-import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
-import dream_test/runner.{run_suite}
-
-to_test_suite("my_test", tests())
-|> run_suite()
-|> report(io.print)
-```
-
-<sub>🧪 [Tested source](examples/snippets/test/execution_modes.gleam)</sub>
-
-### Hook Inheritance
-
-Nested `describe` blocks inherit parent hooks. Hooks run outer-to-inner for
-setup, inner-to-outer for teardown:
-
-```gleam
-describe("Outer", [
-  before_each(fn() {
-    io.println("1. outer setup")
-    succeed()
-  }),
-  after_each(fn() {
-    io.println("4. outer teardown")
-    succeed()
-  }),
-  describe("Inner", [
-    before_each(fn() {
-      io.println("2. inner setup")
-      succeed()
-    }),
-    after_each(fn() {
-      io.println("3. inner teardown")
-      succeed()
-    }),
-    it("test", fn() {
-      io.println("(test)")
-      succeed()
-    }),
-  ]),
-])
-// Output: 1. outer setup → 2. inner setup → (test) → 3. inner teardown → 4. outer teardown
-```
-
-<sub>🧪 [Tested source](examples/snippets/test/hook_inheritance.gleam)</sub>
-
-### Hook Failure Behavior
-
-If a hook fails, Dream Test handles it gracefully:
-
-| Failure in    | Result                                            |
-| ------------- | ------------------------------------------------- |
-| `before_all`  | All tests in group marked `SetupFailed`, skipped  |
-| `before_each` | That test marked `SetupFailed`, skipped           |
-| `after_each`  | Test result preserved; hook failure recorded      |
-| `after_all`   | Hook failure recorded; all test results preserved |
-
-```gleam
-describe("Handles failures", [
-  before_all(fn() {
-    case connect_to_database() {
-      Ok(_) -> succeed()
-      Error(e) -> fail_with("Database connection failed: " <> e)
-    }
-  }),
-  // If before_all fails, these tests are marked SetupFailed (not run)
-  it("test1", fn() { succeed() }),
-  it("test2", fn() { succeed() }),
-])
-```
-
-<sub>🧪 [Tested source](examples/snippets/test/hook_failure.gleam)</sub>
-
----
-
 ## BEAM-Powered Test Isolation
 
 Every test runs in its own lightweight BEAM process—this is what makes Dream Test fast:
@@ -780,6 +748,114 @@ run_all_with_config(config, test_cases)
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/sequential_execution.gleam)</sub>
+
+---
+
+## Tagging, CI & Reporters
+
+### Tagging and filtering
+
+Add tags to tests for selective execution:
+
+```gleam
+import dream_test/unit.{describe, it, with_tags}
+
+describe("Calculator", [
+  it("adds numbers", fn() { ... })
+    |> with_tags(["unit", "fast"]),
+  it("complex calculation", fn() { ... })
+    |> with_tags(["integration", "slow"]),
+])
+```
+
+Filter which tests run via `RunnerConfig.test_filter`:
+
+```gleam
+import dream_test/runner.{RunnerConfig, run_all_with_config}
+import gleam/list
+
+let config = RunnerConfig(
+  max_concurrency: 4,
+  default_timeout_ms: 5000,
+  test_filter: Some(fn(c) { list.contains(c.tags, "unit") }),
+)
+
+test_cases |> run_all_with_config(config)
+```
+
+The filter is a predicate function receiving `SingleTestConfig`, so you can filter by tags, name, or any other field. You control how to populate the filter—from environment variables, CLI args, or hardcoded for debugging.
+
+| Use case           | Filter example                             |
+| ------------------ | ------------------------------------------ |
+| Run tagged "unit"  | `fn(c) { list.contains(c.tags, "unit") }`  |
+| Exclude "slow"     | `fn(c) { !list.contains(c.tags, "slow") }` |
+| Match name pattern | `fn(c) { string.contains(c.name, "add") }` |
+| Run all (default)  | `None`                                     |
+
+For Gherkin scenarios, use `dream_test/gherkin/feature.with_tags` instead.
+
+### CI integration
+
+Use `exit_on_failure` to ensure your CI pipeline fails when tests fail:
+
+```gleam
+import dream_test/runner.{exit_on_failure, run_all}
+
+pub fn main() {
+  to_test_cases("my_test", tests())
+  |> run_all()
+  |> report(io.print)
+  |> exit_on_failure()  // Exits with code 1 if any tests failed
+}
+```
+
+| Result                                           | Exit Code |
+| ------------------------------------------------ | --------- |
+| All tests passed                                 | 0         |
+| Any test failed, timed out, or had setup failure | 1         |
+
+<sub>🧪 [Tested source](examples/snippets/test/quick_start.gleam)</sub>
+
+### JSON reporter
+
+Output test results as JSON for CI/CD integration, test aggregation, or tooling:
+
+```gleam
+import dream_test/reporter/json
+import dream_test/reporter/bdd.{report}
+
+pub fn main() {
+  to_test_cases("my_test", tests())
+  |> run_all()
+  |> report(io.print)           // Human-readable to stdout
+  |> json.report(write_to_file) // JSON to file
+  |> exit_on_failure()
+}
+```
+
+The JSON output includes system info, timing, and detailed failure data:
+
+```json
+{
+  "version": "1.0",
+  "timestamp_ms": 1733151045123,
+  "duration_ms": 315,
+  "system": { "os": "darwin", "otp_version": "27", "gleam_version": "0.67.0" },
+  "summary": { "total": 3, "passed": 2, "failed": 1, ... },
+  "tests": [
+    {
+      "name": "adds numbers",
+      "full_name": ["Calculator", "add", "adds numbers"],
+      "status": "passed",
+      "duration_ms": 2,
+      "kind": "unit",
+      "failures": []
+    }
+  ]
+}
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/json_reporter.gleam)</sub>
 
 ---
 
@@ -846,13 +922,14 @@ Benefits:
 
 ## Status
 
-**Stable** — v1.1 release. API is stable and ready for production use.
+**Stable** — v1.2 release. API is stable and ready for production use.
 
 | Feature                           | Status    |
 | --------------------------------- | --------- |
 | Core DSL (`describe`/`it`/`skip`) | ✅ Stable |
 | Lifecycle hooks                   | ✅ Stable |
 | Assertions (`should.*`)           | ✅ Stable |
+| Snapshot testing                  | ✅ Stable |
 | BDD Reporter                      | ✅ Stable |
 | JSON Reporter                     | ✅ Stable |
 | Parallel execution                | ✅ Stable |
