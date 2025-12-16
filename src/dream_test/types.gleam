@@ -384,6 +384,12 @@ pub type TestSuite(ctx) {
     name: String,
     /// Runs once before any tests in this suite; produces the initial context.
     before_all: Option(fn() -> Result(ctx, String)),
+    /// True only when the user explicitly provided a `before_all` hook.
+    ///
+    /// `unit.describe` injects an implicit `before_all` (Ok(Nil)) so root suites
+    /// always run with a context, but we do not want reporters to display a
+    /// lifecycle hook unless the user actually declared one.
+    has_user_before_all: Bool,
     /// Runs once after all tests in this suite complete (even on failure).
     after_all: List(fn(ctx) -> Result(Nil, String)),
     /// Runs before each test (outer-to-inner); threads context for that test.

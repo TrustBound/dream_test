@@ -119,7 +119,11 @@ pub fn describe(name: String, children: List(SuiteItem(Nil))) -> TestSuite(Nil) 
     None -> default_before_all_nil
   }
 
-  TestSuite(..suite, before_all: Some(before_all))
+  TestSuite(
+    ..suite,
+    before_all: Some(before_all),
+    has_user_before_all: option.is_some(suite.before_all),
+  )
 }
 
 fn default_before_all_nil() -> Result(Nil, String) {
@@ -136,6 +140,7 @@ pub fn describe_with_hooks(
   TestSuite(
     ..suite,
     before_all: Some(hooks.before_all),
+    has_user_before_all: True,
     after_all: list.append(hooks.after_all, suite.after_all),
     before_each: list.append(hooks.before_each, suite.before_each),
     after_each: list.append(hooks.after_each, suite.after_each),
@@ -179,6 +184,7 @@ fn build_suite(
   TestSuite(
     name: name,
     before_all: before_all,
+    has_user_before_all: option.is_some(before_all),
     after_all: after_all_hooks,
     before_each: before_each_hooks,
     after_each: after_each_hooks,

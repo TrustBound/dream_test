@@ -212,6 +212,63 @@ pub fn report(
   results
 }
 
+/// Format a single test result as BDD output, suitable for streaming.
+///
+/// This is designed to be used with `ReporterEvent.TestFinished` so that BDD
+/// output can be printed as tests complete.
+///
+/// - `previous_path` should be the describe-path (all but the leaf test name)
+///   of the previously printed result.
+/// - Returns the formatted output for this result, and the updated
+///   describe-path to use as `previous_path` for the next call.
+pub fn format_incremental(
+  result: TestResult,
+  previous_path: List(String),
+) -> #(String, List(String)) {
+  let formatted = format_one_result_with_test_indent(result, previous_path, 0)
+  let new_path = extract_describe_segments(result.full_name)
+  #(formatted, new_path)
+}
+
+/// Format a single test result as BDD output, allowing an extra indent level
+/// for the test line.
+pub fn format_incremental_with_test_indent(
+  result: TestResult,
+  previous_path: List(String),
+  extra_test_indent: Int,
+) -> #(String, List(String)) {
+  let formatted =
+    format_one_result_with_test_indent(result, previous_path, extra_test_indent)
+  let new_path = extract_describe_segments(result.full_name)
+  #(formatted, new_path)
+}
+
+/// Format a single incremental result as two parts:
+/// - `headers`: any new describe/group lines required for this result
+/// - `test_line`: the test line (and any failure details)
+///
+/// This allows callers to insert additional lines (like lifecycle hooks)
+/// between headers and the test line while maintaining correct ordering.
+pub fn format_incremental_parts_with_test_indent(
+  result: TestResult,
+  previous_path: List(String),
+  extra_test_indent: Int,
+) -> #(String, String, List(String)) {
+  let #(headers, test_line) =
+    format_one_result_parts_with_test_indent(
+      result,
+      previous_path,
+      extra_test_indent,
+    )
+  let new_path = extract_describe_segments(result.full_name)
+  #(headers, test_line, new_path)
+}
+
+/// Format only the trailing summary line (no per-test output).
+pub fn format_summary_only(results: List(TestResult)) -> String {
+  format_summary(results)
+}
+
 fn format_all_results(
   results: List(TestResult),
   previous_path: List(String),
@@ -228,13 +285,35 @@ fn format_all_results(
   }
 }
 
+fn format_one_result_with_test_indent(
+  result: TestResult,
+  previous_path: List(String),
+  extra_test_indent: Int,
+) -> String {
+  let #(headers, test_line) =
+    format_one_result_parts_with_test_indent(
+      result,
+      previous_path,
+      extra_test_indent,
+    )
+  string.concat([headers, test_line])
+}
+
 fn format_one_result(result: TestResult, previous_path: List(String)) -> String {
+  format_one_result_with_test_indent(result, previous_path, 0)
+}
+
+fn format_one_result_parts_with_test_indent(
+  result: TestResult,
+  previous_path: List(String),
+  extra_test_indent: Int,
+) -> #(String, String) {
   let current_path = extract_describe_segments(result.full_name)
   let common_depth = count_common_prefix(previous_path, current_path, 0)
   let new_segments = list.drop(current_path, common_depth)
   let headers = format_header_segments(new_segments, common_depth, "")
-  let test_line = format_test_line(result)
-  string.concat([headers, test_line])
+  let test_line = format_test_line_with_indent(result, extra_test_indent)
+  #(headers, test_line)
 }
 
 fn count_common_prefix(
@@ -292,14 +371,14 @@ fn format_header_segments(
   }
 }
 
-fn format_test_line(result: TestResult) -> String {
+fn format_test_line_with_indent(result: TestResult, extra_indent: Int) -> String {
   let depth = calculate_test_depth(result.full_name)
-  let indent = build_indent(depth)
+  let indent = build_indent(depth + extra_indent)
   let marker = status_marker(result.status)
   let name = extract_test_name(result.full_name)
   let duration = format_duration(result.duration_ms)
   let test_line = string.concat([indent, marker, " ", name, duration, "\n"])
-  let failure_text = format_failure_details(result, depth)
+  let failure_text = format_failure_details(result, depth + extra_indent)
   string.concat([test_line, failure_text])
 }
 

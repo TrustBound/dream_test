@@ -148,6 +148,7 @@ pub fn to_test_suite(
   TestSuite(
     name: feature.name,
     before_all: Some(fn() { Ok(Nil) }),
+    has_user_before_all: False,
     after_all: [],
     before_each: [],
     after_each: [],

@@ -87,6 +87,7 @@ pub fn to_suite(
   TestSuite(
     name: suite_name,
     before_all: Some(fn() { Ok(Nil) }),
+    has_user_before_all: False,
     after_all: [],
     before_each: [],
     after_each: [],

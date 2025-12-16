@@ -18,7 +18,7 @@ pub fn tests() {
     group("run_isolated", [
       it("returns SandboxCompleted for a passing test", fn(_) {
         // Arrange
-        let config = SandboxConfig(timeout_ms: 1000)
+        let config = SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
         let test_function = fn() { AssertionOk }
 
         // Act
@@ -33,7 +33,7 @@ pub fn tests() {
 
       it("returns SandboxCompleted with failure for a failing test", fn(_) {
         // Arrange
-        let config = SandboxConfig(timeout_ms: 1000)
+        let config = SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
         let failure =
           AssertionFailure(
             operator: "equal",
@@ -54,7 +54,7 @@ pub fn tests() {
 
       it("returns SandboxTimedOut for a test that exceeds timeout", fn(_) {
         // Arrange
-        let config = SandboxConfig(timeout_ms: 50)
+        let config = SandboxConfig(timeout_ms: 50, show_crash_reports: False)
         let test_function = fn() {
           // Sleep longer than timeout
           process.sleep(200)
@@ -73,7 +73,7 @@ pub fn tests() {
 
       it("returns SandboxCrashed for a test that panics", fn(_) {
         // Arrange
-        let config = SandboxConfig(timeout_ms: 1000)
+        let config = SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
         let test_function = fn() { panic as "intentional crash" }
 
         // Act
@@ -91,9 +91,34 @@ pub fn tests() {
         |> or_fail_with("Expected SandboxCrashed")
       }),
 
+      it(
+        "can opt-in to crash reports while still returning SandboxCrashed",
+        fn(_) {
+          // Arrange
+          let config = SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
+          let test_function = fn() { panic as "intentional crash" }
+
+          // Act
+          let result = sandbox.run_isolated(config, test_function)
+
+          // Assert
+          let is_crashed = case result {
+            SandboxCrashed(_) -> True
+            _ -> False
+          }
+
+          is_crashed
+          |> should()
+          |> be_true()
+          |> or_fail_with(
+            "Expected SandboxCrashed when crash reports are enabled",
+          )
+        },
+      ),
+
       it("isolates crashes from the parent process", fn(_) {
         // Arrange - if we get here, we weren't crashed by the child
-        let config = SandboxConfig(timeout_ms: 1000)
+        let config = SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
         let test_function = fn() {
           panic as "this should not crash the test runner"
         }

@@ -178,9 +178,14 @@ fn run_suites_with_reporter_loop(
   case suites {
     [] -> #(acc_rev, completed, reporter)
     [suite, ..rest] -> {
-      let suite_results = parallel.run_suite_parallel(config, suite)
-      let #(next_completed, next_reporter) =
-        emit_test_finished_events(suite_results, completed, total, reporter)
+      let #(suite_results, next_completed, next_reporter) =
+        parallel.run_suite_parallel_with_reporter(
+          config,
+          suite,
+          reporter,
+          total,
+          completed,
+        )
       let next_acc_rev = push_results_rev(suite_results, acc_rev)
 
       case find_after_all_failure_message(suite_results) {

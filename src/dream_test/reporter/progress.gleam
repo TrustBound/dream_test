@@ -46,11 +46,17 @@ pub fn handle_event(
   event: reporter_types.ReporterEvent,
   write: fn(String) -> Nil,
 ) -> Nil {
-  let cols = terminal_columns()
-  let line = render(cols, event)
   case event {
-    reporter_types.RunFinished(..) -> write("\r" <> line <> "\n")
-    _ -> write("\r" <> line)
+    reporter_types.HookStarted(..) -> Nil
+    reporter_types.HookFinished(..) -> Nil
+    _ -> {
+      let cols = terminal_columns()
+      let line = render(cols, event)
+      case event {
+        reporter_types.RunFinished(..) -> write("\r" <> line <> "\n")
+        _ -> write("\r" <> line)
+      }
+    }
   }
 }
 
@@ -70,6 +76,9 @@ pub fn render(columns: Int, event: reporter_types.ReporterEvent) -> String {
 
     reporter_types.RunFinished(completed: completed, total: total) ->
       render_line(cols, completed, total, "done")
+
+    // Hook events do not affect the progress bar.
+    _ -> render_line(cols, 0, 1, "")
   }
 }
 

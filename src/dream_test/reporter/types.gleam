@@ -11,6 +11,21 @@
 //// code can depend on it without importing concrete reporters.
 
 import dream_test/types.{type TestResult}
+import gleam/option.{type Option}
+
+/// Lifecycle hook kinds.
+pub type HookKind {
+  BeforeAll
+  BeforeEach
+  AfterEach
+  AfterAll
+}
+
+/// Outcome of a hook run.
+pub type HookOutcome {
+  HookOk
+  HookError(message: String)
+}
 
 /// Events emitted during a test run, suitable for progress indicators.
 pub type ReporterEvent {
@@ -20,6 +35,15 @@ pub type ReporterEvent {
   ///
   /// `completed` is 1-based and increases monotonically until it reaches `total`.
   TestFinished(completed: Int, total: Int, result: TestResult)
+  /// A hook is about to run.
+  HookStarted(kind: HookKind, scope: List(String), test_name: Option(String))
+  /// A hook finished running.
+  HookFinished(
+    kind: HookKind,
+    scope: List(String),
+    test_name: Option(String),
+    outcome: HookOutcome,
+  )
   /// The run finished. `completed` should equal `total`.
   RunFinished(completed: Int, total: Int)
 }

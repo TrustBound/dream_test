@@ -455,19 +455,16 @@ pub fn suites() {
     describe("Lifecycle hooks demo", [
       before_all(fn() {
         // Arrange (once for entire suite)
-        io.println("  [before_all] Setting up shared test environment")
         Ok(Nil)
       }),
 
       before_each(fn(_) {
         // Arrange (before each test)
-        io.println("  [before_each] Preparing fresh state")
         Ok(Nil)
       }),
 
       it("first test runs after hooks", fn(_) {
         // Act & Assert
-        io.println("  [test] First test executing")
         True
         |> should()
         |> be_true()
@@ -476,7 +473,6 @@ pub fn suites() {
 
       it("second test also gets fresh setup", fn(_) {
         // Act & Assert
-        io.println("  [test] Second test executing")
         42
         |> should()
         |> be_greater_than(0)
@@ -485,13 +481,11 @@ pub fn suites() {
 
       after_each(fn(_) {
         // Cleanup (after each test)
-        io.println("  [after_each] Cleaning up test state")
         Ok(Nil)
       }),
 
       after_all(fn(_) {
         // Cleanup (once for entire suite)
-        io.println("  [after_all] Tearing down shared environment")
         Ok(Nil)
       }),
     ]),

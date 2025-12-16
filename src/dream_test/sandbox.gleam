@@ -12,7 +12,7 @@ import gleam/string
 
 /// Configuration for sandboxed test execution.
 pub type SandboxConfig {
-  SandboxConfig(timeout_ms: Int)
+  SandboxConfig(timeout_ms: Int, show_crash_reports: Bool)
 }
 
 /// Result of running a test in an isolated sandbox.
@@ -31,6 +31,11 @@ type WorkerMessage {
   WorkerDown(reason: String)
 }
 
+@external(erlang, "sandbox_ffi", "run_catching")
+fn run_catching(
+  test_function: fn() -> AssertionResult,
+) -> Result(AssertionResult, String)
+
 /// Run a test function in an isolated process with timeout.
 ///
 /// The test function runs in a separate BEAM process that is monitored.
@@ -41,43 +46,60 @@ pub fn run_isolated(
   test_function: fn() -> AssertionResult,
 ) -> SandboxResult {
   let result_subject = new_subject()
-  let worker_pid = spawn_worker(result_subject, test_function)
+  let worker_pid =
+    spawn_worker(result_subject, test_function, config.show_crash_reports)
   let worker_monitor = monitor(worker_pid)
-  let selector = build_result_selector(result_subject)
+  let selector =
+    build_result_selector(result_subject, config.show_crash_reports)
 
   wait_for_result(config, selector, worker_pid, worker_monitor)
 }
 
 /// Spawn a worker process that runs the test and sends the result.
 fn spawn_worker(
-  result_subject: Subject(AssertionResult),
+  result_subject: Subject(WorkerMessage),
   test_function: fn() -> AssertionResult,
+  show_crash_reports: Bool,
 ) -> Pid {
   spawn_unlinked(fn() {
-    let result = test_function()
-    send(result_subject, result)
+    case show_crash_reports {
+      True -> {
+        let result = test_function()
+        send(result_subject, TestCompleted(result))
+      }
+
+      False ->
+        case run_catching(test_function) {
+          Ok(result) -> send(result_subject, TestCompleted(result))
+          Error(reason) -> send(result_subject, WorkerDown(reason))
+        }
+    }
   })
 }
 
 /// Build a selector that waits for either test completion or process down.
 fn build_result_selector(
-  result_subject: Subject(AssertionResult),
+  result_subject: Subject(WorkerMessage),
+  show_crash_reports: Bool,
 ) -> Selector(WorkerMessage) {
-  new_selector()
-  |> select(result_subject)
-  |> process.map_selector(map_result_to_message)
-  |> select_monitors(map_down_to_message)
-}
+  case show_crash_reports {
+    True ->
+      new_selector()
+      |> select(result_subject)
+      |> select_monitors(map_down_to_message)
 
-/// Map a test result to a WorkerMessage.
-fn map_result_to_message(result: AssertionResult) -> WorkerMessage {
-  TestCompleted(result)
+    False ->
+      // In quiet mode the worker always sends a WorkerMessage, so we don't need
+      // to listen to monitor down messages (which would otherwise include Normal).
+      new_selector()
+      |> select(result_subject)
+  }
 }
 
 /// Map a process down event to a WorkerMessage.
 fn map_down_to_message(down: process.Down) -> WorkerMessage {
   let reason = format_exit_reason(down.reason)
-  WorkerDown(reason)
+  WorkerDown(reason: reason)
 }
 
 /// Format an exit reason as a string for error reporting.
@@ -118,5 +140,10 @@ fn handle_timeout(worker_pid: Pid) -> SandboxResult {
 
 /// Default configuration with a 5 second timeout.
 pub fn default_config() -> SandboxConfig {
-  SandboxConfig(timeout_ms: 5000)
+  SandboxConfig(timeout_ms: 5000, show_crash_reports: False)
+}
+
+/// Convenience helper for enabling crash reports in the sandbox.
+pub fn with_crash_reports(config: SandboxConfig) -> SandboxConfig {
+  SandboxConfig(..config, show_crash_reports: True)
 }

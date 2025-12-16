@@ -14,11 +14,6 @@ import matchers/extract_failure_operator.{extract_failure_operator}
 pub fn tests() {
   describe("Snapshot Matchers", [
     group("match_snapshot", [
-      before_each(fn(ctx) {
-        let _ = file.delete("test/fixtures/snapshots/temp/new.snap")
-        let _ = file.delete("test/fixtures/snapshots/temp/created.snap")
-        Ok(ctx)
-      }),
       it("returns MatchOk when content matches existing snapshot", fn(_) {
         // Arrange
         let value = MatchOk("hello world")
@@ -50,11 +45,15 @@ pub fn tests() {
       it("creates snapshot file when it doesn't exist", fn(_) {
         // Arrange
         let value = MatchOk("new snapshot content")
-        let path = "test/fixtures/snapshots/temp/new.snap"
+        let path =
+          "test/fixtures/snapshots/temp/new_"
+          <> int.to_string(process.unique_port())
+          <> ".snap"
 
         // Act
         let _ = snapshot.match_snapshot(value, path)
         let file_content = file.read(path)
+        let _ = file.delete(path)
 
         // Assert
         file_content
@@ -65,10 +64,14 @@ pub fn tests() {
       it("returns MatchOk when creating new snapshot", fn(_) {
         // Arrange
         let value = MatchOk("fresh content")
-        let path = "test/fixtures/snapshots/temp/created.snap"
+        let path =
+          "test/fixtures/snapshots/temp/created_"
+          <> int.to_string(process.unique_port())
+          <> ".snap"
 
         // Act
         let result = snapshot.match_snapshot(value, path)
+        let _ = file.delete(path)
 
         // Assert
         result
@@ -93,10 +96,6 @@ pub fn tests() {
       }),
     ]),
     group("match_snapshot_inspect", [
-      before_each(fn(ctx) {
-        let _ = file.delete("test/fixtures/snapshots/temp/inspected.snap")
-        Ok(ctx)
-      }),
       it("returns MatchOk when inspected value matches snapshot", fn(_) {
         // Arrange
         let value = MatchOk([1, 2, 3])
@@ -128,11 +127,15 @@ pub fn tests() {
       it("creates snapshot with inspected content", fn(_) {
         // Arrange
         let value = MatchOk(#("tuple", 42))
-        let path = "test/fixtures/snapshots/temp/inspected.snap"
+        let path =
+          "test/fixtures/snapshots/temp/inspected_"
+          <> int.to_string(process.unique_port())
+          <> ".snap"
 
         // Act
         let _ = snapshot.match_snapshot_inspect(value, path)
         let file_content = file.read(path)
+        let _ = file.delete(path)
 
         // Assert
         file_content
