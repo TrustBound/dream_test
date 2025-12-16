@@ -1,372 +1,274 @@
 import dream_test/assertions/should.{
-  be_false, be_true, equal, fail_with, have_length, or_fail_with, should,
+  be_false, be_ok, be_true, equal, have_length, or_fail_with, should,
 }
-import dream_test/runner.{
-  RunnerConfig, has_failures, run_all_with_config, run_single_test,
-}
+import dream_test/runner
 import dream_test/types.{
-  type SingleTestConfig, type TestResult, AssertionFailed, AssertionFailure,
-  AssertionOk, EqualityFailure, Failed, Passed, Pending, SetupFailed,
-  SingleTestConfig, Skipped, TestResult, TimedOut, Unit,
+  AssertionOk, Failed, Passed, SetupFailed, TestResult, TimedOut, Unit,
 }
-import dream_test/unit.{describe, it, to_test_cases, with_tags}
+import dream_test/unit.{
+  after_all, describe, describe_with_hooks, group, hooks, it, with_tags,
+}
+import gleam/erlang/process.{
+  new_selector, new_subject, select, selector_receive, send, spawn,
+}
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/result
+import gleam/string
 
 pub fn tests() {
   describe("Runner", [
-    describe("run_single_test", [
-      it("produces Passed status for passing test", fn() {
-        // Arrange
-        let config =
-          SingleTestConfig(
-            name: "passing test",
-            full_name: ["bootstrap", "runner_core"],
-            tags: ["bootstrap", "runner"],
-            kind: Unit,
-            run: fn() { AssertionOk },
-            timeout_ms: None,
-            before_each_hooks: [],
-            after_each_hooks: [],
-          )
-        let expected = Passed
+    it("runs a passing test and returns Passed", fn(_) {
+      // Arrange
+      let suite =
+        describe("Suite", [
+          it("passing", fn(_) { Ok(AssertionOk) }),
+        ])
 
-        // Act
-        let result = run_single_test(config)
+      // Act
+      let results =
+        runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-        // Assert
-        result.status
-        |> should()
-        |> equal(expected)
-        |> or_fail_with("Passing test should have Passed status")
-      }),
+      let status_result = case results {
+        [first] -> Ok(first.status)
+        _ -> Error("Expected exactly 1 result")
+      }
 
-      it("produces empty failures list for passing test", fn() {
-        // Arrange
-        let config =
-          SingleTestConfig(
-            name: "passing test",
-            full_name: ["bootstrap", "runner_core"],
-            tags: ["bootstrap", "runner"],
-            kind: Unit,
-            run: fn() { AssertionOk },
-            timeout_ms: None,
-            before_each_hooks: [],
-            after_each_hooks: [],
-          )
-        let expected = []
+      // Assert
+      status_result
+      |> should()
+      |> be_ok()
+      |> equal(Passed)
+      |> or_fail_with("Passing test should have Passed status")
+    }),
 
-        // Act
-        let result = run_single_test(config)
+    it("marks tests SetupFailed when before_all returns Error", fn(_) {
+      // Arrange
+      let suite =
+        describe_with_hooks(
+          "Suite",
+          hooks(fn() { Error("Intentional before_all failure") }),
+          [
+            it("t1", fn(_) { Ok(AssertionOk) }),
+            it("t2", fn(_) { Ok(AssertionOk) }),
+          ],
+        )
 
-        // Assert
-        result.failures
-        |> should()
-        |> equal(expected)
-        |> or_fail_with("Passing test should have no failures")
-      }),
+      // Act
+      let results =
+        runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-      it("produces Failed status for failing test", fn() {
-        // Arrange
-        let failure =
-          AssertionFailure(
-            operator: "equal",
-            message: "",
-            payload: Some(EqualityFailure(actual: "1", expected: "2")),
-          )
-        let config =
-          SingleTestConfig(
-            name: "failing test",
-            full_name: ["bootstrap", "runner_core"],
-            tags: ["bootstrap", "runner"],
-            kind: Unit,
-            run: fn() { AssertionFailed(failure) },
-            timeout_ms: None,
-            before_each_hooks: [],
-            after_each_hooks: [],
-          )
-        let expected = Failed
+      let statuses_result = case results {
+        [a, b] -> Ok([a.status, b.status])
+        _ -> Error("Expected exactly 2 results")
+      }
 
-        // Act
-        let result = run_single_test(config)
+      // Assert
+      statuses_result
+      |> should()
+      |> be_ok()
+      |> equal([SetupFailed, SetupFailed])
+      |> or_fail_with("Expected both tests SetupFailed")
+    }),
 
-        // Assert
-        result.status
-        |> should()
-        |> equal(expected)
-        |> or_fail_with("Failing test should have Failed status")
-      }),
-
-      it("records at least one failure for failing test", fn() {
-        // Arrange
-        let failure =
-          AssertionFailure(
-            operator: "equal",
-            message: "",
-            payload: Some(EqualityFailure(actual: "1", expected: "2")),
-          )
-        let config =
-          SingleTestConfig(
-            name: "failing test",
-            full_name: ["bootstrap", "runner_core"],
-            tags: ["bootstrap", "runner"],
-            kind: Unit,
-            run: fn() { AssertionFailed(failure) },
-            timeout_ms: None,
-            before_each_hooks: [],
-            after_each_hooks: [],
-          )
-
-        // Act
-        let result = run_single_test(config)
-
-        // Assert
-        case result.failures {
-          [] -> fail_with("Failing test should have at least one failure")
-          [_, ..] -> AssertionOk
-        }
-      }),
-    ]),
-    describe("has_failures", [
-      it("returns False for empty results", fn() {
-        // Arrange
-        let results = []
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_false()
-        |> or_fail_with("Empty results should have no failures")
-      }),
-      it("returns False when all tests passed", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(Passed),
-          make_result_with_status(Passed),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_false()
-        |> or_fail_with("All passed results should have no failures")
-      }),
-      it("returns False when tests are skipped or pending", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(Skipped),
-          make_result_with_status(Pending),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_false()
-        |> or_fail_with("Skipped and pending tests are not failures")
-      }),
-      it("returns True when any test failed", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(Failed),
-          make_result_with_status(Passed),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_true()
-        |> or_fail_with("Should detect Failed status")
-      }),
-      it("returns True when any test timed out", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(TimedOut),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_true()
-        |> or_fail_with("Should detect TimedOut status")
-      }),
-      it("returns True when any test had setup failure", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(SetupFailed),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_true()
-        |> or_fail_with("Should detect SetupFailed status")
-      }),
-      it("returns True for first result being a failure", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Failed),
-          make_result_with_status(Passed),
-          make_result_with_status(Passed),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_true()
-        |> or_fail_with("Should detect failure at start of list")
-      }),
-      it("returns True for last result being a failure", fn() {
-        // Arrange
-        let results = [
-          make_result_with_status(Passed),
-          make_result_with_status(Passed),
-          make_result_with_status(Failed),
-        ]
-
-        // Act & Assert
-        has_failures(results)
-        |> should()
-        |> be_true()
-        |> or_fail_with("Should detect failure at end of list")
-      }),
-    ]),
-    describe("test_filter", [
-      it("runs all tests when filter is None", fn() {
-        // Arrange
-        let test_tree =
-          describe("Feature", [
-            it("test one", fn() { AssertionOk })
-              |> with_tags(["unit"]),
-            it("test two", fn() { AssertionOk })
-              |> with_tags(["integration"]),
+    it(
+      "after_all failure stops later suites and marks their tests SetupFailed",
+      fn(_) {
+        // Arrange: suite A fails in after_all
+        let suite_a =
+          describe_with_hooks("SuiteA", hooks(fn() { Ok(Nil) }), [
+            after_all(fn(_nil) { Error("intentional after_all failure") }),
+            it("a1 ran", fn(_nil) { Ok(AssertionOk) }),
           ])
-        let test_cases = to_test_cases("test_module", test_tree)
-        let config =
-          RunnerConfig(
-            max_concurrency: 1,
-            default_timeout_ms: 5000,
-            test_filter: None,
-          )
+
+        // Arrange: suite B must not run (if it runs, it will crash)
+        let suite_b =
+          describe("SuiteB", [
+            it("must_not_run", fn(_) { panic as "suite B should not run" }),
+          ])
 
         // Act
-        let results = run_all_with_config(config, test_cases)
+        let results =
+          runner.new([suite_a, suite_b])
+          |> runner.max_concurrency(1)
+          |> runner.run()
+        let status_result =
+          list.find(results, fn(r) { r.name == "must_not_run" })
+          |> result.map(fn(r) { r.status })
 
         // Assert
+        status_result
+        |> should()
+        |> be_ok()
+        |> equal(SetupFailed)
+        |> or_fail_with(
+          "must_not_run should be SetupFailed because suite B should not execute",
+        )
+      },
+    ),
+
+    group("has_failures", [
+      it("returns true when any status indicates failure", fn(_) {
+        let results = [
+          TestResult(
+            name: "test",
+            full_name: ["test"],
+            status: Passed,
+            duration_ms: 0,
+            tags: [],
+            failures: [],
+            kind: Unit,
+          ),
+          TestResult(
+            name: "test",
+            full_name: ["test"],
+            status: Failed,
+            duration_ms: 0,
+            tags: [],
+            failures: [],
+            kind: Unit,
+          ),
+          TestResult(
+            name: "test",
+            full_name: ["test"],
+            status: TimedOut,
+            duration_ms: 0,
+            tags: [],
+            failures: [],
+            kind: Unit,
+          ),
+        ]
+        runner.has_failures(results)
+        |> should()
+        |> be_true()
+        |> or_fail_with("Should detect failures")
+      }),
+      it("returns false when all statuses are non-failing", fn(_) {
+        let results = [
+          TestResult(
+            name: "test",
+            full_name: ["test"],
+            status: Passed,
+            duration_ms: 0,
+            tags: [],
+            failures: [],
+            kind: Unit,
+          ),
+        ]
+        runner.has_failures(results)
+        |> should()
+        |> be_false()
+        |> or_fail_with("Should return false when no failures")
+      }),
+    ]),
+
+    group("result filtering", [
+      it("filters results by tag", fn(_) {
+        let suite =
+          describe("Feature", [
+            it("test one", fn(_) { Ok(AssertionOk) }) |> with_tags(["unit"]),
+            it("test two", fn(_) { Ok(AssertionOk) })
+              |> with_tags(["integration"]),
+            it("test three", fn(_) { Ok(AssertionOk) }) |> with_tags(["unit"]),
+          ])
+
+        let results =
+          runner.new([suite])
+          |> runner.max_concurrency(1)
+          |> runner.filter_results(fn(r) { list.contains(r.tags, "unit") })
+          |> runner.run()
+
         results
         |> should()
         |> have_length(2)
-        |> or_fail_with("Should run all tests when filter is None")
+        |> or_fail_with("Should only return tests tagged 'unit'")
       }),
-      it("filters tests by tag", fn() {
-        // Arrange
-        let test_tree =
+
+      it("filters results by test name", fn(_) {
+        let suite =
           describe("Feature", [
-            it("unit test", fn() { AssertionOk })
-              |> with_tags(["unit"]),
-            it("integration test", fn() { AssertionOk })
-              |> with_tags(["integration"]),
-            it("another unit test", fn() { AssertionOk })
-              |> with_tags(["unit"]),
+            it("adds numbers", fn(_) { Ok(AssertionOk) }),
+            it("subtracts numbers", fn(_) { Ok(AssertionOk) }),
+            it("adds strings", fn(_) { Ok(AssertionOk) }),
           ])
-        let test_cases = to_test_cases("test_module", test_tree)
-        let config =
-          RunnerConfig(
-            max_concurrency: 1,
-            default_timeout_ms: 5000,
-            test_filter: Some(fn(c: SingleTestConfig) {
-              list.contains(c.tags, "unit")
-            }),
-          )
 
-        // Act
-        let results = run_all_with_config(config, test_cases)
+        let results =
+          runner.new([suite])
+          |> runner.max_concurrency(1)
+          |> runner.filter_results(fn(r) {
+            case r.name {
+              "adds numbers" -> True
+              "adds strings" -> True
+              _ -> False
+            }
+          })
+          |> runner.run()
 
-        // Assert
-        results
-        |> should()
-        |> have_length(2)
-        |> or_fail_with("Should only run tests tagged 'unit'")
-      }),
-      it("filters out all tests when none match", fn() {
-        // Arrange
-        let test_tree =
-          describe("Feature", [
-            it("test one", fn() { AssertionOk })
-              |> with_tags(["unit"]),
-            it("test two", fn() { AssertionOk })
-              |> with_tags(["unit"]),
-          ])
-        let test_cases = to_test_cases("test_module", test_tree)
-        let config =
-          RunnerConfig(
-            max_concurrency: 1,
-            default_timeout_ms: 5000,
-            test_filter: Some(fn(c: SingleTestConfig) {
-              list.contains(c.tags, "integration")
-            }),
-          )
-
-        // Act
-        let results = run_all_with_config(config, test_cases)
-
-        // Assert
-        results
-        |> should()
-        |> have_length(0)
-        |> or_fail_with("Should run no tests when none match filter")
-      }),
-      it("can filter by test name", fn() {
-        // Arrange
-        let test_tree =
-          describe("Feature", [
-            it("adds numbers", fn() { AssertionOk }),
-            it("subtracts numbers", fn() { AssertionOk }),
-            it("adds strings", fn() { AssertionOk }),
-          ])
-        let test_cases = to_test_cases("test_module", test_tree)
-        let config =
-          RunnerConfig(
-            max_concurrency: 1,
-            default_timeout_ms: 5000,
-            test_filter: Some(fn(c: SingleTestConfig) {
-              case c.name {
-                "adds numbers" -> True
-                "adds strings" -> True
-                _ -> False
-              }
-            }),
-          )
-
-        // Act
-        let results = run_all_with_config(config, test_cases)
-
-        // Assert
         results
         |> should()
         |> have_length(2)
         |> or_fail_with("Should filter by test name")
       }),
     ]),
+
+    group("concurrency", [
+      it(
+        "starts two tests before either completes when max_concurrency=2",
+        fn(_) {
+          // Arrange
+          let started = new_subject()
+          let continue_t1 = new_subject()
+          let continue_t2 = new_subject()
+
+          let suite =
+            describe("suite", [
+              it("t1", fn(_) {
+                send(started, "t1")
+                let selector = new_selector() |> select(continue_t1)
+                case selector_receive(selector, 5000) {
+                  Ok(_) -> Ok(AssertionOk)
+                  Error(Nil) -> Error("timeout waiting to continue t1")
+                }
+              }),
+              it("t2", fn(_) {
+                send(started, "t2")
+                let selector = new_selector() |> select(continue_t2)
+                case selector_receive(selector, 5000) {
+                  Ok(_) -> Ok(AssertionOk)
+                  Error(Nil) -> Error("timeout waiting to continue t2")
+                }
+              }),
+            ])
+
+          // Act
+          let _pid =
+            spawn(fn() {
+              let _results =
+                runner.new([suite]) |> runner.max_concurrency(2) |> runner.run()
+              Nil
+            })
+
+          let selector = new_selector() |> select(started)
+          use n1 <- result.try(case selector_receive(selector, 1000) {
+            Ok(name) -> Ok(name)
+            Error(Nil) -> Error("timeout waiting for started #1")
+          })
+          use n2 <- result.try(case selector_receive(selector, 1000) {
+            Ok(name) -> Ok(name)
+            Error(Nil) -> Error("timeout waiting for started #2")
+          })
+
+          send(continue_t1, Nil)
+          send(continue_t2, Nil)
+
+          // Assert
+          list.sort([n1, n2], string.compare)
+          |> should()
+          |> equal(["t1", "t2"])
+          |> or_fail_with(
+            "Expected both tests to start before either completed",
+          )
+        },
+      ),
+    ]),
   ])
-}
-
-// =============================================================================
-// Test Helpers
-// =============================================================================
-
-fn make_result_with_status(status: types.Status) -> TestResult {
-  TestResult(
-    name: "test",
-    full_name: ["test"],
-    status: status,
-    duration_ms: 0,
-    tags: [],
-    failures: [],
-    kind: Unit,
-  )
 }

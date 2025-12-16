@@ -1,636 +1,378 @@
-//// Test runner for dream_test.
+//// Test runner for dream_test (suite-first).
 ////
-//// This module executes test cases and produces results. Tests run in isolated
-//// BEAM processes by default, providing:
-////
-//// - **Crash isolation** - A panicking test doesn't crash the runner
-//// - **Timeout protection** - Hanging tests are killed after a timeout
-//// - **Parallel execution** - Tests run concurrently for speed
-////
-//// ## Basic Usage
+//// This module provides a pipe-friendly builder API for running suites.
 ////
 //// ```gleam
-//// import dream_test/unit.{describe, it, to_test_cases}
-//// import dream_test/runner.{run_all}
-//// import dream_test/reporter/bdd.{report}
+//// import dream_test/runner
+//// import dream_test/reporter/bdd
 //// import gleam/io
 ////
-//// pub fn main() {
-////   tests()
-////   |> to_test_cases("my_test")
-////   |> run_all()
-////   |> report(io.print)
-//// }
+//// runner.new([suite()])
+//// |> runner.max_concurrency(8)
+//// |> runner.default_timeout_ms(10_000)
+//// |> runner.exit_on_failure()
+//// |> runner.run()
 //// ```
-////
-//// ## Execution Modes
-////
-//// | Function               | Isolation | Parallel | Timeout | Use Case                    |
-//// |------------------------|-----------|----------|---------|------------------------------|
-//// | `run_all`              | ✓         | ✓ (4)    | 5s      | Default for most tests       |
-//// | `run_all_with_config`  | ✓         | Custom   | Custom  | Custom concurrency/timeout   |
-//// | `run_all_sequential`   | ✗         | ✗        | ✗       | Debugging, simple tests      |
-////
-//// ## Custom Configuration
-////
-//// ```gleam
-//// import dream_test/runner.{run_all_with_config, RunnerConfig}
-////
-//// // High concurrency for fast tests
-//// let fast_config = RunnerConfig(
-////   max_concurrency: 16,
-////   default_timeout_ms: 1000,
-//// )
-////
-//// // Sequential with long timeout for integration tests  
-//// let integration_config = RunnerConfig(
-////   max_concurrency: 1,
-////   default_timeout_ms: 30_000,
-//// )
-////
-//// test_cases
-//// |> run_all_with_config(fast_config)
-//// |> report(io.print)
-//// ```
-////   tests()
-////   |> to_test_cases("my_test")
-////   |> run_all()
-////   |> report(io.print)
-//// }
 
 import dream_test/parallel
-import dream_test/timing
+import dream_test/reporter/api as reporter_api
+import dream_test/reporter/types as reporter_types
 import dream_test/types.{
-  type SingleTestConfig, type Status, type TestCase, type TestResult,
-  type TestSuite, AssertionFailed, AssertionOk, AssertionSkipped, Failed, Passed,
-  SetupFailed, Skipped, SuiteGroup, SuiteTest, TestCase, TestResult, TestSuite,
-  TimedOut,
+  type AssertionFailure, type Status, type SuiteTestCase, type TestResult,
+  type TestSuite, type TestSuiteItem, Failed, Passed, SetupFailed, SuiteGroup,
+  SuiteTest, TestResult, TimedOut,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
 
-/// Configuration for test execution.
-///
-/// Controls how many tests run concurrently, how long each test is allowed
-/// to run before being killed, and which tests to run.
-///
-/// ## Fields
-///
-/// - `max_concurrency` - Maximum number of tests running at once. Set to `1`
-///   for sequential execution. Higher values speed up test suites on multi-core
-///   machines but may cause issues if tests share resources.
-///
-/// - `default_timeout_ms` - How long (in milliseconds) a test can run before
-///   being killed. Protects against infinite loops and hanging operations.
-///
-/// - `test_filter` - Optional predicate to filter which tests run. When `Some`,
-///   only tests where the predicate returns `True` will execute. When `None`,
-///   all tests run.
-///
-/// ## Examples
-///
-/// ```gleam
-/// // Fast parallel execution
-/// RunnerConfig(max_concurrency: 8, default_timeout_ms: 2000, test_filter: None)
-///
-/// // Sequential execution for debugging
-/// RunnerConfig(max_concurrency: 1, default_timeout_ms: 5000, test_filter: None)
-///
-/// // Run only tests tagged "unit"
-/// RunnerConfig(
-///   max_concurrency: 4,
-///   default_timeout_ms: 5000,
-///   test_filter: Some(fn(config) { list.contains(config.tags, "unit") }),
-/// )
-///
-/// // Run tests NOT tagged "slow"
-/// RunnerConfig(
-///   max_concurrency: 4,
-///   default_timeout_ms: 5000,
-///   test_filter: Some(fn(config) { !list.contains(config.tags, "slow") }),
-/// )
-/// ```
-///
-pub type RunnerConfig {
-  RunnerConfig(
-    /// Maximum number of tests to run concurrently.
-    /// Set to 1 for sequential execution.
-    max_concurrency: Int,
-    /// Default timeout in milliseconds for each test.
-    default_timeout_ms: Int,
-    /// Optional filter predicate. When Some, only tests where the
-    /// predicate returns True will run. Receives the full SingleTestConfig,
-    /// allowing filtering by tags, name, kind, or any other field.
-    test_filter: Option(fn(SingleTestConfig) -> Bool),
+/// Builder-style runner configuration.
+pub opaque type RunBuilder(ctx) {
+  RunBuilder(
+    suites: List(TestSuite(ctx)),
+    config: parallel.ParallelConfig,
+    result_filter: Option(fn(TestResult) -> Bool),
+    should_exit_on_failure: Bool,
+    reporter: Option(reporter_api.Reporter),
   )
 }
 
-/// Default runner configuration.
-///
-/// Returns a configuration with:
-/// - 4 concurrent tests
-/// - 5 second timeout per test
-/// - No test filter (all tests run)
-///
-/// This is suitable for most unit test suites.
-///
-/// ## Example
-///
-/// ```gleam
-/// let config = default_config()
-/// // RunnerConfig(max_concurrency: 4, default_timeout_ms: 5000, test_filter: None)
-/// ```
-///
-pub fn default_config() -> RunnerConfig {
-  RunnerConfig(max_concurrency: 4, default_timeout_ms: 5000, test_filter: None)
+/// Start building a test run.
+pub fn new(suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
+  RunBuilder(
+    suites: suites,
+    config: parallel.default_config(),
+    result_filter: None,
+    should_exit_on_failure: False,
+    reporter: None,
+  )
 }
 
-/// Configuration for sequential execution.
-///
-/// Returns a configuration with:
-/// - 1 concurrent test (sequential)
-/// - 5 second timeout per test
-/// - No test filter (all tests run)
-///
-/// Use this when debugging test failures or when tests must not run in parallel.
-///
-/// ## Example
-///
-/// ```gleam
-/// test_cases
-/// |> run_all_with_config(sequential_config())
-/// |> report(io.print)
-/// ```
-///
-pub fn sequential_config() -> RunnerConfig {
-  RunnerConfig(max_concurrency: 1, default_timeout_ms: 5000, test_filter: None)
+/// Set the maximum number of tests to execute concurrently.
+pub fn max_concurrency(builder: RunBuilder(ctx), max: Int) -> RunBuilder(ctx) {
+  let parallel.ParallelConfig(max_concurrency: _, default_timeout_ms: timeout) =
+    builder.config
+  RunBuilder(
+    ..builder,
+    config: parallel.ParallelConfig(
+      max_concurrency: max,
+      default_timeout_ms: timeout,
+    ),
+  )
 }
 
-/// Run all tests with custom configuration.
-///
-/// Each test runs in an isolated BEAM process. If a test panics, it doesn't
-/// affect other tests. If a test exceeds the timeout, it's killed and marked
-/// as `TimedOut`.
-///
-/// Results are returned in the same order as the input tests, regardless of
-/// which tests finish first. If a `test_filter` is provided in the config,
-/// only tests where the predicate returns `True` will run.
-///
-/// ## Example
-///
-/// ```gleam
-/// let config = RunnerConfig(
-///   max_concurrency: 8,
-///   default_timeout_ms: 10_000,
-///   test_filter: None,
-/// )
-///
-/// tests()
-/// |> to_test_cases("my_test")
-/// |> run_all_with_config(config)
-/// |> report(io.print)
-/// ```
-///
-/// ## Filtering Example
-///
-/// ```gleam
-/// let config = RunnerConfig(
-///   max_concurrency: 4,
-///   default_timeout_ms: 5000,
-///   test_filter: Some(fn(c) { list.contains(c.tags, "unit") }),
-/// )
-/// ```
-///
-/// ## Parameters
-///
-/// - `config` - Execution settings (concurrency, timeout, filter)
-/// - `test_cases` - List of test cases to run
-///
-/// ## Returns
-///
-/// List of `TestResult` in the same order as the input tests (after filtering).
-///
-pub fn run_all_with_config(
-  config: RunnerConfig,
-  test_cases: List(TestCase),
-) -> List(TestResult) {
-  let filtered_cases = apply_test_filter(config.test_filter, test_cases)
-  let parallel_config =
-    parallel.ParallelConfig(
-      max_concurrency: config.max_concurrency,
-      default_timeout_ms: config.default_timeout_ms,
-    )
-  parallel.run_parallel(parallel_config, filtered_cases)
+/// Set the default per-test timeout in milliseconds.
+pub fn default_timeout_ms(
+  builder: RunBuilder(ctx),
+  timeout_ms: Int,
+) -> RunBuilder(ctx) {
+  let parallel.ParallelConfig(max_concurrency: max, default_timeout_ms: _) =
+    builder.config
+  RunBuilder(
+    ..builder,
+    config: parallel.ParallelConfig(
+      max_concurrency: max,
+      default_timeout_ms: timeout_ms,
+    ),
+  )
 }
 
-fn apply_test_filter(
-  filter: Option(fn(SingleTestConfig) -> Bool),
-  test_cases: List(TestCase),
-) -> List(TestCase) {
-  case filter {
-    None -> test_cases
-    Some(predicate) ->
-      list.filter(test_cases, fn(test_case) {
-        let TestCase(config) = test_case
-        predicate(config)
-      })
+/// Configure the runner to exit non-zero if any test fails.
+///
+/// Exits after `run()` completes.
+pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+  RunBuilder(..builder, should_exit_on_failure: True)
+}
+
+/// Attach an event-driven reporter.
+///
+/// When present, the runner will drive the reporter with `ReporterEvent`s and
+/// the reporter will print output (including progress) during the run.
+pub fn reporter(
+  builder: RunBuilder(ctx),
+  reporter: reporter_api.Reporter,
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, reporter: Some(reporter))
+}
+
+/// Filter the returned results list (and any exit-on-failure decision) by a predicate.
+pub fn filter_results(
+  builder: RunBuilder(ctx),
+  predicate: fn(TestResult) -> Bool,
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, result_filter: Some(predicate))
+}
+
+/// Execute all suites and return the combined results.
+///
+/// If `exit_on_failure()` was set, this function terminates the process (via
+/// `erlang:halt/1`) after running.
+pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
+  let results0 = case builder.reporter {
+    None -> run_suites(builder.config, builder.suites, [])
+    Some(reporter) ->
+      run_suites_with_reporter(builder.config, builder.suites, reporter)
+  }
+
+  let results = case builder.result_filter {
+    None -> results0
+    Some(predicate) -> list.filter(results0, predicate)
+  }
+
+  case builder.should_exit_on_failure {
+    True -> exit_results_on_failure(results)
+    False -> results
   }
 }
 
-/// Run all tests with default configuration.
-///
-/// This is the recommended way to run tests. Uses `default_config()`:
-/// - 4 concurrent tests
-/// - 5 second timeout per test
-/// - Full process isolation
-///
-/// ## Example
-///
-/// ```gleam
-/// pub fn main() {
-/// ```
-///
-pub fn run_all(test_cases: List(TestCase)) -> List(TestResult) {
-  run_all_with_config(default_config(), test_cases)
-}
-
-// =============================================================================
-// Suite Execution (with before_all/after_all support)
-// =============================================================================
-
-/// Run a test suite with custom configuration.
-///
-/// Use this when you need `before_all`/`after_all` hooks with custom
-/// concurrency or timeout settings. For default settings, use `run_suite`.
-///
-/// ## Execution Flow
-///
-/// For each group in the suite:
-///
-/// ```text
-/// ┌─────────────────────────────────────────────────────────────┐
-/// │ 1. Run before_all hooks (sequentially)                      │
-/// │    └─ If any fail → mark all tests as SetupFailed, skip to 5│
-/// │                                                              │
-/// │ 2. For each test:                                           │
-/// │    ├─ Run before_each hooks (outer → inner)                 │
-/// │    ├─ Run test body                                         │
-/// │    └─ Run after_each hooks (inner → outer)                  │
-/// │                                                              │
-/// │ 3. Tests run in parallel (up to max_concurrency)            │
-/// │                                                              │
-/// │ 4. Process nested groups (recurse)                          │
-/// │                                                              │
-/// │ 5. Run after_all hooks (always, even on failure)            │
-/// └─────────────────────────────────────────────────────────────┘
-/// ```
-///
-/// ## Parallelism
-///
-/// - Tests within a group run in parallel
-/// - `before_all` and `after_all` are synchronization barriers
-/// - Nested groups are processed after their parent's tests complete
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
-/// import dream_test/runner.{run_suite_with_config, RunnerConfig}
-/// import dream_test/reporter/bdd.{report}
-/// import dream_test/types.{AssertionOk}
-/// import gleam/io
-///
-/// pub fn main() {
-///   // Custom config for integration tests
-///   let config = RunnerConfig(
-///     max_concurrency: 2,          // Limit parallelism for shared resources
-///     default_timeout_ms: 30_000,  // 30s timeout for slow operations
-///   )
-///
-///   integration_tests()
-///   |> to_test_suite("integration_test")
-///   |> run_suite_with_config(config)
-///   |> report(io.print)
-/// }
-///
-/// fn integration_tests() {
-///   describe("Database", [
-///     before_all(fn() { start_database(); AssertionOk }),
-///     before_each(fn() { begin_transaction(); AssertionOk }),
-///
-///     it("creates users", fn() { ... }),
-///     it("queries users", fn() { ... }),
-///
-///     after_each(fn() { rollback_transaction(); AssertionOk }),
-///     after_all(fn() { stop_database(); AssertionOk }),
-///   ])
-/// }
-/// ```
-///
-/// ## Parameters
-///
-/// - `config` - Execution settings (concurrency, timeout, filter)
-/// - `suite` - The test suite from `to_test_suite`
-///
-/// ## Returns
-///
-/// List of `TestResult` for all tests in the suite (after filtering).
-///
-pub fn run_suite_with_config(
-  config: RunnerConfig,
-  suite: TestSuite,
+fn run_suites(
+  config: parallel.ParallelConfig,
+  suites: List(TestSuite(ctx)),
+  acc_rev: List(TestResult),
 ) -> List(TestResult) {
-  let filtered_suite = apply_suite_filter(config.test_filter, suite)
-  let parallel_config =
-    parallel.ParallelConfig(
-      max_concurrency: config.max_concurrency,
-      default_timeout_ms: config.default_timeout_ms,
-    )
-  parallel.run_suite_parallel(parallel_config, filtered_suite)
-}
+  case suites {
+    [] -> list.reverse(acc_rev)
+    [suite, ..rest] -> {
+      let suite_results = parallel.run_suite_parallel(config, suite)
+      let next_acc_rev = push_results_rev(suite_results, acc_rev)
 
-fn apply_suite_filter(
-  filter: Option(fn(SingleTestConfig) -> Bool),
-  suite: TestSuite,
-) -> TestSuite {
-  case filter {
-    None -> suite
-    Some(predicate) -> filter_suite(predicate, suite)
-  }
-}
-
-fn filter_suite(
-  predicate: fn(SingleTestConfig) -> Bool,
-  suite: TestSuite,
-) -> TestSuite {
-  let filtered_items = filter_suite_items(predicate, suite.items)
-  TestSuite(..suite, items: filtered_items)
-}
-
-fn filter_suite_items(
-  predicate: fn(SingleTestConfig) -> Bool,
-  items: List(types.TestSuiteItem),
-) -> List(types.TestSuiteItem) {
-  list.filter_map(items, fn(item) { filter_suite_item(predicate, item) })
-}
-
-fn filter_suite_item(
-  predicate: fn(SingleTestConfig) -> Bool,
-  item: types.TestSuiteItem,
-) -> Result(types.TestSuiteItem, Nil) {
-  case item {
-    SuiteTest(TestCase(config)) ->
-      case predicate(config) {
-        True -> Ok(item)
-        False -> Error(Nil)
-      }
-    SuiteGroup(nested_suite) -> {
-      let filtered = filter_suite(predicate, nested_suite)
-      // Keep group only if it has remaining tests
-      case list.is_empty(filtered.items) {
-        True -> Error(Nil)
-        False -> Ok(SuiteGroup(filtered))
+      case find_after_all_failure_message(suite_results) {
+        None -> run_suites(config, rest, next_acc_rev)
+        Some(message) -> {
+          let remaining = suites_to_setup_failed_results(rest, message, [])
+          list.reverse(push_results_rev(remaining, next_acc_rev))
+        }
       }
     }
   }
 }
 
-/// Run a test suite with default configuration.
-///
-/// This is the recommended way to run tests when you need `before_all`
-/// or `after_all` hooks. It uses sensible defaults suitable for most
-/// integration test suites.
-///
-/// ## Default Configuration
-///
-/// | Setting            | Value   | Meaning                              |
-/// |--------------------|---------|--------------------------------------|
-/// | `max_concurrency`  | 4       | Up to 4 tests run in parallel        |
-/// | `default_timeout`  | 5000ms  | Each test has 5 seconds to complete  |
-///
-/// For custom settings, use `run_suite_with_config`.
-///
-/// ## When to Use `run_suite` vs `run_all`
-///
-/// ```gleam
-/// // Use run_all when you DON'T need before_all/after_all
-/// tests()
-/// |> to_test_cases("my_test")
-/// |> run_all()
-///
-/// // Use run_suite when you DO need before_all/after_all
-/// tests()
-/// |> to_test_suite("my_test")
-/// |> run_suite()
-/// ```
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
-/// import dream_test/runner.{run_suite}
-/// import dream_test/reporter/bdd.{report}
-/// import dream_test/types.{AssertionOk}
-/// import gleam/io
-///
-/// pub fn main() {
-///   tests()
-///   |> to_test_suite("my_integration_test")
-///   |> run_suite()
-///   |> report(io.print)
-/// }
-///
-/// fn tests() {
-///   describe("API client", [
-///     before_all(fn() {
-///       start_mock_server()
-///       AssertionOk
-///     }),
-///
-///     it("fetches data", fn() { ... }),
-///     it("handles errors", fn() { ... }),
-///
-///     after_all(fn() {
-///       stop_mock_server()
-///       AssertionOk
-///     }),
-///   ])
-/// }
-/// ```
-///
-/// ## Parameters
-///
-/// - `suite` - The test suite from `to_test_suite`
-///
-/// ## Returns
-///
-/// List of `TestResult` for all tests in the suite.
-///
-pub fn run_suite(suite: TestSuite) -> List(TestResult) {
-  run_suite_with_config(default_config(), suite)
-}
-
-/// Run all tests sequentially without process isolation.
-///
-/// Tests run one at a time in the main process. No timeout protection.
-/// Use this for:
-/// - Debugging test failures
-/// - When process isolation causes issues
-/// - Very simple test suites
-///
-/// **Warning:** A crashing test will crash the entire test run.
-///
-/// ## Example
-///
-/// ```gleam
-/// // For debugging a specific failure
-/// test_cases
-/// |> run_all_sequential()
-/// |> report(io.print)
-/// ```
-///
-pub fn run_all_sequential(test_cases: List(TestCase)) -> List(TestResult) {
-  run_all_from_list(test_cases, [])
-}
-
-/// Run a single test directly without isolation.
-///
-/// Executes the test function and returns a `TestResult`. No process isolation
-/// or timeout protection. Useful for debugging individual tests.
-///
-/// ## Example
-///
-/// ```gleam
-/// let config = SingleTestConfig(
-///   name: "my test",
-///   full_name: ["suite", "my test"],
-///   tags: [],
-///   kind: Unit,
-///   run: fn() { ... },
-///   timeout_ms: None,
-/// )
-///
-/// let result = run_single_test(config)
-/// ```
-///
-pub fn run_single_test(config: SingleTestConfig) -> TestResult {
-  let start_time = timing.now_ms()
-  let assertion_result = config.run()
-  let duration_ms = timing.now_ms() - start_time
-
-  let #(status, failures) = case assertion_result {
-    AssertionOk -> #(Passed, [])
-    AssertionFailed(failure) -> #(Failed, [failure])
-    AssertionSkipped -> #(Skipped, [])
-  }
-
-  TestResult(
-    name: config.name,
-    full_name: config.full_name,
-    status: status,
-    duration_ms: duration_ms,
-    tags: config.tags,
-    failures: failures,
-    kind: config.kind,
-  )
-}
-
-/// Run a single test case directly without isolation.
-///
-/// Convenience wrapper around `run_single_test` that unwraps the `TestCase`.
-///
-pub fn run_test_case(test_case: TestCase) -> TestResult {
-  case test_case {
-    TestCase(config) -> run_single_test(config)
-  }
-}
-
-fn run_all_from_list(
-  remaining: List(TestCase),
-  accumulated: List(TestResult),
+fn run_suites_with_reporter(
+  config: parallel.ParallelConfig,
+  suites: List(TestSuite(ctx)),
+  reporter0: reporter_api.Reporter,
 ) -> List(TestResult) {
-  case remaining {
-    [] -> list.reverse(accumulated)
+  let total = count_tests_in_suites(suites, 0)
+  let reporter1 =
+    reporter_api.handle_event(reporter0, reporter_types.RunStarted(total))
 
-    [head, ..tail] -> {
-      let result = run_test_case(head)
-      run_all_from_list(tail, [result, ..accumulated])
+  let #(results_rev, completed, reporter_final) =
+    run_suites_with_reporter_loop(config, suites, reporter1, total, 0, [])
+
+  let _ =
+    reporter_api.handle_event(
+      reporter_final,
+      reporter_types.RunFinished(completed, total),
+    )
+
+  list.reverse(results_rev)
+}
+
+fn run_suites_with_reporter_loop(
+  config: parallel.ParallelConfig,
+  suites: List(TestSuite(ctx)),
+  reporter: reporter_api.Reporter,
+  total: Int,
+  completed: Int,
+  acc_rev: List(TestResult),
+) -> #(List(TestResult), Int, reporter_api.Reporter) {
+  case suites {
+    [] -> #(acc_rev, completed, reporter)
+    [suite, ..rest] -> {
+      let suite_results = parallel.run_suite_parallel(config, suite)
+      let #(next_completed, next_reporter) =
+        emit_test_finished_events(suite_results, completed, total, reporter)
+      let next_acc_rev = push_results_rev(suite_results, acc_rev)
+
+      case find_after_all_failure_message(suite_results) {
+        None ->
+          run_suites_with_reporter_loop(
+            config,
+            rest,
+            next_reporter,
+            total,
+            next_completed,
+            next_acc_rev,
+          )
+
+        Some(message) -> {
+          let remaining_results =
+            suites_to_setup_failed_results(rest, message, [])
+          let #(final_completed, final_reporter) =
+            emit_test_finished_events(
+              remaining_results,
+              next_completed,
+              total,
+              next_reporter,
+            )
+
+          let final_acc_rev = push_results_rev(remaining_results, next_acc_rev)
+          #(final_acc_rev, final_completed, final_reporter)
+        }
+      }
     }
   }
 }
 
-// =============================================================================
-// Exit Code Handling
-// =============================================================================
-
-/// Check if any test results indicate failure.
-///
-/// Returns `True` if any test has status `Failed`, `TimedOut`, or `SetupFailed`.
-/// Returns `False` if all tests passed, were skipped, or are pending.
-///
-/// ## Example
-///
-/// ```gleam
-/// let results = run_all(test_cases)
-/// case has_failures(results) {
-///   True -> io.println("Some tests failed!")
-///   False -> io.println("All tests passed!")
-/// }
-/// ```
-///
-pub fn has_failures(results: List(TestResult)) -> Bool {
-  check_for_failures(results)
-}
-
-fn check_for_failures(results: List(TestResult)) -> Bool {
+fn emit_test_finished_events(
+  results: List(TestResult),
+  completed: Int,
+  total: Int,
+  reporter: reporter_api.Reporter,
+) -> #(Int, reporter_api.Reporter) {
   case results {
-    [] -> False
-    [result, ..rest] -> check_result_for_failure(result.status, rest)
+    [] -> #(completed, reporter)
+    [result, ..rest] -> {
+      case result.name == "<after_all>" {
+        True -> emit_test_finished_events(rest, completed, total, reporter)
+        False -> {
+          let next_completed = completed + 1
+          let next_reporter =
+            reporter_api.handle_event(
+              reporter,
+              reporter_types.TestFinished(next_completed, total, result),
+            )
+          emit_test_finished_events(rest, next_completed, total, next_reporter)
+        }
+      }
+    }
   }
 }
 
-fn check_result_for_failure(status: Status, rest: List(TestResult)) -> Bool {
-  case status {
-    Failed -> True
-    TimedOut -> True
-    SetupFailed -> True
-    Passed -> check_for_failures(rest)
-    _ -> check_for_failures(rest)
+fn count_tests_in_suites(suites: List(TestSuite(ctx)), acc: Int) -> Int {
+  case suites {
+    [] -> acc
+    [suite, ..rest] ->
+      count_tests_in_suites(rest, acc + count_tests_in_suite(suite, 0))
   }
+}
+
+fn count_tests_in_suite(suite: TestSuite(ctx), acc: Int) -> Int {
+  count_tests_in_items(suite.items, acc)
+}
+
+fn count_tests_in_items(items: List(TestSuiteItem(ctx)), acc: Int) -> Int {
+  case items {
+    [] -> acc
+    [item, ..rest] ->
+      case item {
+        SuiteTest(_) -> count_tests_in_items(rest, acc + 1)
+        SuiteGroup(group_suite) ->
+          count_tests_in_items(rest, count_tests_in_suite(group_suite, acc))
+      }
+  }
+}
+
+fn push_results_rev(
+  results: List(TestResult),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case results {
+    [] -> acc_rev
+    [result, ..rest] -> push_results_rev(rest, [result, ..acc_rev])
+  }
+}
+
+fn find_after_all_failure_message(results: List(TestResult)) -> Option(String) {
+  case results {
+    [] -> None
+    [result, ..rest] -> {
+      case result.name == "<after_all>" && result.status == Failed {
+        True -> Some(extract_failure_message(result.failures))
+        False -> find_after_all_failure_message(rest)
+      }
+    }
+  }
+}
+
+fn extract_failure_message(failures: List(AssertionFailure)) -> String {
+  case failures {
+    [failure, ..] -> failure.message
+    [] -> "after_all failed"
+  }
+}
+
+fn suites_to_setup_failed_results(
+  suites: List(TestSuite(ctx)),
+  message: String,
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case suites {
+    [] -> list.reverse(acc_rev)
+    [suite, ..rest] -> {
+      let suite_results = suite_to_setup_failed_results(suite, message, [])
+      let next_acc_rev = push_results_rev(suite_results, acc_rev)
+      suites_to_setup_failed_results(rest, message, next_acc_rev)
+    }
+  }
+}
+
+fn suite_to_setup_failed_results(
+  suite: TestSuite(ctx),
+  message: String,
+  prefix: List(String),
+) -> List(TestResult) {
+  let suite_prefix = list.append(prefix, [suite.name])
+  suite_items_to_setup_failed_results(suite.items, suite_prefix, message, [])
+}
+
+fn suite_items_to_setup_failed_results(
+  items: List(TestSuiteItem(ctx)),
+  prefix: List(String),
+  message: String,
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case items {
+    [] -> list.reverse(acc_rev)
+    [item, ..rest] ->
+      case item {
+        SuiteTest(test_case) -> {
+          let result =
+            test_case_to_setup_failed_result(test_case, prefix, message)
+          suite_items_to_setup_failed_results(rest, prefix, message, [
+            result,
+            ..acc_rev
+          ])
+        }
+
+        SuiteGroup(group_suite) -> {
+          let group_results =
+            suite_to_setup_failed_results(group_suite, message, prefix)
+          let next_acc_rev = push_results_rev(group_results, acc_rev)
+          suite_items_to_setup_failed_results(
+            rest,
+            prefix,
+            message,
+            next_acc_rev,
+          )
+        }
+      }
+  }
+}
+
+fn test_case_to_setup_failed_result(
+  test_case: SuiteTestCase(ctx),
+  prefix: List(String),
+  message: String,
+) -> TestResult {
+  TestResult(
+    name: test_case.name,
+    full_name: list.append(prefix, [test_case.name]),
+    status: SetupFailed,
+    duration_ms: 0,
+    tags: test_case.tags,
+    failures: [
+      types.AssertionFailure(
+        operator: "after_all",
+        message: message,
+        payload: None,
+      ),
+    ],
+    kind: test_case.kind,
+  )
 }
 
 /// Exit the process with an appropriate exit code based on test results.
-///
-/// Exits with code 1 if any test failed, timed out, or had setup failures.
-/// Exits with code 0 if all tests passed, were skipped, or are pending.
-///
-/// **Important:** This function terminates the BEAM process. Code after this
-/// call will not execute.
-///
-/// ## Usage
-///
-/// Call this after reporting results to ensure CI systems detect test failures:
-///
-/// ```gleam
-/// pub fn main() {
-///   let results =
-///     tests()
-///     |> to_test_cases("my_test")
-///     |> run_all()
-///
-///   report(results, io.print)
-///   exit_on_failure(results)
-/// }
-/// ```
-///
-/// ## Exit Codes
-///
-/// | Condition                          | Exit Code |
-/// |------------------------------------|-----------|
-/// | All tests passed/skipped/pending   | 0         |
-/// | Any test failed/timed out/setup failed | 1     |
-///
-pub fn exit_on_failure(results: List(TestResult)) -> Nil {
+pub fn exit_results_on_failure(results: List(TestResult)) -> List(TestResult) {
   let code = case has_failures(results) {
     True -> 1
     False -> 0
@@ -638,5 +380,23 @@ pub fn exit_on_failure(results: List(TestResult)) -> Nil {
   halt(code)
 }
 
+/// Check if any test results indicate failure.
+pub fn has_failures(results: List(TestResult)) -> Bool {
+  case results {
+    [] -> False
+    [result, ..rest] -> check_status(result.status, rest)
+  }
+}
+
+fn check_status(status: Status, rest: List(TestResult)) -> Bool {
+  case status {
+    Failed -> True
+    TimedOut -> True
+    SetupFailed -> True
+    Passed -> has_failures(rest)
+    _ -> has_failures(rest)
+  }
+}
+
 @external(erlang, "erlang", "halt")
-fn halt(code: Int) -> Nil
+fn halt(code: Int) -> List(TestResult)

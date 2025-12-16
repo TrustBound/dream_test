@@ -3,13 +3,13 @@ import dream_test/reporter/bdd.{format}
 import dream_test/types.{
   AssertionFailure, EqualityFailure, Failed, Passed, TestResult, Unit,
 }
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
 import gleam/option.{Some}
 
 pub fn tests() {
   describe("BDD Reporter", [
-    describe("format", [
-      it("renders a basic BDD-style report", fn() {
+    group("format", [
+      it("renders a basic BDD-style report", fn(_) {
         // Arrange
         let passing =
           TestResult(

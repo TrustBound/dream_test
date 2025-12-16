@@ -2,18 +2,18 @@
 
 import dream_test/types.{
   type MatchResult, type TestSuiteItem, AssertionFailure, GherkinScenario,
-  MatchFailed, MatchOk, SuiteTest, TestCase,
+  MatchFailed, MatchOk, SuiteTest,
 }
 import gleam/option.{None}
 
 /// Assert that a list of suite items contains exactly one GherkinScenario test.
 pub fn have_single_gherkin_test(
-  items: MatchResult(List(TestSuiteItem)),
+  items: MatchResult(List(TestSuiteItem(Nil))),
 ) -> MatchResult(Nil) {
   case items {
     MatchFailed(failure) -> MatchFailed(failure)
-    MatchOk([SuiteTest(TestCase(config))]) -> {
-      case config.kind {
+    MatchOk([SuiteTest(test_case)]) -> {
+      case test_case.kind {
         GherkinScenario(_) -> MatchOk(Nil)
         _ ->
           MatchFailed(AssertionFailure(

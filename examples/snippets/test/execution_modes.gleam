@@ -1,14 +1,14 @@
-//// README: Execution modes (flat vs suite)
+//// README: Execution mode (suite-first)
 
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_all, run_suite}
-import dream_test/unit.{describe, it, to_test_cases, to_test_suite}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, it}
 import gleam/io
 
 pub fn tests() {
   describe("Execution modes demo", [
-    it("works in both modes", fn() {
+    it("runs as a suite", fn(_) {
       1 + 1
       |> should()
       |> equal(2)
@@ -17,20 +17,9 @@ pub fn tests() {
   ])
 }
 
-// Flat mode - simpler, faster
-pub fn run_flat_mode() {
-  to_test_cases("my_test", tests())
-  |> run_all()
-  |> report(io.print)
-}
-
-// Suite mode - preserves group structure for before_all/after_all
-pub fn run_suite_mode() {
-  to_test_suite("my_test", tests())
-  |> run_suite()
-  |> report(io.print)
-}
-
 pub fn main() {
-  run_flat_mode()
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

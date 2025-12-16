@@ -1,4 +1,6 @@
-import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
+import dream_test/assertions/should.{
+  be_error, be_ok, be_true, equal, or_fail_with, should,
+}
 import dream_test/gherkin/step_trie.{
   CapturedFloat, CapturedInt, CapturedString, CapturedWord,
 }
@@ -7,13 +9,14 @@ import dream_test/gherkin/steps.{
   new_registry, step, then_, when_,
 }
 import dream_test/gherkin/types as gherkin_types
-import dream_test/types.{type AssertionResult, AssertionOk}
-import dream_test/unit.{describe, it}
+import dream_test/types.{AssertionOk}
+import dream_test/unit.{describe, group, it}
+import gleam/result
 
 pub fn tests() {
   describe("Gherkin Steps", [
-    describe("new_registry", [
-      it("creates empty registry that finds no steps", fn() {
+    group("new_registry", [
+      it("creates empty registry that finds no steps", fn(_) {
         // Arrange
         let registry = new_registry()
 
@@ -21,150 +24,168 @@ pub fn tests() {
         let result = find_step(registry, gherkin_types.Given, "anything")
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Empty registry should find no steps")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Empty registry should find no steps")
       }),
     ]),
-    describe("given", [
-      it("registers and finds Given step", fn() {
+    group("given", [
+      it("registers and finds Given step", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have items", passing_handler)
+          |> given("I have items", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result = find_step(registry, gherkin_types.Given, "I have items")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(msg) -> fail_with("Should find Given step: " <> msg)
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Should find Given step")
       }),
-      it("does not match Given step with When keyword", fn() {
+      it("does not match Given step with When keyword", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have items", passing_handler)
+          |> given("I have items", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result = find_step(registry, gherkin_types.When, "I have items")
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Given step should not match When keyword")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Given step should not match When keyword")
       }),
     ]),
-    describe("when_", [
-      it("registers and finds When step", fn() {
+    group("when_", [
+      it("registers and finds When step", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> when_("I add items", passing_handler)
+          |> when_("I add items", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result = find_step(registry, gherkin_types.When, "I add items")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(msg) -> fail_with("Should find When step: " <> msg)
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Should find When step")
       }),
-      it("does not match When step with Then keyword", fn() {
+      it("does not match When step with Then keyword", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> when_("I add items", passing_handler)
+          |> when_("I add items", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result = find_step(registry, gherkin_types.Then, "I add items")
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("When step should not match Then keyword")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("When step should not match Then keyword")
       }),
     ]),
-    describe("then_", [
-      it("registers and finds Then step", fn() {
+    group("then_", [
+      it("registers and finds Then step", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> then_("I should see results", passing_handler)
+          |> then_("I should see results", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result =
           find_step(registry, gherkin_types.Then, "I should see results")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(msg) -> fail_with("Should find Then step: " <> msg)
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Should find Then step")
       }),
     ]),
-    describe("step", [
-      it("registers step that matches Given keyword", fn() {
+    group("step", [
+      it("registers step that matches Given keyword", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", passing_handler)
+          |> step("something happens", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result =
           find_step(registry, gherkin_types.Given, "something happens")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(_) -> fail_with("Wildcard step should match Given")
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Wildcard step should match Given")
       }),
-      it("registers step that matches When keyword", fn() {
+      it("registers step that matches When keyword", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", passing_handler)
+          |> step("something happens", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result =
           find_step(registry, gherkin_types.When, "something happens")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(_) -> fail_with("Wildcard step should match When")
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Wildcard step should match When")
       }),
-      it("registers step that matches Then keyword", fn() {
+      it("registers step that matches Then keyword", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", passing_handler)
+          |> step("something happens", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
         let result =
           find_step(registry, gherkin_types.Then, "something happens")
 
         // Assert
-        case result {
-          Ok(_) -> pass()
-          Error(_) -> fail_with("Wildcard step should match Then")
-        }
+        result
+        |> should()
+        |> be_ok()
+        |> or_fail_with("Wildcard step should match Then")
       }),
     ]),
-    describe("find_step with And/But", [
-      it("And inherits from Given context - finds Given handler", fn() {
+    group("find_step with And/But", [
+      it("And inherits from Given context - finds Given handler", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("some condition", passing_handler)
+          |> given("some condition", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Note: And/But resolve to their parent keyword in practice
         // The find_step function itself doesn't resolve - that's done at execution time
@@ -175,78 +196,76 @@ pub fn tests() {
         let result = find_step(registry, gherkin_types.And, "some condition")
 
         // Assert - And keyword itself doesn't find Given step
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("And keyword should not directly find Given step")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("And keyword should not directly find Given step")
       }),
     ]),
-    describe("find_step with captures", [
-      it("captures integer from {int} pattern", fn() {
+    group("find_step with captures", [
+      it("captures integer from {int} pattern", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have {int} items", passing_handler)
+          |> given("I have {int} items", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
-        let result = find_step(registry, gherkin_types.Given, "I have 42 items")
+        let captures_result =
+          find_step(registry, gherkin_types.Given, "I have 42 items")
+          |> result.map(fn(m) { m.captures })
 
         // Assert
-        case result {
-          Ok(match) -> {
-            case match.captures {
-              [CapturedInt(42)] -> pass()
-              _ -> fail_with("Should capture integer 42")
-            }
-          }
-          Error(msg) -> fail_with("Should find step: " <> msg)
-        }
+        captures_result
+        |> should()
+        |> be_ok()
+        |> equal([CapturedInt(42)])
+        |> or_fail_with("Should capture integer 42")
       }),
-      it("captures string from {string} pattern", fn() {
+      it("captures string from {string} pattern", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("I see {string}", passing_handler)
+          |> given("I see {string}", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
-        let result =
+        let captures_result =
           find_step(registry, gherkin_types.Given, "I see \"Hello World\"")
+          |> result.map(fn(m) { m.captures })
 
         // Assert
-        case result {
-          Ok(match) -> {
-            case match.captures {
-              [CapturedString("Hello World")] -> pass()
-              _ -> fail_with("Should capture string 'Hello World'")
-            }
-          }
-          Error(msg) -> fail_with("Should find step: " <> msg)
-        }
+        captures_result
+        |> should()
+        |> be_ok()
+        |> equal([CapturedString("Hello World")])
+        |> or_fail_with("Should capture string 'Hello World'")
       }),
-      it("captures multiple values", fn() {
+      it("captures multiple values", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("I add {int} of {string}", passing_handler)
+          |> given("I add {int} of {string}", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
 
         // Act
-        let result =
+        let captures_result =
           find_step(registry, gherkin_types.Given, "I add 5 of \"Widget\"")
+          |> result.map(fn(m) { m.captures })
 
         // Assert
-        case result {
-          Ok(match) -> {
-            case match.captures {
-              [CapturedInt(5), CapturedString("Widget")] -> pass()
-              _ -> fail_with("Should capture int and string")
-            }
-          }
-          Error(msg) -> fail_with("Should find step: " <> msg)
-        }
+        captures_result
+        |> should()
+        |> be_ok()
+        |> equal([CapturedInt(5), CapturedString("Widget")])
+        |> or_fail_with("Should capture int and string")
       }),
     ]),
-    describe("find_step error messages", [
-      it("returns descriptive error for undefined step", fn() {
+    group("find_step error messages", [
+      it("returns descriptive error for undefined step", fn(_) {
         // Arrange
         let registry = new_registry()
 
@@ -255,19 +274,14 @@ pub fn tests() {
           find_step(registry, gherkin_types.Given, "something undefined")
 
         // Assert
-        case result {
-          Error(msg) -> {
-            case msg == "Undefined step: Given something undefined" {
-              True -> pass()
-              False -> fail_with("Error should include keyword and text")
-            }
-          }
-          Ok(_) -> fail_with("Should return error")
-        }
+        result
+        |> should()
+        |> equal(Error("Undefined step: Given something undefined"))
+        |> or_fail_with("Error should include keyword and text")
       }),
     ]),
-    describe("get_int", [
-      it("extracts int at valid index", fn() {
+    group("get_int", [
+      it("extracts int at valid index", fn(_) {
         // Arrange
         let captures = [CapturedInt(42), CapturedString("test")]
         let expected = Ok(42)
@@ -281,7 +295,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Should extract int at index 0")
       }),
-      it("returns error for non-int at index", fn() {
+      it("returns error for non-int at index", fn(_) {
         // Arrange
         let captures = [CapturedString("test")]
 
@@ -289,12 +303,12 @@ pub fn tests() {
         let result = get_int(captures, 0)
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Should error for non-int")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Should error for non-int")
       }),
-      it("returns error for out of bounds index", fn() {
+      it("returns error for out of bounds index", fn(_) {
         // Arrange
         let captures = [CapturedInt(42)]
 
@@ -302,32 +316,30 @@ pub fn tests() {
         let result = get_int(captures, 5)
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Should error for out of bounds")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Should error for out of bounds")
       }),
     ]),
-    describe("get_float", [
-      it("extracts float at valid index", fn() {
+    group("get_float", [
+      it("extracts float at valid index", fn(_) {
         // Arrange
         let captures = [CapturedFloat(3.14)]
 
         // Act
-        let result = get_float(captures, 0)
+        let ok_result =
+          get_float(captures, 0)
+          |> result.map(fn(f) { f >. 3.13 && f <. 3.15 })
 
         // Assert
-        case result {
-          Ok(f) -> {
-            case f >. 3.13 && f <. 3.15 {
-              True -> pass()
-              False -> fail_with("Should extract float ~3.14")
-            }
-          }
-          Error(_) -> fail_with("Should extract float")
-        }
+        ok_result
+        |> should()
+        |> be_ok()
+        |> be_true()
+        |> or_fail_with("Should extract float ~3.14")
       }),
-      it("returns error for non-float at index", fn() {
+      it("returns error for non-float at index", fn(_) {
         // Arrange
         let captures = [CapturedInt(42)]
 
@@ -335,14 +347,14 @@ pub fn tests() {
         let result = get_float(captures, 0)
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Should error for non-float")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Should error for non-float")
       }),
     ]),
-    describe("get_string", [
-      it("extracts CapturedString at valid index", fn() {
+    group("get_string", [
+      it("extracts CapturedString at valid index", fn(_) {
         // Arrange
         let captures = [CapturedString("hello")]
         let expected = Ok("hello")
@@ -356,7 +368,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Should extract string")
       }),
-      it("extracts CapturedWord as string", fn() {
+      it("extracts CapturedWord as string", fn(_) {
         // Arrange
         let captures = [CapturedWord("word")]
         let expected = Ok("word")
@@ -370,7 +382,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Should extract word as string")
       }),
-      it("returns error for non-string at index", fn() {
+      it("returns error for non-string at index", fn(_) {
         // Arrange
         let captures = [CapturedInt(42)]
 
@@ -378,14 +390,14 @@ pub fn tests() {
         let result = get_string(captures, 0)
 
         // Assert
-        case result {
-          Error(_) -> pass()
-          Ok(_) -> fail_with("Should error for non-string")
-        }
+        result
+        |> should()
+        |> be_error()
+        |> or_fail_with("Should error for non-string")
       }),
     ]),
-    describe("get_word", [
-      it("extracts CapturedWord at valid index", fn() {
+    group("get_word", [
+      it("extracts CapturedWord at valid index", fn(_) {
         // Arrange
         let captures = [CapturedWord("myword")]
         let expected = Ok("myword")
@@ -399,7 +411,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Should extract word")
       }),
-      it("extracts CapturedString as word", fn() {
+      it("extracts CapturedString as word", fn(_) {
         // Arrange
         let captures = [CapturedString("quoted")]
         let expected = Ok("quoted")
@@ -414,8 +426,8 @@ pub fn tests() {
         |> or_fail_with("Should extract string as word")
       }),
     ]),
-    describe("capture_count", [
-      it("returns 0 for empty captures", fn() {
+    group("capture_count", [
+      it("returns 0 for empty captures", fn(_) {
         // Arrange
         let captures = []
         let expected = 0
@@ -429,7 +441,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Empty captures should have count 0")
       }),
-      it("returns correct count for multiple captures", fn() {
+      it("returns correct count for multiple captures", fn(_) {
         // Arrange
         let captures = [
           CapturedInt(1),
@@ -448,14 +460,16 @@ pub fn tests() {
         |> or_fail_with("Should count all captures")
       }),
     ]),
-    describe("chained registration", [
-      it("supports chaining multiple step types", fn() {
+    group("chained registration", [
+      it("supports chaining multiple step types", fn(_) {
         // Arrange
         let registry =
           new_registry()
-          |> given("a precondition", passing_handler)
-          |> when_("an action", passing_handler)
-          |> then_("an outcome", passing_handler)
+          |> given("a precondition", fn(_context: steps.StepContext) {
+            AssertionOk
+          })
+          |> when_("an action", fn(_context: steps.StepContext) { AssertionOk })
+          |> then_("an outcome", fn(_context: steps.StepContext) { AssertionOk })
 
         // Act
         let given_result =
@@ -464,23 +478,17 @@ pub fn tests() {
         let then_result = find_step(registry, gherkin_types.Then, "an outcome")
 
         // Assert
-        case given_result, when_result, then_result {
-          Ok(_), Ok(_), Ok(_) -> pass()
-          _, _, _ -> fail_with("All step types should be registered")
-        }
+        let ok_list = [
+          result.is_ok(given_result),
+          result.is_ok(when_result),
+          result.is_ok(then_result),
+        ]
+
+        ok_list
+        |> should()
+        |> equal([True, True, True])
+        |> or_fail_with("All step types should be registered")
       }),
     ]),
   ])
-}
-
-// =============================================================================
-// Test Helpers
-// =============================================================================
-
-fn pass() -> AssertionResult {
-  AssertionOk
-}
-
-fn passing_handler(_context: steps.StepContext) -> AssertionResult {
-  AssertionOk
 }

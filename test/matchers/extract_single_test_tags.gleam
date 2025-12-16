@@ -2,7 +2,7 @@
 
 import dream_test/types.{
   type MatchResult, type TestSuiteItem, AssertionFailure, MatchFailed, MatchOk,
-  SuiteTest, TestCase,
+  SuiteTest,
 }
 import gleam/option.{None}
 
@@ -10,11 +10,11 @@ import gleam/option.{None}
 ///
 /// Passes the tags to subsequent matchers for further assertions.
 pub fn extract_single_test_tags(
-  items: MatchResult(List(TestSuiteItem)),
+  items: MatchResult(List(TestSuiteItem(Nil))),
 ) -> MatchResult(List(String)) {
   case items {
     MatchFailed(failure) -> MatchFailed(failure)
-    MatchOk([SuiteTest(TestCase(config))]) -> MatchOk(config.tags)
+    MatchOk([SuiteTest(test_case)]) -> MatchOk(test_case.tags)
     MatchOk(_) ->
       MatchFailed(AssertionFailure(
         operator: "extract_single_test_tags",

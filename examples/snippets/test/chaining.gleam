@@ -1,16 +1,16 @@
 //// README: Chaining matchers
 
 import dream_test/assertions/should.{be_ok, be_some, equal, or_fail_with, should}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_all}
-import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, it}
 import gleam/io
 import gleam/option.{Some}
 
 pub fn tests() {
   describe("Chaining matchers", [
     // Unwrap Some, then check the value
-    it("unwraps Option", fn() {
+    it("unwraps Option", fn(_) {
       Some(42)
       |> should()
       |> be_some()
@@ -18,7 +18,7 @@ pub fn tests() {
       |> or_fail_with("Should contain 42")
     }),
     // Unwrap Ok, then check the value
-    it("unwraps Result", fn() {
+    it("unwraps Result", fn(_) {
       Ok("success")
       |> should()
       |> be_ok()
@@ -29,7 +29,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  to_test_cases("chaining", tests())
-  |> run_all()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

@@ -300,45 +300,20 @@ pub type TestResult {
   )
 }
 
-/// Configuration for a single test.
+/// A single runnable test within a suite.
 ///
-/// This is the internal representation of a test before it's run.
-/// Most users won't create this directly—use `describe`/`it` instead.
-///
-/// ## Fields
-///
-/// - `name` - The test's name
-/// - `full_name` - Complete path including parent groups
-/// - `tags` - Tags for filtering with `RunnerConfig.test_filter`
-/// - `kind` - Type of test (Unit, Integration, Gherkin)
-/// - `run` - The test function to execute
-/// - `timeout_ms` - Optional per-test timeout override
-/// - `before_each_hooks` - Hooks to run before the test (outer-to-inner order)
-/// - `after_each_hooks` - Hooks to run after the test (inner-to-outer order)
-///
-pub type SingleTestConfig {
-  SingleTestConfig(
+/// The test receives the suite context (possibly transformed by `before_each`)
+/// and may short-circuit with an `Error(String)`.
+pub type SuiteTestCase(ctx) {
+  SuiteTestCase(
     name: String,
-    full_name: List(String),
     tags: List(String),
     kind: TestKind,
-    run: fn() -> AssertionResult,
+    run: fn(ctx) -> Result(AssertionResult, String),
     /// Optional per-test timeout override in milliseconds.
     /// If None, uses the runner's default timeout.
     timeout_ms: Option(Int),
-    /// Hooks to run before the test, in outer-to-inner order.
-    before_each_hooks: List(fn() -> AssertionResult),
-    /// Hooks to run after the test, in inner-to-outer order.
-    after_each_hooks: List(fn() -> AssertionResult),
   )
-}
-
-/// A runnable test case.
-///
-/// Wraps a `SingleTestConfig`. This is what the runner actually executes.
-///
-pub type TestCase {
-  TestCase(SingleTestConfig)
 }
 
 /// A structured test suite preserving group hierarchy.
@@ -404,13 +379,18 @@ pub type TestCase {
 /// - `after_all_hooks` - Run once after all tests in this group complete
 /// - `items` - The tests and nested groups contained in this suite
 ///
-pub type TestSuite {
+pub type TestSuite(ctx) {
   TestSuite(
     name: String,
-    full_name: List(String),
-    before_all_hooks: List(fn() -> AssertionResult),
-    after_all_hooks: List(fn() -> AssertionResult),
-    items: List(TestSuiteItem),
+    /// Runs once before any tests in this suite; produces the initial context.
+    before_all: Option(fn() -> Result(ctx, String)),
+    /// Runs once after all tests in this suite complete (even on failure).
+    after_all: List(fn(ctx) -> Result(Nil, String)),
+    /// Runs before each test (outer-to-inner); threads context for that test.
+    before_each: List(fn(ctx) -> Result(ctx, String)),
+    /// Runs after each test (inner-to-outer); always runs for cleanup.
+    after_each: List(fn(ctx) -> Result(Nil, String)),
+    items: List(TestSuiteItem(ctx)),
   )
 }
 
@@ -432,11 +412,11 @@ pub type TestSuite {
 /// 2. `SuiteGroup` items are processed after tests complete
 /// 3. Each nested group runs its own `before_all`/`after_all` hooks
 ///
-pub type TestSuiteItem {
+pub type TestSuiteItem(ctx) {
   /// A single test case to run.
-  SuiteTest(TestCase)
+  SuiteTest(SuiteTestCase(ctx))
   /// A nested group with its own hooks.
-  SuiteGroup(TestSuite)
+  SuiteGroup(TestSuite(ctx))
 }
 
 /// Derive a Status from a list of failures.

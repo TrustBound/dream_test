@@ -9,19 +9,18 @@ import dream_test/gherkin/world_test
 import dream_test/lifecycle_test
 import dream_test/matchers/snapshot_test
 import dream_test/process_test
-import dream_test/reporter/bdd.{report}
+import dream_test/reporter/api as reporter
 import dream_test/reporter/bdd_test
 import dream_test/reporter/json_test
-import dream_test/runner.{exit_on_failure, run_all}
+import dream_test/runner
 import dream_test/runner_test
 import dream_test/sandbox_test
 import dream_test/types_test
-import dream_test/unit.{describe, to_test_cases}
 import dream_test/unit_test
 import gleam/io
 
 pub fn main() {
-  describe("dream_test", [
+  let suites = [
     types_test.tests(),
     should_test.tests(),
     runner_test.tests(),
@@ -40,9 +39,10 @@ pub fn main() {
     steps_test.tests(),
     parser_test.tests(),
     feature_test.tests(),
-  ])
-  |> to_test_cases("dream_test_test", _)
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()
+  ]
+
+  runner.new(suites)
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

@@ -43,7 +43,7 @@
 ////   feature, scenario, given, when, then, and, with_tags,
 //// }
 ////
-//// pub fn tests() -> TestSuite {
+//// pub fn tests() -> TestSuite(Nil) {
 ////   let steps = cart_steps()
 ////   
 ////   feature("Shopping Cart", steps, [
@@ -66,9 +66,9 @@ import dream_test/gherkin/steps.{
 import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
-  type AssertionResult, type TestCase, type TestSuite, type TestSuiteItem,
-  AssertionFailed, AssertionFailure, AssertionOk, GherkinScenario,
-  SingleTestConfig, SuiteGroup, SuiteTest, TestCase, TestSuite,
+  type AssertionResult, type SuiteTestCase, type TestSuite, type TestSuiteItem,
+  AssertionFailed, AssertionFailure, AssertionOk, GherkinScenario, SuiteTest,
+  SuiteTestCase, TestSuite,
 }
 import gleam/dict.{type Dict}
 import gleam/int
@@ -138,15 +138,19 @@ pub type InlineStep {
 ///
 /// A TestSuite that can be run with `runner.run_suite()`
 ///
-pub fn to_test_suite(module_name: String, config: FeatureConfig) -> TestSuite {
+pub fn to_test_suite(
+  _module_name: String,
+  config: FeatureConfig,
+) -> TestSuite(Nil) {
   let feature = config.feature
   let items = build_suite_items(feature, config)
 
   TestSuite(
     name: feature.name,
-    full_name: [module_name, feature.name],
-    before_all_hooks: [],
-    after_all_hooks: [],
+    before_all: Some(fn() { Ok(Nil) }),
+    after_all: [],
+    before_each: [],
+    after_each: [],
     items: items,
   )
 }
@@ -165,29 +169,10 @@ pub fn to_test_suite(module_name: String, config: FeatureConfig) -> TestSuite {
 ///
 /// A list of TestCases that can be run with `runner.run_all()`
 ///
-pub fn to_test_cases(
-  module_name: String,
-  config: FeatureConfig,
-) -> List(TestCase) {
-  let suite = to_test_suite(module_name, config)
-  flatten_suite(suite)
-}
-
-fn flatten_suite(suite: TestSuite) -> List(TestCase) {
-  list.flat_map(suite.items, flatten_item)
-}
-
-fn flatten_item(item: TestSuiteItem) -> List(TestCase) {
-  case item {
-    SuiteTest(test_case) -> [test_case]
-    SuiteGroup(nested_suite) -> flatten_suite(nested_suite)
-  }
-}
-
 fn build_suite_items(
   feature: gherkin_types.Feature,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
+) -> List(TestSuiteItem(Nil)) {
   list.flat_map(feature.scenarios, fn(scenario) {
     scenario_to_suite_items(feature, scenario, config)
   })
@@ -197,7 +182,7 @@ fn scenario_to_suite_items(
   feature: gherkin_types.Feature,
   scenario: gherkin_types.Scenario,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
+) -> List(TestSuiteItem(Nil)) {
   case scenario {
     gherkin_types.Scenario(name, tags, steps) -> {
       let test_case =
@@ -217,7 +202,7 @@ fn build_scenario_test_case(
   steps: List(gherkin_types.Step),
   config: FeatureConfig,
   example_suffix: Option(String),
-) -> TestCase {
+) -> SuiteTestCase(Nil) {
   let full_name = build_full_name(feature.name, scenario_name, example_suffix)
   let scenario_id = string.join(full_name, "::")
   let all_tags = list.append(feature.tags, scenario_tags)
@@ -228,23 +213,15 @@ fn build_scenario_test_case(
       list.append(background_steps, steps)
     None -> steps
   }
-
-  let run_fn =
-    build_scenario_runner(scenario_id, all_steps, config.step_registry)
-
-  let single_config =
-    SingleTestConfig(
-      name: scenario_name,
-      full_name: full_name,
-      tags: all_tags,
-      kind: GherkinScenario(scenario_id),
-      run: run_fn,
-      timeout_ms: None,
-      before_each_hooks: [],
-      after_each_hooks: [],
-    )
-
-  TestCase(single_config)
+  SuiteTestCase(
+    name: scenario_name,
+    tags: all_tags,
+    kind: GherkinScenario(scenario_id),
+    run: fn(_) {
+      Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
+    },
+    timeout_ms: None,
+  )
 }
 
 fn build_full_name(
@@ -265,7 +242,7 @@ fn expand_scenario_outline(
   steps: List(gherkin_types.Step),
   examples: gherkin_types.ExamplesTable,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
+) -> List(TestSuiteItem(Nil)) {
   let headers = examples.headers
 
   list.index_map(examples.rows, fn(row, index) {
@@ -329,14 +306,6 @@ fn substitute_placeholders(
 // ============================================================================
 // Scenario Execution
 // ============================================================================
-
-fn build_scenario_runner(
-  scenario_id: String,
-  steps: List(gherkin_types.Step),
-  registry: StepRegistry,
-) -> fn() -> AssertionResult {
-  fn() { execute_scenario(scenario_id, steps, registry) }
-}
 
 fn execute_scenario(
   scenario_id: String,
@@ -461,7 +430,7 @@ pub fn feature(
   name: String,
   registry: StepRegistry,
   scenarios: List(InlineScenario),
-) -> TestSuite {
+) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -643,7 +612,7 @@ pub fn feature_with_background(
   registry: StepRegistry,
   background_steps: List(gherkin_types.Step),
   scenarios: List(InlineScenario),
-) -> TestSuite {
+) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(

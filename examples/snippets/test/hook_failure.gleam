@@ -1,9 +1,9 @@
 //// README: Hook failure behavior
 
-import dream_test/assertions/should.{fail_with, succeed}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
-import dream_test/unit.{before_all, describe, it, to_test_suite}
+import dream_test/assertions/should.{succeed}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{before_all, describe, it}
 import gleam/io
 
 fn connect_to_database() {
@@ -14,18 +14,19 @@ pub fn tests() {
   describe("Handles failures", [
     before_all(fn() {
       case connect_to_database() {
-        Ok(_) -> succeed()
-        Error(e) -> fail_with("Database connection failed: " <> e)
+        Ok(_) -> Ok(Nil)
+        Error(e) -> Error("Database connection failed: " <> e)
       }
     }),
     // If before_all fails, these tests are marked SetupFailed (not run)
-    it("test1", fn() { succeed() }),
-    it("test2", fn() { succeed() }),
+    it("test1", fn(_) { Ok(succeed()) }),
+    it("test2", fn(_) { Ok(succeed()) }),
   ])
 }
 
 pub fn main() {
-  to_test_suite("hook_failure", tests())
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

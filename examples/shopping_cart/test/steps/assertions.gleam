@@ -1,11 +1,14 @@
 //// Assertion/verification steps (Then steps).
 
-import dream_test/assertions/should.{be_true, equal, or_fail_with, should}
+import dream_test/assertions/should.{be_true, equal, should}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, get_int, get_string,
 }
 import dream_test/gherkin/world.{get, get_or}
-import dream_test/types.{type AssertionResult}
+import dream_test/types.{
+  type AssertionResult, AssertionFailed, AssertionFailure, AssertionOk,
+  MatchFailed, MatchOk,
+}
 import gleam/float
 import gleam/int
 import gleam/result
@@ -44,10 +47,16 @@ fn step_verify_item_count(context: StepContext) -> AssertionResult {
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = cart.item_count(the_cart)
 
-  actual
-  |> should()
-  |> equal(expected)
-  |> or_fail_with("Cart should contain " <> int.to_string(expected) <> " items")
+  case actual |> should() |> equal(expected) {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(
+          ..failure,
+          message: "Cart should contain " <> int.to_string(expected) <> " items",
+        ),
+      )
+  }
 }
 
 fn step_verify_subtotal(context: StepContext) -> AssertionResult {
@@ -55,10 +64,16 @@ fn step_verify_subtotal(context: StepContext) -> AssertionResult {
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = pricing.subtotal(the_cart)
 
-  floats_equal(actual, expected)
-  |> should()
-  |> be_true()
-  |> or_fail_with("Subtotal should be $" <> float.to_string(expected))
+  case floats_equal(actual, expected) |> should() |> be_true() {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(
+          ..failure,
+          message: "Subtotal should be $" <> float.to_string(expected),
+        ),
+      )
+  }
 }
 
 fn step_verify_discount(context: StepContext) -> AssertionResult {
@@ -66,10 +81,16 @@ fn step_verify_discount(context: StepContext) -> AssertionResult {
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = pricing.discount_amount(the_cart)
 
-  floats_equal(actual, expected)
-  |> should()
-  |> be_true()
-  |> or_fail_with("Discount should be $" <> float.to_string(expected))
+  case floats_equal(actual, expected) |> should() |> be_true() {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(
+          ..failure,
+          message: "Discount should be $" <> float.to_string(expected),
+        ),
+      )
+  }
 }
 
 fn step_verify_total(context: StepContext) -> AssertionResult {
@@ -77,19 +98,28 @@ fn step_verify_total(context: StepContext) -> AssertionResult {
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = pricing.total(the_cart)
 
-  floats_equal(actual, expected)
-  |> should()
-  |> be_true()
-  |> or_fail_with("Total should be $" <> float.to_string(expected))
+  case floats_equal(actual, expected) |> should() |> be_true() {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(
+          ..failure,
+          message: "Total should be $" <> float.to_string(expected),
+        ),
+      )
+  }
 }
 
 fn step_verify_checkout_success(context: StepContext) -> AssertionResult {
   let success: Bool = get_or(context.world, "checkout_success", False)
 
-  success
-  |> should()
-  |> be_true()
-  |> or_fail_with("Checkout should succeed")
+  case success |> should() |> be_true() {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(..failure, message: "Checkout should succeed"),
+      )
+  }
 }
 
 fn step_verify_checkout_failure(context: StepContext) -> AssertionResult {
@@ -99,16 +129,25 @@ fn step_verify_checkout_failure(context: StepContext) -> AssertionResult {
 
   case success {
     True -> {
-      False
-      |> should()
-      |> be_true()
-      |> or_fail_with("Checkout should have failed")
+      case False |> should() |> be_true() {
+        MatchOk(_) -> AssertionOk
+        MatchFailed(failure) ->
+          AssertionFailed(
+            AssertionFailure(..failure, message: "Checkout should have failed"),
+          )
+      }
     }
     False -> {
-      actual_error
-      |> should()
-      |> equal(expected_error)
-      |> or_fail_with("Error should be: " <> expected_error)
+      case actual_error |> should() |> equal(expected_error) {
+        MatchOk(_) -> AssertionOk
+        MatchFailed(failure) ->
+          AssertionFailed(
+            AssertionFailure(
+              ..failure,
+              message: "Error should be: " <> expected_error,
+            ),
+          )
+      }
     }
   }
 }
@@ -119,16 +158,25 @@ fn step_verify_order_total(context: StepContext) -> AssertionResult {
   case get(context.world, "checkout_result") {
     Ok(checkout_result) -> {
       let the_checkout: cart_types.CheckoutResult = checkout_result
-      floats_equal(the_checkout.total, expected)
-      |> should()
-      |> be_true()
-      |> or_fail_with("Order total should be $" <> float.to_string(expected))
+      case floats_equal(the_checkout.total, expected) |> should() |> be_true() {
+        MatchOk(_) -> AssertionOk
+        MatchFailed(failure) ->
+          AssertionFailed(
+            AssertionFailure(
+              ..failure,
+              message: "Order total should be $" <> float.to_string(expected),
+            ),
+          )
+      }
     }
     Error(_) -> {
-      False
-      |> should()
-      |> be_true()
-      |> or_fail_with("No checkout result found")
+      case False |> should() |> be_true() {
+        MatchOk(_) -> AssertionOk
+        MatchFailed(failure) ->
+          AssertionFailed(
+            AssertionFailure(..failure, message: "No checkout result found"),
+          )
+      }
     }
   }
 }
@@ -137,10 +185,16 @@ fn step_verify_operation_failure(context: StepContext) -> AssertionResult {
   let expected_error = get_string(context.captures, 0) |> result.unwrap("")
   let actual_error: String = get_or(context.world, "last_error", "")
 
-  actual_error
-  |> should()
-  |> equal(expected_error)
-  |> or_fail_with("Operation should fail with: " <> expected_error)
+  case actual_error |> should() |> equal(expected_error) {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(
+          ..failure,
+          message: "Operation should fail with: " <> expected_error,
+        ),
+      )
+  }
 }
 
 // ============================================================================

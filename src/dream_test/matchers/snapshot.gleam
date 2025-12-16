@@ -91,6 +91,7 @@ import dream_test/file
 import dream_test/types.{
   type MatchResult, AssertionFailure, MatchFailed, MatchOk, SnapshotFailure,
 }
+import gleam/list
 import gleam/option.{Some}
 import gleam/string
 
@@ -348,9 +349,23 @@ pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {
 
 fn check_snapshot(actual: String, snapshot_path: String) -> MatchResult(String) {
   case file.read(snapshot_path) {
-    Ok(expected) -> compare_snapshot(actual, expected, snapshot_path)
+    Ok(expected) ->
+      compare_snapshot(
+        actual,
+        normalize_snapshot_expected(expected),
+        snapshot_path,
+      )
     Error(file.NotFound(_)) -> create_snapshot(actual, snapshot_path)
     Error(error) -> make_read_error_failure(snapshot_path, error)
+  }
+}
+
+fn normalize_snapshot_expected(expected: String) -> String {
+  let graphemes = string.to_graphemes(expected)
+  case list.reverse(graphemes) {
+    ["\n", "\r", ..rest] -> string.join(list.reverse(rest), "")
+    ["\n", ..rest] -> string.join(list.reverse(rest), "")
+    _ -> expected
   }
 }
 
@@ -434,7 +449,12 @@ fn check_snapshot_inspect(
   let serialized = string.inspect(value)
   case file.read(snapshot_path) {
     Ok(expected) ->
-      compare_snapshot_inspect(value, serialized, expected, snapshot_path)
+      compare_snapshot_inspect(
+        value,
+        serialized,
+        normalize_snapshot_expected(expected),
+        snapshot_path,
+      )
     Error(file.NotFound(_)) ->
       create_snapshot_inspect(value, serialized, snapshot_path)
     Error(error) -> make_read_error_failure_inspect(snapshot_path, error)

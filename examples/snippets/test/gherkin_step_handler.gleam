@@ -1,14 +1,16 @@
 //// README: Gherkin step handler example
 
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/assertions/should.{equal, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, new_registry, step,
 }
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
-import dream_test/types.{type AssertionResult}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/types.{
+  type AssertionResult, AssertionFailed, AssertionFailure, MatchFailed, MatchOk,
+}
 import gleam/io
 import gleam/result
 
@@ -29,10 +31,11 @@ fn step_withdraw(context: StepContext) -> AssertionResult {
 
 fn step_balance_is(context: StepContext) -> AssertionResult {
   let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
-  get_or(context.world, "balance", 0.0)
-  |> should()
-  |> equal(expected)
-  |> or_fail_with("Balance mismatch")
+  case get_or(context.world, "balance", 0.0) |> should() |> equal(expected) {
+    MatchOk(_) -> succeed()
+    MatchFailed(failure) ->
+      AssertionFailed(AssertionFailure(..failure, message: "Balance mismatch"))
+  }
 }
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
@@ -55,7 +58,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  tests()
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

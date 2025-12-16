@@ -1,10 +1,10 @@
 //// README: Lifecycle hooks
 
-import dream_test/assertions/should.{be_empty, or_fail_with, should, succeed}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
+import dream_test/assertions/should.{be_empty, or_fail_with, should}
+import dream_test/reporter/api as reporter
+import dream_test/runner
 import dream_test/unit.{
-  after_all, after_each, before_all, before_each, describe, it, to_test_suite,
+  after_all, after_each, before_all, before_each, describe, it,
 }
 import gleam/io
 
@@ -12,37 +12,38 @@ pub fn tests() {
   describe("Database tests", [
     before_all(fn() {
       // Start database once for all tests
-      succeed()
+      Ok(Nil)
     }),
-    before_each(fn() {
+    before_each(fn(_) {
       // Begin transaction before each test
-      succeed()
+      Ok(Nil)
     }),
-    it("creates a record", fn() {
+    it("creates a record", fn(_) {
       []
       |> should()
       |> be_empty()
       |> or_fail_with("Placeholder test")
     }),
-    it("queries records", fn() {
+    it("queries records", fn(_) {
       []
       |> should()
       |> be_empty()
       |> or_fail_with("Placeholder test")
     }),
-    after_each(fn() {
+    after_each(fn(_) {
       // Rollback transaction after each test
-      succeed()
+      Ok(Nil)
     }),
-    after_all(fn() {
+    after_all(fn(_) {
       // Stop database after all tests
-      succeed()
+      Ok(Nil)
     }),
   ])
 }
 
 pub fn main() {
-  to_test_suite("lifecycle_hooks", tests())
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

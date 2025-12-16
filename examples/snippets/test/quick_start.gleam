@@ -1,22 +1,22 @@
 //// README: Quick Start example
 
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{exit_on_failure, run_all}
-import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, it}
 import gleam/io
 import gleam/string
 
 pub fn tests() {
   describe("String utilities", [
-    it("trims whitespace", fn() {
+    it("trims whitespace", fn(_) {
       "  hello  "
       |> string.trim()
       |> should()
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
-    it("finds substrings", fn() {
+    it("finds substrings", fn(_) {
       "hello world"
       |> string.contains("world")
       |> should()
@@ -27,8 +27,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  to_test_cases("quick_start", tests())
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

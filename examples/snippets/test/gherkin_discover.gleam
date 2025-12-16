@@ -1,12 +1,15 @@
 //// README: Gherkin feature discovery example
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/assertions/should.{equal, should}
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter/gherkin.{report}
-import dream_test/runner.{run_suite}
-import dream_test/types.{type AssertionResult, AssertionOk}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/types.{
+  type AssertionResult, AssertionFailed, AssertionFailure, AssertionOk,
+  MatchFailed, MatchOk,
+}
 import gleam/io
 import gleam/result
 
@@ -24,10 +27,13 @@ fn step_add_items(context: StepContext) -> AssertionResult {
 
 fn step_verify_count(context: StepContext) -> AssertionResult {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  get_or(context.world, "cart", 0)
-  |> should()
-  |> equal(expected)
-  |> or_fail_with("Cart count mismatch")
+  case get_or(context.world, "cart", 0) |> should() |> equal(expected) {
+    MatchOk(_) -> AssertionOk
+    MatchFailed(failure) ->
+      AssertionFailed(
+        AssertionFailure(..failure, message: "Cart count mismatch"),
+      )
+  }
 }
 
 pub fn tests() {
@@ -45,7 +51,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  tests()
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

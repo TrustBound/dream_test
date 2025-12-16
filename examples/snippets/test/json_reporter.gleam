@@ -1,30 +1,28 @@
 //// README: JSON reporter example
 
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter/bdd.{report}
-import dream_test/reporter/json
-import dream_test/runner.{exit_on_failure, run_all}
-import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, it}
 import gleam/io
 
 pub fn tests() {
   describe("JSON Reporter", [
-    it("outputs JSON format", fn() {
+    it("outputs JSON format", fn(_) {
       // The json.report function outputs machine-readable JSON
       // while bdd.report outputs human-readable text
-      succeed()
+      Ok(succeed())
     }),
-    it("includes test metadata", fn() {
+    it("includes test metadata", fn(_) {
       // JSON output includes name, full_name, status, duration, tags
-      succeed()
+      Ok(succeed())
     }),
   ])
 }
 
 pub fn main() {
-  to_test_cases("json_reporter", tests())
-  |> run_all()
-  |> report(io.print)
-  |> json.report_pretty(io.println)
-  |> exit_on_failure()
+  runner.new([tests()])
+  |> runner.reporter(reporter.json(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

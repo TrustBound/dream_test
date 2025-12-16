@@ -1,223 +1,158 @@
 import dream_test/assertions/should.{
   be_empty, equal, fail_with, or_fail_with, should,
 }
-import dream_test/runner.{run_all}
+import dream_test/runner
 import dream_test/types.{AssertionOk, Skipped}
-import dream_test/unit.{
-  type UnitTest, describe, it, skip, to_test_cases, with_tags,
-}
+import dream_test/unit.{describe, group, it, skip, with_tags}
 
 pub fn tests() {
   describe("Unit DSL", [
-    describe("to_test_cases", [
-      it("creates first test case with correct name", fn() {
-        // Arrange
-        let test_tree: UnitTest =
+    group("suite structure", [
+      it("sets result name from it label", fn(_) {
+        let suite =
           describe("Math", [
-            it("adds numbers", fn() { AssertionOk }),
-            it("subtracts numbers", fn() { AssertionOk }),
+            it("adds numbers", fn(_) { Ok(AssertionOk) }),
+            it("subtracts numbers", fn(_) { Ok(AssertionOk) }),
           ])
-        let expected = "adds numbers"
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-        // Assert
         case results {
-          [first, ..] -> {
+          [first, ..] ->
             first.name
             |> should()
-            |> equal(expected)
+            |> equal("adds numbers")
             |> or_fail_with("First test name should match it label")
-          }
-          _ -> fail_with("Expected at least one test case")
+
+          _ -> Ok(fail_with("Expected at least one test result"))
         }
       }),
 
-      it("creates second test case with correct name", fn() {
-        // Arrange
-        let test_tree: UnitTest =
+      it("sets full_name from describe + it", fn(_) {
+        let suite =
           describe("Math", [
-            it("adds numbers", fn() { AssertionOk }),
-            it("subtracts numbers", fn() { AssertionOk }),
+            it("adds numbers", fn(_) { Ok(AssertionOk) }),
           ])
-        let expected = "subtracts numbers"
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-        // Assert
         case results {
-          [_, second] -> {
-            second.name
-            |> should()
-            |> equal(expected)
-            |> or_fail_with("Second test name should match it label")
-          }
-          _ -> fail_with("Expected at least two test cases")
-        }
-      }),
-
-      it("creates first test case with correct full_name path", fn() {
-        // Arrange
-        let test_tree: UnitTest =
-          describe("Math", [
-            it("adds numbers", fn() { AssertionOk }),
-            it("subtracts numbers", fn() { AssertionOk }),
-          ])
-        let expected = ["Math", "adds numbers"]
-
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
-
-        // Assert
-        case results {
-          [first, ..] -> {
+          [first] ->
             first.full_name
             |> should()
-            |> equal(expected)
-            |> or_fail_with("First full_name should include describe and it")
-          }
-          _ -> fail_with("Expected at least one test case")
-        }
-      }),
+            |> equal(["Math", "adds numbers"])
+            |> or_fail_with("full_name should include describe and it")
 
-      it("creates second test case with correct full_name path", fn() {
-        // Arrange
-        let test_tree: UnitTest =
-          describe("Math", [
-            it("adds numbers", fn() { AssertionOk }),
-            it("subtracts numbers", fn() { AssertionOk }),
-          ])
-        let expected = ["Math", "subtracts numbers"]
-
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
-
-        // Assert
-        case results {
-          [_, second] -> {
-            second.full_name
-            |> should()
-            |> equal(expected)
-            |> or_fail_with("Second full_name should include describe and it")
-          }
-          _ -> fail_with("Expected at least two test cases")
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
     ]),
-    describe("with_tags", [
-      it("sets tags on a test", fn() {
-        // Arrange
-        let test_tree: UnitTest =
+
+    group("with_tags", [
+      it("sets tags on a test", fn(_) {
+        let suite =
           describe("Feature", [
-            it("tagged test", fn() { AssertionOk })
+            it("tagged test", fn(_) { Ok(AssertionOk) })
             |> with_tags(["unit", "fast"]),
           ])
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-        // Assert
         case results {
-          [first] -> {
+          [first] ->
             first.tags
             |> should()
             |> equal(["unit", "fast"])
             |> or_fail_with("Tags should be set on test result")
-          }
-          _ -> fail_with("Expected exactly one test case")
+
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
-      it("replaces existing tags", fn() {
-        // Arrange
-        let test_tree: UnitTest =
+
+      it("replaces existing tags", fn(_) {
+        let suite =
           describe("Feature", [
-            it("test", fn() { AssertionOk })
+            it("test", fn(_) { Ok(AssertionOk) })
             |> with_tags(["first"])
             |> with_tags(["second"]),
           ])
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
 
-        // Assert
         case results {
-          [first] -> {
+          [first] ->
             first.tags
             |> should()
             |> equal(["second"])
             |> or_fail_with("Second with_tags should replace first")
-          }
-          _ -> fail_with("Expected exactly one test case")
+
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
-      it("leaves tests without tags empty", fn() {
-        // Arrange
-        let test_tree: UnitTest =
-          describe("Feature", [it("untagged test", fn() { AssertionOk })])
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+      it("leaves tests without tags empty", fn(_) {
+        let suite =
+          describe("Feature", [
+            it("untagged test", fn(_) { Ok(AssertionOk) }),
+          ])
 
-        // Assert
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
+
         case results {
-          [first] -> {
+          [first] ->
             first.tags
             |> should()
             |> be_empty()
             |> or_fail_with("Untagged test should have empty tags")
-          }
-          _ -> fail_with("Expected exactly one test case")
+
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
     ]),
-    describe("skip", [
-      it("produces Skipped status", fn() {
-        // Arrange
-        let test_tree: UnitTest =
-          describe("Feature", [skip("not ready yet", fn() { AssertionOk })])
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+    group("skip", [
+      it("produces Skipped status", fn(_) {
+        let suite =
+          describe("Feature", [
+            skip("not ready yet", fn(_) { Ok(AssertionOk) }),
+          ])
 
-        // Assert
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
+
         case results {
-          [first] -> {
+          [first] ->
             first.status
             |> should()
             |> equal(Skipped)
             |> or_fail_with("skip should produce Skipped status")
-          }
-          _ -> fail_with("Expected exactly one test case")
+
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
-      it("preserves the test name", fn() {
-        // Arrange
-        let test_tree: UnitTest =
-          describe("Feature", [skip("work in progress", fn() { AssertionOk })])
 
-        // Act
-        let test_cases = to_test_cases("test_module", test_tree)
-        let results = run_all(test_cases)
+      it("preserves the test name", fn(_) {
+        let suite =
+          describe("Feature", [
+            skip("work in progress", fn(_) { Ok(AssertionOk) }),
+          ])
 
-        // Assert
+        let results =
+          runner.new([suite]) |> runner.max_concurrency(1) |> runner.run()
+
         case results {
-          [first] -> {
+          [first] ->
             first.name
             |> should()
             |> equal("work in progress")
             |> or_fail_with("skip should preserve the test name")
-          }
-          _ -> fail_with("Expected exactly one test case")
+
+          _ -> Ok(fail_with("Expected exactly one test result"))
         }
       }),
     ]),

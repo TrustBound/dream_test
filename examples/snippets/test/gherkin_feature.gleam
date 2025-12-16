@@ -7,8 +7,8 @@ import dream_test/gherkin/feature.{
 }
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
+import dream_test/reporter/api as reporter
+import dream_test/runner
 import dream_test/types.{type AssertionResult, AssertionOk}
 import gleam/int
 import gleam/io
@@ -59,7 +59,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  tests()
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

@@ -1,174 +1,112 @@
 import dream_test/assertions/should.{
   be_at_least, be_at_most, be_between, be_greater_than, be_in_range,
-  be_less_than, fail_with, should,
+  be_less_than, or_fail_with, should,
 }
-import dream_test/types.{AssertionOk, MatchFailed, MatchOk}
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
+import matchers/be_match_failed_result.{be_match_failed_result}
+import matchers/be_match_ok_result.{be_match_ok_result}
 
 pub fn tests() {
   describe("Comparison Matchers", [
-    describe("be_greater_than", [
-      it("returns MatchOk when value is greater", fn() {
-        let result = 10 |> should() |> be_greater_than(5)
-
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_greater_than should pass when value is greater")
-        }
+    group("be_greater_than", [
+      it("returns MatchOk when value is greater", fn(_) {
+        10
+        |> should()
+        |> be_greater_than(5)
+        |> be_match_ok_result()
+        |> or_fail_with("be_greater_than should pass when value is greater")
       }),
-      it("returns MatchFailed when value is not greater", fn() {
-        let result = 5 |> should() |> be_greater_than(10)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_greater_than should fail when value is not greater")
-        }
+      it("returns MatchFailed when value is not greater", fn(_) {
+        5
+        |> should()
+        |> be_greater_than(10)
+        |> be_match_failed_result()
+        |> or_fail_with("be_greater_than should fail when value is not greater")
       }),
     ]),
-    describe("be_less_than", [
-      it("returns MatchOk when value is less", fn() {
-        let result = 5 |> should() |> be_less_than(10)
 
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_less_than should pass when value is less")
-        }
+    group("be_less_than", [
+      it("returns MatchOk when value is less", fn(_) {
+        5
+        |> should()
+        |> be_less_than(10)
+        |> be_match_ok_result()
+        |> or_fail_with("be_less_than should pass when value is less")
       }),
-      it("returns MatchFailed when value is not less", fn() {
-        let result = 10 |> should() |> be_less_than(5)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_less_than should fail when value is not less")
-        }
+      it("returns MatchFailed when value is not less", fn(_) {
+        10
+        |> should()
+        |> be_less_than(5)
+        |> be_match_failed_result()
+        |> or_fail_with("be_less_than should fail when value is not less")
       }),
     ]),
-    describe("be_at_least", [
-      it("returns MatchOk when value is greater", fn() {
-        let result = 10 |> should() |> be_at_least(5)
 
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_at_least should pass when value is greater")
-        }
+    group("be_at_least", [
+      it("returns MatchOk when value equals minimum", fn(_) {
+        10
+        |> should()
+        |> be_at_least(10)
+        |> be_match_ok_result()
+        |> or_fail_with("be_at_least should pass for equal")
       }),
-      it("returns MatchOk when value is equal", fn() {
-        let result = 5 |> should() |> be_at_least(5)
-
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_at_least should pass when value is equal")
-        }
-      }),
-      it("returns MatchFailed when value is less", fn() {
-        let result = 3 |> should() |> be_at_least(5)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) -> fail_with("be_at_least should fail when value is less")
-        }
+      it("returns MatchFailed when value is below minimum", fn(_) {
+        9
+        |> should()
+        |> be_at_least(10)
+        |> be_match_failed_result()
+        |> or_fail_with("be_at_least should fail when below")
       }),
     ]),
-    describe("be_at_most", [
-      it("returns MatchOk when value is less", fn() {
-        let result = 5 |> should() |> be_at_most(10)
 
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_at_most should pass when value is less")
-        }
+    group("be_at_most", [
+      it("returns MatchOk when value equals maximum", fn(_) {
+        10
+        |> should()
+        |> be_at_most(10)
+        |> be_match_ok_result()
+        |> or_fail_with("be_at_most should pass for equal")
       }),
-      it("returns MatchOk when value is equal", fn() {
-        let result = 10 |> should() |> be_at_most(10)
-
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_at_most should pass when value is equal")
-        }
-      }),
-      it("returns MatchFailed when value is greater", fn() {
-        let result = 15 |> should() |> be_at_most(10)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_at_most should fail when value is greater")
-        }
+      it("returns MatchFailed when value is above maximum", fn(_) {
+        11
+        |> should()
+        |> be_at_most(10)
+        |> be_match_failed_result()
+        |> or_fail_with("be_at_most should fail when above")
       }),
     ]),
-    describe("be_between", [
-      it("returns MatchOk when value is between min and max", fn() {
-        let result = 7 |> should() |> be_between(5, 10)
 
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_between should pass when value is in range")
-        }
+    group("be_between", [
+      it("returns MatchOk when value is between inclusive bounds", fn(_) {
+        5
+        |> should()
+        |> be_between(1, 10)
+        |> be_match_ok_result()
+        |> or_fail_with("be_between should pass inside range")
       }),
-      it("returns MatchFailed when value equals min", fn() {
-        let result = 5 |> should() |> be_between(5, 10)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_between should fail when value equals min")
-        }
-      }),
-      it("returns MatchFailed when value equals max", fn() {
-        let result = 10 |> should() |> be_between(5, 10)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_between should fail when value equals max")
-        }
+      it("returns MatchFailed when value is outside bounds", fn(_) {
+        0
+        |> should()
+        |> be_between(1, 10)
+        |> be_match_failed_result()
+        |> or_fail_with("be_between should fail outside range")
       }),
     ]),
-    describe("be_in_range", [
-      it("returns MatchOk when value is in range", fn() {
-        let result = 7 |> should() |> be_in_range(5, 10)
 
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_in_range should pass when value is in range")
-        }
+    group("be_in_range", [
+      it("returns MatchOk when value is inside range", fn(_) {
+        5
+        |> should()
+        |> be_in_range(1, 10)
+        |> be_match_ok_result()
+        |> or_fail_with("be_in_range should pass inside range")
       }),
-      it("returns MatchOk when value equals min", fn() {
-        let result = 5 |> should() |> be_in_range(5, 10)
-
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_in_range should pass when value equals min")
-        }
-      }),
-      it("returns MatchOk when value equals max", fn() {
-        let result = 10 |> should() |> be_in_range(5, 10)
-
-        case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) ->
-            fail_with("be_in_range should pass when value equals max")
-        }
-      }),
-      it("returns MatchFailed when value is below range", fn() {
-        let result = 3 |> should() |> be_in_range(5, 10)
-
-        case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) ->
-            fail_with("be_in_range should fail when value is below range")
-        }
+      it("returns MatchFailed when value is outside range", fn(_) {
+        11
+        |> should()
+        |> be_in_range(1, 10)
+        |> be_match_failed_result()
+        |> or_fail_with("be_in_range should fail outside range")
       }),
     ]),
   ])

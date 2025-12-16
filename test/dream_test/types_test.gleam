@@ -2,13 +2,13 @@ import dream_test/assertions/should.{equal, or_fail_with, should}
 import dream_test/types.{
   type AssertionFailure, AssertionFailure, Failed, Passed, status_from_failures,
 }
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
 import gleam/option.{None}
 
 pub fn tests() {
   describe("Types", [
-    describe("status_from_failures", [
-      it("returns Passed for empty failures", fn() {
+    group("status_from_failures", [
+      it("returns Passed for empty failures", fn(_) {
         // Arrange
         let empty_failures: List(AssertionFailure) = []
         let expected = Passed
@@ -23,7 +23,7 @@ pub fn tests() {
         |> or_fail_with("Empty failures should yield Passed status")
       }),
 
-      it("returns Failed for non-empty failures", fn() {
+      it("returns Failed for non-empty failures", fn(_) {
         // Arrange
         let failure =
           AssertionFailure(operator: "equal", message: "", payload: None)

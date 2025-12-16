@@ -4,9 +4,8 @@
 
 import chaining
 import custom_matchers
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{exit_on_failure, run_all, run_suite}
-import dream_test/unit.{describe, to_test_cases}
+import dream_test/reporter/api as reporter
+import dream_test/runner
 import execution_modes
 import explicit_failures
 import gherkin_discover
@@ -16,7 +15,6 @@ import gherkin_hero
 import gherkin_placeholders
 import gherkin_step_handler
 import gleam/io
-import gleam/list
 import hero
 import hook_failure
 import hook_inheritance
@@ -26,9 +24,10 @@ import quick_start
 import runner_config
 import sequential_execution
 import skipping_tests
+import snapshot_testing
 
-pub fn tests() {
-  describe("README Snippets", [
+pub fn suites() {
+  [
     quick_start.tests(),
     hero.tests(),
     chaining.tests(),
@@ -42,29 +41,19 @@ pub fn tests() {
     sequential_execution.tests(),
     execution_modes.tests(),
     skipping_tests.tests(),
-  ])
+    snapshot_testing.tests(),
+    gherkin_hero.tests(),
+    gherkin_feature.tests(),
+    gherkin_step_handler.tests(),
+    gherkin_placeholders.tests(),
+    gherkin_file.tests(),
+    gherkin_discover.tests(),
+  ]
 }
 
 pub fn main() {
-  // Run unit test snippets
-  let unit_results =
-    to_test_cases("snippets_test", tests())
-    |> run_all()
-
-  // Run Gherkin snippets (these return TestSuite, not UnitTest)
-  let gherkin_results =
-    [
-      gherkin_hero.tests(),
-      gherkin_feature.tests(),
-      gherkin_step_handler.tests(),
-      gherkin_placeholders.tests(),
-      gherkin_file.tests(),
-      gherkin_discover.tests(),
-    ]
-    |> list.flat_map(run_suite)
-
-  let all_results = list.append(unit_results, gherkin_results)
-
-  report(all_results, io.print)
-  exit_on_failure(all_results)
+  runner.new(suites())
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

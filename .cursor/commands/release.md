@@ -1,0 +1,3 @@
+- pull the latest from main and develop
+- read all of the full commit messages for the develop branch
+- create a release pull request for the main branch

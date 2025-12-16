@@ -1,13 +1,12 @@
-import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
+import dream_test/assertions/should.{equal, or_fail_with, should}
 import dream_test/gherkin/types as gherkin_types
-import dream_test/types.{type AssertionResult, AssertionOk}
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
 import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("Gherkin Types", [
-    describe("keyword_to_string", [
-      it("converts Given to 'Given'", fn() {
+    group("keyword_to_string", [
+      it("converts Given to 'Given'", fn(_) {
         // Arrange
         let keyword = gherkin_types.Given
         let expected = "Given"
@@ -21,7 +20,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Given keyword should convert to 'Given'")
       }),
-      it("converts When to 'When'", fn() {
+      it("converts When to 'When'", fn(_) {
         // Arrange
         let keyword = gherkin_types.When
         let expected = "When"
@@ -35,7 +34,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("When keyword should convert to 'When'")
       }),
-      it("converts Then to 'Then'", fn() {
+      it("converts Then to 'Then'", fn(_) {
         // Arrange
         let keyword = gherkin_types.Then
         let expected = "Then"
@@ -49,7 +48,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Then keyword should convert to 'Then'")
       }),
-      it("converts And to 'And'", fn() {
+      it("converts And to 'And'", fn(_) {
         // Arrange
         let keyword = gherkin_types.And
         let expected = "And"
@@ -63,7 +62,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("And keyword should convert to 'And'")
       }),
-      it("converts But to 'But'", fn() {
+      it("converts But to 'But'", fn(_) {
         // Arrange
         let keyword = gherkin_types.But
         let expected = "But"
@@ -78,8 +77,8 @@ pub fn tests() {
         |> or_fail_with("But keyword should convert to 'But'")
       }),
     ]),
-    describe("keyword_from_string", [
-      it("parses 'Given' to Some(Given)", fn() {
+    group("keyword_from_string", [
+      it("parses 'Given' to Some(Given)", fn(_) {
         // Arrange
         let input = "Given"
 
@@ -87,12 +86,12 @@ pub fn tests() {
         let result = gherkin_types.keyword_from_string(input)
 
         // Assert
-        case result {
-          Some(gherkin_types.Given) -> pass()
-          _ -> fail_with("'Given' should parse to Some(Given)")
-        }
+        result
+        |> should()
+        |> equal(Some(gherkin_types.Given))
+        |> or_fail_with("'Given' should parse to Some(Given)")
       }),
-      it("parses 'When' to Some(When)", fn() {
+      it("parses 'When' to Some(When)", fn(_) {
         // Arrange
         let input = "When"
 
@@ -100,12 +99,12 @@ pub fn tests() {
         let result = gherkin_types.keyword_from_string(input)
 
         // Assert
-        case result {
-          Some(gherkin_types.When) -> pass()
-          _ -> fail_with("'When' should parse to Some(When)")
-        }
+        result
+        |> should()
+        |> equal(Some(gherkin_types.When))
+        |> or_fail_with("'When' should parse to Some(When)")
       }),
-      it("parses 'Then' to Some(Then)", fn() {
+      it("parses 'Then' to Some(Then)", fn(_) {
         // Arrange
         let input = "Then"
 
@@ -113,12 +112,12 @@ pub fn tests() {
         let result = gherkin_types.keyword_from_string(input)
 
         // Assert
-        case result {
-          Some(gherkin_types.Then) -> pass()
-          _ -> fail_with("'Then' should parse to Some(Then)")
-        }
+        result
+        |> should()
+        |> equal(Some(gherkin_types.Then))
+        |> or_fail_with("'Then' should parse to Some(Then)")
       }),
-      it("parses 'And' to Some(And)", fn() {
+      it("parses 'And' to Some(And)", fn(_) {
         // Arrange
         let input = "And"
 
@@ -126,12 +125,12 @@ pub fn tests() {
         let result = gherkin_types.keyword_from_string(input)
 
         // Assert
-        case result {
-          Some(gherkin_types.And) -> pass()
-          _ -> fail_with("'And' should parse to Some(And)")
-        }
+        result
+        |> should()
+        |> equal(Some(gherkin_types.And))
+        |> or_fail_with("'And' should parse to Some(And)")
       }),
-      it("parses 'But' to Some(But)", fn() {
+      it("parses 'But' to Some(But)", fn(_) {
         // Arrange
         let input = "But"
 
@@ -139,12 +138,12 @@ pub fn tests() {
         let result = gherkin_types.keyword_from_string(input)
 
         // Assert
-        case result {
-          Some(gherkin_types.But) -> pass()
-          _ -> fail_with("'But' should parse to Some(But)")
-        }
+        result
+        |> should()
+        |> equal(Some(gherkin_types.But))
+        |> or_fail_with("'But' should parse to Some(But)")
       }),
-      it("returns None for unknown keyword", fn() {
+      it("returns None for unknown keyword", fn(_) {
         // Arrange
         let input = "Unknown"
         let expected = None
@@ -158,7 +157,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Unknown keyword should return None")
       }),
-      it("returns None for lowercase 'given'", fn() {
+      it("returns None for lowercase 'given'", fn(_) {
         // Arrange
         let input = "given"
         let expected = None
@@ -172,7 +171,7 @@ pub fn tests() {
         |> equal(expected)
         |> or_fail_with("Lowercase keywords should return None")
       }),
-      it("returns None for empty string", fn() {
+      it("returns None for empty string", fn(_) {
         // Arrange
         let input = ""
         let expected = None
@@ -187,8 +186,8 @@ pub fn tests() {
         |> or_fail_with("Empty string should return None")
       }),
     ]),
-    describe("resolve_keyword", [
-      it("And after Given resolves to Given", fn() {
+    group("resolve_keyword", [
+      it("And after Given resolves to Given", fn(_) {
         // Arrange
         let current = gherkin_types.And
         let previous = gherkin_types.Given
@@ -197,12 +196,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Given -> pass()
-          _ -> fail_with("And should inherit Given from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Given)
+        |> or_fail_with("And should inherit Given from previous")
       }),
-      it("And after When resolves to When", fn() {
+      it("And after When resolves to When", fn(_) {
         // Arrange
         let current = gherkin_types.And
         let previous = gherkin_types.When
@@ -211,12 +210,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.When -> pass()
-          _ -> fail_with("And should inherit When from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.When)
+        |> or_fail_with("And should inherit When from previous")
       }),
-      it("And after Then resolves to Then", fn() {
+      it("And after Then resolves to Then", fn(_) {
         // Arrange
         let current = gherkin_types.And
         let previous = gherkin_types.Then
@@ -225,12 +224,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Then -> pass()
-          _ -> fail_with("And should inherit Then from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Then)
+        |> or_fail_with("And should inherit Then from previous")
       }),
-      it("But after Given resolves to Given", fn() {
+      it("But after Given resolves to Given", fn(_) {
         // Arrange
         let current = gherkin_types.But
         let previous = gherkin_types.Given
@@ -239,12 +238,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Given -> pass()
-          _ -> fail_with("But should inherit Given from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Given)
+        |> or_fail_with("But should inherit Given from previous")
       }),
-      it("But after When resolves to When", fn() {
+      it("But after When resolves to When", fn(_) {
         // Arrange
         let current = gherkin_types.But
         let previous = gherkin_types.When
@@ -253,12 +252,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.When -> pass()
-          _ -> fail_with("But should inherit When from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.When)
+        |> or_fail_with("But should inherit When from previous")
       }),
-      it("But after Then resolves to Then", fn() {
+      it("But after Then resolves to Then", fn(_) {
         // Arrange
         let current = gherkin_types.But
         let previous = gherkin_types.Then
@@ -267,12 +266,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Then -> pass()
-          _ -> fail_with("But should inherit Then from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Then)
+        |> or_fail_with("But should inherit Then from previous")
       }),
-      it("Given does not inherit from previous", fn() {
+      it("Given does not inherit from previous", fn(_) {
         // Arrange
         let current = gherkin_types.Given
         let previous = gherkin_types.When
@@ -281,12 +280,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Given -> pass()
-          _ -> fail_with("Given should not inherit from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Given)
+        |> or_fail_with("Given should not inherit from previous")
       }),
-      it("When does not inherit from previous", fn() {
+      it("When does not inherit from previous", fn(_) {
         // Arrange
         let current = gherkin_types.When
         let previous = gherkin_types.Given
@@ -295,12 +294,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.When -> pass()
-          _ -> fail_with("When should not inherit from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.When)
+        |> or_fail_with("When should not inherit from previous")
       }),
-      it("Then does not inherit from previous", fn() {
+      it("Then does not inherit from previous", fn(_) {
         // Arrange
         let current = gherkin_types.Then
         let previous = gherkin_types.When
@@ -309,12 +308,12 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.Then -> pass()
-          _ -> fail_with("Then should not inherit from previous")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.Then)
+        |> or_fail_with("Then should not inherit from previous")
       }),
-      it("And after And returns And", fn() {
+      it("And after And returns And", fn(_) {
         // Arrange
         let current = gherkin_types.And
         let previous = gherkin_types.And
@@ -323,14 +322,14 @@ pub fn tests() {
         let result = gherkin_types.resolve_keyword(current, previous)
 
         // Assert
-        case result {
-          gherkin_types.And -> pass()
-          _ -> fail_with("And after And should return And")
-        }
+        result
+        |> should()
+        |> equal(gherkin_types.And)
+        |> or_fail_with("And after And should return And")
       }),
     ]),
-    describe("empty_examples", [
-      it("creates ExamplesTable with empty headers", fn() {
+    group("empty_examples", [
+      it("creates ExamplesTable with empty headers", fn(_) {
         // Arrange
         let expected_headers = []
 
@@ -343,7 +342,7 @@ pub fn tests() {
         |> equal(expected_headers)
         |> or_fail_with("Empty examples should have empty headers")
       }),
-      it("creates ExamplesTable with empty rows", fn() {
+      it("creates ExamplesTable with empty rows", fn(_) {
         // Arrange
         let expected_rows = []
 
@@ -357,8 +356,8 @@ pub fn tests() {
         |> or_fail_with("Empty examples should have empty rows")
       }),
     ]),
-    describe("empty_background", [
-      it("creates Background with empty steps", fn() {
+    group("empty_background", [
+      it("creates Background with empty steps", fn(_) {
         // Arrange
         let expected_steps = []
 
@@ -374,11 +373,8 @@ pub fn tests() {
     ]),
   ])
 }
-
 // =============================================================================
 // Test Helpers
 // =============================================================================
 
-fn pass() -> AssertionResult {
-  AssertionOk
-}
+// (No local pass/fail helpers needed; assertions return Result directly.)

@@ -1,14 +1,14 @@
 import dream_test/assertions/should.{
-  be_false, be_true, equal, fail_with, or_fail_with, should,
+  be_false, be_true, equal, or_fail_with, should,
 }
 import dream_test/gherkin/world
-import dream_test/types.{type AssertionResult, AssertionOk}
-import dream_test/unit.{describe, it}
+import dream_test/types.{AssertionOk}
+import dream_test/unit.{describe, group, it}
 
 pub fn tests() {
   describe("Gherkin World", [
-    describe("new_world", [
-      it("creates world with given scenario_id", fn() {
+    group("new_world", [
+      it("creates world with given scenario_id", fn(_) {
         // Arrange
         let id = "test_scenario_1"
 
@@ -25,7 +25,7 @@ pub fn tests() {
         world.cleanup(w)
         assertion
       }),
-      it("creates independent worlds for different scenarios", fn() {
+      it("creates independent worlds for different scenarios", fn(_) {
         // Arrange
         let w1 = world.new_world("scenario_a")
         let w2 = world.new_world("scenario_b")
@@ -39,14 +39,15 @@ pub fn tests() {
         // Assert & Cleanup
         world.cleanup(w1)
         world.cleanup(w2)
-        case result1, result2 {
-          Ok("value_a"), Ok("value_b") -> pass()
-          _, _ -> fail_with("Each world should have independent storage")
-        }
+        let ok = result1 == Ok("value_a") && result2 == Ok("value_b")
+        ok
+        |> should()
+        |> be_true()
+        |> or_fail_with("Each world should have independent storage")
       }),
     ]),
-    describe("put and get", [
-      it("stores and retrieves string value", fn() {
+    group("put and get", [
+      it("stores and retrieves string value", fn(_) {
         // Arrange
         let w = world.new_world("put_get_string")
         let key = "name"
@@ -58,13 +59,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Ok("Alice") -> pass()
-          Ok(_) -> fail_with("Retrieved wrong string value")
-          Error(_) -> fail_with("Should retrieve stored string")
-        }
+        result
+        |> should()
+        |> equal(Ok("Alice"))
+        |> or_fail_with("Should retrieve stored string")
       }),
-      it("stores and retrieves integer value", fn() {
+      it("stores and retrieves integer value", fn(_) {
         // Arrange
         let w = world.new_world("put_get_int")
         let key = "count"
@@ -76,13 +76,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Ok(42) -> pass()
-          Ok(_) -> fail_with("Retrieved wrong integer value")
-          Error(_) -> fail_with("Should retrieve stored integer")
-        }
+        result
+        |> should()
+        |> equal(Ok(42))
+        |> or_fail_with("Should retrieve stored integer")
       }),
-      it("stores and retrieves list value", fn() {
+      it("stores and retrieves list value", fn(_) {
         // Arrange
         let w = world.new_world("put_get_list")
         let key = "items"
@@ -94,13 +93,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Ok(["apple", "banana", "cherry"]) -> pass()
-          Ok(_) -> fail_with("Retrieved wrong list value")
-          Error(_) -> fail_with("Should retrieve stored list")
-        }
+        result
+        |> should()
+        |> equal(Ok(["apple", "banana", "cherry"]))
+        |> or_fail_with("Should retrieve stored list")
       }),
-      it("returns Error for non-existent key", fn() {
+      it("returns Error for non-existent key", fn(_) {
         // Arrange
         let w = world.new_world("get_missing")
 
@@ -109,12 +107,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Error(Nil) -> pass()
-          Ok(_) -> fail_with("Should return Error for non-existent key")
-        }
+        result
+        |> should()
+        |> equal(Error(Nil))
+        |> or_fail_with("Should return Error for non-existent key")
       }),
-      it("overwrites value when key already exists", fn() {
+      it("overwrites value when key already exists", fn(_) {
         // Arrange
         let w = world.new_world("put_overwrite")
         let key = "value"
@@ -126,13 +124,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Ok("second") -> pass()
-          Ok(_) -> fail_with("Should have overwritten value")
-          Error(_) -> fail_with("Key should exist")
-        }
+        result
+        |> should()
+        |> equal(Ok("second"))
+        |> or_fail_with("Should have overwritten value")
       }),
-      it("stores multiple keys", fn() {
+      it("stores multiple keys", fn(_) {
         // Arrange
         let w = world.new_world("multiple_keys")
 
@@ -146,14 +143,15 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case a, b, c {
-          Ok(1), Ok(2), Ok(3) -> pass()
-          _, _, _ -> fail_with("All keys should be retrievable")
-        }
+        let ok = a == Ok(1) && b == Ok(2) && c == Ok(3)
+        ok
+        |> should()
+        |> be_true()
+        |> or_fail_with("All keys should be retrievable")
       }),
     ]),
-    describe("get_or", [
-      it("returns stored value when key exists", fn() {
+    group("get_or", [
+      it("returns stored value when key exists", fn(_) {
         // Arrange
         let w = world.new_world("get_or_exists")
         world.put(w, "count", 42)
@@ -168,7 +166,7 @@ pub fn tests() {
         |> equal(42)
         |> or_fail_with("Should return stored value")
       }),
-      it("returns default when key does not exist", fn() {
+      it("returns default when key does not exist", fn(_) {
         // Arrange
         let w = world.new_world("get_or_missing")
         let default = 100
@@ -183,7 +181,7 @@ pub fn tests() {
         |> equal(default)
         |> or_fail_with("Should return default value")
       }),
-      it("returns default empty list when key does not exist", fn() {
+      it("returns default empty list when key does not exist", fn(_) {
         // Arrange
         let w = world.new_world("get_or_empty_list")
 
@@ -198,8 +196,8 @@ pub fn tests() {
         |> or_fail_with("Should return default empty list")
       }),
     ]),
-    describe("has", [
-      it("returns True when key exists", fn() {
+    group("has", [
+      it("returns True when key exists", fn(_) {
         // Arrange
         let w = world.new_world("has_exists")
         world.put(w, "key", "value")
@@ -214,7 +212,7 @@ pub fn tests() {
         |> be_true()
         |> or_fail_with("Should return True for existing key")
       }),
-      it("returns False when key does not exist", fn() {
+      it("returns False when key does not exist", fn(_) {
         // Arrange
         let w = world.new_world("has_missing")
 
@@ -228,7 +226,7 @@ pub fn tests() {
         |> be_false()
         |> or_fail_with("Should return False for missing key")
       }),
-      it("returns True after put and False after delete", fn() {
+      it("returns True after put and False after delete", fn(_) {
         // Arrange
         let w = world.new_world("has_lifecycle")
 
@@ -241,15 +239,16 @@ pub fn tests() {
 
         // Cleanup
         world.cleanup(w)
-
-        case before_put, after_put, after_delete {
-          False, True, False -> pass()
-          _, _, _ -> fail_with("has should track key existence correctly")
-        }
+        let ok =
+          before_put == False && after_put == True && after_delete == False
+        ok
+        |> should()
+        |> be_true()
+        |> or_fail_with("has should track key existence correctly")
       }),
     ]),
-    describe("delete", [
-      it("removes key from world", fn() {
+    group("delete", [
+      it("removes key from world", fn(_) {
         // Arrange
         let w = world.new_world("delete_key")
         world.put(w, "key", "value")
@@ -260,12 +259,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case result {
-          Error(Nil) -> pass()
-          Ok(_) -> fail_with("Key should be deleted")
-        }
+        result
+        |> should()
+        |> equal(Error(Nil))
+        |> or_fail_with("Key should be deleted")
       }),
-      it("is no-op for non-existent key", fn() {
+      it("is no-op for non-existent key", fn(_) {
         // Arrange
         let w = world.new_world("delete_missing")
         world.put(w, "other", "value")
@@ -276,12 +275,12 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case other_result {
-          Ok("value") -> pass()
-          _ -> fail_with("Other keys should be unaffected")
-        }
+        other_result
+        |> should()
+        |> equal(Ok("value"))
+        |> or_fail_with("Other keys should be unaffected")
       }),
-      it("only deletes specified key", fn() {
+      it("only deletes specified key", fn(_) {
         // Arrange
         let w = world.new_world("delete_specific")
         world.put(w, "keep1", 1)
@@ -296,14 +295,15 @@ pub fn tests() {
 
         // Assert & Cleanup
         world.cleanup(w)
-        case k1, dm, k2 {
-          Ok(1), Error(Nil), Ok(3) -> pass()
-          _, _, _ -> fail_with("Only specified key should be deleted")
-        }
+        let ok = k1 == Ok(1) && dm == Error(Nil) && k2 == Ok(3)
+        ok
+        |> should()
+        |> be_true()
+        |> or_fail_with("Only specified key should be deleted")
       }),
     ]),
-    describe("scenario_id", [
-      it("returns the scenario id", fn() {
+    group("scenario_id", [
+      it("returns the scenario id", fn(_) {
         // Arrange
         let id = "my_unique_scenario_123"
         let w = world.new_world(id)
@@ -319,24 +319,21 @@ pub fn tests() {
         |> or_fail_with("Should return original scenario_id")
       }),
     ]),
-    describe("cleanup", [
-      it("cleans up world without error", fn() {
+    group("cleanup", [
+      it("cleans up world without error", fn(_) {
         // Arrange
         let w = world.new_world("cleanup_test")
         world.put(w, "data", "value")
 
         // Act & Assert - cleanup should complete without error
         world.cleanup(w)
-        pass()
+        Ok(AssertionOk)
       }),
     ]),
   ])
 }
-
 // =============================================================================
 // Test Helpers
 // =============================================================================
 
-fn pass() -> AssertionResult {
-  AssertionOk
-}
+// (No local pass/fail helpers needed; assertions return Result directly.)

@@ -566,13 +566,16 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 /// - ✗ "wrong"
 /// - ✗ "failed"
 ///
-pub fn or_fail_with(result: MatchResult(a), message: String) -> AssertionResult {
-  case result {
+pub fn or_fail_with(
+  result: MatchResult(a),
+  message: String,
+) -> Result(AssertionResult, String) {
+  Ok(case result {
     MatchOk(_) -> AssertionOk
 
     MatchFailed(failure) ->
       AssertionFailed(AssertionFailure(..failure, message: message))
-  }
+  })
 }
 
 /// Explicitly fail a test with a message.

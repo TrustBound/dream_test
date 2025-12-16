@@ -2,8 +2,8 @@
 ////
 //// Run with: gleam test
 
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{exit_on_failure, run_suite}
+import dream_test/reporter/api as reporter
+import dream_test/runner
 import features/shopping_cart as shopping_cart_feature
 import gleam/io
 
@@ -13,8 +13,8 @@ pub fn main() {
   io.println("====================================")
   io.println("")
 
-  shopping_cart_feature.tests()
-  |> run_suite()
-  |> report(io.print)
-  |> exit_on_failure()
+  runner.new([shopping_cart_feature.tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

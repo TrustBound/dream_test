@@ -4,18 +4,19 @@
 /// - Tests run in isolated processes
 /// - Timeouts work correctly
 /// - Crashes are handled gracefully
+import dream_test/assertions/should.{be_true, equal, or_fail_with, should}
 import dream_test/sandbox.{
   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 }
 import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
 import gleam/erlang/process
 import gleam/option.{None}
 
 pub fn tests() {
   describe("Sandbox", [
-    describe("run_isolated", [
-      it("returns SandboxCompleted for a passing test", fn() {
+    group("run_isolated", [
+      it("returns SandboxCompleted for a passing test", fn(_) {
         // Arrange
         let config = SandboxConfig(timeout_ms: 1000)
         let test_function = fn() { AssertionOk }
@@ -24,13 +25,13 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, test_function)
 
         // Assert
-        case result {
-          SandboxCompleted(AssertionOk) -> AssertionOk
-          _ -> make_failure("Expected SandboxCompleted(AssertionOk)")
-        }
+        result
+        |> should()
+        |> equal(SandboxCompleted(AssertionOk))
+        |> or_fail_with("Expected SandboxCompleted(AssertionOk)")
       }),
 
-      it("returns SandboxCompleted with failure for a failing test", fn() {
+      it("returns SandboxCompleted with failure for a failing test", fn(_) {
         // Arrange
         let config = SandboxConfig(timeout_ms: 1000)
         let failure =
@@ -45,13 +46,13 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, test_function)
 
         // Assert
-        case result {
-          SandboxCompleted(AssertionFailed(_)) -> AssertionOk
-          _ -> make_failure("Expected SandboxCompleted(AssertionFailed)")
-        }
+        result
+        |> should()
+        |> equal(SandboxCompleted(AssertionFailed(failure)))
+        |> or_fail_with("Expected SandboxCompleted(AssertionFailed(failure))")
       }),
 
-      it("returns SandboxTimedOut for a test that exceeds timeout", fn() {
+      it("returns SandboxTimedOut for a test that exceeds timeout", fn(_) {
         // Arrange
         let config = SandboxConfig(timeout_ms: 50)
         let test_function = fn() {
@@ -64,13 +65,13 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, test_function)
 
         // Assert
-        case result {
-          SandboxTimedOut -> AssertionOk
-          _ -> make_failure("Expected SandboxTimedOut")
-        }
+        result
+        |> should()
+        |> equal(SandboxTimedOut)
+        |> or_fail_with("Expected SandboxTimedOut")
       }),
 
-      it("returns SandboxCrashed for a test that panics", fn() {
+      it("returns SandboxCrashed for a test that panics", fn(_) {
         // Arrange
         let config = SandboxConfig(timeout_ms: 1000)
         let test_function = fn() { panic as "intentional crash" }
@@ -79,13 +80,18 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, test_function)
 
         // Assert
-        case result {
-          SandboxCrashed(_) -> AssertionOk
-          _ -> make_failure("Expected SandboxCrashed")
+        let is_crashed = case result {
+          SandboxCrashed(_) -> True
+          _ -> False
         }
+
+        is_crashed
+        |> should()
+        |> be_true()
+        |> or_fail_with("Expected SandboxCrashed")
       }),
 
-      it("isolates crashes from the parent process", fn() {
+      it("isolates crashes from the parent process", fn(_) {
         // Arrange - if we get here, we weren't crashed by the child
         let config = SandboxConfig(timeout_ms: 1000)
         let test_function = fn() {
@@ -93,20 +99,21 @@ pub fn tests() {
         }
 
         // Act
-        let _result = sandbox.run_isolated(config, test_function)
+        let result = sandbox.run_isolated(config, test_function)
 
-        // Assert - if we reach this point, isolation worked
-        AssertionOk
+        // Assert - if we reach this point, isolation worked (and the child crashed)
+        let is_crashed = case result {
+          SandboxCrashed(_) -> True
+          _ -> False
+        }
+
+        is_crashed
+        |> should()
+        |> be_true()
+        |> or_fail_with(
+          "Expected child crash to be isolated and reported as SandboxCrashed",
+        )
       }),
     ]),
   ])
-}
-
-/// Helper to create a failure with a message.
-fn make_failure(message: String) -> types.AssertionResult {
-  AssertionFailed(AssertionFailure(
-    operator: "sandbox_test",
-    message: message,
-    payload: None,
-  ))
 }

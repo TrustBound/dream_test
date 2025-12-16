@@ -1,12 +1,12 @@
 //// README: Custom matchers
 
 import dream_test/assertions/should.{or_fail_with, should}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_all}
+import dream_test/reporter/api as reporter
+import dream_test/runner
 import dream_test/types.{
   type MatchResult, AssertionFailure, CustomMatcherFailure, MatchFailed, MatchOk,
 }
-import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/unit.{describe, it}
 import gleam/int
 import gleam/io
 import gleam/option.{Some}
@@ -70,13 +70,13 @@ fn check_email(value: String) -> MatchResult(String) {
 
 pub fn tests() {
   describe("Custom Matchers", [
-    it("be_even passes for even numbers", fn() {
+    it("be_even passes for even numbers", fn(_) {
       4
       |> should()
       |> be_even()
       |> or_fail_with("4 should be even")
     }),
-    it("be_valid_email passes for valid emails", fn() {
+    it("be_valid_email passes for valid emails", fn(_) {
       "user@example.com"
       |> should()
       |> be_valid_email()
@@ -86,7 +86,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  to_test_cases("custom_matchers", tests())
-  |> run_all()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

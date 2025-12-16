@@ -11,11 +11,12 @@ import dream_test/assertions/should.{
   equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,
 }
 import dream_test/matchers/snapshot
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{exit_on_failure, run_all}
-import dream_test/unit.{describe, it, to_test_cases}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, group, it}
 import gleam/int
 import gleam/io
+import gleam/result
 import gleam/string
 
 // Example: A function that renders a user profile as HTML
@@ -43,29 +44,31 @@ fn build_config() -> Config {
 
 pub fn tests() {
   describe("Snapshot Testing", [
-    describe("match_snapshot", [
-      it("renders user profile", fn() {
+    group("match_snapshot", [
+      it("renders user profile", fn(_) {
         render_profile("Alice", 30)
         |> should()
         |> match_snapshot("./test/snapshots/user_profile.snap")
         |> or_fail_with("Profile should match snapshot")
       }),
     ]),
-    describe("match_snapshot_inspect", [
-      it("builds config correctly", fn() {
+    group("match_snapshot_inspect", [
+      it("builds config correctly", fn(_) {
         build_config()
         |> should()
         |> match_snapshot_inspect("./test/snapshots/config.snap")
         |> or_fail_with("Config should match snapshot")
       }),
     ]),
-    describe("clearing snapshots", [
-      it("can clear a single snapshot", fn() {
+    group("clearing snapshots", [
+      it("can clear a single snapshot", fn(_) {
         // Create a temporary snapshot
-        "temp content"
-        |> should()
-        |> match_snapshot("./test/snapshots/temp.snap")
-        |> or_fail_with("Should create temp snapshot")
+        use _ <- result.try(
+          "temp content"
+          |> should()
+          |> match_snapshot("./test/snapshots/temp.snap")
+          |> or_fail_with("Should create temp snapshot"),
+        )
 
         // Clear it
         let result = snapshot.clear_snapshot("./test/snapshots/temp.snap")
@@ -80,8 +83,8 @@ pub fn tests() {
 }
 
 pub fn main() {
-  to_test_cases("snapshot_testing", tests())
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

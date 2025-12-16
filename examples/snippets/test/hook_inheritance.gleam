@@ -1,40 +1,41 @@
 //// README: Hook inheritance
 
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{run_suite}
-import dream_test/unit.{after_each, before_each, describe, it, to_test_suite}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{after_each, before_each, describe, group, it}
 import gleam/io
 
 pub fn tests() {
   describe("Outer", [
-    before_each(fn() {
+    before_each(fn(_) {
       io.println("1. outer setup")
-      succeed()
+      Ok(Nil)
     }),
-    after_each(fn() {
+    after_each(fn(_) {
       io.println("4. outer teardown")
-      succeed()
+      Ok(Nil)
     }),
-    describe("Inner", [
-      before_each(fn() {
+    group("Inner", [
+      before_each(fn(_) {
         io.println("2. inner setup")
-        succeed()
+        Ok(Nil)
       }),
-      after_each(fn() {
+      after_each(fn(_) {
         io.println("3. inner teardown")
-        succeed()
+        Ok(Nil)
       }),
-      it("test", fn() {
+      it("test", fn(_) {
         io.println("(test)")
-        succeed()
+        Ok(succeed())
       }),
     ]),
   ])
 }
 
 pub fn main() {
-  to_test_suite("hook_inheritance", tests())
-  |> run_suite()
-  |> report(io.print)
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.run()
+  |> runner.exit_results_on_failure
 }

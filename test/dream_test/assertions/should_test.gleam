@@ -2,12 +2,12 @@ import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
 import dream_test/types.{
   AssertionFailed, AssertionOk, AssertionSkipped, MatchFailed, MatchOk,
 }
-import dream_test/unit.{describe, it}
+import dream_test/unit.{describe, group, it}
 
 pub fn tests() {
   describe("Should", [
-    describe("equal", [
-      it("returns MatchOk for equal values", fn() {
+    group("equal", [
+      it("returns MatchOk for equal values", fn(_) {
         // Arrange
         let value = 3
         let expected_value = 3
@@ -17,11 +17,12 @@ pub fn tests() {
 
         // Assert
         case result {
-          MatchOk(_) -> AssertionOk
-          MatchFailed(_) -> fail_with("equal should not fail for equal values")
+          MatchOk(_) -> Ok(AssertionOk)
+          MatchFailed(_) ->
+            Ok(fail_with("equal should not fail for equal values"))
         }
       }),
-      it("returns MatchFailed for unequal values", fn() {
+      it("returns MatchFailed for unequal values", fn(_) {
         // Arrange
         let value = 3
         let expected_value = 4
@@ -31,13 +32,14 @@ pub fn tests() {
 
         // Assert
         case result {
-          MatchFailed(_) -> AssertionOk
-          MatchOk(_) -> fail_with("equal should fail for non-matching values")
+          MatchFailed(_) -> Ok(AssertionOk)
+          MatchOk(_) ->
+            Ok(fail_with("equal should fail for non-matching values"))
         }
       }),
     ]),
-    describe("or_fail_with", [
-      it("overrides the failure message", fn() {
+    group("or_fail_with", [
+      it("overrides the failure message", fn(_) {
         // Arrange
         let value = 3
         let expected_value = 4
@@ -52,14 +54,16 @@ pub fn tests() {
 
         // Assert
         case result {
-          AssertionFailed(failure) -> {
+          Ok(AssertionFailed(failure)) ->
             failure.message
             |> should()
             |> equal(custom_message)
             |> or_fail_with("or_fail_with should override the failure message")
-          }
-          AssertionOk | AssertionSkipped ->
-            fail_with("Expected a failed assertion")
+
+          Ok(AssertionOk) | Ok(AssertionSkipped) ->
+            Ok(fail_with("Expected a failed assertion"))
+
+          Error(_) -> Ok(fail_with("Expected a failed assertion"))
         }
       }),
     ]),

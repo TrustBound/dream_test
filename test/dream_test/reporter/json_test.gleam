@@ -10,7 +10,7 @@ import gleam/option.{Some}
 
 pub fn tests() {
   describe("JSON Reporter", [
-    it("includes schema version", fn() {
+    it("includes schema version", fn(_) {
       // Arrange
       let results = []
 
@@ -23,7 +23,7 @@ pub fn tests() {
       |> contain_string("\"version\":\"1.0\"")
       |> or_fail_with("Should include schema version")
     }),
-    it("includes system info", fn() {
+    it("includes system info", fn(_) {
       // Arrange
       let results = []
 
@@ -36,7 +36,7 @@ pub fn tests() {
       |> contain_string("\"system\":{")
       |> or_fail_with("Should include system info object")
     }),
-    it("includes summary with counts", fn() {
+    it("includes summary with counts", fn(_) {
       // Arrange
       let results = [
         make_test("test1", Passed),
@@ -53,7 +53,7 @@ pub fn tests() {
       |> contain_string("\"total\":3")
       |> or_fail_with("Should include correct total count")
     }),
-    it("sums test durations", fn() {
+    it("sums test durations", fn(_) {
       // Arrange
       let results = [
         make_test_with_duration("test1", Passed, 100),
@@ -69,7 +69,7 @@ pub fn tests() {
       |> contain_string("\"duration_ms\":300")
       |> or_fail_with("Should sum durations")
     }),
-    it("includes test name and full path", fn() {
+    it("includes test name and full path", fn(_) {
       // Arrange
       let test_result =
         TestResult(
@@ -91,7 +91,7 @@ pub fn tests() {
       |> contain_string("\"full_name\":[\"Calculator\",\"add\",\"adds\"]")
       |> or_fail_with("Should include full name path")
     }),
-    it("serializes status as lowercase string", fn() {
+    it("serializes status as lowercase string", fn(_) {
       // Arrange
       let results = [make_test("test", Failed)]
 
@@ -104,7 +104,7 @@ pub fn tests() {
       |> contain_string("\"status\":\"failed\"")
       |> or_fail_with("Should serialize status as lowercase string")
     }),
-    it("includes gherkin scenario id in kind", fn() {
+    it("includes gherkin scenario id in kind", fn(_) {
       // Arrange
       let test_result =
         TestResult(
@@ -126,7 +126,7 @@ pub fn tests() {
       |> contain_string("\"kind\":\"gherkin:cart_1\"")
       |> or_fail_with("Should include gherkin kind with scenario id")
     }),
-    it("includes failure details with expected and actual", fn() {
+    it("includes failure details with expected and actual", fn(_) {
       // Arrange
       let failure =
         AssertionFailure(

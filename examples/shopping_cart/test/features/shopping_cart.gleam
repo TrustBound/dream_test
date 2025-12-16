@@ -11,7 +11,7 @@ import steps/cart
 import steps/checkout
 import steps/discount
 
-pub fn tests() -> TestSuite {
+pub fn tests() -> TestSuite(Nil) {
   let registry =
     new_registry()
     |> cart.register()
