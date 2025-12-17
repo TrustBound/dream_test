@@ -78,7 +78,7 @@ Summary: 3 run, 0 failed, 3 passed in 2ms
 ```toml
 # gleam.toml
 [dev-dependencies]
-dream_test = "~> 1.2"
+dream_test = "~> 2.0"
 ```
 
 ---
@@ -954,7 +954,7 @@ Benefits:
 
 ## Status
 
-**Stable** — v1.2 release. API is stable and ready for production use.
+**Stable** — v2.0 release. API is stable and ready for production use.
 
 | Feature                           | Status    |
 | --------------------------------- | --------- |

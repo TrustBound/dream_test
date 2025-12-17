@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-12-17
+
+### Added
+
+- **Suite-first runner builder** (`dream_test/runner`)
+
+  - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
+  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `reporter`, `exit_on_failure`, `filter_results`)
+
+- **Event-driven reporters** (`dream_test/reporter/api`, `dream_test/reporter/types`)
+
+  - Runner emits structured `ReporterEvent`s (`RunStarted`, `TestFinished`, `RunFinished`, plus hook events)
+  - Unified reporter API:
+    - `reporter.bdd(write, show_progress)`
+    - `reporter.json(write, show_progress)`
+    - `reporter.progress(write)`
+
+- **Live progress bar reporter** (`dream_test/reporter/progress`)
+
+  - In-place single-line progress bar that adapts to terminal width
+
+- **Selective sandbox crash reports** (`dream_test/sandbox`)
+
+  - New `SandboxConfig.show_crash_reports` flag (default `False`) to suppress noisy BEAM crash reports while still reporting failures
+  - Convenience helper `sandbox.with_crash_reports` for local debugging
+
+### Changed
+
+- **Unit DSL is suite-first** (`dream_test/unit`, `dream_test/types`)
+
+  - Suite items are now typed (`SuiteItem(ctx)`) and suites carry context (`TestSuite(ctx)`)
+  - Lifecycle hooks now return `Result(..., String)` for explicit failure reporting
+
+- **Parallel runner API** (`dream_test/parallel`)
+
+  - Added event-driven entrypoints for driving reporters during parallel execution
+
+### Documentation
+
+- Updated docs to the new v2 suite-first pipeline and event-driven reporter model.
+
+### Breaking Changes
+
+- `dream_test/runner`: replaced `run_all*` / `run_suite*` free functions with the `RunBuilder` pipeline (`runner.new(...) |> ... |> runner.run()`).
+- `dream_test/unit`: replaced the old `UnitTest` tree + `to_test_suite` conversion with typed suite builders (`describe`, `group`, `describe_with_hooks`, `SuiteHooks`).
+- `dream_test/types`: suites and test cases are now context-typed (`TestSuite(ctx)`, `SuiteTestCase(ctx)`), so user code matching these types must be updated.
+- `dream_test/gherkin/world.get`: error type changed from `Result(a, Nil)` to `Result(a, String)` for more informative failures.
+
 ## [1.2.0] - 2025-12-04
 
 ### Added
@@ -228,7 +276,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/TrustBound/dream_test/compare/1.2.0...2.0.0
 [1.2.0]: https://github.com/TrustBound/dream_test/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/TrustBound/dream_test/compare/1.0.3...1.1.0
 [1.0.3]: https://github.com/TrustBound/dream_test/compare/1.0.2...1.0.3
