@@ -12,11 +12,11 @@ pub fn tests() {
   describe("Database tests", [
     before_all(fn() {
       // Start database once for all tests
-      Ok(Nil)
+      start_database()
     }),
     before_each(fn(_) {
       // Begin transaction before each test
-      Ok(Nil)
+      begin_transaction()
     }),
     it("creates a record", fn(_) {
       []
@@ -32,18 +32,34 @@ pub fn tests() {
     }),
     after_each(fn(_) {
       // Rollback transaction after each test
-      Ok(Nil)
+      rollback_transaction()
     }),
     after_all(fn(_) {
       // Stop database after all tests
-      Ok(Nil)
+      stop_database()
     }),
   ])
+}
+
+fn start_database() -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn stop_database() -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn begin_transaction() -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn rollback_transaction() -> Result(Nil, String) {
+  Ok(Nil)
 }
 
 pub fn main() {
   runner.new([tests()])
   |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
   |> runner.run()
-  |> runner.exit_results_on_failure
 }

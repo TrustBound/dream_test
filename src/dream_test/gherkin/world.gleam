@@ -11,17 +11,23 @@
 //// ## Example
 ////
 //// ```gleam
-//// fn have_items(context: StepContext) -> AssertionResult {
+//// import dream_test/assertions/should.{equal, or_fail_with, should}
+//// import dream_test/assertions/should.{fail_with}
+//// import dream_test/gherkin/steps.{type StepContext}
+//// import dream_test/gherkin/world as world
+//// import dream_test/types.{AssertionOk, type AssertionResult}
+////
+//// fn have_items(context: StepContext) -> Result(AssertionResult, String) {
 ////   case get_int(context.captures, 0) {
 ////     Ok(count) -> {
 ////       world.put(context.world, "cart_count", count)
-////       AssertionOk
+////       Ok(AssertionOk)
 ////     }
-////     Error(msg) -> fail_with(msg)
+////     Error(msg) -> Ok(fail_with(msg))
 ////   }
 //// }
 ////
-//// fn check_total(context: StepContext) -> AssertionResult {
+//// fn check_total(context: StepContext) -> Result(AssertionResult, String) {
 ////   case world.get(context.world, "cart_count") {
 ////     Ok(count) -> {
 ////       count
@@ -29,7 +35,7 @@
 ////       |> equal(expected)
 ////       |> or_fail_with("Cart count mismatch")
 ////     }
-////     Error(_) -> fail_with("Cart not found in world")
+////     Error(_) -> Ok(fail_with("Cart not found in world"))
 ////   }
 //// }
 //// ```
@@ -146,7 +152,7 @@ pub fn put(world: World, key: String, value: a) -> Nil {
 /// ## Returns
 ///
 /// - `Ok(value)`: Key exists, returns the stored value
-/// - `Error(Nil)`: Key doesn't exist
+/// - `Error(String)`: Key doesn't exist (human-readable message)
 ///
 /// ## Example
 ///
@@ -157,10 +163,10 @@ pub fn put(world: World, key: String, value: a) -> Nil {
 /// }
 /// ```
 ///
-pub fn get(world: World, key: String) -> Result(a, Nil) {
+pub fn get(world: World, key: String) -> Result(a, String) {
   case ets_lookup(world.table, key) {
     Some(value) -> Ok(value)
-    None -> Error(Nil)
+    None -> Error("World key not found: " <> key)
   }
 }
 

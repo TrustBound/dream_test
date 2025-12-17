@@ -19,7 +19,7 @@
 ////
 //// pub fn tests() {
 ////   describe("Counter", [
-////     it("increments correctly", fn() {
+////     it("increments correctly", fn(_) {
 ////       let counter = start_counter()
 ////       increment(counter)
 ////       increment(counter)
@@ -53,6 +53,7 @@ import gleam/otp/actor
 ///
 /// ```gleam
 /// let counter = start_counter()
+/// import gleam/erlang/process
 /// process.send(counter, Increment)
 /// process.send(counter, SetCount(100))
 /// ```
@@ -231,6 +232,11 @@ pub fn unique_port() -> Int {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/process.{call_actor, start_actor}
+/// import gleam/erlang/process.{type Subject}
+/// import gleam/erlang/process as process
+/// import gleam/otp/actor
+///
 /// pub type TodoMessage {
 ///   Add(String)
 ///   GetAll(Subject(List(String)))
@@ -369,6 +375,9 @@ pub type PollResult(a) {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/assertions/should.{be_ok, or_fail_with, should}
+/// import dream_test/process.{await_ready, quick_poll_config}
+///
 /// // Wait for server to be ready
 /// case await_ready(quick_poll_config(), fn() { is_port_open(port) }) {
 ///   Ready(True) -> {
@@ -378,7 +387,7 @@ pub type PollResult(a) {
 ///     |> be_ok()
 ///     |> or_fail_with("Request should succeed")
 ///   }
-///   TimedOut -> fail_with("Server didn't start in time")
+///   TimedOut -> Ok(fail_with("Server didn't start in time"))
 /// }
 /// ```
 ///
@@ -400,6 +409,9 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/assertions/should.{equal, or_fail_with, should}
+/// import dream_test/process.{await_some, default_poll_config}
+///
 /// // Wait for user to appear in database
 /// case await_some(default_poll_config(), fn() { find_user(user_id) }) {
 ///   Ready(user) -> {
@@ -408,7 +420,7 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 ///     |> equal("Alice")
 ///     |> or_fail_with("User should be Alice")
 ///   }
-///   TimedOut -> fail_with("User never appeared in database")
+///   TimedOut -> Ok(fail_with("User never appeared in database"))
 /// }
 /// ```
 ///

@@ -6,9 +6,12 @@
 //// ## Quick Start
 ////
 //// ```gleam
+//// import dream_test/assertions/should.{fail_with}
 //// import dream_test/gherkin/steps.{
 ////   type StepContext, given, new_registry, then_, when_, get_int, get_float,
 //// }
+//// import dream_test/gherkin/world as world
+//// import dream_test/types.{AssertionOk, type AssertionResult}
 ////
 //// pub fn cart_steps() -> StepRegistry {
 ////   new_registry()
@@ -17,13 +20,13 @@
 ////   |> then_("the total should be ${float}", check_total)
 //// }
 ////
-//// fn have_items(context: StepContext) -> AssertionResult {
+//// fn have_items(context: StepContext) -> Result(AssertionResult, String) {
 ////   case get_int(context.captures, 0) {
 ////     Ok(count) -> {
 ////       world.put(context.world, "count", count)
-////       AssertionOk
+////       Ok(AssertionOk)
 ////     }
-////     Error(msg) -> fail_with(msg)
+////     Error(msg) -> Ok(fail_with(msg))
 ////   }
 //// }
 //// ```
@@ -57,15 +60,15 @@
 //// Use the typed extraction helpers to get captured values:
 ////
 //// ```gleam
-//// fn check_total(context: StepContext) -> AssertionResult {
+//// fn check_total(context: StepContext) -> Result(AssertionResult, String) {
 ////   // Pattern was "the total should be ${float}"
 ////   // Step text was "the total should be $19.99"
 ////   case get_float(context.captures, 0) {
 ////     Ok(amount) -> {
 ////       // amount is 19.99 (the $ prefix was matched but not captured)
-////       AssertionOk
+////       Ok(AssertionOk)
 ////     }
-////     Error(msg) -> fail_with(msg)
+////     Error(msg) -> Ok(fail_with(msg))
 ////   }
 //// }
 //// ```
@@ -108,10 +111,25 @@ pub type StepContext {
 /// Type alias for step handler functions.
 ///
 /// All step handlers have the same signature: they receive a StepContext
-/// and return an AssertionResult.
+/// and return `Result(AssertionResult, String)`, just like unit test bodies.
+///
+/// This means you can use the exact same assertion style inside steps:
+///
+/// ```gleam
+/// import dream_test/assertions/should.{be_ok, equal, or_fail_with, should}
+/// import dream_test/gherkin/world as world
+///
+/// fn check_count(context: StepContext) -> Result(AssertionResult, String) {
+///   world.get(context.world, "count")
+///   |> should()
+///   |> be_ok()
+///   |> equal(3)
+///   |> or_fail_with("count should be 3")
+/// }
+/// ```
 ///
 pub type StepHandler =
-  fn(StepContext) -> dream_types.AssertionResult
+  fn(StepContext) -> Result(dream_types.AssertionResult, String)
 
 /// Step registry backed by radix trie.
 ///
@@ -316,9 +334,12 @@ fn keyword_to_string(keyword: StepKeyword) -> String {
 /// ```gleam
 /// // Pattern: "I have {int} items"
 /// // Step: "I have 42 items"
-/// case get_int(context.captures, 0) {
-///   Ok(count) -> // count = 42
-///   Error(msg) -> fail_with(msg)
+/// import dream_test/types.{AssertionOk, type AssertionResult}
+///
+/// fn have_items(context: StepContext) -> Result(AssertionResult, String) {
+///   use count <- get_int(context.captures, 0)
+///   // count == 42
+///   Ok(AssertionOk)
 /// }
 /// ```
 ///
@@ -345,9 +366,12 @@ pub fn get_int(captures: List(CapturedValue), index: Int) -> Result(Int, String)
 /// ```gleam
 /// // Pattern: "the price is {float} dollars"
 /// // Step: "the price is 19.99 dollars"
-/// case get_float(context.captures, 0) {
-///   Ok(price) -> // price = 19.99
-///   Error(msg) -> fail_with(msg)
+/// import dream_test/types.{AssertionOk, type AssertionResult}
+///
+/// fn check_price(context: StepContext) -> Result(AssertionResult, String) {
+///   use price <- get_float(context.captures, 0)
+///   // price == 19.99
+///   Ok(AssertionOk)
 /// }
 /// ```
 ///
@@ -377,9 +401,12 @@ pub fn get_float(
 /// ```gleam
 /// // Pattern: "I add items of {string}"
 /// // Step: "I add items of \"Red Widget\""
-/// case get_string(context.captures, 0) {
-///   Ok(product) -> // product = "Red Widget"
-///   Error(msg) -> fail_with(msg)
+/// import dream_test/types.{AssertionOk, type AssertionResult}
+///
+/// fn add_items(context: StepContext) -> Result(AssertionResult, String) {
+///   use product <- get_string(context.captures, 0)
+///   // product == "Red Widget"
+///   Ok(AssertionOk)
 /// }
 /// ```
 ///
@@ -410,9 +437,12 @@ pub fn get_string(
 /// ```gleam
 /// // Pattern: "the user {word} exists"
 /// // Step: "the user alice exists"
-/// case get_word(context.captures, 0) {
-///   Ok(username) -> // username = "alice"
-///   Error(msg) -> fail_with(msg)
+/// import dream_test/types.{AssertionOk, type AssertionResult}
+///
+/// fn user_exists(context: StepContext) -> Result(AssertionResult, String) {
+///   use username <- get_word(context.captures, 0)
+///   // username == "alice"
+///   Ok(AssertionOk)
 /// }
 /// ```
 ///

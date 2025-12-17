@@ -2,6 +2,14 @@
 ////
 //// This module constructs `types.TestSuite(ctx)` values directly.
 ////
+//// ## Mental model
+////
+//// A **suite** is a named container of tests and hooks.
+//// A **group** is just a nested suite used for organization and hook scoping.
+////
+//// Each suite tree has exactly one context type `ctx`, created once by
+//// `before_all` (or defaulted to `Nil` when you use plain `describe`).
+////
 //// - Root suites are built with `describe(name, children)`.
 //// - Nested groups are built with `group(name, children)`.
 //// - One context type per suite tree:
@@ -11,6 +19,25 @@
 ////   - `after_all` runs once at the end (even on failure).
 ////
 //// All hooks/tests return `Result` to allow short-circuiting via `Error(String)`.
+////
+//// ## Errors
+////
+//// Returning `Error("message")` from a hook or test body marks the test as
+//// failed (or setup-failed) with that message. Use this to abort quickly when
+//// preconditions are not met.
+////
+//// ## Example
+////
+//// ```gleam
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
+////
+//// pub fn tests() {
+////   describe("Math", [
+////     it("adds", fn(_) { Ok(AssertionOk) }),
+////   ])
+//// }
+//// ```
 
 import dream_test/types.{
   type AssertionResult, type SuiteTestCase, type TestSuite, type TestSuiteItem,
@@ -19,6 +46,23 @@ import dream_test/types.{
 import gleam/list
 import gleam/option.{type Option, None, Some}
 
+/// Hook configuration for `describe_with_hooks`.
+///
+/// This is a small builder record so you can add hooks without a long argument
+/// list.
+///
+/// You only need `SuiteHooks` when you want a non-`Nil` context type (i.e. you
+/// want `before_all` to produce something other than `Nil`).
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/unit
+///
+/// let hooks =
+///   unit.hooks(fn() { Ok(0) })
+///   |> unit.hooks_before_each(fn(n) { Ok(n + 1) })
+/// ```
 pub type SuiteHooks(ctx) {
   SuiteHooks(
     before_all: fn() -> Result(ctx, String),
@@ -28,6 +72,22 @@ pub type SuiteHooks(ctx) {
   )
 }
 
+/// Start building hooks by defining the required `before_all`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let hooks = hooks(fn() { Ok("ctx") })
+/// ```
+///
+/// ## Parameters
+///
+/// - `before_all`: a function that runs once and produces the initial context
+///
+/// ## Returns
+///
+/// A `SuiteHooks(ctx)` value you can extend with `hooks_before_each`,
+/// `hooks_after_each`, and `hooks_after_all`.
 pub fn hooks(before_all: fn() -> Result(ctx, String)) -> SuiteHooks(ctx) {
   SuiteHooks(
     before_all: before_all,
@@ -37,6 +97,26 @@ pub fn hooks(before_all: fn() -> Result(ctx, String)) -> SuiteHooks(ctx) {
   )
 }
 
+/// Add an `after_all` hook to a `SuiteHooks`.
+///
+/// Hooks are appended in the order you add them.
+///
+/// ## Example
+///
+/// ```gleam
+/// let hooks =
+///   hooks(fn() { Ok(Nil) })
+///   |> hooks_after_all(fn(_ctx) { Ok(Nil) })
+/// ```
+///
+/// ## Parameters
+///
+/// - `hooks`: existing hook configuration
+/// - `teardown`: runs once after the suite finishes
+///
+/// ## Returns
+///
+/// Updated `SuiteHooks(ctx)`.
 pub fn hooks_after_all(
   hooks: SuiteHooks(ctx),
   teardown: fn(ctx) -> Result(Nil, String),
@@ -44,6 +124,26 @@ pub fn hooks_after_all(
   SuiteHooks(..hooks, after_all: list.append(hooks.after_all, [teardown]))
 }
 
+/// Add a `before_each` hook to a `SuiteHooks`.
+///
+/// `before_each` hooks can transform the context for the test.
+///
+/// ## Example
+///
+/// ```gleam
+/// let hooks =
+///   hooks(fn() { Ok(0) })
+///   |> hooks_before_each(fn(n) { Ok(n + 1) })
+/// ```
+///
+/// ## Parameters
+///
+/// - `hooks`: existing hook configuration
+/// - `setup`: runs before each test and can transform the context
+///
+/// ## Returns
+///
+/// Updated `SuiteHooks(ctx)`.
 pub fn hooks_before_each(
   hooks: SuiteHooks(ctx),
   setup: fn(ctx) -> Result(ctx, String),
@@ -51,6 +151,24 @@ pub fn hooks_before_each(
   SuiteHooks(..hooks, before_each: list.append(hooks.before_each, [setup]))
 }
 
+/// Add an `after_each` hook to a `SuiteHooks`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let hooks =
+///   hooks(fn() { Ok(Nil) })
+///   |> hooks_after_each(fn(_ctx) { Ok(Nil) })
+/// ```
+///
+/// ## Parameters
+///
+/// - `hooks`: existing hook configuration
+/// - `teardown`: runs after each test
+///
+/// ## Returns
+///
+/// Updated `SuiteHooks(ctx)`.
 pub fn hooks_after_each(
   hooks: SuiteHooks(ctx),
   teardown: fn(ctx) -> Result(Nil, String),
@@ -61,6 +179,10 @@ pub fn hooks_after_each(
 /// Items that can appear inside a `describe`/`group` block.
 ///
 /// We keep these as a single type so children lists remain homogeneous.
+///
+/// Most users should construct `SuiteItem`s using the helper functions in this
+/// module (`it`, `group`, `before_each`, etc.) rather than using the
+/// constructors directly.
 pub type SuiteItem(ctx) {
   SuiteTestItem(SuiteTestCase(ctx))
   SuiteGroupItem(TestSuite(ctx))
@@ -71,6 +193,23 @@ pub type SuiteItem(ctx) {
 }
 
 /// Define a single test case.
+///
+/// The function receives the current suite context.
+///
+/// ## Parameters
+///
+/// - `name`: test label shown in reports
+/// - `run`: receives the context for this test; return `Ok(AssertionOk)` to pass
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` suitable for inclusion in a `describe`/`group` children list.
+///
+/// ## Example
+///
+/// ```gleam
+/// it("passes", fn(_ctx) { Ok(AssertionOk) })
+/// ```
 pub fn it(
   name: String,
   run: fn(ctx) -> Result(AssertionResult, String),
@@ -85,6 +224,23 @@ pub fn it(
 }
 
 /// Skip a test case.
+///
+/// The provided function is ignored.
+///
+/// ## Parameters
+///
+/// - `name`: test label shown in reports
+/// - `_run`: ignored (kept to make it easy to “toggle” between `it` and `skip`)
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` that will always produce `AssertionSkipped`.
+///
+/// ## Example
+///
+/// ```gleam
+/// skip("TODO: implement", fn(_ctx) { Ok(AssertionOk) })
+/// ```
 pub fn skip(
   name: String,
   _run: fn(ctx) -> Result(AssertionResult, String),
@@ -103,6 +259,26 @@ fn skip_run(_ctx: ctx) -> Result(AssertionResult, String) {
 }
 
 /// Add tags to a test item.
+///
+/// Tags are used by the runner for filtering.
+///
+/// If you call this on a non-test item (e.g. a hook or group), it is a no-op.
+///
+/// ## Parameters
+///
+/// - `item`: usually the result of `it(...)` or `skip(...)`
+/// - `tags`: replacement tag list (not appended)
+///
+/// ## Returns
+///
+/// The updated item.
+///
+/// ## Example
+///
+/// ```gleam
+/// it("db test", fn(_) { Ok(AssertionOk) })
+/// |> with_tags(["integration"])
+/// ```
 pub fn with_tags(item: SuiteItem(ctx), tags: List(String)) -> SuiteItem(ctx) {
   case item {
     SuiteTestItem(test_case) ->
@@ -112,6 +288,28 @@ pub fn with_tags(item: SuiteItem(ctx), tags: List(String)) -> SuiteItem(ctx) {
 }
 
 /// Root suite constructor.
+///
+/// Root suites always have a context. If you do not provide a `before_all`,
+/// the context is implicitly `Nil`.
+///
+/// If you need a typed context, use `describe_with_hooks`.
+///
+/// ## Parameters
+///
+/// - `name`: suite label shown in reports
+/// - `children`: tests, groups, and hooks created via this module
+///
+/// ## Returns
+///
+/// A `TestSuite(Nil)` you can pass to `runner.new([suite])`.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   it("runs", fn(_) { Ok(AssertionOk) }),
+/// ])
+/// ```
 pub fn describe(name: String, children: List(SuiteItem(Nil))) -> TestSuite(Nil) {
   let suite = build_suite(name, children, True)
   let before_all = case suite.before_all {
@@ -130,6 +328,38 @@ fn default_before_all_nil() -> Result(Nil, String) {
   Ok(Nil)
 }
 
+/// Root suite constructor with typed hooks/context.
+///
+/// `describe_with_hooks` is the escape hatch when you want a strongly typed
+/// context (anything other than `Nil`) shared by hooks and tests.
+///
+/// ## Parameters
+///
+/// - `name`: suite label shown in reports
+/// - `hooks`: hook configuration (must include a `before_all` that produces `ctx`)
+/// - `children`: suite items (`it`, `group`, `before_each`, etc.) using the same `ctx`
+///
+/// ## Returns
+///
+/// A `TestSuite(ctx)` you can pass to `runner.new([suite])`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/assertions/should.{equal, or_fail_with, should}
+/// import dream_test/unit.{describe_with_hooks, hooks, it}
+///
+/// let hooks = hooks(fn() { Ok(41) })
+///
+/// describe_with_hooks("Root", hooks, [
+///   it("sees ctx", fn(n) {
+///     n + 1
+///     |> should()
+///     |> equal(42)
+///     |> or_fail_with("ctx should be 41")
+///   }),
+/// ])
+/// ```
 pub fn describe_with_hooks(
   name: String,
   hooks: SuiteHooks(ctx),
@@ -150,22 +380,134 @@ pub fn describe_with_hooks(
 /// Nested group constructor.
 ///
 /// Nested groups are suites, but **cannot** declare `before_all` (enforced).
+///
+/// Groups exist so you can:
+///
+/// - organize tests under a shared name prefix
+/// - scope `before_each`/`after_each` hooks to just a subsection
+///
+/// ## Parameters
+///
+/// - `name`: group label shown in reports
+/// - `children`: suite items using the same `ctx`
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` suitable for inclusion in a parent suite.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   group("nested", [
+///     it("runs", fn(_) { Ok(AssertionOk) }),
+///   ]),
+/// ])
+/// ```
 pub fn group(name: String, children: List(SuiteItem(ctx))) -> SuiteItem(ctx) {
   SuiteGroupItem(build_suite(name, children, False))
 }
 
+/// Declare a `before_all` hook (root suites only).
+///
+/// This is only allowed directly under `describe` / `describe_with_hooks`.
+/// Declaring it under a `group` causes a runtime panic.
+///
+/// Returning `Error("message")` from `before_all` marks every test in the suite
+/// as `SetupFailed`.
+///
+/// ## Parameters
+///
+/// - `setup`: runs once and produces the initial `ctx`
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` for use in a root suite’s children list.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   before_all(fn() { Ok(Nil) }),
+///   it("runs", fn(_) { Ok(AssertionOk) }),
+/// ])
+/// ```
 pub fn before_all(setup: fn() -> Result(ctx, String)) -> SuiteItem(ctx) {
   BeforeAllItem(setup)
 }
 
+/// Declare a `before_each` hook.
+///
+/// Hooks run outer-to-inner and can transform the context for the test.
+///
+/// ## Parameters
+///
+/// - `setup`: runs before each test; return `Ok(updated_ctx)` to continue
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` for use in any suite/group children list.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   before_each(fn(ctx) { Ok(ctx) }),
+///   it("runs", fn(_) { Ok(AssertionOk) }),
+/// ])
+/// ```
 pub fn before_each(setup: fn(ctx) -> Result(ctx, String)) -> SuiteItem(ctx) {
   BeforeEachItem(setup)
 }
 
+/// Declare an `after_each` hook.
+///
+/// Hooks run inner-to-outer and always run for cleanup.
+///
+/// If an `after_each` hook returns `Error("message")`, the test is marked failed
+/// (even if the test body passed).
+///
+/// ## Parameters
+///
+/// - `teardown`: runs after each test
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` for use in any suite/group children list.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   after_each(fn(_ctx) { Ok(Nil) }),
+///   it("runs", fn(_) { Ok(AssertionOk) }),
+/// ])
+/// ```
 pub fn after_each(teardown: fn(ctx) -> Result(Nil, String)) -> SuiteItem(ctx) {
   AfterEachItem(teardown)
 }
 
+/// Declare an `after_all` hook.
+///
+/// If any `after_all` hook returns `Error`, the run stops and remaining suites
+/// are marked `SetupFailed` to avoid potential test pollution.
+///
+/// ## Parameters
+///
+/// - `teardown`: runs once after all tests in this root suite finish
+///
+/// ## Returns
+///
+/// A `SuiteItem(ctx)` for use in a root suite’s children list.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Root", [
+///   after_all(fn(_ctx) { Ok(Nil) }),
+///   it("runs", fn(_) { Ok(AssertionOk) }),
+/// ])
+/// ```
 pub fn after_all(teardown: fn(ctx) -> Result(Nil, String)) -> SuiteItem(ctx) {
   AfterAllItem(teardown)
 }

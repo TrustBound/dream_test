@@ -1,40 +1,34 @@
 //// README: Gherkin .feature file example
 
-import dream_test/assertions/should.{equal, should}
+import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/reporter/api as reporter
 import dream_test/runner
-import dream_test/types.{
-  type AssertionResult, AssertionFailed, AssertionFailure, AssertionOk,
-  MatchFailed, MatchOk,
-}
+import dream_test/types.{type AssertionResult}
 import gleam/io
 import gleam/result
 
-fn step_empty_cart(context: StepContext) -> AssertionResult {
+fn step_empty_cart(context: StepContext) -> Result(AssertionResult, String) {
   put(context.world, "cart", 0)
-  AssertionOk
+  Ok(succeed())
 }
 
-fn step_add_items(context: StepContext) -> AssertionResult {
+fn step_add_items(context: StepContext) -> Result(AssertionResult, String) {
   let current = get_or(context.world, "cart", 0)
   let to_add = get_int(context.captures, 0) |> result.unwrap(0)
   put(context.world, "cart", current + to_add)
-  AssertionOk
+  Ok(succeed())
 }
 
-fn step_verify_count(context: StepContext) -> AssertionResult {
+fn step_verify_count(context: StepContext) -> Result(AssertionResult, String) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  case get_or(context.world, "cart", 0) |> should() |> equal(expected) {
-    MatchOk(_) -> AssertionOk
-    MatchFailed(failure) ->
-      AssertionFailed(
-        AssertionFailure(..failure, message: "Cart count mismatch"),
-      )
-  }
+  get_or(context.world, "cart", 0)
+  |> should()
+  |> equal(expected)
+  |> or_fail_with("Cart count mismatch")
 }
 
 pub fn tests() {
@@ -56,6 +50,6 @@ pub fn tests() {
 pub fn main() {
   runner.new([tests()])
   |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
   |> runner.run()
-  |> runner.exit_results_on_failure
 }

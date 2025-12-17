@@ -1,8 +1,42 @@
-/// Process isolation for test execution.
-///
-/// This module provides the core mechanism for running tests in isolated
-/// BEAM processes with timeout support. Each test runs in its own process,
-/// ensuring that crashes in one test do not affect others.
+//// Process isolation for test execution.
+////
+//// This module provides the core mechanism for running a function in an
+//// isolated BEAM process with timeout support. It is used internally by the
+//// runner and is also useful directly in tests that need strong crash/timeout
+//// boundaries.
+////
+//// ## What problem does this solve?
+////
+//// Sometimes you want to run code that might:
+////
+//// - `panic`
+//// - hang (never return)
+//// - take “too long” and should be timed out
+////
+//// `run_isolated` runs the function in a separate BEAM process, so the caller
+//// stays healthy even if the function crashes.
+////
+//// ## Selective crash reports
+////
+//// When a test process crashes (e.g. `panic as "boom"`), Erlang can print a
+//// crash report (`=CRASH REPORT==== ...`). This is useful when debugging, but
+//// noisy during normal runs.
+////
+//// `SandboxConfig.show_crash_reports` lets you choose:
+////
+//// - `False` (default): suppress crash reports and return `SandboxCrashed(...)`
+//// - `True`: allow crash reports to print, and still return `SandboxCrashed(...)`
+////
+//// ## Example
+////
+//// ```gleam
+//// import dream_test/sandbox.{SandboxConfig, SandboxCrashed}
+//// import dream_test/types.{AssertionOk}
+////
+//// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
+//// let result = sandbox.run_isolated(config, fn() { AssertionOk })
+//// ```
+
 import dream_test/types.{type AssertionResult}
 import gleam/erlang/process.{
   type Pid, type Selector, type Subject, kill, monitor, new_selector,
@@ -11,11 +45,25 @@ import gleam/erlang/process.{
 import gleam/string
 
 /// Configuration for sandboxed test execution.
+///
+/// - `timeout_ms`: how long to wait for the worker to finish before killing it
+/// - `show_crash_reports`: whether to allow the BEAM to print crash reports
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/sandbox.{SandboxConfig}
+///
+/// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
+/// ```
 pub type SandboxConfig {
   SandboxConfig(timeout_ms: Int, show_crash_reports: Bool)
 }
 
 /// Result of running a test in an isolated sandbox.
+///
+/// This is intentionally simple so it can be used in higher-level code (like a
+/// runner) without pulling in reporter concerns.
 pub type SandboxResult {
   /// Test completed successfully and returned an AssertionResult.
   SandboxCompleted(AssertionResult)
@@ -41,6 +89,32 @@ fn run_catching(
 /// The test function runs in a separate BEAM process that is monitored.
 /// If the process completes normally, its result is returned.
 /// If the process crashes or times out, an appropriate SandboxResult is returned.
+///
+/// ## Example (quiet crash handling)
+///
+/// ```gleam
+/// import dream_test/sandbox.{SandboxConfig}
+/// import dream_test/types.{AssertionOk}
+///
+/// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
+/// let result = sandbox.run_isolated(config, fn() { AssertionOk })
+/// ```
+///
+/// ## Example (timeout)
+///
+/// ```gleam
+/// import dream_test/sandbox.{SandboxConfig, SandboxTimedOut}
+/// import dream_test/types.{AssertionOk}
+/// import gleam/erlang/process
+///
+/// let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
+/// let result =
+///   sandbox.run_isolated(config, fn() {
+///     process.sleep(100)
+///     AssertionOk
+///   })
+/// // result == SandboxTimedOut
+/// ```
 pub fn run_isolated(
   config: SandboxConfig,
   test_function: fn() -> AssertionResult,
@@ -139,11 +213,25 @@ fn handle_timeout(worker_pid: Pid) -> SandboxResult {
 }
 
 /// Default configuration with a 5 second timeout.
+///
+/// Uses `show_crash_reports: False`.
+///
+/// ## Returns
+///
+/// A `SandboxConfig` suitable for most tests.
 pub fn default_config() -> SandboxConfig {
   SandboxConfig(timeout_ms: 5000, show_crash_reports: False)
 }
 
 /// Convenience helper for enabling crash reports in the sandbox.
+///
+/// This is useful when debugging failures locally.
+///
+/// ## Example
+///
+/// ```gleam
+/// let config = sandbox.default_config() |> sandbox.with_crash_reports()
+/// ```
 pub fn with_crash_reports(config: SandboxConfig) -> SandboxConfig {
   SandboxConfig(..config, show_crash_reports: True)
 }

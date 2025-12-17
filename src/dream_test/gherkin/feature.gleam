@@ -17,8 +17,21 @@
 //// ```gleam
 //// import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 //// import dream_test/gherkin/parser
-//// import dream_test/gherkin/steps.{new_registry, given, when_, then_}
+//// import dream_test/gherkin/steps.{type StepContext, given, new_registry, then_, when_}
+//// import dream_test/types.{AssertionOk, type AssertionResult}
 //// import dream_test/runner
+////
+//// fn have_items(_context: StepContext) -> Result(AssertionResult, String) {
+////   Ok(AssertionOk)
+//// }
+////
+//// fn add_items(_context: StepContext) -> Result(AssertionResult, String) {
+////   Ok(AssertionOk)
+//// }
+////
+//// fn check_total(_context: StepContext) -> Result(AssertionResult, String) {
+////   Ok(AssertionOk)
+//// }
 ////
 //// pub fn main() {
 ////   let steps = new_registry()
@@ -29,8 +42,8 @@
 ////   let assert Ok(parsed) = parser.parse_file("features/cart.feature")
 ////   let config = FeatureConfig(feature: parsed, step_registry: steps)
 ////   
-////   to_test_suite("cart_test", config)
-////   |> runner.run_suite()
+////   let suite = to_test_suite("", config)
+////   runner.new([suite]) |> runner.run()
 //// }
 //// ```
 ////
@@ -42,9 +55,13 @@
 //// import dream_test/gherkin/feature.{
 ////   feature, scenario, given, when, then, and, with_tags,
 //// }
+//// import dream_test/gherkin/steps.{type StepContext, given as define_given, new_registry}
+//// import dream_test/types.{AssertionOk, type AssertionResult}
 ////
 //// pub fn tests() -> TestSuite(Nil) {
-////   let steps = cart_steps()
+////   let steps =
+////     new_registry()
+////     |> define_given("I have an empty cart", fn(_context: StepContext) { Ok(AssertionOk) })
 ////   
 ////   feature("Shopping Cart", steps, [
 ////     scenario("Adding items", [
@@ -131,12 +148,12 @@ pub type InlineStep {
 ///
 /// ## Parameters
 ///
-/// - `module_name`: Name for the suite (usually the test module name)
+/// - `module_name`: Deprecated; ignored. (Kept for historical compatibility.)
 /// - `config`: FeatureConfig with feature and step registry
 ///
 /// ## Returns
 ///
-/// A TestSuite that can be run with `runner.run_suite()`
+/// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
 ///
 pub fn to_test_suite(
   _module_name: String,
@@ -156,20 +173,6 @@ pub fn to_test_suite(
   )
 }
 
-/// Convert a Feature to a flat list of TestCases.
-///
-/// Unlike `to_test_suite`, this flattens the feature to a simple list.
-/// Use this when you don't need before_all/after_all hooks.
-///
-/// ## Parameters
-///
-/// - `module_name`: Name prefix for test paths
-/// - `config`: FeatureConfig with feature and step registry
-///
-/// ## Returns
-///
-/// A list of TestCases that can be run with `runner.run_all()`
-///
 fn build_suite_items(
   feature: gherkin_types.Feature,
   config: FeatureConfig,
@@ -360,7 +363,15 @@ fn execute_step(
   case steps.find_step(registry, effective_keyword, step.text) {
     Ok(match) -> {
       let context = build_step_context(match, step, the_world)
-      match.handler(context)
+      case match.handler(context) {
+        Ok(result) -> result
+        Error(message) ->
+          AssertionFailed(AssertionFailure(
+            operator: "step",
+            message: message,
+            payload: None,
+          ))
+      }
     }
     Error(msg) -> {
       AssertionFailed(AssertionFailure(
@@ -421,7 +432,7 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 ///
 /// ## Returns
 ///
-/// A TestSuite that can be run with `runner.run_suite()`
+/// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
 ///
 /// ## Example
 ///

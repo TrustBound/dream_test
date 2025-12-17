@@ -54,6 +54,6 @@ pub fn suites() {
 pub fn main() {
   runner.new(suites())
   |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
   |> runner.run()
-  |> runner.exit_results_on_failure
 }

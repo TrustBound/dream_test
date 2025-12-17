@@ -2,6 +2,42 @@
 ////
 //// Provides a builder pattern for discovering `.feature` files and
 //// converting them to TestSuites without manual file parsing.
+////
+//// ## Terminology: step registry
+////
+//// Gherkin scenarios contain steps like “Given …”, “When …”, “Then …”.
+//// A **step registry** (`steps.StepRegistry`) is the collection of step
+//// definitions that tell Dream Test how to execute those steps:
+////
+//// - you create it with `dream_test/gherkin/steps.new_registry()`
+//// - you add step definitions with `given`, `when_`, `then_`, or `step`
+////
+//// Discovery needs a registry only when converting features into runnable
+//// suites (`to_suite`), because the suite’s tests must be able to *execute*
+//// steps. Pure parsing (`load`) does not.
+////
+//// ## Example
+////
+//// ```gleam
+//// import dream_test/gherkin/discover
+//// import dream_test/gherkin/steps
+//// import dream_test/reporter/api as reporter
+//// import dream_test/runner
+//// import gleam/io
+////
+//// let registry = steps.new_registry()
+//// // |> steps.given("...", handler)
+////
+//// let suite =
+////   discover.features("test/features/**/*.feature")
+////   |> discover.with_registry(registry)
+////   |> discover.to_suite("Features")
+////
+//// runner.new([suite])
+//// |> runner.reporter(reporter.bdd(io.print, True))
+//// |> runner.exit_on_failure()
+//// |> runner.run()
+//// ```
 
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
@@ -23,6 +59,8 @@ import gleam/result
 ///
 /// Use `features()` to create, then chain with `with_registry()` and
 /// `to_suite()` to build a TestSuite.
+///
+/// This is opaque so callers can’t depend on internal fields that may change.
 pub opaque type FeatureDiscovery {
   FeatureDiscovery(
     /// Glob pattern for finding feature files
@@ -37,6 +75,9 @@ pub opaque type FeatureDiscovery {
 }
 
 /// Result of loading features, containing both successes and errors.
+///
+/// This is useful if you want to control how parse errors are handled rather
+/// than converting them to failing tests.
 pub type LoadResult {
   LoadResult(features: List(gherkin_types.Feature), errors: List(String))
 }
@@ -46,11 +87,35 @@ pub type LoadResult {
 // ============================================================================
 
 /// Start discovering features matching a glob pattern.
+///
+/// Use Erlang’s `filelib:wildcard/1` semantics (see `wildcard/1` below).
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+///
+/// let discovery = discover.features("test/features/**/*.feature")
+/// ```
 pub fn features(pattern: String) -> FeatureDiscovery {
   FeatureDiscovery(pattern: pattern, registry: None, features: [], errors: [])
 }
 
 /// Attach a step registry to the discovery.
+///
+/// The step registry is the set of step definitions (Given/When/Then handlers)
+/// used to execute scenarios. It is required before calling `to_suite`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps
+///
+/// let discovery =
+///   discover.features("test/features/**/*.feature")
+///   |> discover.with_registry(steps.new_registry())
+/// ```
 pub fn with_registry(
   discovery: FeatureDiscovery,
   registry: StepRegistry,
@@ -61,6 +126,26 @@ pub fn with_registry(
 /// Build a TestSuite from discovered features.
 ///
 /// Panics if `with_registry()` was not called.
+///
+/// Parse errors are converted into failing unit tests tagged with
+/// `"parse-error"`.
+///
+/// ## What does this produce?
+///
+/// The returned suite contains one test per scenario. Each test runs the
+/// scenario’s steps using the provided step registry.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps
+///
+/// let suite =
+///   discover.features("test/features/**/*.feature")
+///   |> discover.with_registry(steps.new_registry())
+///   |> discover.to_suite("Features")
+/// ```
 pub fn to_suite(
   discovery: FeatureDiscovery,
   suite_name: String,
@@ -96,12 +181,34 @@ pub fn to_suite(
 }
 
 /// Load features and return detailed results.
+///
+/// This does **not** require a step registry because it only discovers files
+/// and parses Gherkin syntax. Step definitions are only needed when you want to
+/// execute scenarios (`to_suite`).
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+///
+/// let result = discover.features("test/features/**/*.feature") |> discover.load()
+/// ```
 pub fn load(discovery: FeatureDiscovery) -> LoadResult {
   let files = discover_files(discovery.pattern)
   load_all_features(files)
 }
 
 /// Get the list of files matching the discovery pattern.
+///
+/// This is a pure discovery step; files are not parsed.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+///
+/// let files = discover.features("test/features/**/*.feature") |> discover.list_files()
+/// ```
 pub fn list_files(discovery: FeatureDiscovery) -> List(String) {
   discover_files(discovery.pattern)
 }

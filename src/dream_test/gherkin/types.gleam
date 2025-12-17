@@ -2,7 +2,7 @@
 ////
 //// This module defines the data structures representing parsed Gherkin
 //// `.feature` files. These types are used by the parser and converted
-//// to dream_test's `TestCase` and `TestSuite` types for execution.
+//// to dream_test's suite-first types (`TestSuite` / `SuiteTestCase`) for execution.
 ////
 //// ## Type Overview
 ////

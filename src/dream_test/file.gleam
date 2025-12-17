@@ -10,6 +10,9 @@
 //// structured `FileError` types that tell you exactly what went wrong:
 ////
 //// ```gleam
+//// import dream_test/file
+//// import gleam/io
+////
 //// case file.read("config.json") {
 ////   Ok(content) -> parse(content)
 ////   Error(NotFound(_)) -> use_defaults()
@@ -24,6 +27,7 @@
 ////
 //// ```gleam
 //// import dream_test/file
+//// import gleam/io
 ////
 //// case file.read("./test/fixtures/expected.json") {
 ////   Ok(content) -> content
@@ -37,6 +41,8 @@
 //// ### Writing Files
 ////
 //// ```gleam
+//// import dream_test/file
+//// import gleam/io
 //// // Creates parent directories automatically
 //// case file.write("./test/snapshots/output.snap", result) {
 ////   Ok(Nil) -> io.println("Saved!")
@@ -48,6 +54,10 @@
 //// ### Deleting Files
 ////
 //// ```gleam
+//// import dream_test/file
+//// import gleam/int
+//// import gleam/io
+////
 //// // Safe to call even if file doesn't exist
 //// let _ = file.delete("./test/snapshots/old.snap")
 ////

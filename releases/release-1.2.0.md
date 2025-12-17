@@ -49,7 +49,7 @@ No magic environment variables or flags. To update a snapshot:
 
 ```sh
 rm ./test/snapshots/user_profile.snap
-gleam test
+make test
 ```
 
 The new snapshot is created automatically on the next run.

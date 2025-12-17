@@ -9,9 +9,13 @@ import dream_test/gherkin/steps.{
   new_registry, step, then_, when_,
 }
 import dream_test/gherkin/types as gherkin_types
-import dream_test/types.{AssertionOk}
+import dream_test/types.{type AssertionResult, AssertionOk}
 import dream_test/unit.{describe, group, it}
 import gleam/result
+
+fn ok_step(_context: steps.StepContext) -> Result(AssertionResult, String) {
+  Ok(AssertionOk)
+}
 
 pub fn tests() {
   describe("Gherkin Steps", [
@@ -35,9 +39,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have items", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("I have items", ok_step)
 
         // Act
         let result = find_step(registry, gherkin_types.Given, "I have items")
@@ -52,9 +54,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have items", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("I have items", ok_step)
 
         // Act
         let result = find_step(registry, gherkin_types.When, "I have items")
@@ -71,9 +71,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> when_("I add items", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> when_("I add items", ok_step)
 
         // Act
         let result = find_step(registry, gherkin_types.When, "I add items")
@@ -88,9 +86,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> when_("I add items", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> when_("I add items", ok_step)
 
         // Act
         let result = find_step(registry, gherkin_types.Then, "I add items")
@@ -107,9 +103,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> then_("I should see results", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> then_("I should see results", ok_step)
 
         // Act
         let result =
@@ -127,9 +121,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> step("something happens", ok_step)
 
         // Act
         let result =
@@ -145,9 +137,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> step("something happens", ok_step)
 
         // Act
         let result =
@@ -163,9 +153,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> step("something happens", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> step("something happens", ok_step)
 
         // Act
         let result =
@@ -183,9 +171,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("some condition", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("some condition", ok_step)
 
         // Note: And/But resolve to their parent keyword in practice
         // The find_step function itself doesn't resolve - that's done at execution time
@@ -207,9 +193,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("I have {int} items", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("I have {int} items", ok_step)
 
         // Act
         let captures_result =
@@ -227,9 +211,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("I see {string}", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("I see {string}", ok_step)
 
         // Act
         let captures_result =
@@ -247,9 +229,7 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("I add {int} of {string}", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
+          |> given("I add {int} of {string}", ok_step)
 
         // Act
         let captures_result =
@@ -465,11 +445,9 @@ pub fn tests() {
         // Arrange
         let registry =
           new_registry()
-          |> given("a precondition", fn(_context: steps.StepContext) {
-            AssertionOk
-          })
-          |> when_("an action", fn(_context: steps.StepContext) { AssertionOk })
-          |> then_("an outcome", fn(_context: steps.StepContext) { AssertionOk })
+          |> given("a precondition", ok_step)
+          |> when_("an action", ok_step)
+          |> then_("an outcome", ok_step)
 
         // Act
         let given_result =

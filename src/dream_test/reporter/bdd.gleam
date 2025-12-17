@@ -25,16 +25,22 @@
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/unit.{describe, it, to_test_cases}
-//// import dream_test/runner.{run_all}
-//// import dream_test/reporter/bdd.{report}
+//// import dream_test/reporter/api as reporter
+//// import dream_test/runner
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
 //// pub fn main() {
-////   tests()
-////   |> to_test_cases("my_test")
-////   |> run_all()
-////   |> report(io.print)
+////   let suite =
+////     describe("Example", [
+////       it("passes", fn(_) { Ok(AssertionOk) }),
+////     ])
+////
+////   runner.new([suite])
+////   |> runner.reporter(reporter.bdd(io.print, True))
+////   |> runner.exit_on_failure()
+////   |> runner.run()
 //// }
 //// ```
 ////
@@ -179,13 +185,13 @@ fn remove_gherkin_summary(
 ///
 /// ```gleam
 /// // Print to stdout
-/// results |> report(io.print)
+/// let _ = report(results, io.print)
 ///
 /// // Print each line separately (for flushing)
-/// results |> report(io.println)
+/// let _ = report(results, io.println)
 ///
 /// // Custom handling
-/// results |> report(fn(s) { logger.info(s) })
+/// let _ = report(results, fn(s) { logger.info(s) })
 /// ```
 ///
 /// ## Parameters
@@ -198,10 +204,10 @@ fn remove_gherkin_summary(
 /// Returns the input results unchanged, enabling pipeline composition:
 ///
 /// ```gleam
-/// to_test_cases("my_test", tests())
-/// |> run_all()
-/// |> report(io.print)
-/// |> exit_on_failure()
+/// import dream_test/reporter/bdd
+///
+/// results
+/// |> bdd.report(io.print)
 /// ```
 ///
 pub fn report(

@@ -22,20 +22,20 @@ import dream_test/assertions/should.{be_error, be_ok, equal, or_fail_with, shoul
 
 pub fn tests() {
   describe("Calculator", [
-    it("adds two numbers", fn() {
+    it("adds two numbers", fn(_) {
       add(2, 3)
       |> should()
       |> equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
-    it("handles division", fn() {
+    it("handles division", fn(_) {
       divide(10, 2)
       |> should()
       |> be_ok()
       |> equal(5)
       |> or_fail_with("10 / 2 should equal 5")
     }),
-    it("returns error for division by zero", fn() {
+    it("returns error for division by zero", fn(_) {
       divide(1, 0)
       |> should()
       |> be_error()
@@ -109,23 +109,23 @@ dream_test = "~> 1.2"
 
 ```gleam
 // test/my_app_test.gleam
-import dream_test/unit.{describe, it, to_test_cases}
-import dream_test/runner.{exit_on_failure, run_all}
-import dream_test/reporter/bdd.{report}
-import dream_test/assertions/should.{should, equal, or_fail_with}
+import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/unit.{describe, it}
 import gleam/io
 import gleam/string
 
 pub fn tests() {
   describe("String utilities", [
-    it("trims whitespace", fn() {
+    it("trims whitespace", fn(_) {
       "  hello  "
       |> string.trim()
       |> should()
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
-    it("finds substrings", fn() {
+    it("finds substrings", fn(_) {
       "hello world"
       |> string.contains("world")
       |> should()
@@ -136,19 +136,19 @@ pub fn tests() {
 }
 
 pub fn main() {
-  to_test_cases("my_app_test", tests())
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/quick_start.gleam)</sub>
 
-### 2. Run with gleam test
+### 2. Run the tests
 
 ```sh
-gleam test
+make test
 ```
 
 ### 3. See readable output
@@ -254,10 +254,13 @@ When you need to explicitly succeed or fail in conditional branches:
 ```gleam
 import dream_test/assertions/should.{fail_with, succeed}
 
-case result {
-  Ok(_) -> succeed()
-  Error(_) -> fail_with("Should have succeeded")
-}
+it("succeeds explicitly when division works", fn(_) {
+  let result = divide(10, 2)
+  Ok(case result {
+    Ok(_) -> succeed()
+    Error(_) -> fail_with("Should have succeeded")
+  })
+})
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/explicit_failures.gleam)</sub>
@@ -269,10 +272,26 @@ Use `skip` instead of `it` to temporarily disable a test:
 ```gleam
 import dream_test/unit.{describe, it, skip}
 
-describe("Feature", [
-  it("works correctly", fn() { ... }),
-  skip("not implemented yet", fn() { ... }),  // Skipped
-  it("handles edge cases", fn() { ... }),
+describe("Skipping tests", [
+  it("runs normally", fn(_) {
+    add(2, 3)
+    |> should()
+    |> equal(5)
+    |> or_fail_with("2 + 3 should equal 5")
+  }),
+  skip("not implemented yet", fn(_) {
+    // This test is skipped - the body is preserved but not executed
+    add(100, 200)
+    |> should()
+    |> equal(300)
+    |> or_fail_with("Should add large numbers")
+  }),
+  it("also runs normally", fn(_) {
+    add(0, 0)
+    |> should()
+    |> equal(0)
+    |> or_fail_with("0 + 0 should equal 0")
+  }),
 ])
 ```
 
@@ -298,30 +317,35 @@ that let you run code before and after tests.
 
 ```gleam
 import dream_test/unit.{describe, it, before_each, after_each, before_all, after_all}
-import dream_test/assertions/should.{succeed}
 
 describe("Database tests", [
   before_all(fn() {
     start_database()
-    succeed()
   }),
 
-  before_each(fn() {
+  before_each(fn(_) {
     begin_transaction()
-    succeed()
   }),
 
-  it("creates a user", fn() { ... }),
-  it("deletes a user", fn() { ... }),
+  it("creates a record", fn(_) {
+    []
+    |> should()
+    |> be_empty()
+    |> or_fail_with("Placeholder test")
+  }),
+  it("queries records", fn(_) {
+    []
+    |> should()
+    |> be_empty()
+    |> or_fail_with("Placeholder test")
+  }),
 
-  after_each(fn() {
+  after_each(fn(_) {
     rollback_transaction()
-    succeed()
   }),
 
-  after_all(fn() {
+  after_all(fn(_) {
     stop_database()
-    succeed()
   }),
 ])
 ```
@@ -337,38 +361,11 @@ describe("Database tests", [
 | `after_each`  | After each test (even on failure) | Rollback, cleanup temp data       |
 | `after_all`   | Once after all tests in group     | Stop services, remove temp files  |
 
-### Two Execution Modes
+### Execution model
 
-Choose the mode based on which hooks you need:
-
-| Mode  | Function                      | Hooks supported             |
-| ----- | ----------------------------- | --------------------------- |
-| Flat  | `to_test_cases` → `run_all`   | `before_each`, `after_each` |
-| Suite | `to_test_suite` → `run_suite` | All four hooks              |
-
-**Flat mode** — simpler, faster; use when you only need per-test setup:
-
-```gleam
-import dream_test/unit.{describe, it, before_each, to_test_cases}
-import dream_test/runner.{run_all}
-
-to_test_cases("my_test", tests())
-|> run_all()
-|> report(io.print)
-```
-
-**Suite mode** — preserves group structure; use when you need once-per-group setup:
-
-```gleam
-import dream_test/unit.{describe, it, before_all, after_all, to_test_suite}
-import dream_test/runner.{run_suite}
-
-to_test_suite("my_test", tests())
-|> run_suite()
-|> report(io.print)
-```
-
-<sub>🧪 [Tested source](examples/snippets/test/execution_modes.gleam)</sub>
+Dream Test is **suite-first**: `describe(...)` builds a `TestSuite`, and the
+runner executes suites. All four hooks (`before_all`, `before_each`, `after_each`,
+`after_all`) are supported in the suite model.
 
 ### Hook Inheritance
 
@@ -377,26 +374,26 @@ setup, inner-to-outer for teardown:
 
 ```gleam
 describe("Outer", [
-  before_each(fn() {
+  before_each(fn(_) {
     io.println("1. outer setup")
-    succeed()
+    Ok(Nil)
   }),
-  after_each(fn() {
+  after_each(fn(_) {
     io.println("4. outer teardown")
-    succeed()
+    Ok(Nil)
   }),
-  describe("Inner", [
-    before_each(fn() {
+  group("Inner", [
+    before_each(fn(_) {
       io.println("2. inner setup")
-      succeed()
+      Ok(Nil)
     }),
-    after_each(fn() {
+    after_each(fn(_) {
       io.println("3. inner teardown")
-      succeed()
+      Ok(Nil)
     }),
-    it("test", fn() {
+    it("test", fn(_) {
       io.println("(test)")
-      succeed()
+      Ok(succeed())
     }),
   ]),
 ])
@@ -420,13 +417,13 @@ If a hook fails, Dream Test handles it gracefully:
 describe("Handles failures", [
   before_all(fn() {
     case connect_to_database() {
-      Ok(_) -> succeed()
-      Error(e) -> fail_with("Database connection failed: " <> e)
+      Ok(_) -> Ok(Nil)
+      Error(e) -> Error("Database connection failed: " <> e)
     }
   }),
   // If before_all fails, these tests are marked SetupFailed (not run)
-  it("test1", fn() { succeed() }),
-  it("test2", fn() { succeed() }),
+  it("test1", fn(_) { Ok(succeed()) }),
+  it("test2", fn(_) { Ok(succeed()) }),
 ])
 ```
 
@@ -439,14 +436,16 @@ describe("Handles failures", [
 Snapshot tests compare output against stored "golden" files. On first run, the snapshot is created automatically. On subsequent runs, any difference is a failure.
 
 ```gleam
-import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
-
-it("renders user profile", fn() {
-  render_profile(user)
-  |> should()
-  |> match_snapshot("./test/snapshots/user_profile.snap")
-  |> or_fail_with("Profile should match snapshot")
-})
+describe("Snapshot Testing", [
+  group("match_snapshot", [
+    it("renders user profile", fn(_) {
+      render_profile("Alice", 30)
+      |> should()
+      |> match_snapshot("./test/snapshots/user_profile.snap")
+      |> or_fail_with("Profile should match snapshot")
+    }),
+  ]),
+])
 ```
 
 | Scenario         | Behavior                    |
@@ -459,16 +458,20 @@ it("renders user profile", fn() {
 
 ```sh
 rm ./test/snapshots/user_profile.snap
-gleam test
+make test
 ```
 
 **Testing non-strings** — use `match_snapshot_inspect` for complex data:
 
 ```gleam
-build_config()
-|> should()
-|> match_snapshot_inspect("./test/snapshots/config.snap")
-|> or_fail_with("Config should match snapshot")
+group("match_snapshot_inspect", [
+  it("builds config correctly", fn(_) {
+    build_config()
+    |> should()
+    |> match_snapshot_inspect("./test/snapshots/config.snap")
+    |> or_fail_with("Config should match snapshot")
+  }),
+])
 ```
 
 This serializes values using `string.inspect`, so you can snapshot records, lists, tuples, etc.
@@ -498,26 +501,30 @@ Write behavior-driven tests using Cucumber-style Given/When/Then syntax.
 Define features directly in Gleam—no `.feature` files needed:
 
 ```gleam
-import dream_test/assertions/should.{succeed}
-import dream_test/gherkin/feature.{feature, scenario, given, when, then}
+import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/types.{type AssertionResult}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import dream_test/types.{AssertionOk, type AssertionResult}
+import gleam/io
 
-fn step_have_items(context: StepContext) -> AssertionResult {
-  put(context.world, "cart", get_int(context.captures, 0) |> result.unwrap(0))
-  succeed()
+fn step_have_items(context: StepContext) -> Result(AssertionResult, String) {
+  use count <- get_int(context.captures, 0)
+  put(context.world, "cart", count)
+  Ok(AssertionOk)
 }
 
-fn step_add_items(context: StepContext) -> AssertionResult {
+fn step_add_items(context: StepContext) -> Result(AssertionResult, String) {
   let current = get_or(context.world, "cart", 0)
-  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
+  use to_add <- get_int(context.captures, 0)
   put(context.world, "cart", current + to_add)
-  succeed()
+  Ok(AssertionOk)
 }
 
-fn step_should_have(context: StepContext) -> AssertionResult {
-  let expected = get_int(context.captures, 0) |> result.unwrap(0)
+fn step_should_have(context: StepContext) -> Result(AssertionResult, String) {
+  use expected <- get_int(context.captures, 0)
   get_or(context.world, "cart", 0)
   |> should()
   |> equal(expected)
@@ -538,6 +545,13 @@ pub fn tests() {
       then("I should have 5 items total"),
     ]),
   ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
 ```
 
@@ -603,11 +617,33 @@ Capture values from step text using typed placeholders:
 Numeric placeholders work with prefixes/suffixes—`${float}` matches `$19.99` and captures `19.99`:
 
 ```gleam
-fn step_have_balance(context: StepContext) -> AssertionResult {
+import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, type StepRegistry, get_float, step}
+import dream_test/gherkin/world.{get_or, put}
+import dream_test/types.{type AssertionResult}
+import gleam/result
+
+// Each step handler receives a StepContext
+fn step_have_balance(context: StepContext) -> Result(AssertionResult, String) {
   // {float} captures the numeric value (even with $ prefix)
   let balance = get_float(context.captures, 0) |> result.unwrap(0.0)
   put(context.world, "balance", balance)
-  succeed()
+  Ok(succeed())
+}
+
+fn step_withdraw(context: StepContext) -> Result(AssertionResult, String) {
+  let current = get_or(context.world, "balance", 0.0)
+  let amount = get_float(context.captures, 0) |> result.unwrap(0.0)
+  put(context.world, "balance", current -. amount)
+  Ok(succeed())
+}
+
+fn step_balance_is(context: StepContext) -> Result(AssertionResult, String) {
+  let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
+  get_or(context.world, "balance", 0.0)
+  |> should()
+  |> equal(expected)
+  |> or_fail_with("Balance mismatch")
 }
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
@@ -705,29 +741,27 @@ Every test runs in its own lightweight BEAM process—this is what makes Dream T
 
 ```gleam
 // This test crashes, but others keep running
-it("handles edge case", fn() {
+it("handles edge case", fn(_) {
   panic as "oops"  // Other tests still execute and report
+  Ok(succeed())
 })
 
 // This test hangs, but gets killed after timeout
-it("fetches data", fn() {
+it("fetches data", fn(_) {
   infinite_loop()  // Killed after 5 seconds (default)
+  Ok(succeed())
 })
 ```
 
 ### Configuring execution
 
 ```gleam
-import dream_test/runner.{run_all_with_config, RunnerConfig}
+import dream_test/runner
 
-let config = RunnerConfig(
-  max_concurrency: 8,
-  default_timeout_ms: 10_000,
-)
-
-let test_cases = to_test_cases("my_test", tests())
-run_all_with_config(config, test_cases)
-|> report(io.print)
+runner.new([tests()])
+|> runner.max_concurrency(8)
+|> runner.default_timeout_ms(10_000)
+|> runner.run()
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/runner_config.gleam)</sub>
@@ -743,8 +777,12 @@ If your tests interact with shared resources, either:
 
 ```gleam
 // Sequential execution for tests with shared state
-let config = RunnerConfig(max_concurrency: 1, default_timeout_ms: 30_000)
-run_all_with_config(config, test_cases)
+import dream_test/runner
+
+runner.new([tests()])
+|> runner.max_concurrency(1)
+|> runner.default_timeout_ms(30_000)
+|> runner.run()
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/sequential_execution.gleam)</sub>
@@ -761,29 +799,25 @@ Add tags to tests for selective execution:
 import dream_test/unit.{describe, it, with_tags}
 
 describe("Calculator", [
-  it("adds numbers", fn() { ... })
+  it("adds numbers", fn(_) { ... })
     |> with_tags(["unit", "fast"]),
-  it("complex calculation", fn() { ... })
+  it("complex calculation", fn(_) { ... })
     |> with_tags(["integration", "slow"]),
 ])
 ```
 
-Filter which tests run via `RunnerConfig.test_filter`:
+Filter which results are considered (and therefore which failures trigger CI exit):
 
 ```gleam
-import dream_test/runner.{RunnerConfig, run_all_with_config}
 import gleam/list
+import dream_test/runner
 
-let config = RunnerConfig(
-  max_concurrency: 4,
-  default_timeout_ms: 5000,
-  test_filter: Some(fn(c) { list.contains(c.tags, "unit") }),
-)
-
-test_cases |> run_all_with_config(config)
+runner.new([tests()])
+|> runner.filter_results(fn(result) { list.contains(result.tags, "unit") })
+|> runner.run()
 ```
 
-The filter is a predicate function receiving `SingleTestConfig`, so you can filter by tags, name, or any other field. You control how to populate the filter—from environment variables, CLI args, or hardcoded for debugging.
+The filter is a predicate function receiving a `TestResult`, so you can filter by tags, name, kind, etc. (This is currently a post-run filter.)
 
 | Use case           | Filter example                             |
 | ------------------ | ------------------------------------------ |
@@ -796,16 +830,18 @@ For Gherkin scenarios, use `dream_test/gherkin/feature.with_tags` instead.
 
 ### CI integration
 
-Use `exit_on_failure` to ensure your CI pipeline fails when tests fail:
+Use `exit_on_failure()` to ensure your CI pipeline fails when tests fail:
 
 ```gleam
-import dream_test/runner.{exit_on_failure, run_all}
+import dream_test/reporter/api as reporter
+import dream_test/runner
+import gleam/io
 
 pub fn main() {
-  to_test_cases("my_test", tests())
-  |> run_all()
-  |> report(io.print)
-  |> exit_on_failure()  // Exits with code 1 if any tests failed
+  runner.new([tests()])
+  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
 ```
 
@@ -821,15 +857,20 @@ pub fn main() {
 Output test results as JSON for CI/CD integration, test aggregation, or tooling:
 
 ```gleam
+import dream_test/reporter/api as reporter
 import dream_test/reporter/json
-import dream_test/reporter/bdd.{report}
+import dream_test/runner
+import gleam/io
 
 pub fn main() {
-  to_test_cases("my_test", tests())
-  |> run_all()
-  |> report(io.print)           // Human-readable to stdout
+  let results =
+    runner.new([tests()])
+    |> runner.reporter(reporter.bdd(io.print, True))
+    |> runner.exit_on_failure()
+    |> runner.run()
+
+  results
   |> json.report(write_to_file) // JSON to file
-  |> exit_on_failure()
 }
 ```
 
@@ -863,26 +904,17 @@ The JSON output includes system info, timing, and detailed failure data:
 
 Dream_test uses an explicit pipeline—no hidden globals, no magic test discovery.
 
-### Flat Mode (most common)
+### Suite-first pipeline
 
 ```
-describe/it  →  to_test_cases  →  run_all  →  report
-   (DSL)         (flatten)       (execute)   (format)
+describe/it  →  runner.new  →  runner.run  →  (optional post-run reporting)
+   (DSL)         (builder)      (execute)
 ```
 
 1. **Define** tests with `describe`/`it` — builds a test tree
-2. **Convert** with `to_test_cases` — flattens to runnable cases
-3. **Run** with `run_all` — executes in parallel with isolation
-4. **Report** with your choice of formatter — outputs results
-
-### Suite Mode (for `before_all`/`after_all`)
-
-```
-describe/it  →  to_test_suite  →  run_suite  →  report
-   (DSL)         (preserve)       (execute)    (format)
-```
-
-Suite mode preserves the group hierarchy so hooks can run at group boundaries.
+2. **Build** a run with `runner.new([suite])` — configure concurrency/reporting
+3. **Run** with `runner.run()` — executes in parallel with isolation
+4. **Report** either during the run (event-driven reporter) or after the run
 
 ### Under the Hood
 

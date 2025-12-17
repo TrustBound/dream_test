@@ -13,35 +13,35 @@ import gleam/io
 import gleam/result
 
 // {int} captures integers
-fn step_int(context: StepContext) -> AssertionResult {
+fn step_int(context: StepContext) -> Result(AssertionResult, String) {
   let value = get_int(context.captures, 0) |> result.unwrap(0)
   put(context.world, "int", value)
-  succeed()
+  Ok(succeed())
 }
 
 // {float} captures decimals (works with $ prefix too)
-fn step_float(context: StepContext) -> AssertionResult {
+fn step_float(context: StepContext) -> Result(AssertionResult, String) {
   let value = get_float(context.captures, 0) |> result.unwrap(0.0)
   put(context.world, "float", value)
-  succeed()
+  Ok(succeed())
 }
 
 // {string} captures quoted strings
-fn step_string(context: StepContext) -> AssertionResult {
+fn step_string(context: StepContext) -> Result(AssertionResult, String) {
   let value = get_string(context.captures, 0) |> result.unwrap("")
   put(context.world, "string", value)
-  succeed()
+  Ok(succeed())
 }
 
 // {word} captures a single unquoted word
-fn step_word(context: StepContext) -> AssertionResult {
+fn step_word(context: StepContext) -> Result(AssertionResult, String) {
   let value = get_word(context.captures, 0) |> result.unwrap("")
   put(context.world, "word", value)
-  succeed()
+  Ok(succeed())
 }
 
-fn step_pass(_context: StepContext) -> AssertionResult {
-  succeed()
+fn step_pass(_context: StepContext) -> Result(AssertionResult, String) {
+  Ok(succeed())
 }
 
 pub fn tests() {
@@ -67,6 +67,6 @@ pub fn tests() {
 pub fn main() {
   runner.new([tests()])
   |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
   |> runner.run()
-  |> runner.exit_results_on_failure
 }

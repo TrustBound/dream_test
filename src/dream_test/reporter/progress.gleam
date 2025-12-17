@@ -3,33 +3,42 @@
 //// This module renders a single-line progress bar that updates in-place using
 //// carriage returns, and adapts to the current terminal width.
 ////
+//// Because it uses `\r` (carriage return) to rewrite the current line, it is
+//// best suited for interactive terminals. In CI logs (or when other output is
+//// printed concurrently), the output may be less readable.
+////
+//// ## Terminal width
+////
+//// Width is detected via Erlang `io:columns/0` with fallbacks:
+////
+//// - if `io:columns/0` fails, it reads the `COLUMNS` environment variable
+//// - if that is missing/invalid, it defaults to 80 columns
+////
 //// It is designed to be driven by `dream_test/reporter/types.ReporterEvent`,
-//// which you can obtain by using `runner.run_*_with_events` (or the underlying
-//// parallel functions).
+//// but most users should not call it directly. Prefer attaching a reporter via
+//// `dream_test/reporter/api` and letting the runner drive events.
 ////
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/reporter/progress
-//// import dream_test/reporter/types.{type ReporterEvent}
+//// import dream_test/reporter/api as reporter
 //// import dream_test/runner
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
 //// pub fn main() {
-////   let on_event = fn(event: ReporterEvent) {
-////     progress.handle_event(event, io.print)
-////   }
+////   let suite =
+////     describe("Example", [
+////       it("passes", fn(_) { Ok(AssertionOk) }),
+////     ])
 ////
-////   tests()
-////   |> to_test_cases("my_test")
-////   |> runner.run_all_with_progress(on_event)
-////   |> bdd.report(io.print)
+////   runner.new([suite])
+////   |> runner.reporter(reporter.progress(io.print))
 ////   |> runner.exit_on_failure()
+////   |> runner.run()
 //// }
 //// ```
-////
-//// This module intentionally does not return callbacks (to avoid forcing
-//// closures in library code). Call `handle_event` from your own callback.
 
 import dream_test/reporter/types as reporter_types
 import dream_test/types.{type TestResult}
@@ -42,6 +51,36 @@ import gleam/string
 /// - For `RunStarted`, prints an initial 0% bar.
 /// - For `TestFinished`, prints an updated bar using the included counts.
 /// - For `RunFinished`, prints a final 100% bar and a newline.
+///
+/// This function ignores hook events (`HookStarted` / `HookFinished`) so hook
+/// chatter doesn’t scramble the single-line UI.
+///
+/// ## Parameters
+///
+/// - `event`: a `ReporterEvent` emitted by the runner
+/// - `write`: an output sink (typically `io.print`). For best results this
+///   should write **without adding extra newlines**.
+///
+/// ## When should I use this?
+///
+/// Usually you shouldn’t call it directly—prefer `reporter.progress(...)` via
+/// `dream_test/reporter/api` and attach that reporter to `runner`.
+///
+/// You may call it directly only if you are building your own reporter/driver
+/// and you are already receiving `ReporterEvent`s.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/runner
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.progress(io.print))
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
 pub fn handle_event(
   event: reporter_types.ReporterEvent,
   write: fn(String) -> Nil,
@@ -62,7 +101,30 @@ pub fn handle_event(
 
 /// Render a progress bar line for a given terminal width.
 ///
-/// This is pure and is intended for testing.
+/// This is pure and is intended for testing and for custom reporter work.
+///
+/// Width is measured in **graphemes** (user-visible characters), so Unicode
+/// stays aligned. The width is clamped to a minimum of 20 so the bar remains
+/// readable.
+///
+/// Note: The `columns` input is typically a *terminal column count* (from
+/// `io:columns/0`), but rendering is done by grapheme count so we can safely
+/// pad/truncate Unicode.
+///
+/// ## Parameters
+///
+/// - `columns`: terminal width (in columns)
+/// - `event`: event to render
+///
+/// ## Returns
+///
+/// A single line of text **exactly** `columns` graphemes wide (after clamping).
+///
+/// ## Example
+///
+/// ```gleam
+/// let line = progress.render(30, reporter_types.RunStarted(total: 10))
+/// ```
 pub fn render(columns: Int, event: reporter_types.ReporterEvent) -> String {
   let cols = clamp_min(columns, 20)
   case event {

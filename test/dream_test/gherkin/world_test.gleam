@@ -33,8 +33,8 @@ pub fn tests() {
         // Act
         world.put(w1, "key", "value_a")
         world.put(w2, "key", "value_b")
-        let result1: Result(String, Nil) = world.get(w1, "key")
-        let result2: Result(String, Nil) = world.get(w2, "key")
+        let result1: Result(String, String) = world.get(w1, "key")
+        let result2: Result(String, String) = world.get(w2, "key")
 
         // Assert & Cleanup
         world.cleanup(w1)
@@ -55,7 +55,7 @@ pub fn tests() {
 
         // Act
         world.put(w, key, value)
-        let result: Result(String, Nil) = world.get(w, key)
+        let result: Result(String, String) = world.get(w, key)
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -72,7 +72,7 @@ pub fn tests() {
 
         // Act
         world.put(w, key, value)
-        let result: Result(Int, Nil) = world.get(w, key)
+        let result: Result(Int, String) = world.get(w, key)
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -89,7 +89,7 @@ pub fn tests() {
 
         // Act
         world.put(w, key, value)
-        let result: Result(List(String), Nil) = world.get(w, key)
+        let result: Result(List(String), String) = world.get(w, key)
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -103,13 +103,13 @@ pub fn tests() {
         let w = world.new_world("get_missing")
 
         // Act
-        let result: Result(String, Nil) = world.get(w, "non_existent")
+        let result: Result(String, String) = world.get(w, "non_existent")
 
         // Assert & Cleanup
         world.cleanup(w)
         result
         |> should()
-        |> equal(Error(Nil))
+        |> equal(Error("World key not found: non_existent"))
         |> or_fail_with("Should return Error for non-existent key")
       }),
       it("overwrites value when key already exists", fn(_) {
@@ -120,7 +120,7 @@ pub fn tests() {
         // Act
         world.put(w, key, "first")
         world.put(w, key, "second")
-        let result: Result(String, Nil) = world.get(w, key)
+        let result: Result(String, String) = world.get(w, key)
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -137,9 +137,9 @@ pub fn tests() {
         world.put(w, "a", 1)
         world.put(w, "b", 2)
         world.put(w, "c", 3)
-        let a: Result(Int, Nil) = world.get(w, "a")
-        let b: Result(Int, Nil) = world.get(w, "b")
-        let c: Result(Int, Nil) = world.get(w, "c")
+        let a: Result(Int, String) = world.get(w, "a")
+        let b: Result(Int, String) = world.get(w, "b")
+        let c: Result(Int, String) = world.get(w, "c")
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -255,13 +255,13 @@ pub fn tests() {
 
         // Act
         world.delete(w, "key")
-        let result: Result(String, Nil) = world.get(w, "key")
+        let result: Result(String, String) = world.get(w, "key")
 
         // Assert & Cleanup
         world.cleanup(w)
         result
         |> should()
-        |> equal(Error(Nil))
+        |> equal(Error("World key not found: key"))
         |> or_fail_with("Key should be deleted")
       }),
       it("is no-op for non-existent key", fn(_) {
@@ -271,7 +271,7 @@ pub fn tests() {
 
         // Act - deleting non-existent key should not error
         world.delete(w, "non_existent")
-        let other_result: Result(String, Nil) = world.get(w, "other")
+        let other_result: Result(String, String) = world.get(w, "other")
 
         // Assert & Cleanup
         world.cleanup(w)
@@ -289,13 +289,16 @@ pub fn tests() {
 
         // Act
         world.delete(w, "delete_me")
-        let k1: Result(Int, Nil) = world.get(w, "keep1")
-        let dm: Result(Int, Nil) = world.get(w, "delete_me")
-        let k2: Result(Int, Nil) = world.get(w, "keep2")
+        let k1: Result(Int, String) = world.get(w, "keep1")
+        let dm: Result(Int, String) = world.get(w, "delete_me")
+        let k2: Result(Int, String) = world.get(w, "keep2")
 
         // Assert & Cleanup
         world.cleanup(w)
-        let ok = k1 == Ok(1) && dm == Error(Nil) && k2 == Ok(3)
+        let ok =
+          k1 == Ok(1)
+          && dm == Error("World key not found: delete_me")
+          && k2 == Ok(3)
         ok
         |> should()
         |> be_true()

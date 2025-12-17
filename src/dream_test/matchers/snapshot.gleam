@@ -18,7 +18,7 @@
 //// ```gleam
 //// import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
 ////
-//// it("renders user profile", fn() {
+//// it("renders user profile", fn(_) {
 ////   render_profile(user)
 ////   |> should()
 ////   |> match_snapshot("./test/snapshots/user_profile.snap")
@@ -41,11 +41,11 @@
 //// ```bash
 //// # Update one snapshot
 //// rm ./test/snapshots/user_profile.snap
-//// gleam test
+//// make test
 ////
 //// # Update all snapshots in a directory
 //// rm ./test/snapshots/*.snap
-//// gleam test
+//// make test
 //// ```
 ////
 //// Or use the helper functions:
@@ -120,7 +120,7 @@ import gleam/string
 /// ### Basic Usage
 ///
 /// ```gleam
-/// it("serializes user to JSON", fn() {
+/// it("serializes user to JSON", fn(_) {
 ///   user_to_json(sample_user)
 ///   |> should()
 ///   |> match_snapshot("./test/snapshots/user.json")
@@ -131,7 +131,7 @@ import gleam/string
 /// ### With Transformation
 ///
 /// ```gleam
-/// it("renders HTML correctly", fn() {
+/// it("renders HTML correctly", fn(_) {
 ///   render_page(data)
 ///   |> string.trim()  // Normalize whitespace
 ///   |> should()
@@ -143,9 +143,9 @@ import gleam/string
 /// ### Error Handling
 ///
 /// ```gleam
-/// it("handles parse errors gracefully", fn() {
+/// it("handles parse errors gracefully", fn(_) {
 ///   case parse(invalid_input) {
-///     Ok(_) -> fail("Should have failed")
+///     Ok(_) -> Ok(fail_with("Should have failed"))
 ///     Error(msg) ->
 ///       msg
 ///       |> should()
@@ -158,7 +158,7 @@ import gleam/string
 /// ## Updating the Snapshot
 ///
 /// ```bash
-/// rm ./test/snapshots/user.json && gleam test
+/// rm ./test/snapshots/user.json && make test
 /// ```
 ///
 pub fn match_snapshot(
@@ -193,7 +193,7 @@ pub fn match_snapshot(
 /// ### Testing a Record
 ///
 /// ```gleam
-/// it("parses config correctly", fn() {
+/// it("parses config correctly", fn(_) {
 ///   parse_config(raw_toml)
 ///   |> should()
 ///   |> match_snapshot_inspect("./test/snapshots/config.snap")
@@ -204,7 +204,7 @@ pub fn match_snapshot(
 /// ### Testing a List
 ///
 /// ```gleam
-/// it("filters users correctly", fn() {
+/// it("filters users correctly", fn(_) {
 ///   users
 ///   |> list.filter(is_active)
 ///   |> should()

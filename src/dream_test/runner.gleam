@@ -4,10 +4,18 @@
 ////
 //// ```gleam
 //// import dream_test/runner
-//// import dream_test/reporter/bdd
+//// import dream_test/reporter/api as reporter
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
-//// runner.new([suite()])
+//// let suite =
+////   describe("Example", [
+////     it("passes", fn(_) { Ok(AssertionOk) }),
+////   ])
+////
+//// runner.new([suite])
+//// |> runner.reporter(reporter.bdd(io.print, True))
 //// |> runner.max_concurrency(8)
 //// |> runner.default_timeout_ms(10_000)
 //// |> runner.exit_on_failure()
@@ -26,6 +34,28 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 
 /// Builder-style runner configuration.
+///
+/// The type parameter `ctx` is the suite context type shared by hooks/tests in
+/// your `TestSuite(ctx)`. For plain unit tests built with `unit.describe`, that
+/// context is `Nil`.
+///
+/// You generally don’t construct `RunBuilder` directly—use `runner.new(...)` and
+/// then apply builder functions like `max_concurrency`, `reporter`, and
+/// `exit_on_failure`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/runner
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.bdd(io.print, True))
+/// |> runner.max_concurrency(4)
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
 pub opaque type RunBuilder(ctx) {
   RunBuilder(
     suites: List(TestSuite(ctx)),
@@ -37,6 +67,37 @@ pub opaque type RunBuilder(ctx) {
 }
 
 /// Start building a test run.
+///
+/// The returned builder starts with:
+///
+/// - no reporter (no output)
+/// - no result filter
+/// - `exit_on_failure` disabled
+/// - parallel defaults from `parallel.default_config()` (currently:
+///   max concurrency 4, default timeout 5000ms)
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+/// import dream_test/types.{AssertionOk}
+///
+/// let suite =
+///   describe("Example", [
+///     it("passes", fn(_) { Ok(AssertionOk) }),
+///   ])
+///
+/// let builder = runner.new([suite])
+/// ```
+///
+/// ## Parameters
+///
+/// - `suites`: root suites to run
+///
+/// ## Returns
+///
+/// A `RunBuilder(ctx)` you can further configure.
 pub fn new(suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
   RunBuilder(
     suites: suites,
@@ -48,6 +109,26 @@ pub fn new(suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 }
 
 /// Set the maximum number of tests to execute concurrently.
+///
+/// This does not change result ordering; results are still returned in
+/// deterministic traversal order.
+///
+/// ## Example
+///
+/// ```gleam
+/// runner.new([suite])
+/// |> runner.max_concurrency(8)
+/// |> runner.run()
+/// ```
+///
+/// ## Parameters
+///
+/// - `builder`: the current `RunBuilder`
+/// - `max`: maximum number of concurrent tests (>= 1)
+///
+/// ## Returns
+///
+/// A new `RunBuilder` with updated concurrency.
 pub fn max_concurrency(builder: RunBuilder(ctx), max: Int) -> RunBuilder(ctx) {
   let parallel.ParallelConfig(max_concurrency: _, default_timeout_ms: timeout) =
     builder.config
@@ -61,6 +142,25 @@ pub fn max_concurrency(builder: RunBuilder(ctx), max: Int) -> RunBuilder(ctx) {
 }
 
 /// Set the default per-test timeout in milliseconds.
+///
+/// This timeout is used when a test does not specify its own `timeout_ms`.
+///
+/// ## Example
+///
+/// ```gleam
+/// runner.new([suite])
+/// |> runner.default_timeout_ms(10_000)
+/// |> runner.run()
+/// ```
+///
+/// ## Parameters
+///
+/// - `builder`: the current `RunBuilder`
+/// - `timeout_ms`: timeout to apply when a test does not specify its own timeout
+///
+/// ## Returns
+///
+/// A new `RunBuilder` with updated default timeout.
 pub fn default_timeout_ms(
   builder: RunBuilder(ctx),
   timeout_ms: Int,
@@ -79,6 +179,21 @@ pub fn default_timeout_ms(
 /// Configure the runner to exit non-zero if any test fails.
 ///
 /// Exits after `run()` completes.
+///
+/// If a `filter_results(...)` predicate is present, the exit decision is based
+/// on the **filtered** results.
+///
+/// ## Example
+///
+/// ```gleam
+/// runner.new([suite])
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
+///
+/// ## Returns
+///
+/// A new `RunBuilder` with exit-on-failure enabled.
 pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
   RunBuilder(..builder, should_exit_on_failure: True)
 }
@@ -87,6 +202,26 @@ pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 ///
 /// When present, the runner will drive the reporter with `ReporterEvent`s and
 /// the reporter will print output (including progress) during the run.
+///
+/// ## Parameters
+///
+/// - `builder`: the current `RunBuilder`
+/// - `reporter`: a reporter created via `dream_test/reporter/api`
+///
+/// ## Returns
+///
+/// A new `RunBuilder` with the reporter attached.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.bdd(io.print, True))
+/// |> runner.run()
+/// ```
 pub fn reporter(
   builder: RunBuilder(ctx),
   reporter: reporter_api.Reporter,
@@ -95,6 +230,32 @@ pub fn reporter(
 }
 
 /// Filter the returned results list (and any exit-on-failure decision) by a predicate.
+///
+/// This is commonly used for tag filtering in CI.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/types.{type TestResult}
+/// import gleam/list
+///
+/// fn is_smoke(result: TestResult) {
+///   list.contains(result.tags, "smoke")
+/// }
+///
+/// runner.new([suite])
+/// |> runner.filter_results(is_smoke)
+/// |> runner.run()
+/// ```
+///
+/// ## Parameters
+///
+/// - `builder`: the current `RunBuilder`
+/// - `predicate`: keep results where this returns `True`
+///
+/// ## Returns
+///
+/// A new `RunBuilder` with the filter installed.
 pub fn filter_results(
   builder: RunBuilder(ctx),
   predicate: fn(TestResult) -> Bool,
@@ -106,6 +267,22 @@ pub fn filter_results(
 ///
 /// If `exit_on_failure()` was set, this function terminates the process (via
 /// `erlang:halt/1`) after running.
+///
+/// ## after_all failure behavior
+///
+/// If any suite’s `after_all` fails, the runner stops executing subsequent root
+/// suites. Tests in those later suites are returned as `SetupFailed` with a
+/// failure message derived from the `after_all` failure.
+///
+/// ## Example
+///
+/// ```gleam
+/// let results = runner.new([suite]) |> runner.run()
+/// ```
+///
+/// ## Returns
+///
+/// A list of `TestResult` values (one per test), in deterministic traversal order.
 pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
   let results0 = case builder.reporter {
     None -> run_suites(builder.config, builder.suites, [])
@@ -119,7 +296,7 @@ pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
   }
 
   case builder.should_exit_on_failure {
-    True -> exit_results_on_failure(results)
+    True -> halt_with_results_on_failure(results)
     False -> results
   }
 }
@@ -376,8 +553,7 @@ fn test_case_to_setup_failed_result(
   )
 }
 
-/// Exit the process with an appropriate exit code based on test results.
-pub fn exit_results_on_failure(results: List(TestResult)) -> List(TestResult) {
+fn halt_with_results_on_failure(results: List(TestResult)) -> List(TestResult) {
   let code = case has_failures(results) {
     True -> 1
     False -> 0
@@ -386,6 +562,20 @@ pub fn exit_results_on_failure(results: List(TestResult)) -> List(TestResult) {
 }
 
 /// Check if any test results indicate failure.
+///
+/// This returns `True` if **any** result has a failure status:
+///
+/// - `Failed`
+/// - `TimedOut`
+/// - `SetupFailed`
+///
+/// (Other statuses like `Passed` and `Skipped` do not count as failures.)
+///
+/// ## Example
+///
+/// ```gleam
+/// let failed = runner.has_failures(results)
+/// ```
 pub fn has_failures(results: List(TestResult)) -> Bool {
   case results {
     [] -> False

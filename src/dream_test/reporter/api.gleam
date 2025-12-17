@@ -6,6 +6,44 @@
 ////
 //// A reporter is responsible for printing any live output and for printing the
 //// final report when it receives `RunFinished`.
+////
+//// ## Choosing a reporter
+////
+//// - `bdd(write, show_progress)`: human-readable BDD output.
+////   - `show_progress: True` streams output as tests complete (useful in long runs).
+////   - `show_progress: False` prints only once at the end.
+//// - `json(write, show_progress)`: machine-readable JSON output.
+////   - `show_progress: True` also shows the live progress bar while the run executes.
+////   - `show_progress: False` prints only JSON once at the end.
+//// - `progress(write)`: progress bar only (no final summary).
+////
+//// ## How this fits with the runner
+////
+//// You attach a reporter to a run via `runner.reporter(...)`. During execution
+//// the runner emits events like `RunStarted`, `TestFinished`, and `RunFinished`,
+//// and the reporter decides what (if anything) to print for each event.
+////
+//// ## Usage
+////
+//// Most users will construct one of these reporters and attach it to the runner:
+////
+//// ```gleam
+//// import dream_test/reporter/api as reporter
+//// import dream_test/runner
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
+//// import gleam/io
+////
+//// let suite =
+////   describe("Example", [
+////     it("passes", fn(_) { Ok(AssertionOk) }),
+////   ])
+////
+//// runner.new([suite])
+//// |> runner.reporter(reporter.bdd(io.print, True))
+//// |> runner.exit_on_failure()
+//// |> runner.run()
+//// ```
 
 import dream_test/reporter/bdd as bdd_reporter
 import dream_test/reporter/json as json_reporter
@@ -17,6 +55,13 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 
+/// A reporter state machine driven by `ReporterEvent`s.
+///
+/// Construct a reporter with `bdd`, `json`, or `progress`, then attach it to a
+/// run via `runner.reporter(...)`.
+///
+/// Treat `Reporter` as opaque: construct it using the functions in this module.
+/// The internal variants/fields are not intended for pattern matching by users.
 pub type Reporter {
   Bdd(
     write: fn(String) -> Nil,
@@ -36,7 +81,28 @@ pub type Reporter {
 
 /// Construct a BDD-style reporter.
 ///
-/// Set `show_progress` to `True` to include the live progress bar.
+/// Set `show_progress` to `True` to include live output as tests complete.
+///
+/// When `True`, BDD output is streamed during the run and the final summary is
+/// printed on `RunFinished`.
+///
+/// ## Parameters
+///
+/// - `write`: output sink (e.g. `io.print`)
+/// - `show_progress`: when `True`, stream output during the run
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/runner
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.bdd(io.print, True))
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
 pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
   Bdd(
     write: write,
@@ -49,15 +115,68 @@ pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 /// Construct a JSON reporter.
 ///
 /// Set `show_progress` to `True` to include the live progress bar.
+///
+/// When `False`, JSON is printed only once on `RunFinished`.
+///
+/// ## Parameters
+///
+/// - `write`: output sink (e.g. `io.print`)
+/// - `show_progress`: when `True`, show a live progress bar during the run
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/runner
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.json(io.print, False))
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
 pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
   Json(write: write, show_progress: show_progress, results_rev: [])
 }
 
 /// Construct a progress-only reporter.
+///
+/// This prints only the progress bar (no final summary).
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/runner
+/// import gleam/io
+///
+/// runner.new([suite])
+/// |> runner.reporter(reporter.progress(io.print))
+/// |> runner.exit_on_failure()
+/// |> runner.run()
+/// ```
 pub fn progress(write: fn(String) -> Nil) -> Reporter {
   Progress(write: write)
 }
 
+/// Feed a single `ReporterEvent` into a reporter state machine.
+///
+/// The runner uses this internally. It’s public so you can build custom
+/// reporter drivers if you need them.
+///
+/// Reporters are state machines: this function returns the updated reporter.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporter/api as reporter
+/// import dream_test/reporter/types as reporter_types
+/// import gleam/io
+///
+/// let r0 = reporter.progress(io.print)
+/// let r1 = reporter.handle_event(r0, reporter_types.RunStarted(total: 10))
+/// let _r2 = reporter.handle_event(r1, reporter_types.RunFinished(completed: 10, total: 10))
+/// ```
 pub fn handle_event(
   reporter: Reporter,
   event: reporter_types.ReporterEvent,

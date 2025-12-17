@@ -26,9 +26,8 @@
 //// import gleam/io
 ////
 //// pub fn main() {
-////   my_feature_suite()
-////   |> runner.run_suite()
-////   |> gherkin_reporter.report(io.print)
+////   let results = runner.new([my_feature_suite()]) |> runner.run()
+////   let _ = gherkin_reporter.report(results, io.print)
 //// }
 //// ```
 ////
@@ -86,7 +85,7 @@ pub fn format(results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// results |> report(io.print)
+/// let _ = report(results, io.print)
 /// ```
 ///
 /// ## Parameters

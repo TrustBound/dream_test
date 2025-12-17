@@ -22,6 +22,6 @@ pub fn main() {
   |> runner.max_concurrency(8)
   |> runner.default_timeout_ms(10_000)
   |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.exit_on_failure()
   |> runner.run()
-  |> runner.exit_results_on_failure
 }

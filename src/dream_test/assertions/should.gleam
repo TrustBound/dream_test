@@ -65,7 +65,7 @@
 ////     |> equal("Alice")
 ////     |> or_fail_with("User should be Alice")
 ////   }
-////   Error(_) -> fail_with("Should have returned a user")
+////   Error(_) -> Ok(fail_with("Should have returned a user"))
 //// }
 //// ```
 ////
@@ -558,6 +558,21 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 /// |> or_fail_with("Result should be 42")
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(a)` produced by `should()` and matchers
+/// - `message`: message to show if the chain failed
+///
+/// ## Returns
+///
+/// A `Result(AssertionResult, String)` so test bodies can return it directly:
+///
+/// - `Ok(AssertionOk)` when the chain passed
+/// - `Ok(AssertionFailed(...))` when the chain failed
+///
+/// (This function currently never returns `Error`, but the `Result` shape keeps
+/// test bodies uniform: `fn(_) { ... } -> Result(AssertionResult, String)`.)
+///
 /// ## Writing Good Messages
 ///
 /// Good failure messages explain **what should have happened**:
@@ -593,7 +608,7 @@ pub fn or_fail_with(
 ///     |> equal(expected)
 ///     |> or_fail_with("Value should match")
 ///   }
-///   Error(_) -> fail_with("Should have succeeded but got an error")
+///   Error(_) -> Ok(fail_with("Should have succeeded but got an error"))
 /// }
 /// ```
 ///
@@ -602,6 +617,13 @@ pub fn or_fail_with(
 /// - In `case` branches that represent unexpected states
 /// - When testing that something does NOT happen
 /// - As a placeholder for unimplemented test branches
+///
+/// ## Returns
+///
+/// An `AssertionResult` you can wrap in `Ok(...)` from a test body.
+///
+/// If you want to abort a test immediately (rather than “failing an assertion”),
+/// return `Error("...")` from the test body instead.
 ///
 pub fn fail_with(message: String) -> AssertionResult {
   AssertionFailed(AssertionFailure(
@@ -620,8 +642,8 @@ pub fn fail_with(message: String) -> AssertionResult {
 ///
 /// ```gleam
 /// case result {
-///   Ok(_) -> succeed()
-///   Error(_) -> fail_with("Should have succeeded")
+///   Ok(_) -> Ok(succeed())
+///   Error(_) -> Ok(fail_with("Should have succeeded"))
 /// }
 /// ```
 ///
@@ -630,6 +652,10 @@ pub fn fail_with(message: String) -> AssertionResult {
 /// - In `case` branches where success is the expected outcome
 /// - When all branches of a case must return an `AssertionResult`
 /// - To make intent explicit rather than relying on implicit success
+///
+/// ## Returns
+///
+/// `AssertionOk`.
 ///
 pub fn succeed() -> AssertionResult {
   AssertionOk

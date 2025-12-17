@@ -6,6 +6,26 @@
 //// - parallelism up to max_concurrency
 //// - deterministic result ordering (based on traversal order)
 ////
+//// ## When should I use this?
+////
+//// Most users should prefer `dream_test/runner`:
+////
+//// - it runs multiple root suites
+//// - it can drive event-based reporters automatically
+//// - it implements project-level behavior like “stop subsequent suites after after_all fails”
+////
+//// Use `parallel` directly only if you are embedding Dream Test inside another
+//// runner or test harness and you need low-level control.
+////
+//// ## Output and “live” reporting
+////
+//// Tests execute in worker processes. Printing directly from tests/hooks (e.g.
+//// `io.println`) can be buffered or reordered by the BEAM and by your terminal
+//// / CI log capture.
+////
+//// If you want reliable “live” output, drive a reporter using
+//// `run_suite_parallel_with_reporter` (or use `runner.reporter(...)`).
+////
 //// It does NOT provide a list-based `run_parallel` mode; suites are the only
 //// execution unit.
 
@@ -28,10 +48,26 @@ import gleam/order
 import gleam/string
 
 /// Configuration for parallel execution.
+///
+/// `max_concurrency` limits how many tests can run at the same time.
+/// `default_timeout_ms` is used when a test does not specify its own timeout.
+///
+/// These values are not clamped by the library. Provide sensible values:
+///
+/// - `max_concurrency` should be >= 1
+/// - `default_timeout_ms` should be > 0
 pub type ParallelConfig {
   ParallelConfig(max_concurrency: Int, default_timeout_ms: Int)
 }
 
+/// Default parallel configuration.
+///
+/// - `max_concurrency`: 4
+/// - `default_timeout_ms`: 5000
+///
+/// ## Returns
+///
+/// A `ParallelConfig` suitable for most small/medium projects.
 pub fn default_config() -> ParallelConfig {
   ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 }
@@ -39,6 +75,32 @@ pub fn default_config() -> ParallelConfig {
 /// Run a suite in parallel.
 ///
 /// Nested groups are processed after the current group's tests complete.
+///
+/// Most users should call `runner.run()` instead of calling this directly.
+///
+/// ## Parameters
+///
+/// - `config`: concurrency and timeout settings
+/// - `suite`: a root `TestSuite(ctx)` to execute
+///
+/// ## Returns
+///
+/// One `TestResult` per test case, in deterministic traversal order.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/parallel
+/// import dream_test/unit.{describe, it}
+/// import dream_test/types.{AssertionOk}
+///
+/// let suite =
+///   describe("Example", [
+///     it("passes", fn(_) { Ok(AssertionOk) }),
+///   ])
+///
+/// let results = parallel.run_suite_parallel(parallel.default_config(), suite)
+/// ```
 pub fn run_suite_parallel(
   config: ParallelConfig,
   suite: TestSuite(ctx),
@@ -57,7 +119,47 @@ pub fn run_suite_parallel(
 /// Run a suite and emit reporter events.
 ///
 /// This is intended to drive progress indicators. Events are emitted in
-/// completion order after results are available.
+/// completion order **after** results are available (this is not “truly live”).
+///
+/// Prefer `runner.reporter(...)` for most runs.
+///
+/// ## Parameters
+///
+/// - `config`: concurrency and timeout settings
+/// - `suite`: a root `TestSuite(ctx)` to execute
+/// - `on_event`: receives `RunStarted`, `TestFinished`, and `RunFinished`
+///
+/// ## Returns
+///
+/// The same results list as `run_suite_parallel`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/parallel
+/// import dream_test/reporter/types as reporter_types
+/// import dream_test/unit.{describe, it}
+/// import dream_test/reporter/types.{type ReporterEvent}
+/// import dream_test/types.{AssertionOk}
+/// import gleam/io
+/// import gleam/string
+///
+/// fn on_event(event: ReporterEvent) {
+///   io.println(string.inspect(event))
+/// }
+///
+/// let suite =
+///   describe("Example", [
+///     it("passes", fn(_) { Ok(AssertionOk) }),
+///   ])
+///
+/// let _results =
+///   parallel.run_suite_parallel_with_events(
+///     parallel.default_config(),
+///     suite,
+///     on_event,
+///   )
+/// ```
 pub fn run_suite_parallel_with_events(
   config: ParallelConfig,
   suite: TestSuite(ctx),
@@ -77,6 +179,24 @@ pub fn run_suite_parallel_with_events(
 ///
 /// This is used by `runner` to provide truly live reporting without requiring
 /// the caller to provide an event handler.
+///
+/// Most users should not call this directly.
+///
+/// ## Parameters
+///
+/// - `config`: concurrency and timeout settings
+/// - `suite`: a root `TestSuite(ctx)` to execute
+/// - `reporter0`: the current reporter state machine
+/// - `total`: total tests across the entire run (used for progress UIs)
+/// - `completed`: how many tests have already finished before this suite begins
+///
+/// ## Returns
+///
+/// A tuple:
+///
+/// - the suite’s `TestResult`s
+/// - the updated completed count
+/// - the updated reporter state machine
 pub fn run_suite_parallel_with_reporter(
   config: ParallelConfig,
   suite: TestSuite(ctx),

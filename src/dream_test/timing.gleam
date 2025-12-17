@@ -98,6 +98,9 @@ pub fn format_duration_us(duration_us: Int) -> String {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/timing
+/// import gleam/io
+///
 /// let start = now_ms()
 /// // ... do work ...
 /// let elapsed = now_ms() - start
@@ -111,6 +114,18 @@ pub fn now_ms() -> Int {
 /// Get the current monotonic time in microseconds.
 ///
 /// Higher precision version of `now_ms()` for sub-millisecond timing.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/timing
+/// import gleam/io
+///
+/// let start = now_us()
+/// // ... do work ...
+/// let elapsed_us = now_us() - start
+/// io.println("Took " <> format_duration_us(elapsed_us))
+/// ```
 ///
 pub fn now_us() -> Int {
   erlang_monotonic_time_us()

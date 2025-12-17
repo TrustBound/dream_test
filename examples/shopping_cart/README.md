@@ -87,7 +87,7 @@ pub fn register(registry: StepRegistry) -> StepRegistry {
 
 ```bash
 cd examples/shopping_cart
-gleam test
+make test
 ```
 
 ## Output

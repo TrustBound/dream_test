@@ -41,24 +41,35 @@
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/reporter/json
+//// import dream_test/reporter/api as reporter
+//// import dream_test/runner
+//// import dream_test/unit.{describe, it}
+//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
 //// pub fn main() {
-////   to_test_cases("my_test", tests())
-////   |> run_all()
-////   |> json.report(io.print)
-////   |> exit_on_failure()
+////   let suite =
+////     describe("Example", [
+////       it("passes", fn(_) { Ok(AssertionOk) }),
+////     ])
+////
+////   runner.new([suite])
+////   |> runner.reporter(reporter.json(io.print, False))
+////   |> runner.exit_on_failure()
+////   |> runner.run()
 //// }
 //// ```
 ////
 //// ## Combining with BDD Reporter
 ////
 //// ```gleam
-//// results
-//// |> bdd.report(io.print)           // Human-readable to stdout
-//// |> json.report(write_to_file)     // JSON to file
-//// |> exit_on_failure()
+//// import dream_test/runner
+//// import dream_test/reporter/bdd
+//// import dream_test/reporter/json
+////
+//// let results = runner.new([suite]) |> runner.run()
+//// results |> bdd.report(io.print)
+//// results |> json.report(write_to_file)
 //// ```
 
 import dream_test/types.{
@@ -119,10 +130,10 @@ pub fn format_pretty(results: List(TestResult)) -> String {
 ///
 /// ```gleam
 /// // Print to stdout
-/// results |> json.report(io.print)
+/// let _ = json.report(results, io.print)
 ///
 /// // Write to file
-/// results |> json.report(fn(s) { file.write("results.json", s) })
+/// let _ = json.report(results, fn(s) { file.write("results.json", s) })
 /// ```
 ///
 /// ## Returns
@@ -130,11 +141,11 @@ pub fn format_pretty(results: List(TestResult)) -> String {
 /// Returns the input results unchanged, enabling pipeline composition:
 ///
 /// ```gleam
-/// to_test_cases("my_test", tests())
-/// |> run_all()
-/// |> bdd.report(io.print)
-/// |> json.report(write_to_file)
-/// |> exit_on_failure()
+/// import dream_test/reporter/bdd
+/// import dream_test/reporter/json
+///
+/// let _ = bdd.report(results, io.print)
+/// let _ = json.report(results, write_to_file)
 /// ```
 ///
 pub fn report(

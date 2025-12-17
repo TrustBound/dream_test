@@ -1,19 +1,36 @@
 //// Reporter event types for live/progress reporting.
 ////
-//// Most reporters in dream_test are *post-run* formatters (they take the final
-//// `List(TestResult)` and render it). These types enable *live* reporting by
-//// emitting events as tests complete.
+//// These types are emitted by the runner/parallel execution code and consumed
+//// by event-driven reporters (see `dream_test/reporter/api`).
 ////
-//// The runner/parallel modules expose `*_with_events` functions that accept an
-//// `on_event` callback. That callback receives values of `ReporterEvent`.
+//// Most users should not need to construct these values directly; you’ll
+//// typically choose a reporter with `dream_test/reporter/api` and attach it to
+//// `runner` so events are handled automatically.
 ////
-//// This module is intentionally small and dependency-light so core execution
-//// code can depend on it without importing concrete reporters.
+//// ## Terminology
+////
+//// - **scope**: the describe/group path for where something happened.
+////   Example: `["File", "delete"]`
+//// - **test_name**: the leaf `it(...)` name for per-test hooks (BeforeEach/AfterEach).
+//// - **completed / total**: monotonically increasing counts used by progress UIs.
+////
+//// ## Event model (high level)
+////
+//// A run looks like:
+////
+//// - `RunStarted(total)`
+//// - many `TestFinished(completed, total, result)` (in completion order)
+//// - `RunFinished(completed, total)`
+////
+//// Hook events may be interleaved for suites that declare hooks.
 
 import dream_test/types.{type TestResult}
 import gleam/option.{type Option}
 
 /// Lifecycle hook kinds.
+///
+/// Hook events include a `kind` plus contextual information (`scope` and an
+/// optional `test_name` for per-test hooks).
 pub type HookKind {
   BeforeAll
   BeforeEach
@@ -22,12 +39,17 @@ pub type HookKind {
 }
 
 /// Outcome of a hook run.
+///
+/// Hook failures are represented as `HookError(String)`.
 pub type HookOutcome {
   HookOk
   HookError(message: String)
 }
 
 /// Events emitted during a test run, suitable for progress indicators.
+///
+/// `scope` is the describe/group path (e.g. `["file", "delete"]`).
+/// For per-test hooks, `test_name` is the leaf `it` name.
 pub type ReporterEvent {
   /// The run is starting, and this many tests will be attempted.
   RunStarted(total: Int)
