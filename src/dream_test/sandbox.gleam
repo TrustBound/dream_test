@@ -1,4 +1,4 @@
-//// Process isolation for test execution.
+//// Process isolation for test execution (sandboxing).
 ////
 //// This module provides the core mechanism for running a function in an
 //// isolated BEAM process with timeout support. It is used internally by the
@@ -36,8 +36,20 @@
 //// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
 //// let result = sandbox.run_isolated(config, fn() { AssertionOk })
 //// ```
+////
+//// ## Example (from snippets)
+////
+//// ```gleam
+//// // examples/snippets/test/snippets/utils/sandboxing.gleam
+//// import dream_test/sandbox.{
+////   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
+//// }
+////
+//// let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+//// let result = sandbox.run_isolated(config, fn() { 123 })
+//// // result == SandboxCompleted(123)
+//// ```
 
-import dream_test/types.{type AssertionResult}
 import gleam/erlang/process.{
   type Pid, type Selector, type Subject, kill, monitor, new_selector,
   new_subject, select, select_monitors, selector_receive, send, spawn_unlinked,
@@ -60,13 +72,13 @@ pub type SandboxConfig {
   SandboxConfig(timeout_ms: Int, show_crash_reports: Bool)
 }
 
-/// Result of running a test in an isolated sandbox.
+/// Result of running a function in an isolated sandbox.
 ///
 /// This is intentionally simple so it can be used in higher-level code (like a
 /// runner) without pulling in reporter concerns.
-pub type SandboxResult {
-  /// Test completed successfully and returned an AssertionResult.
-  SandboxCompleted(AssertionResult)
+pub type SandboxResult(a) {
+  /// Function completed successfully and returned a value.
+  SandboxCompleted(a)
   /// Test did not complete within the timeout period.
   SandboxTimedOut
   /// Test process crashed with the given reason.
@@ -74,15 +86,13 @@ pub type SandboxResult {
 }
 
 /// Internal message type for communication between runner and test worker.
-type WorkerMessage {
-  TestCompleted(AssertionResult)
+type WorkerMessage(a) {
+  TestCompleted(a)
   WorkerDown(reason: String)
 }
 
 @external(erlang, "sandbox_ffi", "run_catching")
-fn run_catching(
-  test_function: fn() -> AssertionResult,
-) -> Result(AssertionResult, String)
+fn run_catching(test_function: fn() -> a) -> Result(a, String)
 
 /// Run a test function in an isolated process with timeout.
 ///
@@ -117,8 +127,8 @@ fn run_catching(
 /// ```
 pub fn run_isolated(
   config: SandboxConfig,
-  test_function: fn() -> AssertionResult,
-) -> SandboxResult {
+  test_function: fn() -> a,
+) -> SandboxResult(a) {
   let result_subject = new_subject()
   let worker_pid =
     spawn_worker(result_subject, test_function, config.show_crash_reports)
@@ -131,8 +141,8 @@ pub fn run_isolated(
 
 /// Spawn a worker process that runs the test and sends the result.
 fn spawn_worker(
-  result_subject: Subject(WorkerMessage),
-  test_function: fn() -> AssertionResult,
+  result_subject: Subject(WorkerMessage(a)),
+  test_function: fn() -> a,
   show_crash_reports: Bool,
 ) -> Pid {
   spawn_unlinked(fn() {
@@ -153,9 +163,9 @@ fn spawn_worker(
 
 /// Build a selector that waits for either test completion or process down.
 fn build_result_selector(
-  result_subject: Subject(WorkerMessage),
+  result_subject: Subject(WorkerMessage(a)),
   show_crash_reports: Bool,
-) -> Selector(WorkerMessage) {
+) -> Selector(WorkerMessage(a)) {
   case show_crash_reports {
     True ->
       new_selector()
@@ -171,7 +181,7 @@ fn build_result_selector(
 }
 
 /// Map a process down event to a WorkerMessage.
-fn map_down_to_message(down: process.Down) -> WorkerMessage {
+fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
   let reason = format_exit_reason(down.reason)
   WorkerDown(reason: reason)
 }
@@ -188,10 +198,10 @@ fn format_exit_reason(reason: process.ExitReason) -> String {
 /// Wait for the worker to complete or timeout.
 fn wait_for_result(
   config: SandboxConfig,
-  selector: Selector(WorkerMessage),
+  selector: Selector(WorkerMessage(a)),
   worker_pid: Pid,
   _worker_monitor: process.Monitor,
-) -> SandboxResult {
+) -> SandboxResult(a) {
   case selector_receive(selector, config.timeout_ms) {
     Ok(message) -> handle_worker_message(message)
     Error(Nil) -> handle_timeout(worker_pid)
@@ -199,7 +209,7 @@ fn wait_for_result(
 }
 
 /// Handle a message from the worker or monitor.
-fn handle_worker_message(message: WorkerMessage) -> SandboxResult {
+fn handle_worker_message(message: WorkerMessage(a)) -> SandboxResult(a) {
   case message {
     TestCompleted(result) -> SandboxCompleted(result)
     WorkerDown(reason) -> SandboxCrashed(reason)
@@ -207,7 +217,7 @@ fn handle_worker_message(message: WorkerMessage) -> SandboxResult {
 }
 
 /// Handle timeout by killing the worker and returning timeout result.
-fn handle_timeout(worker_pid: Pid) -> SandboxResult {
+fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
   kill(worker_pid)
   SandboxTimedOut
 }

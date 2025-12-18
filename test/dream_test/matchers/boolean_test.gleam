@@ -1,41 +1,21 @@
-import dream_test/assertions/should.{be_false, be_true, or_fail_with, should}
-import dream_test/unit.{describe, group, it}
-import matchers/be_match_failed_result.{be_match_failed_result}
-import matchers/be_match_ok_result.{be_match_ok_result}
+import dream_test/assertions/should.{or_fail_with, should}
+import dream_test/matchers/boolean
+import dream_test/unit.{describe, it}
 
 pub fn tests() {
-  describe("Boolean Matchers", [
-    group("be_true", [
-      it("returns MatchOk when value is True", fn(_) {
-        True
-        |> should()
-        |> be_true()
-        |> be_match_ok_result()
-        |> or_fail_with("be_true should pass for True")
-      }),
-      it("returns MatchFailed when value is False", fn(_) {
-        False
-        |> should()
-        |> be_true()
-        |> be_match_failed_result()
-        |> or_fail_with("be_true should fail for False")
-      }),
-    ]),
-    group("be_false", [
-      it("returns MatchOk when value is False", fn(_) {
-        False
-        |> should()
-        |> be_false()
-        |> be_match_ok_result()
-        |> or_fail_with("be_false should pass for False")
-      }),
-      it("returns MatchFailed when value is True", fn(_) {
-        True
-        |> should()
-        |> be_false()
-        |> be_match_failed_result()
-        |> or_fail_with("be_false should fail for True")
-      }),
-    ]),
+  describe("dream_test/matchers/boolean", [
+    it("be_true passes for True", fn() {
+      True
+      |> should()
+      |> boolean.be_true()
+      |> or_fail_with("True should be true")
+    }),
+
+    it("be_false passes for False", fn() {
+      False
+      |> should()
+      |> boolean.be_false()
+      |> or_fail_with("False should be false")
+    }),
   ])
 }

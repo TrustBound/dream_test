@@ -571,7 +571,7 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 /// - `Ok(AssertionFailed(...))` when the chain failed
 ///
 /// (This function currently never returns `Error`, but the `Result` shape keeps
-/// test bodies uniform: `fn(_) { ... } -> Result(AssertionResult, String)`.)
+/// test bodies uniform for `dream_test/unit`: `fn() { ... } -> Result(AssertionResult, String)`.)
 ///
 /// ## Writing Good Messages
 ///

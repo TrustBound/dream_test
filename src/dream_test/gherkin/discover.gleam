@@ -44,8 +44,8 @@ import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
 import dream_test/types.{
-  type AssertionResult, type TestSuite, type TestSuiteItem, AssertionFailed,
-  AssertionFailure, SuiteGroup, SuiteTest, SuiteTestCase, TestSuite, Unit,
+  type AssertionResult, type Node, type TestSuite, AssertionFailed,
+  AssertionFailure, Group, Root, Test, Unit,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -159,24 +159,21 @@ pub fn to_suite(
   let files = discover_files(discovery.pattern)
   let load_result = load_all_features(files)
 
-  let suite_items =
+  let children =
     list.map(load_result.features, fn(feature) {
       let config = FeatureConfig(feature: feature, step_registry: registry)
       let feature_suite = to_test_suite(suite_name, config)
-      SuiteGroup(feature_suite)
+      root_to_group(feature_suite)
     })
 
-  let error_items = list.map(load_result.errors, error_to_suite_item)
-  let all_items = list.append(suite_items, error_items)
-
-  TestSuite(
-    name: suite_name,
-    before_all: Some(fn() { Ok(Nil) }),
-    has_user_before_all: False,
-    after_all: [],
-    before_each: [],
-    after_each: [],
-    items: all_items,
+  let error_nodes = list.map(load_result.errors, error_to_node)
+  Root(
+    seed: Nil,
+    tree: Group(
+      name: suite_name,
+      tags: [],
+      children: list.append(children, error_nodes),
+    ),
   )
 }
 
@@ -250,14 +247,14 @@ fn parse_feature_file(path: String) -> Result(gherkin_types.Feature, String) {
   |> result.map_error(fn(e) { path <> ": " <> e })
 }
 
-fn error_to_suite_item(error: String) -> TestSuiteItem(Nil) {
-  SuiteTest(SuiteTestCase(
+fn error_to_node(error: String) -> Node(Nil) {
+  Test(
     name: "Parse Error: " <> error,
     tags: ["parse-error"],
     kind: Unit,
-    run: fn(_) { Ok(parse_error_assertion()) },
+    run: fn(_nil: Nil) { Ok(parse_error_assertion()) },
     timeout_ms: None,
-  ))
+  )
 }
 
 fn parse_error_assertion() -> AssertionResult {
@@ -266,6 +263,11 @@ fn parse_error_assertion() -> AssertionResult {
     message: "Failed to parse feature file (see test name for details)",
     payload: None,
   ))
+}
+
+fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
+  let Root(_seed, tree) = suite
+  tree
 }
 
 // ============================================================================

@@ -18,7 +18,7 @@
 //// ```gleam
 //// import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
 ////
-//// it("renders user profile", fn(_) {
+//// it("renders user profile", fn() {
 ////   render_profile(user)
 ////   |> should()
 ////   |> match_snapshot("./test/snapshots/user_profile.snap")
@@ -120,7 +120,7 @@ import gleam/string
 /// ### Basic Usage
 ///
 /// ```gleam
-/// it("serializes user to JSON", fn(_) {
+/// it("serializes user to JSON", fn() {
 ///   user_to_json(sample_user)
 ///   |> should()
 ///   |> match_snapshot("./test/snapshots/user.json")
@@ -131,7 +131,7 @@ import gleam/string
 /// ### With Transformation
 ///
 /// ```gleam
-/// it("renders HTML correctly", fn(_) {
+/// it("renders HTML correctly", fn() {
 ///   render_page(data)
 ///   |> string.trim()  // Normalize whitespace
 ///   |> should()
@@ -143,7 +143,7 @@ import gleam/string
 /// ### Error Handling
 ///
 /// ```gleam
-/// it("handles parse errors gracefully", fn(_) {
+/// it("handles parse errors gracefully", fn() {
 ///   case parse(invalid_input) {
 ///     Ok(_) -> Ok(fail_with("Should have failed"))
 ///     Error(msg) ->
@@ -193,7 +193,7 @@ pub fn match_snapshot(
 /// ### Testing a Record
 ///
 /// ```gleam
-/// it("parses config correctly", fn(_) {
+/// it("parses config correctly", fn() {
 ///   parse_config(raw_toml)
 ///   |> should()
 ///   |> match_snapshot_inspect("./test/snapshots/config.snap")
@@ -204,7 +204,7 @@ pub fn match_snapshot(
 /// ### Testing a List
 ///
 /// ```gleam
-/// it("filters users correctly", fn(_) {
+/// it("filters users correctly", fn() {
 ///   users
 ///   |> list.filter(is_active)
 ///   |> should()

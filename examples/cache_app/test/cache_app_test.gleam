@@ -12,7 +12,7 @@ import dream_test/assertions/should.{
   be_empty, be_error, be_false, be_greater_than, be_none, be_ok, be_some,
   be_true, contain, equal, have_length, or_fail_with, should,
 }
-import dream_test/reporter/api as reporter
+import dream_test/reporter
 import dream_test/runner
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, group, it,
@@ -32,7 +32,7 @@ pub fn suites() {
       // Basic Operations
       // -------------------------------------------------------------------------
       group("get and set", [
-        it("retrieves a stored value", fn(_) {
+        it("retrieves a stored value", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "name", "Alice")
@@ -48,7 +48,7 @@ pub fn suites() {
           |> or_fail_with("get() should return the stored value")
         }),
 
-        it("returns None for keys that were never set", fn(_) {
+        it("returns None for keys that were never set", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -62,7 +62,7 @@ pub fn suites() {
           |> or_fail_with("get() should return None for missing keys")
         }),
 
-        it("overwrites previous values for the same key", fn(_) {
+        it("overwrites previous values for the same key", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "version", "1.0")
@@ -81,7 +81,7 @@ pub fn suites() {
       ]),
 
       group("delete", [
-        it("removes an existing key", fn(_) {
+        it("removes an existing key", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "temp", "data")
@@ -97,7 +97,7 @@ pub fn suites() {
           |> or_fail_with("delete() should remove the key")
         }),
 
-        it("does nothing when deleting a nonexistent key", fn(_) {
+        it("does nothing when deleting a nonexistent key", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "keep", "this")
@@ -123,7 +123,7 @@ pub fn suites() {
       ]),
 
       group("clear", [
-        it("removes all entries", fn(_) {
+        it("removes all entries", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "a", "1")
@@ -141,7 +141,7 @@ pub fn suites() {
           |> or_fail_with("clear() should remove all entries")
         }),
 
-        it("leaves cache usable after clearing", fn(_) {
+        it("leaves cache usable after clearing", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "old", "data")
@@ -164,7 +164,7 @@ pub fn suites() {
       // Collection Operations
       // -------------------------------------------------------------------------
       group("keys", [
-        it("returns empty list for new cache", fn(_) {
+        it("returns empty list for new cache", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -178,7 +178,7 @@ pub fn suites() {
           |> or_fail_with("New cache should have no keys")
         }),
 
-        it("returns all stored keys", fn(_) {
+        it("returns all stored keys", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "first", "1")
@@ -204,7 +204,7 @@ pub fn suites() {
       ]),
 
       group("size", [
-        it("returns zero for empty cache", fn(_) {
+        it("returns zero for empty cache", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -218,7 +218,7 @@ pub fn suites() {
           |> or_fail_with("Empty cache should have size 0")
         }),
 
-        it("increases as items are added", fn(_) {
+        it("increases as items are added", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -242,7 +242,7 @@ pub fn suites() {
           |> or_fail_with("Size should be 2 after second insert")
         }),
 
-        it("does not increase when overwriting", fn(_) {
+        it("does not increase when overwriting", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "key", "first")
@@ -263,7 +263,7 @@ pub fn suites() {
       // Convenience Functions
       // -------------------------------------------------------------------------
       group("get_or", [
-        it("returns stored value when key exists", fn(_) {
+        it("returns stored value when key exists", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "exists", "actual")
@@ -278,7 +278,7 @@ pub fn suites() {
           |> or_fail_with("Should return actual value, not default")
         }),
 
-        it("returns default when key is missing", fn(_) {
+        it("returns default when key is missing", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -294,7 +294,7 @@ pub fn suites() {
       ]),
 
       group("has", [
-        it("returns true when key exists", fn(_) {
+        it("returns true when key exists", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "present", "here")
@@ -309,7 +309,7 @@ pub fn suites() {
           |> or_fail_with("has() should return True for existing key")
         }),
 
-        it("returns false when key is missing", fn(_) {
+        it("returns false when key is missing", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -325,7 +325,7 @@ pub fn suites() {
       ]),
 
       group("update", [
-        it("transforms existing value and returns Ok", fn(_) {
+        it("transforms existing value and returns Ok", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "counter", 10)
@@ -341,7 +341,7 @@ pub fn suites() {
           |> or_fail_with("update() should return Ok with new value")
         }),
 
-        it("persists the transformed value", fn(_) {
+        it("persists the transformed value", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "counter", 5)
@@ -358,7 +358,7 @@ pub fn suites() {
           |> or_fail_with("Updated value should be persisted")
         }),
 
-        it("returns Error for missing key", fn(_) {
+        it("returns Error for missing key", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -374,7 +374,7 @@ pub fn suites() {
       ]),
 
       group("pop", [
-        it("returns and removes the value", fn(_) {
+        it("returns and removes the value", fn() {
           // Arrange
           let cache = cache_app.start()
           cache_app.set(cache, "temp", "data")
@@ -398,7 +398,7 @@ pub fn suites() {
           |> or_fail_with("Key should be removed after pop()")
         }),
 
-        it("returns None for missing key", fn(_) {
+        it("returns None for missing key", fn() {
           // Arrange
           let cache = cache_app.start()
 
@@ -418,7 +418,7 @@ pub fn suites() {
       // -------------------------------------------------------------------------
       group("nested organization", [
         group("outer group", [
-          it("test at outer level", fn(_) {
+          it("test at outer level", fn() {
             // Arrange
             let value = Some("outer")
 
@@ -431,7 +431,7 @@ pub fn suites() {
           }),
 
           group("inner group", [
-            it("test at inner level", fn(_) {
+            it("test at inner level", fn() {
               // Arrange
               let list = [1, 2, 3]
 
@@ -458,12 +458,12 @@ pub fn suites() {
         Ok(Nil)
       }),
 
-      before_each(fn(_) {
+      before_each(fn() {
         // Arrange (before each test)
         Ok(Nil)
       }),
 
-      it("first test runs after hooks", fn(_) {
+      it("first test runs after hooks", fn() {
         // Act & Assert
         True
         |> should()
@@ -471,7 +471,7 @@ pub fn suites() {
         |> or_fail_with("Test should pass")
       }),
 
-      it("second test also gets fresh setup", fn(_) {
+      it("second test also gets fresh setup", fn() {
         // Act & Assert
         42
         |> should()
@@ -479,12 +479,12 @@ pub fn suites() {
         |> or_fail_with("42 should be positive")
       }),
 
-      after_each(fn(_) {
+      after_each(fn() {
         // Cleanup (after each test)
         Ok(Nil)
       }),
 
-      after_all(fn(_) {
+      after_all(fn() {
         // Cleanup (once for entire suite)
         Ok(Nil)
       }),

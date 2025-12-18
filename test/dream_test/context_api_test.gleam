@@ -1,0 +1,30 @@
+import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/context
+import dream_test/types.{AssertionFailure}
+import dream_test/unit.{describe, it}
+import gleam/option.{None}
+
+pub fn tests() {
+  describe("dream_test/context", [
+    it("new starts with no failures", fn() {
+      context.new()
+      |> context.failures()
+      |> should()
+      |> equal([])
+      |> or_fail_with("new context should have no failures")
+    }),
+
+    it("failures are stored newest-first", fn() {
+      let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+      let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+
+      context.new()
+      |> context.add_failure(f1)
+      |> context.add_failure(f2)
+      |> context.failures()
+      |> should()
+      |> equal([f2, f1])
+      |> or_fail_with("failures should be stored newest-first")
+    }),
+  ])
+}

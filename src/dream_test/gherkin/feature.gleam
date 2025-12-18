@@ -83,9 +83,8 @@ import dream_test/gherkin/steps.{
 import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
-  type AssertionResult, type SuiteTestCase, type TestSuite, type TestSuiteItem,
-  AssertionFailed, AssertionFailure, AssertionOk, GherkinScenario, SuiteTest,
-  SuiteTestCase, TestSuite,
+  type AssertionResult, type Node, type TestSuite, AssertionFailed,
+  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
 }
 import gleam/dict.{type Dict}
 import gleam/int
@@ -160,23 +159,18 @@ pub fn to_test_suite(
   config: FeatureConfig,
 ) -> TestSuite(Nil) {
   let feature = config.feature
-  let items = build_suite_items(feature, config)
+  let children = build_suite_items(feature, config)
 
-  TestSuite(
-    name: feature.name,
-    before_all: Some(fn() { Ok(Nil) }),
-    has_user_before_all: False,
-    after_all: [],
-    before_each: [],
-    after_each: [],
-    items: items,
+  Root(
+    seed: Nil,
+    tree: Group(name: feature.name, tags: feature.tags, children: children),
   )
 }
 
 fn build_suite_items(
   feature: gherkin_types.Feature,
   config: FeatureConfig,
-) -> List(TestSuiteItem(Nil)) {
+) -> List(Node(Nil)) {
   list.flat_map(feature.scenarios, fn(scenario) {
     scenario_to_suite_items(feature, scenario, config)
   })
@@ -186,12 +180,12 @@ fn scenario_to_suite_items(
   feature: gherkin_types.Feature,
   scenario: gherkin_types.Scenario,
   config: FeatureConfig,
-) -> List(TestSuiteItem(Nil)) {
+) -> List(Node(Nil)) {
   case scenario {
     gherkin_types.Scenario(name, tags, steps) -> {
-      let test_case =
-        build_scenario_test_case(feature, name, tags, steps, config, None)
-      [SuiteTest(test_case)]
+      let test_node =
+        build_scenario_test_node(feature, name, tags, steps, config, None)
+      [test_node]
     }
     gherkin_types.ScenarioOutline(name, tags, steps, examples) -> {
       expand_scenario_outline(feature, name, tags, steps, examples, config)
@@ -199,14 +193,14 @@ fn scenario_to_suite_items(
   }
 }
 
-fn build_scenario_test_case(
+fn build_scenario_test_node(
   feature: gherkin_types.Feature,
   scenario_name: String,
   scenario_tags: List(String),
   steps: List(gherkin_types.Step),
   config: FeatureConfig,
   example_suffix: Option(String),
-) -> SuiteTestCase(Nil) {
+) -> Node(Nil) {
   let full_name = build_full_name(feature.name, scenario_name, example_suffix)
   let scenario_id = string.join(full_name, "::")
   let all_tags = list.append(feature.tags, scenario_tags)
@@ -217,11 +211,11 @@ fn build_scenario_test_case(
       list.append(background_steps, steps)
     None -> steps
   }
-  SuiteTestCase(
+  Test(
     name: scenario_name,
     tags: all_tags,
     kind: GherkinScenario(scenario_id),
-    run: fn(_) {
+    run: fn(_nil: Nil) {
       Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
     },
     timeout_ms: None,
@@ -246,7 +240,7 @@ fn expand_scenario_outline(
   steps: List(gherkin_types.Step),
   examples: gherkin_types.ExamplesTable,
   config: FeatureConfig,
-) -> List(TestSuiteItem(Nil)) {
+) -> List(Node(Nil)) {
   let headers = examples.headers
 
   list.index_map(examples.rows, fn(row, index) {
@@ -254,16 +248,14 @@ fn expand_scenario_outline(
     let expanded_steps = substitute_steps(steps, substitutions)
     let suffix = "(Example " <> int.to_string(index + 1) <> ")"
 
-    let test_case =
-      build_scenario_test_case(
-        feature,
-        name,
-        tags,
-        expanded_steps,
-        config,
-        Some(suffix),
-      )
-    SuiteTest(test_case)
+    build_scenario_test_node(
+      feature,
+      name,
+      tags,
+      expanded_steps,
+      config,
+      Some(suffix),
+    )
   })
 }
 

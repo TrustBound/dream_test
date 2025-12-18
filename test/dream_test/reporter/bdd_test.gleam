@@ -1,43 +1,82 @@
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter/bdd.{format}
-import dream_test/types.{
-  AssertionFailure, EqualityFailure, Failed, Passed, TestResult, Unit,
-}
+import dream_test/reporters/bdd
+import dream_test/types
 import dream_test/unit.{describe, group, it}
-import gleam/option.{Some}
+import gleam/list
+import gleam/option.{None, Some}
+import gleam/string
+
+fn sample_results() -> List(types.TestResult) {
+  [
+    types.TestResult(
+      name: "t1",
+      full_name: ["suite", "t1"],
+      status: types.Passed,
+      duration_ms: 1,
+      tags: [],
+      failures: [],
+      kind: types.Unit,
+    ),
+    types.TestResult(
+      name: "t2",
+      full_name: ["suite", "t2"],
+      status: types.Failed,
+      duration_ms: 1,
+      tags: [],
+      failures: [
+        types.AssertionFailure(operator: "fail", message: "nope", payload: None),
+      ],
+      kind: types.Unit,
+    ),
+  ]
+}
 
 pub fn tests() {
-  describe("BDD Reporter", [
+  describe("dream_test/reporter/bdd", [
     group("format", [
-      it("renders a basic BDD-style report", fn(_) {
-        // Arrange
+      it("includes test names", fn() {
+        let out = bdd.format(sample_results())
+        case string.contains(out, "t1") && string.contains(out, "t2") {
+          True -> Ok(types.AssertionOk)
+          False ->
+            Ok(
+              types.AssertionFailed(types.AssertionFailure(
+                operator: "bdd.format",
+                message: "expected formatted output to contain test names",
+                payload: None,
+              )),
+            )
+        }
+      }),
+
+      it("renders a basic BDD-style report (exact)", fn() {
         let passing =
-          TestResult(
+          types.TestResult(
             name: "adds numbers",
             full_name: ["Math", "adds numbers"],
-            status: Passed,
+            status: types.Passed,
             duration_ms: 0,
             tags: [],
             failures: [],
-            kind: Unit,
+            kind: types.Unit,
           )
 
         let failure =
-          AssertionFailure(
+          types.AssertionFailure(
             operator: "equal",
             message: "1 + 2 should equal 3",
-            payload: Some(EqualityFailure(actual: "4", expected: "3")),
+            payload: Some(types.EqualityFailure(actual: "4", expected: "3")),
           )
 
         let failing =
-          TestResult(
+          types.TestResult(
             name: "adds numbers incorrectly",
             full_name: ["Math", "adds numbers incorrectly"],
-            status: Failed,
+            status: types.Failed,
             duration_ms: 0,
             tags: [],
             failures: [failure],
-            kind: Unit,
+            kind: types.Unit,
           )
 
         let results = [passing, failing]
@@ -53,15 +92,54 @@ pub fn tests() {
           <> "\n"
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n"
 
-        // Act
-        let result = format(results)
-
-        // Assert
-        result
+        bdd.format(results)
         |> should()
         |> equal(expected)
         |> or_fail_with("bdd.format should render a basic BDD-style report")
       }),
     ]),
+
+    it("format_summary_only returns a non-empty summary", fn() {
+      let out = bdd.format_summary_only(sample_results())
+      case out == "" {
+        True ->
+          Ok(
+            types.AssertionFailed(types.AssertionFailure(
+              operator: "bdd.format_summary_only",
+              message: "expected non-empty summary",
+              payload: None,
+            )),
+          )
+        False -> Ok(types.AssertionOk)
+      }
+    }),
+
+    it("format_incremental and friends do not crash", fn() {
+      case list.first(sample_results()) {
+        Ok(_r) -> {
+          // Any crash here should fail the test run.
+          let previous = []
+          let assert Ok(r) = list.first(sample_results())
+          let _ = bdd.format_incremental(r, previous)
+          let _ = bdd.format_incremental_with_test_indent(r, previous, 2)
+          let _ = bdd.format_incremental_parts_with_test_indent(r, previous, 2)
+          Ok(types.AssertionOk)
+        }
+        Error(_) ->
+          Ok(
+            types.AssertionFailed(types.AssertionFailure(
+              operator: "bdd",
+              message: "expected sample_results to have at least one element",
+              payload: None,
+            )),
+          )
+      }
+    }),
+
+    it("report does not crash", fn() {
+      let write = fn(_s: String) { Nil }
+      bdd.report(sample_results(), write)
+      Ok(types.AssertionOk)
+    }),
   ])
 }

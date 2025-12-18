@@ -6,17 +6,18 @@
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, be_true, be_false, or_fail_with}
+//// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
+//// import dream_test/assertions/should.{be_false, be_true, or_fail_with, should}
 ////
-//// is_valid(input)
+//// True
 //// |> should()
 //// |> be_true()
-//// |> or_fail_with("Input should be valid")
+//// |> or_fail_with("expected True")
 ////
-//// is_empty(list)
+//// False
 //// |> should()
 //// |> be_false()
-//// |> or_fail_with("List should not be empty")
+//// |> or_fail_with("expected False")
 //// ```
 
 import dream_test/types.{
@@ -29,10 +30,11 @@ import gleam/option.{Some}
 /// ## Example
 ///
 /// ```gleam
-/// is_valid(input)
+/// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
+/// True
 /// |> should()
 /// |> be_true()
-/// |> or_fail_with("Input should be valid")
+/// |> or_fail_with("expected True")
 /// ```
 ///
 pub fn be_true(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {
@@ -62,10 +64,11 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 /// ## Example
 ///
 /// ```gleam
-/// is_empty(list)
+/// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
+/// False
 /// |> should()
 /// |> be_false()
-/// |> or_fail_with("List should not be empty")
+/// |> or_fail_with("expected False")
 /// ```
 ///
 pub fn be_false(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {

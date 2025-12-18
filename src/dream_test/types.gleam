@@ -42,6 +42,16 @@
 ////   }
 //// }
 //// ```
+//// =============================================================================
+//// Unified tree model (Root/Node)
+//// =============================================================================
+////
+//// Dream Test compiles all unit/context/gherkin tests into a single tree model
+//// that the executor runs.
+////
+//// - `Root(context)` holds the initial seed value and a single root `Node`.
+//// - `Node(context)` represents groups, tests, and lifecycle hooks.
+////
 
 import gleam/option.{type Option}
 
@@ -77,8 +87,8 @@ import gleam/option.{type Option}
 ///
 /// describe("Database", [
 ///   before_all(fn() { Error("could not connect to database") }),
-///   it("test1", fn(_) { Ok(AssertionOk) }), // Never runs → SetupFailed
-///   it("test2", fn(_) { Ok(AssertionOk) }), // Never runs → SetupFailed
+///   it("test1", fn() { Ok(AssertionOk) }), // Never runs → SetupFailed
+///   it("test2", fn() { Ok(AssertionOk) }), // Never runs → SetupFailed
 /// ])
 /// ```
 ///
@@ -323,7 +333,7 @@ pub type CoverageSummary {
 ///
 /// let suite =
 ///   describe("Example", [
-///     it("passes", fn(_) { Ok(AssertionOk) }),
+///     it("passes", fn() { Ok(AssertionOk) }),
 ///   ])
 ///
 /// let results = runner.new([suite]) |> runner.run()
@@ -342,135 +352,55 @@ pub type TestResult {
   )
 }
 
-/// A single runnable test within a suite.
+/// A complete test suite in the unified execution model.
 ///
-/// The test receives the suite context (possibly transformed by `before_each`)
-/// and may short-circuit with an `Error("message")`.
+/// A `Root(context)` stores the initial `seed` context value and the top-level
+/// `tree` (`Node(context)`) containing groups, tests, and hooks.
+pub type Root(context) {
+  Root(seed: context, tree: Node(context))
+}
+
+/// A node in the unified test tree: groups, tests, and hooks.
 ///
-/// This is the runnable “leaf node” that reporters ultimately display as a
-/// `TestResult`.
-///
-/// You typically create these via the unit DSL (`unit.it`, `unit.skip`) or via
-/// the Gherkin integration.
-pub type SuiteTestCase(ctx) {
-  SuiteTestCase(
+/// Most users build these values via `dream_test/unit` or `dream_test/unit_context`.
+pub type Node(context) {
+  /// A named group containing child nodes.
+  Group(name: String, tags: List(String), children: List(Node(context)))
+
+  /// A runnable test leaf.
+  Test(
     name: String,
     tags: List(String),
     kind: TestKind,
-    run: fn(ctx) -> Result(AssertionResult, String),
-    /// Optional per-test timeout override in milliseconds.
-    /// If None, uses the runner's default timeout.
+    run: fn(context) -> Result(AssertionResult, String),
     timeout_ms: Option(Int),
   )
+
+  /// Group-scoped hooks.
+  BeforeAll(run: fn(context) -> Result(context, String))
+  BeforeEach(run: fn(context) -> Result(context, String))
+  AfterEach(run: fn(context) -> Result(Nil, String))
+  AfterAll(run: fn(context) -> Result(Nil, String))
 }
 
-/// A structured test suite preserving group hierarchy.
-///
-/// Unlike a flat list of tests, a `TestSuite(ctx)` preserves the tree structure
-/// of your `describe`/`group` blocks. This enables hook scoping and makes BDD
-/// reporting possible (reporters can show nested names deterministically).
-///
-/// ## When will I touch this type?
-///
-/// Most users won’t construct `TestSuite` manually:
-///
-/// - `unit.describe(...)` returns a `TestSuite(Nil)`
-/// - `unit.describe_with_hooks(...)` returns a `TestSuite(ctx)`
-///
-/// ## How It's Structured
-///
-/// ```text
-/// TestSuite("Database tests")
-/// ├── before_all: Some(start_db)
-/// ├── items:
-/// │   ├── SuiteTest("creates users")
-/// │   ├── SuiteTest("queries users")
-/// │   └── SuiteGroup(TestSuite("error cases"))
-/// │       ├── before_all: None
-/// │       ├── items:
-/// │       │   ├── SuiteTest("handles not found")
-/// │       │   └── SuiteTest("handles timeout")
-/// │       └── after_all: []
-/// └── after_all: [stop_db]
-/// ```
-///
-/// ## Creating a TestSuite
-///
-/// Don't construct this directly. Use the unit DSL (`describe`, `group`, `it`,
-/// etc.) to build it:
-///
-/// ```gleam
-/// import dream_test/unit.{describe, it}
-/// import dream_test/types.{AssertionOk}
-///
-/// pub fn tests() {
-///   describe("My suite", [
-///     it("works", fn(_) { Ok(AssertionOk) }),
-///   ])
-/// }
-/// ```
-///
-/// ## Executing a TestSuite
-///
-/// Use the runner:
-///
-/// ```gleam
-/// import dream_test/runner
-/// runner.new([tests()]) |> runner.run()
-/// ```
-///
-/// ## Fields (high level)
-///
-/// - `name`: this suite/group name
-/// - `before_all`: optional root-only hook that produces the initial `ctx`
-/// - `before_each` / `after_each`: per-test hooks scoped to this suite
-/// - `after_all`: root-only cleanup hooks (failures stop subsequent suites)
-/// - `items`: tests and nested groups
-///
-pub type TestSuite(ctx) {
-  TestSuite(
-    name: String,
-    /// Runs once before any tests in this suite; produces the initial context.
-    before_all: Option(fn() -> Result(ctx, String)),
-    /// True only when the user explicitly provided a `before_all` hook.
-    ///
-    /// `unit.describe` injects an implicit `before_all` (Ok(Nil)) so root suites
-    /// always run with a context, but we do not want reporters to display a
-    /// lifecycle hook unless the user actually declared one.
-    has_user_before_all: Bool,
-    /// Runs once after all tests in this suite complete (even on failure).
-    after_all: List(fn(ctx) -> Result(Nil, String)),
-    /// Runs before each test (outer-to-inner); threads context for that test.
-    before_each: List(fn(ctx) -> Result(ctx, String)),
-    /// Runs after each test (inner-to-outer); always runs for cleanup.
-    after_each: List(fn(ctx) -> Result(Nil, String)),
-    items: List(TestSuiteItem(ctx)),
-  )
-}
+/// Compatibility alias: suites are roots in the unified model.
+pub type TestSuite(context) =
+  Root(context)
 
-/// An item within a test suite: either a single test or a nested group.
+/// Compatibility alias: suite items are nodes in the unified model.
+pub type TestSuiteItem(context) =
+  Node(context)
+
+/// Construct a root suite with a single top-level group.
 ///
-/// This type enables the recursive structure of `TestSuite`. You won't
-/// typically construct these directly—they're created by the unit DSL.
-///
-/// ## Variants
-///
-/// - `SuiteTest(SuiteTestCase)` - A single test to execute
-/// - `SuiteGroup(TestSuite)` - A nested group with its own hooks
-///
-/// ## Execution Order
-///
-/// When a suite is executed, items are processed in order:
-///
-/// 1. All `SuiteTest` items run in parallel (up to `max_concurrency`)
-/// 2. `SuiteGroup` items are processed after tests complete
-/// 3. Each nested group runs its own `before_all`/`after_all` hooks
-///
-pub type TestSuiteItem(ctx) {
-  /// A single test case to run.
-  SuiteTest(SuiteTestCase(ctx))
-  /// A nested group with its own hooks.
-  SuiteGroup(TestSuite(ctx))
+/// This is primarily a low-level helper; most users should start from
+/// `dream_test/unit.describe` or `dream_test/unit_context.describe`.
+pub fn root(
+  name: String,
+  seed: context,
+  children: List(Node(context)),
+) -> Root(context) {
+  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
 }
 
 /// Derive a Status from a list of failures.

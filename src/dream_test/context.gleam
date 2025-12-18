@@ -1,3 +1,8 @@
+//// Per-test context bookkeeping.
+////
+//// Most users should not need this module directly; it exists to support
+//// internal plumbing and future extensibility.
+
 import dream_test/types.{type AssertionFailure}
 
 /// Per-test context carrying assertion failures and any other
@@ -23,9 +28,10 @@ pub type TestContext {
 /// ## Example
 ///
 /// ```gleam
+/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
 ///
-/// let ctx = context.new()
+/// let failures = context.new() |> context.failures()
 /// ```
 pub fn new() -> TestContext {
   TestContext(failures: [])
@@ -42,9 +48,10 @@ pub fn new() -> TestContext {
 /// ## Example
 ///
 /// ```gleam
+/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
 ///
-/// let all = context.failures(ctx)
+/// let all = context.new() |> context.failures()
 /// ```
 ///
 /// ## Returns
@@ -74,12 +81,20 @@ pub fn failures(context: TestContext) -> List(AssertionFailure) {
 /// ## Example
 ///
 /// ```gleam
+/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
 /// import dream_test/types.{AssertionFailure}
+/// import gleam/option.{None}
 ///
-/// let ctx0 = context.new()
-/// let failure = AssertionFailure(operator: "equal", message: "nope", payload: None)
-/// let ctx1 = context.add_failure(ctx0, failure)
+/// let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+/// let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///
+/// let failures =
+///   context.new()
+///   |> context.add_failure(f1)
+///   |> context.add_failure(f2)
+///   |> context.failures()
+/// // failures == [f2, f1]
 /// ```
 pub fn add_failure(
   context: TestContext,

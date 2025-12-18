@@ -2,7 +2,7 @@
 ////
 //// Run with: gleam test
 
-import dream_test/reporter/api as reporter
+import dream_test/reporter
 import dream_test/runner
 import features/shopping_cart as shopping_cart_feature
 import gleam/io

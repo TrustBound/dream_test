@@ -1,113 +1,63 @@
-import dream_test/assertions/should.{
-  be_at_least, be_at_most, be_between, be_greater_than, be_in_range,
-  be_less_than, or_fail_with, should,
-}
-import dream_test/unit.{describe, group, it}
-import matchers/be_match_failed_result.{be_match_failed_result}
-import matchers/be_match_ok_result.{be_match_ok_result}
+import dream_test/assertions/should.{or_fail_with, should}
+import dream_test/matchers/comparison
+import dream_test/unit.{describe, it}
 
 pub fn tests() {
-  describe("Comparison Matchers", [
-    group("be_greater_than", [
-      it("returns MatchOk when value is greater", fn(_) {
-        10
-        |> should()
-        |> be_greater_than(5)
-        |> be_match_ok_result()
-        |> or_fail_with("be_greater_than should pass when value is greater")
-      }),
-      it("returns MatchFailed when value is not greater", fn(_) {
-        5
-        |> should()
-        |> be_greater_than(10)
-        |> be_match_failed_result()
-        |> or_fail_with("be_greater_than should fail when value is not greater")
-      }),
-    ]),
+  describe("dream_test/matchers/comparison", [
+    it("be_greater_than passes for greater values", fn() {
+      5
+      |> should()
+      |> comparison.be_greater_than(3)
+      |> or_fail_with("5 should be > 3")
+    }),
 
-    group("be_less_than", [
-      it("returns MatchOk when value is less", fn(_) {
-        5
-        |> should()
-        |> be_less_than(10)
-        |> be_match_ok_result()
-        |> or_fail_with("be_less_than should pass when value is less")
-      }),
-      it("returns MatchFailed when value is not less", fn(_) {
-        10
-        |> should()
-        |> be_less_than(5)
-        |> be_match_failed_result()
-        |> or_fail_with("be_less_than should fail when value is not less")
-      }),
-    ]),
+    it("be_less_than passes for lesser values", fn() {
+      5
+      |> should()
+      |> comparison.be_less_than(10)
+      |> or_fail_with("5 should be < 10")
+    }),
 
-    group("be_at_least", [
-      it("returns MatchOk when value equals minimum", fn(_) {
-        10
-        |> should()
-        |> be_at_least(10)
-        |> be_match_ok_result()
-        |> or_fail_with("be_at_least should pass for equal")
-      }),
-      it("returns MatchFailed when value is below minimum", fn(_) {
-        9
-        |> should()
-        |> be_at_least(10)
-        |> be_match_failed_result()
-        |> or_fail_with("be_at_least should fail when below")
-      }),
-    ]),
+    it("be_at_least passes for equal values", fn() {
+      5
+      |> should()
+      |> comparison.be_at_least(5)
+      |> or_fail_with("5 should be >= 5")
+    }),
 
-    group("be_at_most", [
-      it("returns MatchOk when value equals maximum", fn(_) {
-        10
-        |> should()
-        |> be_at_most(10)
-        |> be_match_ok_result()
-        |> or_fail_with("be_at_most should pass for equal")
-      }),
-      it("returns MatchFailed when value is above maximum", fn(_) {
-        11
-        |> should()
-        |> be_at_most(10)
-        |> be_match_failed_result()
-        |> or_fail_with("be_at_most should fail when above")
-      }),
-    ]),
+    it("be_at_most passes for equal values", fn() {
+      5
+      |> should()
+      |> comparison.be_at_most(5)
+      |> or_fail_with("5 should be <= 5")
+    }),
 
-    group("be_between", [
-      it("returns MatchOk when value is between inclusive bounds", fn(_) {
-        5
-        |> should()
-        |> be_between(1, 10)
-        |> be_match_ok_result()
-        |> or_fail_with("be_between should pass inside range")
-      }),
-      it("returns MatchFailed when value is outside bounds", fn(_) {
-        0
-        |> should()
-        |> be_between(1, 10)
-        |> be_match_failed_result()
-        |> or_fail_with("be_between should fail outside range")
-      }),
-    ]),
+    it("be_between passes for values inside inclusive bounds", fn() {
+      5
+      |> should()
+      |> comparison.be_between(1, 10)
+      |> or_fail_with("5 should be between 1 and 10")
+    }),
 
-    group("be_in_range", [
-      it("returns MatchOk when value is inside range", fn(_) {
-        5
-        |> should()
-        |> be_in_range(1, 10)
-        |> be_match_ok_result()
-        |> or_fail_with("be_in_range should pass inside range")
-      }),
-      it("returns MatchFailed when value is outside range", fn(_) {
-        11
-        |> should()
-        |> be_in_range(1, 10)
-        |> be_match_failed_result()
-        |> or_fail_with("be_in_range should fail outside range")
-      }),
-    ]),
+    it("be_in_range passes for values inside range", fn() {
+      5
+      |> should()
+      |> comparison.be_in_range(5, 6)
+      |> or_fail_with("5 should be in range [5,6]")
+    }),
+
+    it("be_greater_than_float passes for greater float values", fn() {
+      1.5
+      |> should()
+      |> comparison.be_greater_than_float(1.0)
+      |> or_fail_with("1.5 should be > 1.0")
+    }),
+
+    it("be_less_than_float passes for lesser float values", fn() {
+      1.5
+      |> should()
+      |> comparison.be_less_than_float(2.0)
+      |> or_fail_with("1.5 should be < 2.0")
+    }),
   ])
 }

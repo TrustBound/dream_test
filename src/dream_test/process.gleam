@@ -19,7 +19,7 @@
 ////
 //// pub fn tests() {
 ////   describe("Counter", [
-////     it("increments correctly", fn(_) {
+////     it("increments correctly", fn() {
 ////       let counter = start_counter()
 ////       increment(counter)
 ////       increment(counter)
