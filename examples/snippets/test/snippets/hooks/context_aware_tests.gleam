@@ -17,27 +17,23 @@ fn increment(ctx: Ctx) {
   Ok(Ctx(counter: ctx.counter + 1))
 }
 
-fn counter_is_one(ctx: Ctx) {
-  ctx.counter
-  |> should()
-  |> equal(1)
-  |> or_fail_with("expected counter to be 1 after before_each")
-}
-
-fn counter_is_two(ctx: Ctx) {
-  ctx.counter
-  |> should()
-  |> equal(2)
-  |> or_fail_with("expected counter to be 2 after two before_each hooks")
-}
-
 pub fn suite() {
   describe("Context-aware suite", Ctx(counter: 0), [
     before_each(increment),
-    it("receives the updated context", counter_is_one),
+    it("receives the updated context", fn(ctx: Ctx) {
+      ctx.counter
+      |> should()
+      |> equal(1)
+      |> or_fail_with("expected counter to be 1 after before_each")
+    }),
     // Hook can be repeated; each applies to subsequent tests.
     before_each(increment),
-    it("sees hook effects for subsequent tests", counter_is_two),
+    it("sees hook effects for subsequent tests", fn(ctx: Ctx) {
+      ctx.counter
+      |> should()
+      |> equal(2)
+      |> or_fail_with("expected counter to be 2 after two before_each hooks")
+    }),
   ])
 }
 

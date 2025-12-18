@@ -1,5 +1,13 @@
 ## Gherkin / BDD testing
 
+Unit tests are great for “input → output.” Gherkin is for “a sequence of behavior over time.”
+
+This chapter explains Dream Test’s Gherkin layer as an engineering tool:
+
+- It’s for scenarios with shared per-scenario state (“the world”)
+- It’s for readable specs you can share with product/QA
+- It’s for reusing step definitions across many scenarios
+
 ### Mental model
 
 - A **scenario** is a test.
@@ -94,6 +102,12 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_hero.gleam)</sub>
+
+What to notice in this example:
+
+- The step registry is built once and shared by scenarios.
+- `context.world` is per-scenario state, so scenarios don’t leak into each other.
+- `context.captures` turns step text into typed values (via helpers like `get_int`).
 
 ### Placeholders (`{int}`, `{float}`, `{string}`, `{word}`)
 
@@ -317,3 +331,9 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_discover.gleam)</sub>
+
+### What's Next?
+
+- Go back to [Snapshot testing](09-snapshot-testing.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Utilities](11-utilities.md)

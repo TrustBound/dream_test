@@ -6,7 +6,7 @@
 
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters
-import dream_test/runner
+import dream_test/runner.{exit_on_failure, reporter, run}
 import gleam/io
 
 pub fn main() {
@@ -16,7 +16,7 @@ pub fn main() {
     |> to_suites()
 
   runner.new(suites)
-  |> runner.reporter(reporters.bdd(io.print, True))
-  |> runner.exit_on_failure()
-  |> runner.run()
+  |> reporter(reporters.bdd(io.print, True))
+  |> exit_on_failure()
+  |> run()
 }

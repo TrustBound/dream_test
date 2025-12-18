@@ -20,19 +20,19 @@
 
 Dream Test is a **testing framework for Gleam** that feels like Gleam:
 
-| Feature | What you get |
-| --- | --- |
-| **Powerful assertions + matchers** | A rich matcher library with readable, pipe-friendly assertions that keep failures explicit. |
-| **Straight Gleam** | No macros or hidden runtime tricks—just Gleam modules and functions. |
-| **Parallel by default** | Fast test runs with bounded concurrency, plus a single dial to go fully sequential when you need it. |
-| **Crash + timeout isolation** | Each test is isolated so crashes and timeouts don’t take down the whole run. |
-| **Explicit runner (with optional discovery)** | You control what runs and how it’s reported: list suites explicitly, or opt into discovery when that’s cleaner. |
-| **Reporters for humans + CI** | Event-driven reporters (BDD/Progress/JSON) and post-run formatting. |
-| **Context-aware tests** | Share setup and values cleanly with `unit_context` when tests need more structure than plain `describe`/`it`. |
-| **Lifecycle hooks** | Compose setup/teardown with `before_*` / `after_*` hooks without turning tests into a maze. |
-| **Snapshot testing** | Lock in complex output with snapshots when “assert everything” would be noisy. |
-| **Gherkin BDD feature specs** | Write clear `Given/When/Then` specs that bridge product and engineering—authored as standard `.feature` files or directly in Gleam. |
-| **A path from small to large** | Start with `describe`/`it`, then add contexts, hooks, snapshots, or Gherkin only when they actually help. |
+| Feature                                       | What you get                                                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Built-in + custom matchers**                | A rich built-in matcher library, plus a clean custom matcher pattern so you can write reusable matchers and keep assertions readable. |
+| **Straight Gleam**                            | No macros or hidden runtime tricks—just Gleam modules and functions.                                                                  |
+| **Parallel by default**                       | Fast test runs with bounded concurrency, plus a single dial to go fully sequential when you need it.                                  |
+| **Crash + timeout isolation**                 | Each test is isolated so crashes and timeouts don’t take down the whole run.                                                          |
+| **Explicit runner (with optional discovery)** | You control what runs and how it’s reported: list suites explicitly, or opt into discovery when that’s cleaner.                       |
+| **Reporters for humans + CI**                 | Event-driven reporters (BDD/Progress/JSON) and post-run formatting.                                                                   |
+| **Context-aware tests**                       | Share setup and values cleanly with `unit_context` when tests need more structure than plain `describe`/`it`.                         |
+| **Lifecycle hooks**                           | Compose setup/teardown with `before_*` / `after_*` hooks without turning tests into a maze.                                           |
+| **Snapshot testing**                          | Lock in complex output with snapshots when “assert everything” would be noisy.                                                        |
+| **Gherkin BDD feature specs**                 | Write clear `Given/When/Then` specs that bridge product and engineering—authored as standard `.feature` files or directly in Gleam.   |
+| **A path from small to large**                | Start with `describe`/`it`, then add contexts, hooks, snapshots, or Gherkin only when they actually help.                             |
 
 It’s designed for the common case (unit + integration tests) and it scales cleanly as your suite grows (contexts, snapshots, BDD/Gherkin, CI reporting).
 

@@ -1,5 +1,9 @@
 ## Reporters (BDD, JSON, Progress, Gherkin)
 
+Reporters are the bridge between “test results” and “what someone sees.”
+
+This chapter helps you choose an output style for humans (local dev), for machines (CI/tooling), and for scenarios where you want both.
+
 ### Mental model
 
 Dream Test has two reporting styles:
@@ -11,6 +15,13 @@ Dream Test supports two “reporting modes”:
 
 - **Event-driven reporters**: stream output while tests run (best for humans + CI logs).
 - **Post-run formatting/reporting**: take `List(TestResult)` and render later (best for tooling, saving artifacts, custom output).
+
+### Why there are two modes
+
+Parallel test execution changes what “nice output” means:
+
+- Streaming output gives fast feedback and keeps CI logs alive.
+- Post-run formatting gives you a complete picture and is easier to integrate with tooling (upload artifacts, dashboards).
 
 ### BDD reporter (event-driven)
 
@@ -177,5 +188,18 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/gherkin_reporter.gleam)</sub>
+
+### Choosing a reporter (a quick heuristic)
+
+- **Local dev**: start with BDD output.
+- **Big suites / noisy logs**: progress output.
+- **Tooling / CI integration**: JSON output (and/or post-run formatting to write files).
+- **Behavior specs**: use the Gherkin reporter when your suites are authored via `dream_test/gherkin`.
+
+### What's Next?
+
+- Go back to [Runner & execution model](07-runner-and-execution.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Snapshot testing](09-snapshot-testing.md)
 
 

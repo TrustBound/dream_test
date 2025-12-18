@@ -1,15 +1,22 @@
 ## Installation
 
-### Add the dependency
+Installation is deliberately boring. The goal is not “get the fanciest setup,” it’s:
 
-Add Dream Test as a **dev dependency** in your `gleam.toml`:
+- Get one test running locally
+- Get one test running in CI
+- Keep the runner **explicit**, so future changes don’t surprise you
 
-```toml
-[dev-dependencies]
-dream_test = "~> 2.0"
+### Add the dependency (as dev-only)
+
+Add Dream Test as a **dev dependency** in your `gleam.toml` using `gleam add`:
+
+```shell
+gleam add --dev dream_test
 ```
 
-### Run tests locally
+Why dev-dependency? Tests are a build-time concern. Keeping it in `[dev-dependencies]` makes it clear Dream Test is not part of your runtime application surface area.
+
+### Run tests locally (what command you should use)
 
 This repo (and the examples) use a Makefile. If you’re in this repo:
 
@@ -23,18 +30,24 @@ In your own project, you typically run:
 gleam test
 ```
 
+**Note:** In this repo (and in typical Gleam projects), `gleam test` uses a test runner module in `test/`. A common convention is `test/{project_name}_test.gleam` (matching your `name` in `gleam.toml`), containing a `pub fn main()` entrypoint.
+
 ### Required: a test runner module (`pub fn main()`)
 
-Dream Test uses a test runner module with a `pub fn main()` that runs your suites.
+Dream Test requires an explicit runner module. This is a design choice:
 
-Create a file under `test/` (for example, `test/my_project_test.gleam`) with a `pub fn main()`.
+- **No hidden global state**: the runner is just Gleam code you can read.
+- **No surprising defaults**: your code chooses concurrency, timeouts, reporters, and CI behavior.
+- **Better “why did this fail?” debugging**: you can add logging or swap reporters without rewriting tests.
 
-If you’re using the BEAM (Erlang target), you can use module discovery to avoid maintaining an import list.
+Create a file under `test/` (for example, `test/{project_name}_test.gleam`) with a `pub fn main()`.
+
+If you’re using the BEAM (Erlang target), you can use module discovery to avoid maintaining an import list. Discovery is BEAM-only because it relies on filesystem/module behaviors that aren’t the same on the JavaScript target.
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters
-import dream_test/runner
+import dream_test/runner.{reporter, exit_on_failure, run}
 import gleam/io
 
 pub fn main() {
@@ -44,10 +57,21 @@ pub fn main() {
     |> to_suites()
 
   runner.new(suites)
-  |> runner.reporter(reporters.bdd(io.print, True))
-  |> runner.exit_on_failure()
-  |> runner.run()
+  |> reporter(reporters.bdd(io.print, True))
+  |> exit_on_failure()
+  |> run()
 }
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>
+
+### What you just setup
+
+- `discover` turns files into suites (BEAM-only convenience).
+- `runner` executes suites with isolation, timeouts, and configurable parallelism.
+- `reporters` decide how results are rendered (human output vs JSON vs more).
+
+### What's Next?
+
+- Go back to [Documentation README](README.md)
+- Continue to [Quick Start](02-quick-start.md) to write a first passing test and see the output you’ll build on.

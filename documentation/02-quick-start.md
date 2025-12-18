@@ -2,16 +2,29 @@
 
 When you’re adopting Dream Test, the first goal is simple: **write one passing test, run it, and see readable output**.
 
-Dream Test keeps the runner explicit: you control what runs and how it’s reported.
+Dream Test keeps the runner explicit on purpose. Instead of “magic test registration,” you get a tiny runner module where you decide:
 
-### The smallest useful setup (with discovery)
+- What suites to run
+- What output to produce
+- How CI should behave on failure
 
-<sub>Note: module discovery is BEAM-only (Erlang target). If you’re targeting JavaScript, skip to the “explicit suites” example below.</sub>
+That explicitness is the source of most of Dream Test’s reliability: when a test run surprises you, there’s always a concrete `main()` you can inspect.
+
+### Choose your first runner style
+
+There are two good starting points. Pick the one that matches your target:
+
+- **BEAM (Erlang target)**: use discovery to avoid maintaining an import list.
+- **Portable (BEAM or JavaScript)**: list suites explicitly.
+
+### Option A: the smallest useful setup (BEAM-only discovery)
+
+<sub>Note: module discovery is BEAM-only. If you’re targeting JavaScript, use Option B.</sub>
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters
-import dream_test/runner
+import dream_test/runner.{reporter, exit_on_failure, run}
 import gleam/io
 
 pub fn main() {
@@ -21,15 +34,23 @@ pub fn main() {
     |> to_suites()
 
   runner.new(suites)
-  |> runner.reporter(reporters.bdd(io.print, True))
-  |> runner.exit_on_failure()
-  |> runner.run()
+  |> reporter(reporters.bdd(io.print, True))
+  |> exit_on_failure()
+  |> run()
 }
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>
 
-### Explicit suites (simple and portable)
+What’s happening here (in English):
+
+- `from_path("unit/**_test.gleam")` finds test modules on disk.
+- `to_suites()` turns them into suite values.
+- The runner executes those suites and streams output via a reporter.
+
+### Option B: explicit suites (simple, portable, and easy to reason about)
+
+This is the most “teachable” version because nothing is implicit: `tests()` returns a suite, and `main()` runs it.
 
 ```gleam
 import dream_test/assertions/should.{equal, or_fail_with, should}
@@ -72,8 +93,14 @@ pub fn main() {
 
 ### Why this shape?
 
-- **`tests()` is your suite**: it declares what should be true.
-- **`main()` is the runner**: it decides how you want to see output and how CI should behave.
-- **Assertions are pipes**: you take a value, run matchers, and finish with a message you’ll actually want to read when something fails.
+- **`tests()` is your suite**: it describes behavior. It should be boring to call and easy to reuse.
+- **`main()` is policy**: it decides how you want output and how strict CI should be.
+- **Assertions are pipes**: you start from a value, apply matchers, and end with a message you’ll be happy to see in logs.
 
 If you only copy one idea from Dream Test, copy this one: always end an assertion chain with `or_fail_with("...")`. That message becomes the breadcrumb you’ll use when debugging.
+
+### What's Next?
+
+- Go back to [Installation](01-installation.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Writing unit tests](03-writing-tests.md) to get comfortable with `describe`, `it`, grouping, skipping, and tags.

@@ -1,5 +1,9 @@
 ## Utilities (file, process, timing, sandbox)
 
+These modules exist because real test suites always accumulate a little infrastructure: temp files, unique ports, timing, and “run this safely.”
+
+Rather than forcing every project to reinvent these helpers slightly differently (and slightly incorrectly), Dream Test provides small, intentionally-minimal building blocks.
+
 ### Mental model
 
 These are small helper modules that make tests more reliable and less repetitive:
@@ -207,5 +211,11 @@ pub fn tests() {
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/sandboxing.gleam)</sub>
+
+### What's Next?
+
+- Go back to [Gherkin / BDD testing](10-gherkin-bdd.md)
+- Go back to [Documentation README](README.md)
+- Jump to the API reference on Hexdocs: [Dream Test on Hexdocs](https://hexdocs.pm/dream_test/)
 
 

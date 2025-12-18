@@ -1,5 +1,9 @@
 ## Runner & execution model
 
+This chapter is about turning “a suite” into “a reliable test run.”
+
+Suites describe behavior; the runner decides execution policy. The runner exists so you can make those policies explicit instead of relying on defaults you can’t see.
+
 ### Mental model
 
 - You control **how fast** tests run with `max_concurrency`.
@@ -12,6 +16,16 @@ Dream Test is **suite-first**:
 - You run them with `dream_test/runner`
 
 <sub>(Under the hood: the runner uses the parallel executor, but most users never need to call it directly.)</sub>
+
+### Why Dream Test is explicit here
+
+Most testing pain shows up at the runner layer:
+
+- Flakiness due to shared resources + parallelism
+- Hung tests that stall CI
+- Output that is hard to interpret under concurrency
+
+Dream Test’s runner makes those constraints visible and configurable.
 
 ### Configure parallelism + timeouts
 
@@ -92,6 +106,12 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/sequential_execution.gleam)</sub>
 
+### Choosing a concurrency number (practical guidance)
+
+- Start with the default.
+- If you see flakes involving ports/files/DB state, either isolate those resources per test or set `max_concurrency(1)` for that run.
+- If you have a large suite of pure unit tests (no external state), increasing concurrency often speeds up feedback noticeably.
+
 ### Advanced: running the executor directly
 
 Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor.
@@ -121,4 +141,9 @@ pub fn tests() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/parallel_direct.gleam)</sub>
 
+### What's Next?
+
+- Go back to [Lifecycle hooks](06-lifecycle-hooks.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Reporters](08-reporters.md)
 

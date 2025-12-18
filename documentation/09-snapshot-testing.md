@@ -1,5 +1,9 @@
 ## Snapshot testing
 
+Snapshot tests are about turning “a big output blob” into a stable contract.
+
+They’re great when the output is too large or too structural to assert on directly, but they can also become noise if you snapshot things that change frequently.
+
 ### Mental model
 
 A snapshot test compares current output against a stored “golden file”:
@@ -19,10 +23,14 @@ Snapshot testing is for “this output should stay stable” assertions:
 - You want confidence that output didn’t change unexpectedly.
 - The output is large/structured enough that writing a manual assertion would be noisy.
 
+The real “why” is readability: a snapshot test often makes the intent clearer than a dozen micro-assertions.
+
 ### When to avoid snapshots
 
 - The output includes inherently unstable data (timestamps, random IDs) unless you normalize it.
 - The output is so small that a direct `equal(...)` is clearer.
+
+If your snapshot fails every day for “expected reasons,” it’s no longer buying you safety—it’s training you to ignore diffs.
 
 ### String snapshots + `inspect` snapshots
 
@@ -112,4 +120,14 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/snapshot_testing.gleam)</sub>
 
+### Practical workflow
 
+- **First run**: the snapshot file doesn’t exist → Dream Test creates it.
+- **Review**: treat the snapshot like code. Make sure it matches what you intend to guarantee.
+- **Future changes**: when it fails, decide whether the change is a regression (fix code) or an intentional update (update snapshot).
+
+### What's Next?
+
+- Go back to [Reporters](08-reporters.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Gherkin / BDD testing](10-gherkin-bdd.md)

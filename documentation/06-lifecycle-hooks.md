@@ -1,5 +1,9 @@
 ## Lifecycle hooks (`before_all`, `before_each`, `after_each`, `after_all`)
 
+Hooks are a power tool: they remove repetition, but they can also hide the story of a test if you overuse them.
+
+The goal of Dream Test’s hook design is to keep hooks **predictable and debuggable**, especially under parallel execution.
+
 ### Mental model
 
 Hooks are nodes in the suite tree that the runner executes around tests:
@@ -14,6 +18,11 @@ Hooks let you run setup/teardown logic around tests while keeping the test bodie
 
 - **Use hooks** for repetitive setup/cleanup (opening DB connections, starting servers, creating temp directories).
 - **Avoid hooks** when they hide important context. Prefer explicit setup in the test body for small cases.
+
+Two practical rules of thumb:
+
+- If the setup is essential to understanding the assertion, consider keeping it in the test body.
+- If the setup is infrastructure (“start server”, “create temp directory”), hooks usually make things clearer.
 
 ### The four hooks
 
@@ -179,4 +188,18 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_failure.gleam)</sub>
 
+### Hooks and parallelism (the source of most flaky tests)
+
+Dream Test runs tests in parallel by default (configurable). Hooks don’t change that: they run *around* tests, but they don’t automatically serialize tests that share resources.
+
+If your hooks touch shared external state (ports, filesystem paths, database schemas), you have two options:
+
+- Make the resource usage isolated (unique temp dirs, unique ports, per-test DB schemas), or
+- Run sequentially by setting the runner’s concurrency to 1 (see the runner chapter).
+
+### What's Next?
+
+- Go back to [Assertions & matchers](05-assertions-and-matchers.md)
+- Go back to [Documentation README](README.md)
+- Continue to [Runner & execution model](07-runner-and-execution.md)
 
