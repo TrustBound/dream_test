@@ -1,7 +1,7 @@
 //// README: Progress reporter
 
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
@@ -15,7 +15,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.progress(io.print))
+  |> runner.reporter(reporters.progress(io.print))
   |> runner.exit_on_failure()
   |> runner.run()
 }

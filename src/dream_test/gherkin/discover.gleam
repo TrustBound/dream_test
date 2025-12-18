@@ -21,7 +21,7 @@
 //// ```gleam
 //// import dream_test/gherkin/discover
 //// import dream_test/gherkin/steps
-//// import dream_test/reporter/api as reporter
+//// import dream_test/reporters as reporters
 //// import dream_test/runner
 //// import gleam/io
 ////
@@ -34,7 +34,7 @@
 ////   |> discover.to_suite("Features")
 ////
 //// runner.new([suite])
-//// |> runner.reporter(reporter.bdd(io.print, True))
+//// |> runner.reporter(reporters.bdd(io.print, True))
 //// |> runner.exit_on_failure()
 //// |> runner.run()
 //// ```

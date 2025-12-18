@@ -1,10 +1,10 @@
 //// Reporter event types for live/progress reporting.
 ////
 //// These types are emitted by the runner/parallel execution code and consumed
-//// by event-driven reporters (see `dream_test/reporter`).
+//// by event-driven reporters (see `dream_test/reporters`).
 ////
 //// Most users should not need to construct these values directly; you’ll
-//// typically choose a reporter with `dream_test/reporter` and attach it to
+//// typically choose a reporter with `dream_test/reporters` and attach it to
 //// `runner` so events are handled automatically.
 ////
 //// ## Terminology

@@ -170,7 +170,7 @@ dream_test/assertions/should  # Assertion API
 dream_test/types           # Shared data types
 dream_test/runner          # Test execution
 dream_test/unit            # describe/it DSL
-dream_test/reporter/bdd    # Output formatting
+dream_test/reporters/bdd    # Output formatting
 ```
 
 ---

@@ -12,7 +12,7 @@ import dream_test/assertions/should.{
   be_empty, be_error, be_false, be_greater_than, be_none, be_ok, be_some,
   be_true, contain, equal, have_length, or_fail_with, should,
 }
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, group, it,
@@ -503,7 +503,7 @@ pub fn main() {
   io.println("")
 
   runner.new(suites())
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

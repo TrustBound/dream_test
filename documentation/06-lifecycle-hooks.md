@@ -26,7 +26,7 @@ Hooks let you run setup/teardown logic around tests while keeping the test bodie
 
 ```gleam
 import dream_test/assertions/should.{be_empty, or_fail_with, should}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, it,
@@ -84,7 +84,7 @@ fn rollback_transaction() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -98,7 +98,7 @@ Nested groups inherit hooks. Setup runs **outer → inner**, teardown runs **inn
 
 ```gleam
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
 import gleam/io
@@ -132,7 +132,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -146,7 +146,7 @@ If a hook fails, Dream Test records that failure and marks affected tests approp
 
 ```gleam
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{before_all, describe, it}
 import gleam/io
@@ -171,7 +171,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

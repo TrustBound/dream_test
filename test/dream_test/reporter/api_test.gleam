@@ -1,4 +1,4 @@
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, it}
@@ -37,7 +37,7 @@ fn read_out(out: beam_process.Subject(OutMsg)) -> List(String) {
 }
 
 pub fn tests() {
-  describe("dream_test/reporter", [
+  describe("dream_test/reporters", [
     it(
       "bdd/json/progress constructors and handle_event do not crash and write on RunFinished",
       fn() {
@@ -55,22 +55,22 @@ pub fn tests() {
             kind: types.Unit,
           )
 
-        let r0 = reporter.bdd(write, False)
-        let r1 = reporter.handle_event(r0, reporter_types.RunStarted(total: 1))
+        let r0 = reporters.bdd(write, False)
+        let r1 = reporters.handle_event(r0, reporter_types.RunStarted(total: 1))
         let r2 =
-          reporter.handle_event(
+          reporters.handle_event(
             r1,
             reporter_types.TestFinished(completed: 1, total: 1, result: result),
           )
         let _r3 =
-          reporter.handle_event(
+          reporters.handle_event(
             r2,
             reporter_types.RunFinished(completed: 1, total: 1),
           )
 
         // Also ensure constructors exist and don't crash.
-        let _ = reporter.json(write, False)
-        let _ = reporter.progress(write)
+        let _ = reporters.json(write, False)
+        let _ = reporters.progress(write)
 
         case read_out(out) {
           [] ->

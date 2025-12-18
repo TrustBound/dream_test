@@ -16,12 +16,12 @@
 ////
 //// It is designed to be driven by `dream_test/reporters/types.ReporterEvent`,
 //// but most users should not call it directly. Prefer attaching a reporter via
-//// `dream_test/reporter` and letting the runner drive events.
+//// `dream_test/reporters` and letting the runner drive events.
 ////
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/reporter
+//// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
 //// import dream_test/types.{AssertionOk}
@@ -34,7 +34,7 @@
 ////     ])
 ////
 ////   runner.new([suite])
-////   |> runner.reporter(reporter.progress(io.print))
+////   |> runner.reporter(reporters.progress(io.print))
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
@@ -63,8 +63,8 @@ import gleam/string
 ///
 /// ## When should I use this?
 ///
-/// Usually you shouldn’t call it directly—prefer `reporter.progress(...)` via
-/// `dream_test/reporter` and attach that reporter to `runner`.
+/// Usually you shouldn’t call it directly—prefer `reporters.progress(...)` via
+/// `dream_test/reporters` and attach that reporter to `runner`.
 ///
 /// You may call it directly only if you are building your own reporter/driver
 /// and you are already receiving `ReporterEvent`s.
@@ -72,12 +72,12 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporter
+/// import dream_test/reporters
 /// import dream_test/runner
 /// import gleam/io
 ///
 /// runner.new([suite])
-/// |> runner.reporter(reporter.progress(io.print))
+/// |> runner.reporter(reporters.progress(io.print))
 /// |> runner.exit_on_failure()
 /// |> runner.run()
 /// ```

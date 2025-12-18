@@ -2,36 +2,57 @@
 
 When you’re adopting Dream Test, the first goal is simple: **write one passing test, run it, and see readable output**.
 
-Dream Test doesn’t do “magic discovery” of test functions. You write suites explicitly, and you run them explicitly.
+Dream Test keeps the runner explicit: you control what runs and how it’s reported.
 
-At a high level, the workflow is:
+### The smallest useful setup (with discovery)
 
-- Define a suite with `describe` + `it`
-- Run it with `runner.new([...]) |> runner.run()`
-- Add a reporter for readable output (and CI-friendly failures)
+<sub>Note: module discovery is BEAM-only (Erlang target). If you’re targeting JavaScript, skip to the “explicit suites” example below.</sub>
 
-### The smallest useful setup
+```gleam
+import dream_test/discover.{from_path, to_suites}
+import dream_test/reporters
+import dream_test/runner
+import gleam/io
+
+pub fn main() {
+  let suites =
+    discover.new()
+    |> from_path("unit/**_test.gleam")
+    |> to_suites()
+
+  runner.new(suites)
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>
+
+### Explicit suites (simple and portable)
 
 ```gleam
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
-import gleam/string
+import gleam/string.{contains, trim}
 
 pub fn tests() {
   describe("String utilities", [
     it("trims whitespace", fn() {
-      "  hello  "
-      |> string.trim()
+      let actual = "  hello  " |> trim()
+
+      actual
       |> should()
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
-      "hello world"
-      |> string.contains("world")
+      let has_world = "hello world" |> contains("world")
+
+      has_world
       |> should()
       |> equal(True)
       |> or_fail_with("Should find 'world' in string")
@@ -41,7 +62,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

@@ -28,7 +28,7 @@
 //// Most users will construct one of these reporters and attach it to the runner:
 ////
 //// ```gleam
-//// import dream_test/reporter
+//// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
 //// import dream_test/types.{AssertionOk}
@@ -40,7 +40,7 @@
 ////   ])
 ////
 //// runner.new([suite])
-//// |> runner.reporter(reporter.bdd(io.print, True))
+//// |> runner.reporter(reporters.bdd(io.print, True))
 //// |> runner.exit_on_failure()
 //// |> runner.run()
 //// ```
@@ -94,12 +94,12 @@ pub type Reporter {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporter
+/// import dream_test/reporters
 /// import dream_test/runner
 /// import gleam/io
 ///
 /// runner.new([suite])
-/// |> runner.reporter(reporter.bdd(io.print, True))
+/// |> runner.reporter(reporters.bdd(io.print, True))
 /// |> runner.exit_on_failure()
 /// |> runner.run()
 /// ```
@@ -126,12 +126,12 @@ pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporter
+/// import dream_test/reporters
 /// import dream_test/runner
 /// import gleam/io
 ///
 /// runner.new([suite])
-/// |> runner.reporter(reporter.json(io.print, False))
+/// |> runner.reporter(reporters.json(io.print, False))
 /// |> runner.exit_on_failure()
 /// |> runner.run()
 /// ```
@@ -146,12 +146,12 @@ pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporter
+/// import dream_test/reporters
 /// import dream_test/runner
 /// import gleam/io
 ///
 /// runner.new([suite])
-/// |> runner.reporter(reporter.progress(io.print))
+/// |> runner.reporter(reporters.progress(io.print))
 /// |> runner.exit_on_failure()
 /// |> runner.run()
 /// ```

@@ -4,7 +4,7 @@
 
 Dream Test has two reporting styles:
 
-- **During the run (event-driven)**: `runner.reporter(reporter.*(...))`
+- **During the run (event-driven)**: `runner.reporter(reporters.*(...))`
 - **After the run (post-run formatting)**: take `List(TestResult)` and format/report later
 
 Dream Test supports two “reporting modes”:
@@ -18,7 +18,7 @@ This is the default “human” output: nested suite names, checkmarks, and fail
 
 ```gleam
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
@@ -32,7 +32,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -46,7 +46,7 @@ Use JSON output for CI/CD integration and tooling (parsing, dashboards, artifact
 
 ```gleam
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
@@ -67,7 +67,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.json(io.print, True))
+  |> runner.reporter(reporters.json(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -81,7 +81,7 @@ Use progress output when you want compact logs, especially for large suites.
 
 ```gleam
 import dream_test/assertions/should.{succeed}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
@@ -95,7 +95,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.progress(io.print))
+  |> runner.reporter(reporters.progress(io.print))
   |> runner.exit_on_failure()
   |> runner.run()
 }

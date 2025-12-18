@@ -43,7 +43,7 @@ import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/io
 import gleam/result
@@ -87,7 +87,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -107,7 +107,7 @@ import dream_test/gherkin/steps.{
   type StepContext, get_float, get_int, get_string, get_word, new_registry, step,
 }
 import dream_test/gherkin/world.{put}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/io
 import gleam/result
@@ -166,7 +166,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -209,7 +209,7 @@ import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/io
 import gleam/result
@@ -252,7 +252,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -269,7 +269,7 @@ import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/io
 import gleam/result
@@ -310,7 +310,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

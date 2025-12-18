@@ -7,7 +7,7 @@ import dream_test/gherkin/feature.{
 }
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/int
 import gleam/io
@@ -59,7 +59,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

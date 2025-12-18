@@ -204,8 +204,8 @@ pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
 Output test results as JSON for CI/CD integration, test aggregation, or tooling:
 
 ```gleam
-import dream_test/reporter/json
-import dream_test/reporter/bdd.{report}
+import dream_test/reporters/json
+import dream_test/reporters/bdd.{report}
 
 pub fn main() {
   to_test_cases("my_test", tests())

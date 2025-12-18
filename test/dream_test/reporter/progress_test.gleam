@@ -6,7 +6,7 @@ import gleam/option.{None}
 import gleam/string
 
 pub fn tests() {
-  describe("dream_test/reporter/progress", [
+  describe("dream_test/reporters/progress", [
     it("render produces a line containing counts", fn() {
       let result =
         types.TestResult(

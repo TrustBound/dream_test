@@ -4,7 +4,7 @@ import dream_test/unit.{describe, it}
 import gleam/option.{None}
 
 pub fn tests() {
-  describe("dream_test/reporter/gherkin", [
+  describe("dream_test/reporters/gherkin", [
     it("is_gherkin_result is false for non-gherkin kinds", fn() {
       let result =
         types.TestResult(

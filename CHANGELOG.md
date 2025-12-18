@@ -16,15 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
   - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `reporter`, `exit_on_failure`, `filter_results`)
 
-- **Event-driven reporters** (`dream_test/reporter/api`, `dream_test/reporter/types`)
+- **Event-driven reporters** (`dream_test/reporters`, `dream_test/reporters/types`)
 
   - Runner emits structured `ReporterEvent`s (`RunStarted`, `TestFinished`, `RunFinished`, plus hook events)
   - Unified reporter API:
-    - `reporter.bdd(write, show_progress)`
-    - `reporter.json(write, show_progress)`
-    - `reporter.progress(write)`
+    - `reporters.bdd(write, show_progress)`
+    - `reporters.json(write, show_progress)`
+    - `reporters.progress(write)`
 
-- **Live progress bar reporter** (`dream_test/reporter/progress`)
+- **Live progress bar reporter** (`dream_test/reporters/progress`)
 
   - In-place single-line progress bar that adapts to terminal width
 
@@ -137,7 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Per-test and total duration in BDD and Gherkin reporters
   - Monotonic time measurement for accurate elapsed time
 
-- **JSON Reporter** (`dream_test/reporter/json`)
+- **JSON Reporter** (`dream_test/reporters/json`)
 
   - Machine-readable JSON output for CI/CD integration
   - `format` and `format_pretty` for string output
@@ -247,7 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Test timeout handling
   - Comprehensive test result reporting
 
-- **BDD Reporter** (`dream_test/reporter/bdd`)
+- **BDD Reporter** (`dream_test/reporters/bdd`)
 
   - Colorized terminal output
   - Hierarchical test result display

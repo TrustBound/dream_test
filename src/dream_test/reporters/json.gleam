@@ -41,7 +41,7 @@
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/reporter
+//// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
 //// import dream_test/types.{AssertionOk}
@@ -54,7 +54,7 @@
 ////     ])
 ////
 ////   runner.new([suite])
-////   |> runner.reporter(reporter.json(io.print, False))
+////   |> runner.reporter(reporters.json(io.print, False))
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }

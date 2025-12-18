@@ -3,7 +3,7 @@
 //// Each snippet lives in its own file for easy linking from README.md
 
 // Back-compat module name (now located at snippets/unit/chaining.gleam)
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import gleam/io
 import snippets/gherkin/gherkin_discover
@@ -91,7 +91,7 @@ pub fn suites() {
 
 pub fn main() {
   runner.new(suites())
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

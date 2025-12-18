@@ -32,7 +32,7 @@ fn sample_results() -> List(types.TestResult) {
 }
 
 pub fn tests() {
-  describe("dream_test/reporter/bdd", [
+  describe("dream_test/reporters/bdd", [
     group("format", [
       it("includes test names", fn() {
         let out = bdd.format(sample_results())

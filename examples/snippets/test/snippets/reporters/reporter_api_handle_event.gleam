@@ -2,7 +2,7 @@
 
 import dream_test/assertions/should.{be_ok, contain_string, or_fail_with, should}
 import dream_test/file
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/reporters/types as reporter_types
 import dream_test/unit.{describe, it}
 import gleam/result
@@ -13,10 +13,10 @@ pub fn tests() {
       let path = "test/tmp/reporter_api_handle_event.json"
       let _ = ignore_file_errors(file.delete(path))
 
-      let r0 = reporter.json(write_to_file(path), False)
-      let r1 = reporter.handle_event(r0, reporter_types.RunStarted(total: 1))
+      let r0 = reporters.json(write_to_file(path), False)
+      let r1 = reporters.handle_event(r0, reporter_types.RunStarted(total: 1))
       let r2 =
-        reporter.handle_event(
+        reporters.handle_event(
           r1,
           reporter_types.RunFinished(completed: 1, total: 1),
         )

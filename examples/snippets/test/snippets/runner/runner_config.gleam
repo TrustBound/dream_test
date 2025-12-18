@@ -1,7 +1,7 @@
 //// README: Runner config
 
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
 import gleam/io
@@ -21,7 +21,7 @@ pub fn main() {
   runner.new([tests()])
   |> runner.max_concurrency(8)
   |> runner.default_timeout_ms(10_000)
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

@@ -19,7 +19,7 @@ fn sample_results() -> List(types.TestResult) {
 }
 
 pub fn tests() {
-  describe("dream_test/reporter/json", [
+  describe("dream_test/reporters/json", [
     it("format emits JSON containing the test name", fn() {
       let out = json.format(sample_results())
       case string.contains(out, "\"t1\"") {

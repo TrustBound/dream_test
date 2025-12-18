@@ -25,33 +25,29 @@ gleam test
 
 ### Required: a test runner module (`pub fn main()`)
 
-Dream Test does not rely on “auto-discovery” of test functions. Instead, you create one
-test module with a `pub fn main()` that runs your suites.
+Dream Test uses a test runner module with a `pub fn main()` that runs your suites.
+
+Create a file under `test/` (for example, `test/my_project_test.gleam`) with a `pub fn main()`.
+
+If you’re using the BEAM (Erlang target), you can use module discovery to avoid maintaining an import list.
 
 ```gleam
-import dream_test/reporter
+import dream_test/discover.{from_path, to_suites}
+import dream_test/reporters
 import dream_test/runner
-import dream_test/unit.{describe, it}
-import dream_test/assertions/should.{equal, or_fail_with, should}
 import gleam/io
 
-pub fn tests() {
-  describe("Example", [
-    it("works", fn() {
-      1 + 1
-      |> should()
-      |> equal(2)
-      |> or_fail_with("math should work")
-    }),
-  ])
-}
-
 pub fn main() {
-  runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  let suites =
+    discover.new()
+    |> from_path("unit/**_test.gleam")
+    |> to_suites()
+
+  runner.new(suites)
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/minimal_test_runner.gleam)</sub>
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>

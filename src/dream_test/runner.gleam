@@ -18,7 +18,7 @@
 ////
 //// ```gleam
 //// // examples/snippets/test/snippets/unit/quick_start.gleam
-//// import dream_test/reporter
+//// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
 //// import gleam/io
@@ -26,14 +26,14 @@
 //// pub fn main() {
 ////   let suite = describe("Example", [it("passes", fn() { Ok(succeed()) })])
 ////   runner.new([suite])
-////   |> runner.reporter(reporter.bdd(io.print, True))
+////   |> runner.reporter(reporters.bdd(io.print, True))
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
 //// ```
 
 import dream_test/parallel
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
   type Node, type TestResult, type TestSuite, Failed, Group, SetupFailed, Test,
@@ -52,7 +52,7 @@ pub opaque type RunBuilder(ctx) {
     config: parallel.ParallelConfig,
     result_filter: Option(fn(TestResult) -> Bool),
     should_exit_on_failure: Bool,
-    reporter: Option(reporter.Reporter),
+    reporter: Option(reporters.Reporter),
   )
 }
 
@@ -118,10 +118,10 @@ pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 
 /// Attach an event-driven reporter.
 ///
-/// Use `dream_test/reporter` to construct a reporter (BDD/JSON/Progress).
+/// Use `dream_test/reporters` to construct a reporter (BDD/JSON/Progress).
 pub fn reporter(
   builder: RunBuilder(ctx),
-  reporter: reporter.Reporter,
+  reporter: reporters.Reporter,
 ) -> RunBuilder(ctx) {
   RunBuilder(..builder, reporter: Some(reporter))
 }
@@ -147,7 +147,7 @@ pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
     None -> #(run_without_reporter(builder), total, None)
     Some(reporter0) -> {
       let reporter1 =
-        reporter.handle_event(reporter0, reporter_types.RunStarted(total))
+        reporters.handle_event(reporter0, reporter_types.RunStarted(total))
 
       let #(results, completed, reporter2) =
         run_with_reporter(
@@ -160,7 +160,7 @@ pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
         )
 
       let reporter3 =
-        reporter.handle_event(
+        reporters.handle_event(
           reporter2,
           reporter_types.RunFinished(completed, total),
         )
@@ -209,11 +209,11 @@ fn run_suites_no_reporter(
 fn run_with_reporter(
   suites: List(TestSuite(ctx)),
   config: parallel.ParallelConfig,
-  reporter0: reporter.Reporter,
+  reporter0: reporters.Reporter,
   total: Int,
   completed: Int,
   acc_rev: List(TestResult),
-) -> #(List(TestResult), Int, reporter.Reporter) {
+) -> #(List(TestResult), Int, reporters.Reporter) {
   case suites {
     [] -> #(list.reverse(acc_rev), completed, reporter0)
     [suite, ..rest] -> {

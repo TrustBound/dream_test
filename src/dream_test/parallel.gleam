@@ -30,7 +30,7 @@
 //// |> or_fail_with("expected two results")
 //// ```
 
-import dream_test/reporter.{type Reporter, handle_event}
+import dream_test/reporters.{type Reporter, handle_event}
 import dream_test/reporters/types as reporter_types
 import dream_test/sandbox
 import dream_test/timing

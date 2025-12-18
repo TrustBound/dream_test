@@ -11,7 +11,7 @@ import dream_test/assertions/should.{
   equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,
 }
 import dream_test/matchers/snapshot
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, group, it}
 import gleam/int
@@ -84,7 +84,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }

@@ -24,7 +24,7 @@ If you don’t need an explicit context, prefer `dream_test/unit` — it’s sim
 
 ```gleam
 import dream_test/assertions/should.{equal, or_fail_with, should}
-import dream_test/reporter
+import dream_test/reporters
 import dream_test/runner
 import dream_test/unit_context.{before_each, describe, it}
 import gleam/io
@@ -63,7 +63,7 @@ pub fn suite() {
 
 pub fn main() {
   runner.new([suite()])
-  |> runner.reporter(reporter.bdd(io.print, True))
+  |> runner.reporter(reporters.bdd(io.print, True))
   |> runner.exit_on_failure()
   |> runner.run()
 }
