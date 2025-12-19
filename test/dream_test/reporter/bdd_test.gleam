@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/types
 import dream_test/unit.{describe, group, it}
@@ -94,7 +94,7 @@ pub fn tests() {
 
         bdd.format(results)
         |> should
-        |> equal(expected)
+        |> be_equal(expected)
         |> or_fail_with("bdd.format should render a basic BDD-style report")
       }),
     ]),

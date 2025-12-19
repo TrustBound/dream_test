@@ -1,6 +1,6 @@
 //// README: Core types helpers
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/types
 import dream_test/unit.{describe, it}
 import gleam/option.{None}
@@ -10,14 +10,14 @@ pub fn tests() {
     it("status_from_failures returns Passed for empty failures", fn() {
       types.status_from_failures([])
       |> should
-      |> equal(types.Passed)
+      |> be_equal(types.Passed)
       |> or_fail_with("expected Passed for empty failures")
     }),
 
     it("to_assertion_result converts match results", fn() {
       types.to_assertion_result(types.MatchOk(1))
       |> should
-      |> equal(types.AssertionOk)
+      |> be_equal(types.AssertionOk)
       |> or_fail_with("expected MatchOk -> AssertionOk")
     }),
 
@@ -27,7 +27,7 @@ pub fn tests() {
 
       types.status_from_failures([failure])
       |> should
-      |> equal(types.Failed)
+      |> be_equal(types.Failed)
       |> or_fail_with("expected Failed for non-empty failures")
     }),
   ])

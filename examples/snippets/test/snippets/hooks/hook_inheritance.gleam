@@ -1,6 +1,6 @@
 //// README: Hook inheritance
 
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}

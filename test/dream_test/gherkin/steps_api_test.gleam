@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/gherkin/step_trie
 import dream_test/gherkin/steps
 import dream_test/gherkin/types as gtypes
@@ -22,7 +22,7 @@ pub fn tests() {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.capture_count(captures)
           |> should
-          |> equal(2)
+          |> be_equal(2)
           |> or_fail_with("should have 2 captures")
         Error(msg) -> Ok(fail_with(msg))
       }
@@ -43,7 +43,7 @@ pub fn tests() {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_int(captures, 0)
           |> should
-          |> equal(Ok(3))
+          |> be_equal(Ok(3))
           |> or_fail_with("first capture should be int 3")
         Error(msg) -> Ok(fail_with(msg))
       }
@@ -64,7 +64,7 @@ pub fn tests() {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_word(captures, 1)
           |> should
-          |> equal(Ok("apples"))
+          |> be_equal(Ok("apples"))
           |> or_fail_with("second capture should be word apples")
         Error(msg) -> Ok(fail_with(msg))
       }
@@ -84,7 +84,7 @@ pub fn tests() {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_string(captures, 0)
           |> should
-          |> equal(Ok("hello"))
+          |> be_equal(Ok("hello"))
           |> or_fail_with("string capture should be unquoted")
         Error(msg) -> Ok(fail_with(msg))
       }

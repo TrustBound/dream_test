@@ -1,6 +1,6 @@
 //// Assertion/verification steps (Then steps).
 
-import dream_test/assertions/should.{be_true, equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, be_true, or_fail_with, should}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, get_int, get_string,
 }
@@ -52,7 +52,7 @@ fn step_verify_item_count(
 
   actual
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart should contain " <> int.to_string(expected) <> " items")
 }
 
@@ -110,7 +110,7 @@ fn step_verify_checkout_failure(
 
   #(checkout_succeeded, actual_error)
   |> should
-  |> equal(#(False, expected_error))
+  |> be_equal(#(False, expected_error))
   |> or_fail_with("Checkout should fail with: " <> expected_error)
 }
 
@@ -139,7 +139,7 @@ fn step_verify_operation_failure(
 
   actual_error
   |> should
-  |> equal(expected_error)
+  |> be_equal(expected_error)
   |> or_fail_with("Operation should fail with: " <> expected_error)
 }
 

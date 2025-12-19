@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox
 import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
 import dream_test/unit.{describe, it}
@@ -15,7 +15,7 @@ pub fn tests() {
         sandbox.SandboxCompleted(result) ->
           result
           |> should
-          |> equal(AssertionOk)
+          |> be_equal(AssertionOk)
           |> or_fail_with("should return AssertionOk")
         other ->
           Ok(

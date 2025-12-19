@@ -3,7 +3,7 @@
 //// This snippet exists so hexdocs examples for `dream_test/context` can be
 //// copied from real, compiled code.
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/context
 import dream_test/types.{AssertionFailure}
 import dream_test/unit.{describe, it}
@@ -15,7 +15,7 @@ pub fn tests() {
       context.new()
       |> context.failures()
       |> should
-      |> equal([])
+      |> be_equal([])
       |> or_fail_with("expected new context to have no failures")
     }),
 
@@ -28,7 +28,7 @@ pub fn tests() {
       |> context.add_failure(f2)
       |> context.failures()
       |> should
-      |> equal([f2, f1])
+      |> be_equal([f2, f1])
       |> or_fail_with("expected newest-first failure ordering")
     }),
   ])

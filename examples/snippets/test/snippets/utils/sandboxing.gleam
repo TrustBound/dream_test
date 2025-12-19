@@ -1,6 +1,6 @@
 //// README: Sandboxing (timeouts + crash isolation)
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox.{
   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 }
@@ -18,7 +18,7 @@ pub fn tests() {
 
       result
       |> should
-      |> equal(SandboxCompleted(123))
+      |> be_equal(SandboxCompleted(123))
       |> or_fail_with("expected SandboxCompleted(123)")
     }),
 
@@ -30,7 +30,7 @@ pub fn tests() {
 
         result
         |> should
-        |> equal(SandboxTimedOut)
+        |> be_equal(SandboxTimedOut)
         |> or_fail_with("expected SandboxTimedOut")
       },
     ),
@@ -46,7 +46,7 @@ pub fn tests() {
 
       did_crash
       |> should
-      |> equal(True)
+      |> be_equal(True)
       |> or_fail_with("expected SandboxCrashed(...)")
     }),
   ])

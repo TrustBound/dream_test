@@ -1,7 +1,7 @@
 //// Option matchers for dream_test.
 ////
 //// These matchers work with `Option(a)` values and support chaining.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Chaining
 ////
@@ -9,13 +9,13 @@
 //// additional matchers:
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, be_some, equal, or_fail_with}
+//// import dream_test/matchers.{should, be_some, , or_fail_with}
 ////
 //// // Check that it's Some, then check the inner value
 //// find_user(id)
 //// |> should
 //// |> be_some()
-//// |> equal(expected_user)
+//// |> be_equal(expected_user)
 //// |> or_fail_with("Should find the expected user")
 //// ```
 
@@ -44,7 +44,7 @@ import gleam/string
 /// Some(42)
 /// |> should
 /// |> be_some()
-/// |> equal(42)
+/// |> be_equal(42)
 /// |> or_fail_with("Should be Some(42)")
 /// ```
 ///

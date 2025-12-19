@@ -3,10 +3,7 @@
 //// This snippet exists so hexdocs examples for the matcher modules can be
 //// copied from real, compiled code.
 
-import dream_test/assertions/should.{
-  be_between, be_false, be_ok, be_some, be_true, contain, contain_string, equal,
-  have_length, or_fail_with, should,
-}
+import dream_test/matchers.{be_between, be_equal, be_false, be_ok, be_some, be_true, contain, contain_string, have_length, or_fail_with, should,}
 import dream_test/unit.{describe, it}
 import gleam/option.{Some}
 
@@ -30,7 +27,7 @@ pub fn tests() {
       Some(42)
       |> should
       |> be_some()
-      |> equal(42)
+      |> be_equal(42)
       |> or_fail_with("expected Some(42)")
     }),
 
@@ -38,7 +35,7 @@ pub fn tests() {
       Ok("hello")
       |> should
       |> be_ok()
-      |> equal("hello")
+      |> be_equal("hello")
       |> or_fail_with("expected Ok(\"hello\")")
     }),
 

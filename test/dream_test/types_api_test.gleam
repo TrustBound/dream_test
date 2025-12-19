@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/types
 import dream_test/unit.{describe, it}
 import gleam/option.{None}
@@ -8,7 +8,7 @@ pub fn tests() {
     it("to_assertion_result converts match results to assertion results", fn() {
       types.to_assertion_result(types.MatchOk(1))
       |> should
-      |> equal(types.AssertionOk)
+      |> be_equal(types.AssertionOk)
       |> or_fail_with("MatchOk should map to AssertionOk")
     }),
 
@@ -18,7 +18,7 @@ pub fn tests() {
 
       types.to_assertion_result(types.MatchFailed(failure))
       |> should
-      |> equal(types.AssertionFailed(failure))
+      |> be_equal(types.AssertionFailed(failure))
       |> or_fail_with("MatchFailed should map to AssertionFailed(failure)")
     }),
 
@@ -28,7 +28,7 @@ pub fn tests() {
 
       seed
       |> should
-      |> equal(Nil)
+      |> be_equal(Nil)
       |> or_fail_with("seed should be preserved")
     }),
 
@@ -38,7 +38,7 @@ pub fn tests() {
 
       tree
       |> should
-      |> equal(types.Group(name: "r", tags: [], children: []))
+      |> be_equal(types.Group(name: "r", tags: [], children: []))
       |> or_fail_with(
         "expected Root(tree: Group(name: \"r\", tags: [], children: []))",
       )
@@ -47,7 +47,7 @@ pub fn tests() {
     it("status_from_failures returns Passed for empty failures", fn() {
       types.status_from_failures([])
       |> should
-      |> equal(types.Passed)
+      |> be_equal(types.Passed)
       |> or_fail_with("empty failures should be Passed")
     }),
 
@@ -57,7 +57,7 @@ pub fn tests() {
 
       types.status_from_failures([failure])
       |> should
-      |> equal(types.Failed)
+      |> be_equal(types.Failed)
       |> or_fail_with("non-empty failures should be Failed")
     }),
   ])

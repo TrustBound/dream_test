@@ -1,12 +1,12 @@
 //// Collection matchers for dream_test.
 ////
 //// These matchers work with lists.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
+//// import dream_test/matchers.{
 ////   should, contain, not_contain, have_length, be_empty, or_fail_with,
 //// }
 ////

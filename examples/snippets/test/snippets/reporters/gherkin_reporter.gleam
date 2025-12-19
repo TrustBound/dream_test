@@ -1,6 +1,6 @@
 //// README: Gherkin reporter (Cucumber-style formatting)
 
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{new_registry, step}
 import dream_test/reporters/gherkin as gherkin_reporter

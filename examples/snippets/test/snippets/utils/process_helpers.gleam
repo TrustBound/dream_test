@@ -1,6 +1,6 @@
 //// README: Process helpers
 
-import dream_test/assertions/should.{be_between, equal, or_fail_with, should}
+import dream_test/matchers.{be_between, be_equal, or_fail_with, should}
 import dream_test/process.{get_count, increment, start_counter, unique_port}
 import dream_test/unit.{describe, it}
 
@@ -13,7 +13,7 @@ pub fn tests() {
 
       get_count(counter)
       |> should
-      |> equal(2)
+      |> be_equal(2)
       |> or_fail_with("expected counter to be 2")
     }),
 

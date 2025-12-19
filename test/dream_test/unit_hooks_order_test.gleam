@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file
 import dream_test/runner
 import dream_test/types.{AssertionOk}
@@ -37,7 +37,7 @@ pub fn tests() {
 
       file.read(log_path)
       |> should
-      |> equal(Ok("outer_before\ninner_before\ninner_after\nouter_after\n"))
+      |> be_equal(Ok("outer_before\ninner_before\ninner_after\nouter_after\n"))
       |> or_fail_with("hook order should be deterministic")
     }),
   ])

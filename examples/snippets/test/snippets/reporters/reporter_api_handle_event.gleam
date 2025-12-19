@@ -1,6 +1,6 @@
 //// README: Driving a reporter manually with ReporterEvent
 
-import dream_test/assertions/should.{be_ok, contain_string, or_fail_with, should}
+import dream_test/matchers.{be_ok, contain_string, or_fail_with, should}
 import dream_test/file
 import dream_test/reporters
 import dream_test/reporters/types as reporter_types

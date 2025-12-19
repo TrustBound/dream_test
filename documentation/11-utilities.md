@@ -21,7 +21,7 @@ They’re public because they’re useful in real test suites, but they’re int
 Use these helpers when you want predictable, structured error handling around file IO (snapshots, temp files, fixtures).
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file.{NotFound, delete, error_to_string, read, write}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, it}
@@ -39,7 +39,7 @@ pub fn tests() {
 
       read(path)
       |> should
-      |> equal(Ok("hello"))
+      |> be_equal(Ok("hello"))
       |> or_fail_with("expected to read back written content")
     }),
 
@@ -50,14 +50,14 @@ pub fn tests() {
 
       read(path)
       |> should
-      |> equal(Error(NotFound(path)))
+      |> be_equal(Error(NotFound(path)))
       |> or_fail_with("expected deleted file to be NotFound")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should
-      |> equal("File not found: /x")
+      |> be_equal("File not found: /x")
       |> or_fail_with("expected NotFound formatting")
     }),
   ])
@@ -71,7 +71,7 @@ pub fn tests() {
 These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
 
 ```gleam
-import dream_test/assertions/should.{be_between, equal, or_fail_with, should}
+import dream_test/matchers.{be_between, , or_fail_with, should}
 import dream_test/process.{get_count, increment, start_counter, unique_port}
 import dream_test/unit.{describe, it}
 
@@ -84,7 +84,7 @@ pub fn tests() {
 
       get_count(counter)
       |> should
-      |> equal(2)
+      |> be_equal(2)
       |> or_fail_with("expected counter to be 2")
     }),
 
@@ -105,7 +105,7 @@ pub fn tests() {
 Use `timing.now_ms()` / `timing.now_us()` for monotonic timing, and format helpers for readable output.
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/timing
 import dream_test/unit.{describe, it}
 
@@ -118,21 +118,21 @@ pub fn tests() {
       // Assert
       ms
       |> should
-      |> equal("42ms")
+      |> be_equal("42ms")
       |> or_fail_with("expected 42ms")
     }),
 
     it("format_duration_ms formats 1500ms as seconds", fn() {
       timing.format_duration_ms(1500)
       |> should
-      |> equal("1.5s")
+      |> be_equal("1.5s")
       |> or_fail_with("expected 1.5s")
     }),
 
     it("format_duration_us formats sub-millisecond values", fn() {
       timing.format_duration_us(500)
       |> should
-      |> equal("0.5ms")
+      |> be_equal("0.5ms")
       |> or_fail_with("expected 0.5ms")
     }),
 
@@ -143,7 +143,7 @@ pub fn tests() {
 
       ok
       |> should
-      |> equal(True)
+      |> be_equal(True)
       |> or_fail_with("expected now_ms to be monotonic")
     }),
   ])
@@ -157,7 +157,7 @@ pub fn tests() {
 This is the mechanism Dream Test uses to make test execution resilient: run code in an isolated process, detect timeouts, and catch crashes.
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox.{
   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 }
@@ -175,7 +175,7 @@ pub fn tests() {
 
       result
       |> should
-      |> equal(SandboxCompleted(123))
+      |> be_equal(SandboxCompleted(123))
       |> or_fail_with("expected SandboxCompleted(123)")
     }),
 
@@ -187,7 +187,7 @@ pub fn tests() {
 
         result
         |> should
-        |> equal(SandboxTimedOut)
+        |> be_equal(SandboxTimedOut)
         |> or_fail_with("expected SandboxTimedOut")
       },
     ),
@@ -203,7 +203,7 @@ pub fn tests() {
 
       did_crash
       |> should
-      |> equal(True)
+      |> be_equal(True)
       |> or_fail_with("expected SandboxCrashed(...)")
     }),
   ])

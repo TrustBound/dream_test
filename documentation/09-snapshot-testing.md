@@ -35,8 +35,8 @@ If your snapshot fails every day for “expected reasons,” it’s no longer bu
 ### String snapshots + `inspect` snapshots
 
 ```gleam
-import dream_test/assertions/should.{
-  equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,
+import dream_test/matchers.{
+  , match_snapshot, match_snapshot_inspect, or_fail_with, should,
 }
 import dream_test/matchers/snapshot
 import dream_test/reporters
@@ -103,7 +103,7 @@ pub fn tests() {
 
         result
         |> should
-        |> equal(Ok(Nil))
+        |> be_equal(Ok(Nil))
         |> or_fail_with("Should successfully clear snapshot")
       }),
     ]),

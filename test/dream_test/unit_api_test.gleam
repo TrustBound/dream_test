@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{
   AssertionFailed, AssertionFailure, AssertionOk, Failed, Passed, Unit,
@@ -20,7 +20,7 @@ pub fn tests() {
 
       #(r.name, r.full_name, r.status, r.tags, r.failures, r.kind)
       |> should
-      |> equal(#("passes", ["inner", "passes"], Passed, ["smoke"], [], Unit))
+      |> be_equal(#("passes", ["inner", "passes"], Passed, ["smoke"], [], Unit))
       |> or_fail_with("runner should execute a unit suite deterministically")
     }),
 
@@ -42,7 +42,7 @@ pub fn tests() {
 
       r.tags
       |> should
-      |> equal(["group", "inner", "leaf"])
+      |> be_equal(["group", "inner", "leaf"])
       |> or_fail_with("test tags should include group tags + test tags")
     }),
 
@@ -65,7 +65,7 @@ pub fn tests() {
 
       r.status
       |> should
-      |> equal(Failed)
+      |> be_equal(Failed)
       |> or_fail_with("failed assertion should produce Failed status")
     }),
   ])

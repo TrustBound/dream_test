@@ -7,9 +7,7 @@
 // - match_snapshot_inspect for complex data
 // - Clearing snapshots programmatically
 
-import dream_test/assertions/should.{
-  equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,
-}
+import dream_test/matchers.{be_equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,}
 import dream_test/matchers/snapshot
 import dream_test/reporters
 import dream_test/runner
@@ -75,7 +73,7 @@ pub fn tests() {
 
         result
         |> should
-        |> equal(Ok(Nil))
+        |> be_equal(Ok(Nil))
         |> or_fail_with("Should successfully clear snapshot")
       }),
     ]),

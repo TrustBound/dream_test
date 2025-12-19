@@ -54,7 +54,7 @@ What’s happening here (in English):
 This is the most “teachable” version because nothing is implicit: `tests()` returns a suite, and `main()` runs it.
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -68,7 +68,7 @@ pub fn tests() {
 
       actual
       |> should
-      |> equal("hello")
+      |> be_equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
@@ -76,7 +76,7 @@ pub fn tests() {
 
       has_world
       |> should
-      |> equal(True)
+      |> be_equal(True)
       |> or_fail_with("Should find 'world' in string")
     }),
   ])

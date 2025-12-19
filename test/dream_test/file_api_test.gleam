@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file.{
   FileSystemError, IsDirectory, NoSpace, NotFound, PermissionDenied, delete,
   delete_files_matching, error_to_string, read, write,
@@ -16,7 +16,7 @@ pub fn tests() {
         <> ".txt"
       write(path, "hello")
       |> should
-      |> equal(Ok(Nil))
+      |> be_equal(Ok(Nil))
       |> or_fail_with("expected write to succeed")
     }),
 
@@ -28,7 +28,7 @@ pub fn tests() {
       let _ = write(path, "hello")
       read(path)
       |> should
-      |> equal(Ok("hello"))
+      |> be_equal(Ok("hello"))
       |> or_fail_with("expected read to return written content")
     }),
 
@@ -40,7 +40,7 @@ pub fn tests() {
       let _ = write(path, "hello")
       delete(path)
       |> should
-      |> equal(Ok(Nil))
+      |> be_equal(Ok(Nil))
       |> or_fail_with("expected delete to succeed")
     }),
 
@@ -52,7 +52,7 @@ pub fn tests() {
       let _ = delete(path)
       delete(path)
       |> should
-      |> equal(Ok(Nil))
+      |> be_equal(Ok(Nil))
       |> or_fail_with("expected delete to be idempotent")
     }),
 
@@ -69,7 +69,7 @@ pub fn tests() {
 
       delete_files_matching(dir, ".tmp")
       |> should
-      |> equal(Ok(2))
+      |> be_equal(Ok(2))
       |> or_fail_with("expected 2 tmp files deleted")
     }),
 
@@ -83,7 +83,7 @@ pub fn tests() {
 
       read(a)
       |> should
-      |> equal(Error(NotFound(a)))
+      |> be_equal(Error(NotFound(a)))
       |> or_fail_with("a.tmp should be deleted")
     }),
 
@@ -97,42 +97,42 @@ pub fn tests() {
 
       read(c)
       |> should
-      |> equal(Ok("c"))
+      |> be_equal(Ok("c"))
       |> or_fail_with("c.other should remain")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should
-      |> equal("File not found: /x")
+      |> be_equal("File not found: /x")
       |> or_fail_with("NotFound formatting")
     }),
 
     it("error_to_string formats PermissionDenied", fn() {
       error_to_string(PermissionDenied("/x"))
       |> should
-      |> equal("Permission denied: /x")
+      |> be_equal("Permission denied: /x")
       |> or_fail_with("PermissionDenied formatting")
     }),
 
     it("error_to_string formats IsDirectory", fn() {
       error_to_string(IsDirectory("/x"))
       |> should
-      |> equal("Is a directory: /x")
+      |> be_equal("Is a directory: /x")
       |> or_fail_with("IsDirectory formatting")
     }),
 
     it("error_to_string formats NoSpace", fn() {
       error_to_string(NoSpace("/x"))
       |> should
-      |> equal("No space left on device: /x")
+      |> be_equal("No space left on device: /x")
       |> or_fail_with("NoSpace formatting")
     }),
 
     it("error_to_string formats FileSystemError", fn() {
       error_to_string(FileSystemError("/x", "enoent"))
       |> should
-      |> equal("File error (enoent): /x")
+      |> be_equal("File error (enoent): /x")
       |> or_fail_with("FileSystemError formatting")
     }),
   ])

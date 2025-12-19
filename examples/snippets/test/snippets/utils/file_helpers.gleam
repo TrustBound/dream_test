@@ -1,6 +1,6 @@
 //// README: File helpers
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file.{NotFound, delete, error_to_string, read, write}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, it}
@@ -18,7 +18,7 @@ pub fn tests() {
 
       read(path)
       |> should
-      |> equal(Ok("hello"))
+      |> be_equal(Ok("hello"))
       |> or_fail_with("expected to read back written content")
     }),
 
@@ -29,14 +29,14 @@ pub fn tests() {
 
       read(path)
       |> should
-      |> equal(Error(NotFound(path)))
+      |> be_equal(Error(NotFound(path)))
       |> or_fail_with("expected deleted file to be NotFound")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should
-      |> equal("File not found: /x")
+      |> be_equal("File not found: /x")
       |> or_fail_with("expected NotFound formatting")
     }),
   ])

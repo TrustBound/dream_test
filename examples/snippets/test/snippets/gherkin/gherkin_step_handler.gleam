@@ -1,6 +1,6 @@
 //// README: Gherkin step handler example
 
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
@@ -28,7 +28,7 @@ fn step_balance_is(context: StepContext) {
   let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
   get_or(context.world, "balance", 0.0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Balance mismatch")
 }
 

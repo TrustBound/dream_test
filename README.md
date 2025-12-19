@@ -69,7 +69,7 @@ pub fn main() {
 This is the simplest thing that can work: one module exports `tests()`, and `main()` runs it.
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -82,14 +82,14 @@ pub fn tests() {
       "  hello  "
       |> string.trim()
       |> should
-      |> equal("hello")
+      |> be_equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
       "hello world"
       |> string.contains("world")
       |> should
-      |> equal(True)
+      |> be_equal(True)
       |> or_fail_with("Should find 'world' in string")
     }),
   ])
@@ -105,6 +105,38 @@ pub fn main() {
 
 <sub>🧪 [Tested source](examples/snippets/test/snippets/unit/quick_start.gleam)</sub>
 <sub>📖 [Guide](documentation/02-quick-start.md)</sub>
+
+## Built-in matchers (table)
+
+All built-in matchers are re-exported from `dream_test/matchers` and are designed to be used in the `should |> matcher(...) |> or_fail_with(...)` pipeline.
+
+| Category | Matcher | What it asserts / does |
+| --- | --- | --- |
+| **Equality** | `be_equal(expected)` | Structural equality (`==`). |
+| **Equality** | `not_equal(unexpected)` | Structural inequality (`!=`). |
+| **Boolean** | `be_true()` | Value is `True`. |
+| **Boolean** | `be_false()` | Value is `False`. |
+| **Option** | `be_some()` | Value is `Some(_)` and **unwraps** to the inner value for chaining. |
+| **Option** | `be_none()` | Value is `None`. |
+| **Result** | `be_ok()` | Value is `Ok(_)` and **unwraps** to the `Ok` value for chaining. |
+| **Result** | `be_error()` | Value is `Error(_)` and **unwraps** to the error value for chaining. |
+| **Collections (List)** | `contain(item)` | List contains `item`. |
+| **Collections (List)** | `not_contain(item)` | List does not contain `item`. |
+| **Collections (List)** | `have_length(n)` | List length is exactly `n`. |
+| **Collections (List)** | `be_empty()` | List is empty (`[]`). |
+| **Comparison (Int)** | `be_greater_than(n)` | Value is `> n`. |
+| **Comparison (Int)** | `be_less_than(n)` | Value is `< n`. |
+| **Comparison (Int)** | `be_at_least(n)` | Value is `>= n`. |
+| **Comparison (Int)** | `be_at_most(n)` | Value is `<= n`. |
+| **Comparison (Int)** | `be_between(min, max)` | Value is strictly between: `min < value < max`. |
+| **Comparison (Int)** | `be_in_range(min, max)` | Value is in inclusive range: `min <= value <= max`. |
+| **Comparison (Float)** | `be_greater_than_float(n)` | Value is `> n`. |
+| **Comparison (Float)** | `be_less_than_float(n)` | Value is `< n`. |
+| **String** | `start_with(prefix)` | String starts with `prefix`. |
+| **String** | `end_with(suffix)` | String ends with `suffix`. |
+| **String** | `contain_string(substring)` | String contains `substring`. |
+| **Snapshot** | `match_snapshot(path)` | Compares a `String` to a snapshot file (creates it on first run). |
+| **Snapshot** | `match_snapshot_inspect(path)` | Snapshot testing for any value via `string.inspect` serialization. |
 
 ### Showcase: runner configuration (parallelism + timeouts)
 
@@ -151,7 +183,7 @@ Dream Test gives you a few ways to keep integration tests readable:
 ### Inline Gherkin (authored in Gleam)
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
@@ -177,7 +209,7 @@ fn step_should_have(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
@@ -222,7 +254,7 @@ Feature: Shopping Cart
 ```
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
@@ -253,7 +285,7 @@ fn step_verify_count(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
@@ -287,7 +319,7 @@ pub fn main() {
 ### Snapshot testing (handy for integration outputs too)
 
 ```gleam
-import dream_test/assertions/should.{
+import dream_test/matchers.{
   match_snapshot, match_snapshot_inspect, or_fail_with, should,
 }
 import dream_test/reporters

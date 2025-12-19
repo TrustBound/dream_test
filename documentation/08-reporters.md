@@ -28,7 +28,7 @@ Parallel test execution changes what “nice output” means:
 This is the default “human” output: nested suite names, checkmarks, and failures.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -56,7 +56,7 @@ pub fn main() {
 Use JSON output for CI/CD integration and tooling (parsing, dashboards, artifact uploads).
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -91,7 +91,7 @@ pub fn main() {
 Use progress output when you want compact logs, especially for large suites.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -123,7 +123,7 @@ Post-run formatting is useful when you want to:
 - Perform extra processing before output
 
 ```gleam
-import dream_test/assertions/should.{
+import dream_test/matchers.{
   contain_string, or_fail_with, should, succeed,
 }
 import dream_test/reporters/bdd
@@ -158,7 +158,7 @@ pub fn tests() {
 If you’re using `dream_test/gherkin`, you can render results in Gherkin-friendly formatting.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{new_registry, step}
 import dream_test/reporters/gherkin as gherkin_reporter

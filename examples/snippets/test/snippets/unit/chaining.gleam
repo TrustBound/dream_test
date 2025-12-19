@@ -1,6 +1,6 @@
 //// README: Chaining matchers
 
-import dream_test/assertions/should.{be_ok, be_some, equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should,}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -14,7 +14,7 @@ pub fn tests() {
       Some(42)
       |> should
       |> be_some()
-      |> equal(42)
+      |> be_equal(42)
       |> or_fail_with("Should contain 42")
     }),
     // Unwrap Ok, then check the value
@@ -22,7 +22,7 @@ pub fn tests() {
       Ok("success")
       |> should
       |> be_ok()
-      |> equal("success")
+      |> be_equal("success")
       |> or_fail_with("Should be Ok with 'success'")
     }),
   ])

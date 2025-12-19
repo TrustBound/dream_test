@@ -1,6 +1,6 @@
 //// README: Gherkin feature definition example
 
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{
   and, background, feature_with_background, given, scenario, then, when,
   with_tags,
@@ -35,7 +35,7 @@ fn step_verify_count(context: StepContext) {
   let actual = get_or(context.world, "cart", 0)
   actual
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Expected " <> int.to_string(expected) <> " items")
 }
 

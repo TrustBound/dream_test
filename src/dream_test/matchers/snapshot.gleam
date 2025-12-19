@@ -16,7 +16,7 @@
 //// ## Basic Usage
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
+//// import dream_test/matchers.{should, match_snapshot, or_fail_with}
 ////
 //// it("renders user profile", fn() {
 ////   render_profile(user)

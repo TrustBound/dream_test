@@ -1,6 +1,6 @@
 //// Cart setup and manipulation steps.
 
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_int, get_string,
 }

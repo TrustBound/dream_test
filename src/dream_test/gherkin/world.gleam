@@ -11,8 +11,8 @@
 //// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{equal, or_fail_with, should}
-//// import dream_test/assertions/should.{fail_with}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/matchers.{fail_with}
 //// import dream_test/gherkin/steps.{type StepContext}
 //// import dream_test/gherkin/world as world
 //// import dream_test/types.{AssertionOk, type AssertionResult}
@@ -32,7 +32,7 @@
 ////     Ok(count) -> {
 ////       count
 ////       |> should
-////       |> equal(expected)
+////       |> be_equal(expected)
 ////       |> or_fail_with("Cart count mismatch")
 ////     }
 ////     Error(_) -> Ok(fail_with("Cart not found in world"))

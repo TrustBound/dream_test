@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{type TestResult, AssertionOk, Passed}
 import dream_test/unit.{describe, it, with_tags}
@@ -14,7 +14,7 @@ pub fn tests() {
       let suite = describe("s", [it("t", fn() { Ok(AssertionOk) })])
       let results = runner.new([suite]) |> runner.run()
       let assert [r] = results
-      r.status |> should |> equal(Passed) |> or_fail_with("test should pass")
+      r.status |> should |> be_equal(Passed) |> or_fail_with("test should pass")
     }),
 
     it("filters returned results with filter_results", fn() {
@@ -32,7 +32,7 @@ pub fn tests() {
       let assert [r] = results
       r.name
       |> should
-      |> equal("a")
+      |> be_equal("a")
       |> or_fail_with("should keep only smoke test")
     }),
   ])

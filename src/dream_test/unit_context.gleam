@@ -19,7 +19,7 @@
 ////
 //// ```gleam
 //// // examples/snippets/test/snippets/hooks/context_aware_tests.gleam
-//// import dream_test/assertions/should.{equal, or_fail_with, should}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/unit_context.{before_each, describe, it}
 ////
 //// pub type Ctx { Ctx(counter: Int) }
@@ -29,7 +29,7 @@
 //// fn counter_is_one(ctx: Ctx) {
 ////   ctx.counter
 ////   |> should
-////   |> equal(1)
+////   |> be_equal(1)
 ////   |> or_fail_with("expected counter to be 1 after before_each")
 //// }
 ////

@@ -1,6 +1,6 @@
 //// README: Running suites directly with the parallel executor
 
-import dream_test/assertions/should.{have_length, or_fail_with, should, succeed}
+import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 import dream_test/parallel
 import dream_test/unit.{describe, it}
 

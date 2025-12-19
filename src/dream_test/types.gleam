@@ -196,7 +196,7 @@ pub type AssertionFailure {
 /// let result: Result(AssertionResult, String) =
 ///   42
 ///   |> should
-///   |> equal(42)
+///   |> be_equal(42)
 ///   |> or_fail_with("Should be 42")
 /// // result == Ok(AssertionOk)
 /// ```
@@ -218,7 +218,7 @@ pub type AssertionResult {
 /// Some(42)           // Start with a value
 /// |> should        // -> MatchOk(Some(42))
 /// |> be_some()       // -> MatchOk(42)  (unwrapped!)
-/// |> equal(42)       // -> MatchOk(42)
+/// |> be_equal(42)       // -> MatchOk(42)
 /// |> or_fail_with("expected Some(42)")  // -> Ok(AssertionOk)
 /// ```
 ///

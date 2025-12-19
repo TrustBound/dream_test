@@ -1,6 +1,6 @@
 //// README: Gherkin hero example (featured at top)
 
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
@@ -26,7 +26,7 @@ fn step_should_have(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 

@@ -1,6 +1,4 @@
-import dream_test/assertions/should.{
-  be_empty, contain, have_length, or_fail_with, should,
-}
+import dream_test/matchers.{be_empty, contain, have_length, or_fail_with, should,}
 import dream_test/file
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps

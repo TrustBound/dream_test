@@ -1,6 +1,6 @@
 //// README: Using `group` to organize a suite
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, group, it}
@@ -12,13 +12,13 @@ pub fn tests() {
       it("adds small numbers", fn() {
         2 + 3
         |> should
-        |> equal(5)
+        |> be_equal(5)
         |> or_fail_with("2 + 3 should equal 5")
       }),
       it("adds negative numbers", fn() {
         -2 + -3
         |> should
-        |> equal(-5)
+        |> be_equal(-5)
         |> or_fail_with("-2 + -3 should equal -5")
       }),
     ]),
@@ -26,7 +26,7 @@ pub fn tests() {
       it("integer division rounds toward zero", fn() {
         7 / 2
         |> should
-        |> equal(3)
+        |> be_equal(3)
         |> or_fail_with("7 / 2 should equal 3")
       }),
     ]),

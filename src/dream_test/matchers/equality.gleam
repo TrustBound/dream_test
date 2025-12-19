@@ -1,17 +1,17 @@
 //// Equality matchers for dream_test.
 ////
 //// These matchers compare values using Gleam's structural equality.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, equal, not_equal, or_fail_with}
+//// import dream_test/matchers.{should, be_equal, not_equal, or_fail_with}
 ////
 //// // Check equality
 //// result
 //// |> should
-//// |> equal(42)
+//// |> be_equal(42)
 //// |> or_fail_with("Should be 42")
 ////
 //// // Check inequality
@@ -37,11 +37,11 @@ import gleam/string
 /// ```gleam
 /// add(2, 3)
 /// |> should
-/// |> equal(5)
+/// |> be_equal(5)
 /// |> or_fail_with("2 + 3 should equal 5")
 /// ```
 ///
-pub fn equal(value_or_result: MatchResult(a), expected: a) -> MatchResult(a) {
+pub fn be_equal(value_or_result: MatchResult(a), expected: a) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_equal(actual, expected)
@@ -59,7 +59,7 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
         )
 
       MatchFailed(AssertionFailure(
-        operator: "equal",
+        operator: "be_equal",
         message: "",
         payload: Some(payload),
       ))

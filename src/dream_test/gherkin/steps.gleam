@@ -6,7 +6,7 @@
 //// ## Quick Start
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{fail_with}
+//// import dream_test/matchers.{fail_with}
 //// import dream_test/gherkin/steps.{
 ////   type StepContext, given, new_registry, then_, when_, get_int, get_float,
 //// }
@@ -116,14 +116,14 @@ pub type StepContext {
 /// This means you can use the exact same assertion style inside steps:
 ///
 /// ```gleam
-/// import dream_test/assertions/should.{be_ok, equal, or_fail_with, should}
+/// import dream_test/matchers.{be_ok, , or_fail_with, should}
 /// import dream_test/gherkin/world as world
 ///
 /// fn check_count(context: StepContext) -> Result(AssertionResult, String) {
 ///   world.get(context.world, "count")
 ///   |> should
 ///   |> be_ok()
-///   |> equal(3)
+///   |> be_equal(3)
 ///   |> or_fail_with("count should be 3")
 /// }
 /// ```

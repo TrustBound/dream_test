@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/gherkin/feature as gfeature
 import dream_test/gherkin/steps
 import dream_test/runner
@@ -72,7 +72,7 @@ pub fn tests() {
         ] ->
           tags
           |> should
-          |> equal(["smoke"])
+          |> be_equal(["smoke"])
           |> or_fail_with("scenario tags should appear in result")
         _ -> Ok(fail_with("unexpected results"))
       }

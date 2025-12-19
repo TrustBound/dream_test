@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process as dt_process
 import dream_test/types
 import dream_test/unit.{describe, it}
@@ -32,7 +32,7 @@ pub fn tests() {
 
       dt_process.get_count(counter)
       |> should
-      |> equal(0)
+      |> be_equal(0)
       |> or_fail_with("start_counter should initialize to 0")
     }),
 
@@ -45,7 +45,7 @@ pub fn tests() {
 
       dt_process.get_count(counter)
       |> should
-      |> equal(42)
+      |> be_equal(42)
       |> or_fail_with("counter should end at 42")
     }),
 
@@ -74,7 +74,7 @@ pub fn tests() {
 
       items
       |> should
-      |> equal(["b", "a"])
+      |> be_equal(["b", "a"])
       |> or_fail_with("actor should return items in LIFO order")
     }),
 

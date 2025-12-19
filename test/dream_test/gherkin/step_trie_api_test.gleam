@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/gherkin/step_trie
 import dream_test/unit.{describe, it}
 import gleam/option.{None, Some}
@@ -10,7 +10,7 @@ pub fn tests() {
       fn() {
         step_trie.parse_step_pattern("${float}USD")
         |> should
-        |> equal([
+        |> be_equal([
           step_trie.LiteralWord("$"),
           step_trie.FloatParam,
           step_trie.LiteralWord("USD"),
@@ -22,14 +22,14 @@ pub fn tests() {
     it("parse_step_pattern splits suffix placeholders ({int}%)", fn() {
       step_trie.parse_step_pattern("{int}%")
       |> should
-      |> equal([step_trie.IntParam, step_trie.LiteralWord("%")])
+      |> be_equal([step_trie.IntParam, step_trie.LiteralWord("%")])
       |> or_fail_with("pattern {int}% should split into int, %")
     }),
 
     it("tokenize_step_text preserves quoted strings as a single token", fn() {
       step_trie.tokenize_step_text("I add \"Red Widget\" to cart")
       |> should
-      |> equal(["I", "add", "\"Red Widget\"", "to", "cart"])
+      |> be_equal(["I", "add", "\"Red Widget\"", "to", "cart"])
       |> or_fail_with("quoted strings should be one token")
     }),
 
@@ -38,7 +38,7 @@ pub fn tests() {
       fn() {
         step_trie.tokenize_step_text("price is $99.99USD")
         |> should
-        |> equal(["price", "is", "$", "99.99", "USD"])
+        |> be_equal(["price", "is", "$", "99.99", "USD"])
         |> or_fail_with("numeric boundary splitting should work")
       },
     ),
@@ -52,7 +52,7 @@ pub fn tests() {
 
       int_match
       |> should
-      |> equal(
+      |> be_equal(
         Some(step_trie.StepMatch("handler", [step_trie.CapturedInt(42)])),
       )
       |> or_fail_with("expected int step match with CapturedInt(42)")
@@ -67,7 +67,7 @@ pub fn tests() {
 
       float_match
       |> should
-      |> equal(
+      |> be_equal(
         Some(step_trie.StepMatch("money", [step_trie.CapturedFloat(19.99)])),
       )
       |> or_fail_with("expected float step match with CapturedFloat(19.99)")
@@ -77,7 +77,7 @@ pub fn tests() {
       let trie = step_trie.new()
       step_trie.lookup(trie, "Given", "I have 1 item")
       |> should
-      |> equal(None)
+      |> be_equal(None)
       |> or_fail_with("empty trie should not match")
     }),
   ])

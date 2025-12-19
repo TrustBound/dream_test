@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{fail_with}
+import dream_test/matchers.{fail_with}
 import dream_test/file
 import dream_test/gherkin/parser
 import dream_test/gherkin/types as gtypes

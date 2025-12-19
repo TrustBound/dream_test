@@ -20,7 +20,7 @@ it("retrieves a stored value", fn() {
   result
   |> should
   |> be_some()
-  |> equal("Alice")
+  |> be_equal("Alice")
   |> or_fail_with("get() should return the stored value")
 })
 ```
@@ -40,7 +40,7 @@ Tests interact only with the public API — no internal state inspection.
 | Boolean matchers (`be_true`, `be_false`)                   | Convenience functions          |
 | Comparison matchers (`be_greater_than`, `be_at_least`)     | Collection operations          |
 | Equality matchers (`equal`, `not_equal`)                   | Throughout                     |
-| Assertion chaining (`be_ok() \|> equal()`)                 | Convenience functions          |
+| Assertion chaining (`be_ok() \|> be_equal()`)                 | Convenience functions          |
 | Runner (suite-first) (`runner.new` → `runner.run`)         | `cache_app_test.gleam`         |
 
 ## Running the Tests
@@ -78,6 +78,6 @@ Key patterns to follow:
 
 1. **Group related tests** in `describe` blocks
 2. **Use lifecycle hooks** for shared setup/teardown
-3. **Chain assertions** for readability (`be_ok() |> equal()`)
+3. **Chain assertions** for readability (`be_ok() |> be_equal()`)
 4. **Use root hooks** when you need `before_all`/`after_all`
 5. **Clean up resources** in tests (stop caches, close connections)

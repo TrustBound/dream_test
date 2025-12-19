@@ -8,10 +8,7 @@
 //// Tests interact only with the public API — no internal state inspection.
 
 import cache_app
-import dream_test/assertions/should.{
-  be_empty, be_error, be_false, be_greater_than, be_none, be_ok, be_some,
-  be_true, contain, equal, have_length, or_fail_with, should,
-}
+import dream_test/matchers.{be_empty, be_equal, be_error, be_false, be_greater_than, be_none, be_ok, be_some, be_true, contain, have_length, or_fail_with, should,}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{
@@ -44,7 +41,7 @@ pub fn suites() {
           result
           |> should
           |> be_some()
-          |> equal("Alice")
+          |> be_equal("Alice")
           |> or_fail_with("get() should return the stored value")
         }),
 
@@ -75,7 +72,7 @@ pub fn suites() {
           result
           |> should
           |> be_some()
-          |> equal("2.0")
+          |> be_equal("2.0")
           |> or_fail_with("set() should overwrite existing values")
         }),
       ]),
@@ -117,7 +114,7 @@ pub fn suites() {
 
           size
           |> should
-          |> equal(1)
+          |> be_equal(1)
           |> or_fail_with("Size should remain unchanged")
         }),
       ]),
@@ -137,7 +134,7 @@ pub fn suites() {
           let size = cache_app.size(cache)
           size
           |> should
-          |> equal(0)
+          |> be_equal(0)
           |> or_fail_with("clear() should remove all entries")
         }),
 
@@ -155,7 +152,7 @@ pub fn suites() {
           result
           |> should
           |> be_some()
-          |> equal("data")
+          |> be_equal("data")
           |> or_fail_with("Cache should work normally after clear()")
         }),
       ]),
@@ -214,7 +211,7 @@ pub fn suites() {
           // Assert
           result
           |> should
-          |> equal(0)
+          |> be_equal(0)
           |> or_fail_with("Empty cache should have size 0")
         }),
 
@@ -232,13 +229,13 @@ pub fn suites() {
           use _ <- result.try(
             after_one
             |> should
-            |> equal(1)
+            |> be_equal(1)
             |> or_fail_with("Size should be 1 after first insert"),
           )
 
           after_two
           |> should
-          |> equal(2)
+          |> be_equal(2)
           |> or_fail_with("Size should be 2 after second insert")
         }),
 
@@ -254,7 +251,7 @@ pub fn suites() {
           // Assert
           result
           |> should
-          |> equal(1)
+          |> be_equal(1)
           |> or_fail_with("Overwriting should not increase size")
         }),
       ]),
@@ -274,7 +271,7 @@ pub fn suites() {
           // Assert
           result
           |> should
-          |> equal("actual")
+          |> be_equal("actual")
           |> or_fail_with("Should return actual value, not default")
         }),
 
@@ -288,7 +285,7 @@ pub fn suites() {
           // Assert
           result
           |> should
-          |> equal("fallback")
+          |> be_equal("fallback")
           |> or_fail_with("Should return default for missing key")
         }),
       ]),
@@ -337,7 +334,7 @@ pub fn suites() {
           result
           |> should
           |> be_ok()
-          |> equal(20)
+          |> be_equal(20)
           |> or_fail_with("update() should return Ok with new value")
         }),
 
@@ -354,7 +351,7 @@ pub fn suites() {
           result
           |> should
           |> be_some()
-          |> equal(8)
+          |> be_equal(8)
           |> or_fail_with("Updated value should be persisted")
         }),
 
@@ -388,7 +385,7 @@ pub fn suites() {
             popped
             |> should
             |> be_some()
-            |> equal("data")
+            |> be_equal("data")
             |> or_fail_with("pop() should return the value"),
           )
 
@@ -426,7 +423,7 @@ pub fn suites() {
             value
             |> should
             |> be_some()
-            |> equal("outer")
+            |> be_equal("outer")
             |> or_fail_with("Should be Some(\"outer\")")
           }),
 

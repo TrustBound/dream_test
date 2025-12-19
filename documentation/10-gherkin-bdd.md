@@ -63,7 +63,7 @@ That’s why the examples annotate `context: StepContext` (it’s the minimal ty
 ### Inline Gherkin (the “hero” example)
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
@@ -89,7 +89,7 @@ fn step_should_have(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
@@ -131,7 +131,7 @@ Placeholders let you capture values from the step text into `context.captures`.
 Typed helpers like `get_int` parse the capture into the right type.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
   type StepContext, get_float, get_int, get_string, get_word, new_registry, step,
@@ -236,7 +236,7 @@ Feature: Shopping Cart
 #### Loading a `.feature` file and converting to a suite
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
@@ -262,7 +262,7 @@ fn step_verify_count(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
@@ -298,7 +298,7 @@ pub fn main() {
 Use discovery when you want real `.feature` files (e.g. written by QA or copied into tickets).
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
@@ -328,7 +328,7 @@ fn step_verify_count(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
   |> should
-  |> equal(expected)
+  |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 

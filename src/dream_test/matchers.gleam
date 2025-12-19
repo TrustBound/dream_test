@@ -1,6 +1,6 @@
-//// Assertion API for dream_test.
+//// Matcher API for dream_test.
 ////
-//// This module provides a fluent, pipe-friendly assertion API. Every assertion
+//// This module provides a fluent, pipe-friendly matcher API. Every matcher
 //// chain starts with `should` and ends with `or_fail_with()`.
 ////
 //// ## Basic Pattern
@@ -8,7 +8,7 @@
 //// ```gleam
 //// value
 //// |> should
-//// |> equal(expected)
+//// |> be_equal(expected)
 //// |> or_fail_with("Helpful error message")
 //// ```
 ////
@@ -16,12 +16,12 @@
 ////
 //// | Category       | Matchers                                                    |
 //// |----------------|-------------------------------------------------------------|
-//// | **Equality**   | `equal`, `not_equal`                                        |
+//// | **Equality**   | `be_equal`, `not_equal`                                     |
 //// | **Boolean**    | `be_true`, `be_false`                                       |
 //// | **Option**     | `be_some`, `be_none`                                        |
 //// | **Result**     | `be_ok`, `be_error`                                         |
 //// | **Collections**| `contain`, `not_contain`, `have_length`, `be_empty`         |
-//// | **Comparison** | `be_greater_than`, `be_less_than`, `be_at_least`, `be_at_most`, `be_between`, `be_in_range` |
+//// | **Comparison** | `be_greater_than`, `be_less_than`, `be_at_least`, `be_at_most`, `be_between`, `be_in_range`, `be_greater_than_float`, `be_less_than_float` |
 //// | **String**     | `start_with`, `end_with`, `contain_string`                  |
 //// | **Snapshot**   | `match_snapshot`, `match_snapshot_inspect`                  |
 ////
@@ -34,14 +34,14 @@
 //// Some(42)
 //// |> should
 //// |> be_some()
-//// |> equal(42)
+//// |> be_equal(42)
 //// |> or_fail_with("Should be Some(42)")
 ////
 //// // Unwrap Ok, then check the inner value
 //// Ok("hello")
 //// |> should
 //// |> be_ok()
-//// |> equal("hello")
+//// |> be_equal("hello")
 //// |> or_fail_with("Should be Ok with 'hello'")
 ////
 //// // Unwrap Ok, then check the inner Option
@@ -62,7 +62,7 @@
 ////   Ok(user) -> {
 ////     user.name
 ////     |> should
-////     |> equal("Alice")
+////     |> be_equal("Alice")
 ////     |> or_fail_with("User should be Alice")
 ////   }
 ////   Error(_) -> Ok(fail_with("Should have returned a user"))
@@ -74,8 +74,8 @@
 //// For best readability, import the commonly used functions unqualified:
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
-////   should, equal, be_ok, be_some, or_fail_with, fail_with, succeed,
+//// import dream_test/matchers.{
+////   should, be_equal, be_ok, be_some, or_fail_with, fail_with, succeed,
 //// }
 //// ```
 
@@ -93,17 +93,17 @@ import dream_test/types.{
 }
 import gleam/option as gleam_option
 
-/// Start an assertion chain.
+/// Start a matcher chain.
 ///
 /// This wraps any value in a `MatchResult` so it can be piped into matchers.
-/// Every assertion chain should start with this function.
+/// Every matcher chain should start with this function.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// 42
 /// |> should
-/// |> equal(42)
+/// |> be_equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```
 ///
@@ -124,11 +124,11 @@ pub fn should(value: a) -> MatchResult(a) {
 /// ```gleam
 /// add(2, 3)
 /// |> should
-/// |> equal(5)
+/// |> be_equal(5)
 /// |> or_fail_with("2 + 3 should equal 5")
 /// ```
 ///
-pub const equal = equality.equal
+pub const be_equal = equality.be_equal
 
 /// Assert that a value does not equal the unexpected value.
 ///
@@ -180,7 +180,7 @@ pub const be_false = boolean.be_false
 /// Assert that an `Option` is `Some` and extract its value.
 ///
 /// If the assertion passes, the inner value is passed to subsequent matchers.
-/// This enables chaining like `be_some() |> equal(42)`.
+/// This enables chaining like `be_some() |> be_equal(42)`.
 ///
 /// ## Example
 ///
@@ -194,7 +194,7 @@ pub const be_false = boolean.be_false
 /// find_user(id)
 /// |> should
 /// |> be_some()
-/// |> equal(expected_user)
+/// |> be_equal(expected_user)
 /// |> or_fail_with("Should find the expected user")
 /// ```
 ///
@@ -220,7 +220,7 @@ pub const be_none = option.be_none
 /// Assert that a `Result` is `Ok` and extract its value.
 ///
 /// If the assertion passes, the `Ok` value is passed to subsequent matchers.
-/// This enables chaining like `be_ok() |> equal(42)`.
+/// This enables chaining like `be_ok() |> be_equal(42)`.
 ///
 /// ## Example
 ///
@@ -234,7 +234,7 @@ pub const be_none = option.be_none
 /// parse_int("42")
 /// |> should
 /// |> be_ok()
-/// |> equal(42)
+/// |> be_equal(42)
 /// |> or_fail_with("Should parse to 42")
 /// ```
 ///
@@ -256,7 +256,7 @@ pub const be_ok = result.be_ok
 /// validate(input)
 /// |> should
 /// |> be_error()
-/// |> equal(ValidationError("email required"))
+/// |> be_equal(ValidationError("email required"))
 /// |> or_fail_with("Should fail with email error")
 /// ```
 ///
@@ -540,13 +540,13 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 // Terminal Operations
 // =============================================================================
 
-/// Complete an assertion chain and provide a failure message.
+/// Complete a matcher chain and provide a failure message.
 ///
-/// This is the **terminal operation** that ends every assertion chain. It
+/// This is the **terminal operation** that ends every matcher chain. It
 /// converts the `MatchResult` into an `AssertionResult` that the test runner
 /// understands.
 ///
-/// If the assertion passed, returns `AssertionOk`. If it failed, returns
+/// If the matcher passed, returns `AssertionOk`. If it failed, returns
 /// `AssertionFailed` with the provided message.
 ///
 /// ## Example
@@ -554,7 +554,7 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 /// ```gleam
 /// result
 /// |> should
-/// |> equal(42)
+/// |> be_equal(42)
 /// |> or_fail_with("Result should be 42")
 /// ```
 ///
@@ -596,7 +596,7 @@ pub fn or_fail_with(
 /// Explicitly fail a test with a message.
 ///
 /// Use this when you need to fail a test in a conditional branch where
-/// the normal assertion chain doesn't apply.
+/// the normal matcher chain doesn't apply.
 ///
 /// ## Example
 ///
@@ -605,7 +605,7 @@ pub fn or_fail_with(
 ///   Ok(value) -> {
 ///     value
 ///     |> should
-///     |> equal(expected)
+///     |> be_equal(expected)
 ///     |> or_fail_with("Value should match")
 ///   }
 ///   Error(_) -> Ok(fail_with("Should have succeeded but got an error"))
@@ -622,7 +622,7 @@ pub fn or_fail_with(
 ///
 /// An `AssertionResult` you can wrap in `Ok(...)` from a test body.
 ///
-/// If you want to abort a test immediately (rather than “failing an assertion”),
+/// If you want to abort a test immediately (rather than “failing an matcher”),
 /// return `Error("...")` from the test body instead.
 ///
 pub fn fail_with(message: String) -> AssertionResult {
@@ -633,7 +633,7 @@ pub fn fail_with(message: String) -> AssertionResult {
   ))
 }
 
-/// Explicitly mark an assertion as successful.
+/// Explicitly mark a matcher chain as successful.
 ///
 /// Use this when you need to explicitly succeed in a conditional branch,
 /// as the counterpart to `fail_with`.
@@ -660,3 +660,5 @@ pub fn fail_with(message: String) -> AssertionResult {
 pub fn succeed() -> AssertionResult {
   AssertionOk
 }
+
+

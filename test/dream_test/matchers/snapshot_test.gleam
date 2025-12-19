@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file
 import dream_test/matchers/snapshot
 import dream_test/unit.{describe, it}
@@ -44,7 +44,7 @@ pub fn tests() {
       let _ = snapshot.clear_snapshot(path)
       snapshot.clear_snapshot(path)
       |> should
-      |> equal(Ok(Nil))
+      |> be_equal(Ok(Nil))
       |> or_fail_with("clear_snapshot should succeed even when missing")
     }),
 
@@ -60,7 +60,7 @@ pub fn tests() {
 
         file.read(dir <> "/c.txt")
         |> should
-        |> equal(Ok("c"))
+        |> be_equal(Ok("c"))
         |> or_fail_with("non-.snap file should remain")
       },
     ),

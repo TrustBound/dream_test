@@ -1,12 +1,12 @@
 //// String matchers for dream_test.
 ////
 //// These matchers work with strings.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Usage
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
+//// import dream_test/matchers.{
 ////   should, start_with, end_with, contain_string, or_fail_with,
 //// }
 ////

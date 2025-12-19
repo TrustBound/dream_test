@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/timing
 import dream_test/types
 import dream_test/unit.{describe, it}
@@ -9,14 +9,14 @@ pub fn tests() {
     it("format_duration_ms formats common ranges", fn() {
       timing.format_duration_ms(0)
       |> should
-      |> equal("0ms")
+      |> be_equal("0ms")
       |> or_fail_with("0ms should format as 0ms")
     }),
 
     it("format_duration_us formats common ranges", fn() {
       timing.format_duration_us(500)
       |> should
-      |> equal("0.5ms")
+      |> be_equal("0.5ms")
       |> or_fail_with("500us should format as 0.5ms")
     }),
 

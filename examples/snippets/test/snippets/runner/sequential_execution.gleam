@@ -1,6 +1,6 @@
 //// README: Sequential execution for shared resources
 
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -12,13 +12,13 @@ pub fn tests() {
       // When tests share external resources, run them sequentially
       1 + 1
       |> should
-      |> equal(2)
+      |> be_equal(2)
       |> or_fail_with("Math works")
     }),
     it("second test", fn() {
       2 + 2
       |> should
-      |> equal(4)
+      |> be_equal(4)
       |> or_fail_with("Math still works")
     }),
   ])

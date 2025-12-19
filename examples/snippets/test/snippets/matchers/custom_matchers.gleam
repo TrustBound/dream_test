@@ -1,6 +1,6 @@
 //// README: Custom matchers
 
-import dream_test/assertions/should.{or_fail_with, should}
+import dream_test/matchers.{or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/types.{

@@ -1,10 +1,10 @@
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should, succeed}
 import dream_test/types
 import dream_test/unit.{describe, it}
 import gleam/option.{None}
 
 pub fn tests() {
-  describe("dream_test/assertions/should", [
+  describe("dream_test/matchers", [
     it("should wraps values in a MatchOk", fn() {
       case should(123) {
         types.MatchOk(123) -> Ok(types.AssertionOk)
@@ -21,14 +21,14 @@ pub fn tests() {
 
     it("or_fail_with turns MatchOk into Ok(AssertionOk)", fn() {
       should(1)
-      |> equal(1)
+      |> be_equal(1)
       |> or_fail_with("should be 1")
     }),
 
     it("fail_with produces AssertionFailed with the message", fn() {
-      should.fail_with("nope")
+      fail_with("nope")
       |> should
-      |> equal(
+      |> be_equal(
         types.AssertionFailed(types.AssertionFailure(
           operator: "fail_with",
           message: "nope",
@@ -39,9 +39,9 @@ pub fn tests() {
     }),
 
     it("succeed produces AssertionOk", fn() {
-      should.succeed()
+      succeed()
       |> should
-      |> equal(types.AssertionOk)
+      |> be_equal(types.AssertionOk)
       |> or_fail_with("succeed should return AssertionOk")
     }),
   ])

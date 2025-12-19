@@ -31,7 +31,7 @@ There’s also a human reason:
 ### Chaining matchers (unwrap + assert)
 
 ```gleam
-import dream_test/assertions/should.{be_ok, be_some, equal, or_fail_with, should}
+import dream_test/matchers.{be_ok, be_some, , or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -45,7 +45,7 @@ pub fn tests() {
       Some(42)
       |> should
       |> be_some()
-      |> equal(42)
+      |> be_equal(42)
       |> or_fail_with("Should contain 42")
     }),
     // Unwrap Ok, then check the value
@@ -53,7 +53,7 @@ pub fn tests() {
       Ok("success")
       |> should
       |> be_ok()
-      |> equal("success")
+      |> be_equal("success")
       |> or_fail_with("Should be Ok with 'success'")
     }),
   ])
@@ -72,8 +72,8 @@ pub fn main() {
 ### Built-in matcher catalogue (practical examples)
 
 ```gleam
-import dream_test/assertions/should.{
-  be_between, be_false, be_ok, be_some, be_true, contain, contain_string, equal,
+import dream_test/matchers.{
+  be_between, be_false, be_ok, be_some, be_true, contain, contain_string, ,
   have_length, or_fail_with, should,
 }
 import dream_test/unit.{describe, it}
@@ -99,7 +99,7 @@ pub fn tests() {
       Some(42)
       |> should
       |> be_some()
-      |> equal(42)
+      |> be_equal(42)
       |> or_fail_with("expected Some(42)")
     }),
 
@@ -107,7 +107,7 @@ pub fn tests() {
       Ok("hello")
       |> should
       |> be_ok()
-      |> equal("hello")
+      |> be_equal("hello")
       |> or_fail_with("expected Ok(\"hello\")")
     }),
 
@@ -208,7 +208,7 @@ Sometimes you need a conditional check that isn’t a good fit for the normal ma
 Use `succeed()` and `fail_with("...")` to keep the return type consistent.
 
 ```gleam
-import dream_test/assertions/should.{fail_with, succeed}
+import dream_test/matchers.{fail_with, succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}

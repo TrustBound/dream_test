@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{or_fail_with, should}
+import dream_test/matchers.{or_fail_with, should}
 import dream_test/matchers/equality
 import dream_test/unit.{describe, it}
 
@@ -7,7 +7,7 @@ pub fn tests() {
     it("equal passes for equal values", fn() {
       1
       |> should
-      |> equality.equal(1)
+      |> equality.be_equal(1)
       |> or_fail_with("1 should equal 1")
     }),
 

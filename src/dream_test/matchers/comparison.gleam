@@ -1,12 +1,12 @@
 //// Comparison matchers for dream_test.
 ////
 //// These matchers compare numeric values.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Integer Matchers
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
+//// import dream_test/matchers.{
 ////   should, be_greater_than, be_less_than, be_at_least,
 ////   be_at_most, be_between, be_in_range, or_fail_with,
 //// }

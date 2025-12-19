@@ -1,7 +1,7 @@
 //// Result matchers for dream_test.
 ////
 //// These matchers work with `Result(a, e)` values and support chaining.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Chaining
 ////
@@ -9,20 +9,20 @@
 //// chain additional matchers:
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, be_ok, be_error, equal, or_fail_with}
+//// import dream_test/matchers.{should, be_ok, be_error, , or_fail_with}
 ////
 //// // Check that it's Ok, then check the inner value
 //// parse_int("42")
 //// |> should
 //// |> be_ok()
-//// |> equal(42)
+//// |> be_equal(42)
 //// |> or_fail_with("Should parse to 42")
 ////
 //// // Check that it's Error, then check the error value
 //// validate(invalid_input)
 //// |> should
 //// |> be_error()
-//// |> equal(ValidationError("email required"))
+//// |> be_equal(ValidationError("email required"))
 //// |> or_fail_with("Should fail with email error")
 //// ```
 
@@ -51,7 +51,7 @@ import gleam/string
 /// Ok("hello")
 /// |> should
 /// |> be_ok()
-/// |> equal("hello")
+/// |> be_equal("hello")
 /// |> or_fail_with("Should be Ok with 'hello'")
 /// ```
 ///
@@ -100,7 +100,7 @@ fn check_is_ok(actual: Result(a, e)) -> MatchResult(a) {
 /// Error("invalid")
 /// |> should
 /// |> be_error()
-/// |> equal("invalid")
+/// |> be_equal("invalid")
 /// |> or_fail_with("Should be Error with 'invalid'")
 /// ```
 ///

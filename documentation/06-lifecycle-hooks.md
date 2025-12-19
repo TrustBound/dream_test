@@ -34,7 +34,7 @@ Two practical rules of thumb:
 ### Basic lifecycle example
 
 ```gleam
-import dream_test/assertions/should.{be_empty, or_fail_with, should}
+import dream_test/matchers.{be_empty, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{
@@ -106,7 +106,7 @@ pub fn main() {
 Nested groups inherit hooks. Setup runs **outer → inner**, teardown runs **inner → outer**.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
@@ -154,7 +154,7 @@ pub fn main() {
 If a hook fails, Dream Test records that failure and marks affected tests appropriately (e.g. setup failures).
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{before_all, describe, it}

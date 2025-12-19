@@ -1,8 +1,6 @@
 //// README: BDD formatting (post-run, string output)
 
-import dream_test/assertions/should.{
-  contain_string, or_fail_with, should, succeed,
-}
+import dream_test/matchers.{contain_string, or_fail_with, should, succeed,}
 import dream_test/reporters/bdd
 import dream_test/runner
 import dream_test/unit.{describe, it}

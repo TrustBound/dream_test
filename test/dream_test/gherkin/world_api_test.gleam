@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{equal, fail_with, or_fail_with, should}
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/gherkin/world
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
@@ -9,7 +9,7 @@ pub fn tests() {
       let w = world.new_world("scenario-1")
       world.scenario_id(w)
       |> should
-      |> equal("scenario-1")
+      |> be_equal("scenario-1")
       |> or_fail_with("scenario_id should be preserved")
     }),
 
@@ -24,7 +24,7 @@ pub fn tests() {
       // Assert
       result
       |> should
-      |> equal(Ok(3))
+      |> be_equal(Ok(3))
       |> or_fail_with("should get the value that was put")
     }),
 
@@ -50,7 +50,7 @@ pub fn tests() {
       let w = world.new_world("scenario-2")
       world.get_or(w, "missing", 9)
       |> should
-      |> equal(9)
+      |> be_equal(9)
       |> or_fail_with("default should be returned")
     }),
 

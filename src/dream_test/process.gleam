@@ -15,7 +15,7 @@
 //// ```gleam
 //// import dream_test/process.{start_counter, get_count, increment}
 //// import dream_test/unit.{describe, it}
-//// import dream_test/assertions/should.{should, equal, or_fail_with}
+//// import dream_test/matchers.{should, , or_fail_with}
 ////
 //// pub fn tests() {
 ////   describe("Counter", [
@@ -26,7 +26,7 @@
 ////
 ////       get_count(counter)
 ////       |> should
-////       |> equal(2)
+////       |> be_equal(2)
 ////       |> or_fail_with("Counter should be 2")
 ////     }),
 ////   ])
@@ -375,7 +375,7 @@ pub type PollResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/assertions/should.{be_ok, or_fail_with, should}
+/// import dream_test/matchers.{be_ok, or_fail_with, should}
 /// import dream_test/process.{await_ready, quick_poll_config}
 ///
 /// // Wait for server to be ready
@@ -409,7 +409,7 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/assertions/should.{equal, or_fail_with, should}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/process.{await_some, default_poll_config}
 ///
 /// // Wait for user to appear in database
@@ -417,7 +417,7 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 ///   Ready(user) -> {
 ///     user.name
 ///     |> should
-///     |> equal("Alice")
+///     |> be_equal("Alice")
 ///     |> or_fail_with("User should be Alice")
 ///   }
 ///   TimedOut -> Ok(fail_with("User never appeared in database"))

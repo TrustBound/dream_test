@@ -1,13 +1,13 @@
 //// Boolean matchers for dream_test.
 ////
 //// These matchers check boolean values.
-//// They're re-exported through `dream_test/assertions/should`.
+//// They're re-exported through `dream_test/matchers`.
 ////
 //// ## Usage
 ////
 //// ```gleam
 //// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
-//// import dream_test/assertions/should.{be_false, be_true, or_fail_with, should}
+//// import dream_test/matchers.{be_false, be_true, or_fail_with, should}
 ////
 //// True
 //// |> should

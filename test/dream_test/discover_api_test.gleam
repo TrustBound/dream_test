@@ -1,6 +1,4 @@
-import dream_test/assertions/should.{
-  contain, equal, have_length, or_fail_with, should,
-}
+import dream_test/matchers.{be_equal, contain, have_length, or_fail_with, should,}
 import dream_test/discover.{from_path, list_modules}
 import dream_test/unit.{describe, it}
 
@@ -14,7 +12,7 @@ pub fn tests() {
 
       result
       |> should
-      |> equal(Ok(["dream_test@unit_api_test"]))
+      |> be_equal(Ok(["dream_test@unit_api_test"]))
       |> or_fail_with("expected discovery to find the unit_api_test module")
     }),
 

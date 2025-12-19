@@ -1,8 +1,6 @@
 //// README: Hero example (Calculator)
 
-import dream_test/assertions/should.{
-  be_error, be_ok, equal, or_fail_with, should,
-}
+import dream_test/matchers.{be_equal, be_error, be_ok, or_fail_with, should,}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -14,14 +12,14 @@ pub fn tests() {
     it("adds two numbers", fn() {
       add(2, 3)
       |> should
-      |> equal(5)
+      |> be_equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
     it("handles division", fn() {
       divide(10, 2)
       |> should
       |> be_ok()
-      |> equal(5)
+      |> be_equal(5)
       |> or_fail_with("10 / 2 should equal 5")
     }),
     it("returns error for division by zero", fn() {

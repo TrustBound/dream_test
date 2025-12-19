@@ -20,7 +20,7 @@
 ////
 //// ```gleam
 //// // examples/snippets/test/snippets/unit/quick_start.gleam
-//// import dream_test/assertions/should.{equal, or_fail_with, should}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/unit.{describe, it}
 //// import gleam/string
 ////
@@ -30,7 +30,7 @@
 ////       "  hello  "
 ////       |> string.trim()
 ////       |> should
-////       |> equal("hello")
+////       |> be_equal("hello")
 ////       |> or_fail_with("Should remove surrounding whitespace")
 ////     }),
 ////   ])

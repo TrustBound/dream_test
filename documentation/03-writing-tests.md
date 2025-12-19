@@ -14,8 +14,8 @@ Dream Test’s unit DSL is built for that style, but there’s a deeper design g
 ### `describe` + `it` (the core loop)
 
 ```gleam
-import dream_test/assertions/should.{
-  be_error, be_ok, equal, or_fail_with, should,
+import dream_test/matchers.{
+  be_error, be_ok, , or_fail_with, should,
 }
 import dream_test/reporters
 import dream_test/runner
@@ -28,14 +28,14 @@ pub fn tests() {
     it("adds two numbers", fn() {
       add(2, 3)
       |> should
-      |> equal(5)
+      |> be_equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
     it("handles division", fn() {
       divide(10, 2)
       |> should
       |> be_ok()
-      |> equal(5)
+      |> be_equal(5)
       |> or_fail_with("10 / 2 should equal 5")
     }),
     it("returns error for division by zero", fn() {
@@ -77,7 +77,7 @@ If an `it` body starts to get long, consider extracting it into a named helper f
 Use `skip` when you want to keep the test structure and body around, but temporarily disable execution.
 
 ```gleam
-import dream_test/assertions/should.{equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it, skip}
@@ -89,20 +89,20 @@ pub fn tests() {
     it("runs normally", fn() {
       add(2, 3)
       |> should
-      |> equal(5)
+      |> be_equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
     skip("not implemented yet", fn() {
       // This test is skipped - the body is preserved but not executed
       add(100, 200)
       |> should
-      |> equal(300)
+      |> be_equal(300)
       |> or_fail_with("Should add large numbers")
     }),
     it("also runs normally", fn() {
       add(0, 0)
       |> should
-      |> equal(0)
+      |> be_equal(0)
       |> or_fail_with("0 + 0 should equal 0")
     }),
   ])
@@ -165,7 +165,7 @@ Why tags exist:
 This repo also uses tags heavily in Gherkin suites (see the Gherkin guide), where tags come from `with_tags(...)` on scenarios.
 
 ```gleam
-import dream_test/assertions/should.{succeed}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it, with_tags}

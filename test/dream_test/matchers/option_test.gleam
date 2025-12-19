@@ -1,4 +1,4 @@
-import dream_test/assertions/should.{or_fail_with, should}
+import dream_test/matchers.{or_fail_with, should}
 import dream_test/matchers/option as option_matcher
 import dream_test/unit.{describe, it}
 import gleam/option.{None, Some}
