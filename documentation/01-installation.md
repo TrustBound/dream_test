@@ -42,7 +42,7 @@ Dream Test requires an explicit runner module. This is a design choice:
 
 Create a file under `test/` (for example, `test/{project_name}_test.gleam`) with a `pub fn main()`.
 
-If you’re using the BEAM (Erlang target), you can use module discovery to avoid maintaining an import list. Discovery is BEAM-only because it relies on filesystem/module behaviors that aren’t the same on the JavaScript target.
+On BEAM, you can use module discovery to avoid maintaining an import list.
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}

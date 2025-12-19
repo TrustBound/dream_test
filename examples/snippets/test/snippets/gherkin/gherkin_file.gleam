@@ -10,6 +10,11 @@ import dream_test/runner
 import gleam/io
 import gleam/result
 
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
+  Ok(succeed())
+}
+
 fn step_empty_cart(context: StepContext) {
   put(context.world, "cart", 0)
   Ok(succeed())
@@ -34,7 +39,8 @@ pub fn tests() {
   // Define step handlers
   let steps =
     new_registry()
-    |> step("I have an empty cart", step_empty_cart)
+    |> step("the server is running", step_server_running)
+    |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)
     |> step("the cart should have {int} items", step_verify_count)
 

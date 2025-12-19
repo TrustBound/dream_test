@@ -36,6 +36,92 @@ Dream Test is a **testing framework for Gleam** that feels like Gleam:
 
 It’s designed for the common case (unit + integration tests) and it scales cleanly as your suite grows (contexts, snapshots, BDD/Gherkin, CI reporting).
 
+**Target support:** Dream Test is built and tested for the **BEAM (Erlang target)**. The JavaScript target is **not tested or supported** at this time — if you attempt it anyway, **YMMV**.
+
+## Integration testing (behavior over time)
+
+Unit tests are great for “input → output.” Integration tests often look like “a sequence of behavior over time.”
+
+Dream Test gives you two ways to write those scenario tests:
+
+- **Inline Gherkin in Gleam** (works great when engineers own the specs)
+- **Standard `.feature` files** (great when specs come from tickets/QA)
+
+### Inline Gherkin (authored in Gleam)
+
+```gleam
+import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/steps.{new_registry, step}
+
+pub fn tests() {
+  let steps =
+    new_registry()
+    |> step("I have {int} items in my cart", step_have_items)
+    |> step("I add {int} more items", step_add_items)
+    |> step("I should have {int} items total", step_should_have)
+
+  feature("Shopping Cart", steps, [
+    scenario("Adding items to cart", [
+      given("I have 3 items in my cart"),
+      when("I add 2 more items"),
+      then("I should have 5 items total"),
+    ]),
+  ])
+}
+```
+
+- Full tested example: [`examples/snippets/test/snippets/gherkin/gherkin_hero.gleam`](examples/snippets/test/snippets/gherkin/gherkin_hero.gleam)
+- Guide: `documentation/10-gherkin-bdd.md`
+
+### `.feature` files (authored as standard Gherkin)
+
+```gherkin
+Feature: Shopping Cart
+  Background:
+    Given the server is running
+
+  Scenario: Adding items
+    Given the cart is empty
+    When I add 3 items
+    Then the cart should have 3 items
+```
+
+```gleam
+import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/parser
+
+pub fn tests() {
+  let assert Ok(feature) = parser.parse_file("test/cart.feature")
+  let config = FeatureConfig(feature: feature, step_registry: steps)
+  to_test_suite("cart_test", config)
+}
+```
+
+- Full tested `.feature` example: [`examples/shopping_cart/features/shopping_cart.feature`](examples/shopping_cart/features/shopping_cart.feature)
+- Full tested runner + steps: [`examples/shopping_cart/test/shopping_cart_test.gleam`](examples/shopping_cart/test/shopping_cart_test.gleam) and [`examples/shopping_cart/test/steps/`](examples/shopping_cart/test/steps/)
+- Docs: `documentation/10-gherkin-bdd.md` (see “Loading a .feature file…” / discovery)
+
+### Snapshot testing (handy for integration outputs too)
+
+```gleam
+import dream_test/assertions/should.{match_snapshot, match_snapshot_inspect, or_fail_with, should}
+
+// Snapshot a string (great for HTML, CLI output, etc.)
+render_profile("Alice", 30)
+|> should()
+|> match_snapshot("./test/snapshots/user_profile.snap")
+|> or_fail_with("Profile should match snapshot")
+
+// Snapshot complex data with inspect output
+build_config()
+|> should()
+|> match_snapshot_inspect("./test/snapshots/config.snap")
+|> or_fail_with("Config should match snapshot")
+```
+
+- Full tested example: [`examples/snippets/test/snippets/matchers/snapshot_testing.gleam`](examples/snippets/test/snippets/matchers/snapshot_testing.gleam)
+- Guide: `documentation/09-snapshot-testing.md`
+
 ## Showcase (copy/paste)
 
 If you want step-by-step setup (install + where to put the runner), start with:

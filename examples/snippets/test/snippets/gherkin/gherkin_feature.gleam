@@ -13,6 +13,11 @@ import gleam/int
 import gleam/io
 import gleam/result
 
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
+  Ok(succeed())
+}
+
 fn step_empty_cart(context: StepContext) {
   put(context.world, "cart", 0)
   Ok(succeed())
@@ -37,22 +42,25 @@ fn step_verify_count(context: StepContext) {
 pub fn tests() {
   let steps =
     new_registry()
-    |> step("I have an empty cart", step_empty_cart)
+    |> step("the server is running", step_server_running)
+    |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)
-    |> step("I should have {int} items", step_verify_count)
+    |> step("the cart should have {int} items", step_verify_count)
 
-  let bg = background([given("I have an empty cart")])
+  let bg = background([given("the server is running")])
 
   feature_with_background("Shopping Cart", steps, bg, [
     scenario("Adding items", [
+      given("the cart is empty"),
       when("I add 3 items"),
-      then("I should have 3 items"),
+      then("the cart should have 3 items"),
     ])
       |> with_tags(["smoke"]),
     scenario("Adding more items", [
+      given("the cart is empty"),
       when("I add 2 items"),
       and("I add 3 items"),
-      then("I should have 5 items"),
+      then("the cart should have 5 items"),
     ]),
   ])
 }

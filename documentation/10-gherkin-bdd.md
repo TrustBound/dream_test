@@ -1,5 +1,21 @@
 ## Gherkin / BDD testing
 
+### What is Gherkin?
+
+**Gherkin** is a lightweight, plain-text format for writing **behavior-driven development (BDD)** specs. It’s commonly associated with tools like Cucumber, and it’s designed to be readable by both engineers and non-engineers.
+
+At a high level, you describe behavior using a small vocabulary:
+
+- **Feature**: a capability you’re describing (a suite of scenarios)
+- **Scenario**: one concrete example (a test)
+- **Background**: steps that should run before every scenario (shared setup)
+- **Given / When / Then**: a convention for structuring steps:
+  - **Given**: starting state / setup
+  - **When**: the action
+  - **Then**: the expected outcome
+
+In Dream Test, you write Gherkin either as standard `.feature` files or directly in Gleam, and you implement behavior by mapping step text to handler functions (a “step registry”).
+
 Unit tests are great for “input → output.” Gherkin is for “a sequence of behavior over time.”
 
 This chapter explains Dream Test’s Gherkin layer as an engineering tool:
@@ -200,14 +216,16 @@ Feature: Shopping Cart
   As a customer I want to add items to my cart
 
   Background:
-    Given I have an empty cart
+    Given the server is running
 
   @smoke
   Scenario: Adding items
+    Given the cart is empty
     When I add 3 items
     Then the cart should have 3 items
 
   Scenario: Adding multiple times
+    Given the cart is empty
     When I add 2 items
     And I add 3 items
     Then the cart should have 5 items
@@ -252,7 +270,8 @@ pub fn tests() {
   // Define step handlers
   let steps =
     new_registry()
-    |> step("I have an empty cart", step_empty_cart)
+    |> step("the server is running", step_server_running)
+    |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)
     |> step("the cart should have {int} items", step_verify_count)
 
@@ -293,6 +312,11 @@ fn step_empty_cart(context: StepContext) {
   Ok(succeed())
 }
 
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
+  Ok(succeed())
+}
+
 fn step_add_items(context: StepContext) {
   let current = get_or(context.world, "cart", 0)
   let to_add = get_int(context.captures, 0) |> result.unwrap(0)
@@ -312,7 +336,8 @@ pub fn tests() {
   // Define step handlers
   let steps =
     new_registry()
-    |> step("I have an empty cart", step_empty_cart)
+    |> step("the server is running", step_server_running)
+    |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)
     |> step("the cart should have {int} items", step_verify_count)
 

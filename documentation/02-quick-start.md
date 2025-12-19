@@ -2,7 +2,7 @@
 
 When you’re adopting Dream Test, the first goal is simple: **write one passing test, run it, and see readable output**.
 
-Dream Test keeps the runner explicit on purpose. Instead of “magic test registration,” you get a tiny runner module where you decide:
+Dream Test keeps the runner explicit on purpose. Instead of **implicit/global** test registration (tests registering themselves at import time), you build **suite values** and pass them to a tiny runner module where you decide:
 
 - What suites to run
 - What output to produce
@@ -10,16 +10,17 @@ Dream Test keeps the runner explicit on purpose. Instead of “magic test regist
 
 That explicitness is the source of most of Dream Test’s reliability: when a test run surprises you, there’s always a concrete `main()` you can inspect.
 
+If you’re looking for a mental model of “registration”: in Dream Test, **your suites are the registration**. You can list them explicitly, or (on BEAM) generate the list via discovery.
+
 ### Choose your first runner style
 
 There are two good starting points. Pick the one that matches your target:
 
-- **BEAM (Erlang target)**: use discovery to avoid maintaining an import list.
-- **Portable (BEAM or JavaScript)**: list suites explicitly.
+- **BEAM**: use discovery to avoid maintaining an import list, or list suites explicitly.
 
 ### Option A: the smallest useful setup (BEAM-only discovery)
 
-<sub>Note: module discovery is BEAM-only. If you’re targeting JavaScript, use Option B.</sub>
+<sub>Note: module discovery is BEAM-only.</sub>
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
@@ -48,7 +49,7 @@ What’s happening here (in English):
 - `to_suites()` turns them into suite values.
 - The runner executes those suites and streams output via a reporter.
 
-### Option B: explicit suites (simple, portable, and easy to reason about)
+### Option B: explicit suites (simple and easy to reason about)
 
 This is the most “teachable” version because nothing is implicit: `tests()` returns a suite, and `main()` runs it.
 

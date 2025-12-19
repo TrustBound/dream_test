@@ -98,6 +98,30 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/context_aware_tests.gleam)</sub>
 
+### Grouping + hook scoping (`group`)
+
+`unit_context.group` is the same idea as `unit.group`: it lets you nest structure, and it scopes hooks.
+
+- Hooks declared in an **outer scope** apply inside nested groups.
+- Hooks declared in an **inner group** apply only to tests in that group.
+
+```gleam
+import dream_test/unit_context.{before_each, describe, group, it}
+
+pub fn suite() {
+  describe("Context-aware grouping", seed, [
+    before_each(outer_setup),
+    group("inner group", [
+      before_each(inner_setup),
+      it("uses both hooks", fn(ctx) { todo }),
+    ]),
+    it("uses only the outer hook", fn(ctx) { todo }),
+  ])
+}
+```
+
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/context_aware_grouping.gleam)</sub>
+
 ### Important Gleam detail: when type inference needs help
 
 In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.world`.

@@ -130,7 +130,26 @@ Use `group` when you want nested structure inside a suite: a second level of nar
 
 The most common reason to use `group` is to scope hooks (setup/teardown) to a subset of tests. Even if you don’t use hooks, `group` can make long suites easier to skim.
 
-You’ll see `group` used in the hook inheritance example:
+Here’s the minimal shape:
+
+```gleam
+import dream_test/unit.{describe, group, it}
+
+pub fn tests() {
+  describe("Thing", [
+    group("Case A", [
+      it("does one thing", fn() { todo }),
+    ]),
+    group("Case B", [
+      it("does another thing", fn() { todo }),
+    ]),
+  ])
+}
+```
+
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/grouping.gleam)</sub>
+
+You’ll also see `group` used in the hook inheritance example (outer hooks apply to inner groups):
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_inheritance.gleam)</sub>
 
