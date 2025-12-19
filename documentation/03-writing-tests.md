@@ -15,7 +15,7 @@ Dream Test’s unit DSL is built for that style, but there’s a deeper design g
 
 ```gleam
 import dream_test/matchers.{
-  be_error, be_ok, , or_fail_with, should,
+  be_equal, be_error, be_ok, or_fail_with, should,
 }
 import dream_test/reporters
 import dream_test/runner

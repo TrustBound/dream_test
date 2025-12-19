@@ -9,7 +9,7 @@
 //// additional matchers:
 ////
 //// ```gleam
-//// import dream_test/matchers.{should, be_some, , or_fail_with}
+//// import dream_test/matchers.{be_equal, be_some, or_fail_with, should}
 ////
 //// // Check that it's Some, then check the inner value
 //// find_user(id)

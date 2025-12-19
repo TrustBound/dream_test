@@ -15,7 +15,7 @@
 //// ```gleam
 //// import dream_test/process.{start_counter, get_count, increment}
 //// import dream_test/unit.{describe, it}
-//// import dream_test/matchers.{should, , or_fail_with}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
 ////
 //// pub fn tests() {
 ////   describe("Counter", [

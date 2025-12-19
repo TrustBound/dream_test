@@ -36,7 +36,7 @@ If your snapshot fails every day for “expected reasons,” it’s no longer bu
 
 ```gleam
 import dream_test/matchers.{
-  , match_snapshot, match_snapshot_inspect, or_fail_with, should,
+  be_equal, match_snapshot, match_snapshot_inspect, or_fail_with, should,
 }
 import dream_test/matchers/snapshot
 import dream_test/reporters

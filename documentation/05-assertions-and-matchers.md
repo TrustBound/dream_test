@@ -31,7 +31,7 @@ There’s also a human reason:
 ### Chaining matchers (unwrap + assert)
 
 ```gleam
-import dream_test/matchers.{be_ok, be_some, , or_fail_with, should}
+import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}
@@ -73,8 +73,8 @@ pub fn main() {
 
 ```gleam
 import dream_test/matchers.{
-  be_between, be_false, be_ok, be_some, be_true, contain, contain_string, ,
-  have_length, or_fail_with, should,
+  be_between, be_equal, be_false, be_ok, be_some, be_true, contain,
+  contain_string, have_length, or_fail_with, should,
 }
 import dream_test/unit.{describe, it}
 import gleam/option.{Some}

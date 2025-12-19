@@ -116,7 +116,7 @@ pub type StepContext {
 /// This means you can use the exact same assertion style inside steps:
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_ok, , or_fail_with, should}
+/// import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
 /// import dream_test/gherkin/world as world
 ///
 /// fn check_count(context: StepContext) -> Result(AssertionResult, String) {

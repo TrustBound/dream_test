@@ -9,7 +9,7 @@
 //// chain additional matchers:
 ////
 //// ```gleam
-//// import dream_test/matchers.{should, be_ok, be_error, , or_fail_with}
+//// import dream_test/matchers.{be_equal, be_error, be_ok, or_fail_with, should}
 ////
 //// // Check that it's Ok, then check the inner value
 //// parse_int("42")

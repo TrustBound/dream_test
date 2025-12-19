@@ -71,7 +71,7 @@ pub fn tests() {
 These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
 
 ```gleam
-import dream_test/matchers.{be_between, , or_fail_with, should}
+import dream_test/matchers.{be_between, be_equal, or_fail_with, should}
 import dream_test/process.{get_count, increment, start_counter, unique_port}
 import dream_test/unit.{describe, it}
 
