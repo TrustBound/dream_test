@@ -30,7 +30,7 @@ fn step_add_items(context: StepContext) {
 fn step_verify_count(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   get_or(context.world, "cart", 0)
-  |> should()
+  |> should
   |> equal(expected)
   |> or_fail_with("Cart count mismatch")
 }

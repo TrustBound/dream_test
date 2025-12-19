@@ -12,21 +12,21 @@ pub fn tests() {
 
       // Assert
       ms
-      |> should()
+      |> should
       |> equal("42ms")
       |> or_fail_with("expected 42ms")
     }),
 
     it("format_duration_ms formats 1500ms as seconds", fn() {
       timing.format_duration_ms(1500)
-      |> should()
+      |> should
       |> equal("1.5s")
       |> or_fail_with("expected 1.5s")
     }),
 
     it("format_duration_us formats sub-millisecond values", fn() {
       timing.format_duration_us(500)
-      |> should()
+      |> should
       |> equal("0.5ms")
       |> or_fail_with("expected 0.5ms")
     }),
@@ -37,7 +37,7 @@ pub fn tests() {
       let ok = t2 >= t1
 
       ok
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("expected now_ms to be monotonic")
     }),

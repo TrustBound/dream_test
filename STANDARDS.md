@@ -193,7 +193,7 @@ value
 
 ```gleam
 value
-|> should()
+|> should
 |> equal(expected)
 |> or_fail_with("message")
 ```
@@ -204,7 +204,7 @@ value
 
 **Rule**: Use unqualified imports for DSL functions and piped helpers. Use qualified references when the namespace adds clarity.
 
-**Why**: `should()`, `equal()`, `or_fail_with()` read better unqualified in pipes. Module prefixes add noise for frequently-used functions.
+**Why**: `should`, `equal()`, `or_fail_with()` read better unqualified in pipes. Module prefixes add noise for frequently-used functions.
 
 ### Importing values
 

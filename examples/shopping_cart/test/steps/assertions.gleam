@@ -51,7 +51,7 @@ fn step_verify_item_count(
   let actual = cart.item_count(the_cart)
 
   actual
-  |> should()
+  |> should
   |> equal(expected)
   |> or_fail_with("Cart should contain " <> int.to_string(expected) <> " items")
 }
@@ -62,7 +62,7 @@ fn step_verify_subtotal(context: StepContext) -> Result(AssertionResult, String)
   let actual = pricing.subtotal(the_cart)
 
   floats_equal(actual, expected)
-  |> should()
+  |> should
   |> be_true()
   |> or_fail_with("Subtotal should be $" <> float.to_string(expected))
 }
@@ -73,7 +73,7 @@ fn step_verify_discount(context: StepContext) -> Result(AssertionResult, String)
   let actual = pricing.discount_amount(the_cart)
 
   floats_equal(actual, expected)
-  |> should()
+  |> should
   |> be_true()
   |> or_fail_with("Discount should be $" <> float.to_string(expected))
 }
@@ -84,7 +84,7 @@ fn step_verify_total(context: StepContext) -> Result(AssertionResult, String) {
   let actual = pricing.total(the_cart)
 
   floats_equal(actual, expected)
-  |> should()
+  |> should
   |> be_true()
   |> or_fail_with("Total should be $" <> float.to_string(expected))
 }
@@ -96,7 +96,7 @@ fn step_verify_checkout_success(
     get_or(context.world, "checkout_success", False)
 
   checkout_succeeded
-  |> should()
+  |> should
   |> be_true()
   |> or_fail_with("Checkout should succeed")
 }
@@ -109,7 +109,7 @@ fn step_verify_checkout_failure(
   let actual_error: String = get_or(context.world, "checkout_error", "")
 
   #(checkout_succeeded, actual_error)
-  |> should()
+  |> should
   |> equal(#(False, expected_error))
   |> or_fail_with("Checkout should fail with: " <> expected_error)
 }
@@ -126,7 +126,7 @@ fn step_verify_order_total(
   let the_checkout: cart_types.CheckoutResult = checkout_result
 
   floats_equal(the_checkout.total, expected)
-  |> should()
+  |> should
   |> be_true()
   |> or_fail_with("Order total should be $" <> float.to_string(expected))
 }
@@ -138,7 +138,7 @@ fn step_verify_operation_failure(
   let actual_error: String = get_or(context.world, "last_error", "")
 
   actual_error
-  |> should()
+  |> should
   |> equal(expected_error)
   |> or_fail_with("Operation should fail with: " <> expected_error)
 }

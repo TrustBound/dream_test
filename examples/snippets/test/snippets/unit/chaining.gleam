@@ -12,7 +12,7 @@ pub fn tests() {
     // Unwrap Some, then check the value
     it("unwraps Option", fn() {
       Some(42)
-      |> should()
+      |> should
       |> be_some()
       |> equal(42)
       |> or_fail_with("Should contain 42")
@@ -20,7 +20,7 @@ pub fn tests() {
     // Unwrap Ok, then check the value
     it("unwraps Result", fn() {
       Ok("success")
-      |> should()
+      |> should
       |> be_ok()
       |> equal("success")
       |> or_fail_with("Should be Ok with 'success'")

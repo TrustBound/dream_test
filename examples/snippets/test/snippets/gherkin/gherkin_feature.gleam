@@ -34,7 +34,7 @@ fn step_verify_count(context: StepContext) {
   let expected = get_int(context.captures, 0) |> result.unwrap(0)
   let actual = get_or(context.world, "cart", 0)
   actual
-  |> should()
+  |> should
   |> equal(expected)
   |> or_fail_with("Expected " <> int.to_string(expected) <> " items")
 }

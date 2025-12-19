@@ -121,7 +121,7 @@ pub type StepContext {
 ///
 /// fn check_count(context: StepContext) -> Result(AssertionResult, String) {
 ///   world.get(context.world, "count")
-///   |> should()
+///   |> should
 ///   |> be_ok()
 ///   |> equal(3)
 ///   |> or_fail_with("count should be 3")

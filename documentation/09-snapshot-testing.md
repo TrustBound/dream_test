@@ -75,7 +75,7 @@ pub fn tests() {
     group("match_snapshot", [
       it("renders user profile", fn() {
         render_profile("Alice", 30)
-        |> should()
+        |> should
         |> match_snapshot("./test/snapshots/user_profile.snap")
         |> or_fail_with("Profile should match snapshot")
       }),
@@ -83,7 +83,7 @@ pub fn tests() {
     group("match_snapshot_inspect", [
       it("builds config correctly", fn() {
         build_config()
-        |> should()
+        |> should
         |> match_snapshot_inspect("./test/snapshots/config.snap")
         |> or_fail_with("Config should match snapshot")
       }),
@@ -93,7 +93,7 @@ pub fn tests() {
         // Create a temporary snapshot
         use _ <- result.try(
           "temp content"
-          |> should()
+          |> should
           |> match_snapshot("./test/snapshots/temp.snap")
           |> or_fail_with("Should create temp snapshot"),
         )
@@ -102,7 +102,7 @@ pub fn tests() {
         let result = snapshot.clear_snapshot("./test/snapshots/temp.snap")
 
         result
-        |> should()
+        |> should
         |> equal(Ok(Nil))
         |> or_fail_with("Should successfully clear snapshot")
       }),

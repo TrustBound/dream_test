@@ -45,7 +45,7 @@ pub fn tests() {
   describe("Runner config demo", [
     it("runs with custom config", fn() {
       1 + 1
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("Math works")
     }),
@@ -80,13 +80,13 @@ pub fn tests() {
     it("first test", fn() {
       // When tests share external resources, run them sequentially
       1 + 1
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("Math works")
     }),
     it("second test", fn() {
       2 + 2
-      |> should()
+      |> should
       |> equal(4)
       |> or_fail_with("Math still works")
     }),
@@ -131,7 +131,7 @@ pub fn tests() {
         ])
 
       parallel.run_root_parallel(parallel.default_config(), suite)
-      |> should()
+      |> should
       |> have_length(2)
       |> or_fail_with("expected two results")
     }),

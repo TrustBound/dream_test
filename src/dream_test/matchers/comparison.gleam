@@ -12,12 +12,12 @@
 //// }
 ////
 //// count
-//// |> should()
+//// |> should
 //// |> be_greater_than(0)
 //// |> or_fail_with("Count should be positive")
 ////
 //// score
-//// |> should()
+//// |> should
 //// |> be_in_range(0, 100)
 //// |> or_fail_with("Score should be 0-100")
 //// ```
@@ -26,7 +26,7 @@
 ////
 //// ```gleam
 //// average
-//// |> should()
+//// |> should
 //// |> be_greater_than_float(0.0)
 //// |> or_fail_with("Average should be positive")
 //// ```
@@ -44,7 +44,7 @@ import gleam/option.{Some}
 ///
 /// ```gleam
 /// count_items()
-/// |> should()
+/// |> should
 /// |> be_greater_than(0)
 /// |> or_fail_with("Should have at least one item")
 /// ```
@@ -85,7 +85,7 @@ fn check_greater_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// response_time_ms
-/// |> should()
+/// |> should
 /// |> be_less_than(100)
 /// |> or_fail_with("Response should be under 100ms")
 /// ```
@@ -126,7 +126,7 @@ fn check_less_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// user.age
-/// |> should()
+/// |> should
 /// |> be_at_least(18)
 /// |> or_fail_with("User must be at least 18")
 /// ```
@@ -167,7 +167,7 @@ fn check_at_least(actual: Int, minimum: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// password.length
-/// |> should()
+/// |> should
 /// |> be_at_most(128)
 /// |> or_fail_with("Password must be at most 128 characters")
 /// ```
@@ -210,7 +210,7 @@ fn check_at_most(actual: Int, maximum: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// port
-/// |> should()
+/// |> should
 /// |> be_between(1024, 65535)
 /// |> or_fail_with("Port must be between 1024 and 65535")
 /// ```
@@ -254,7 +254,7 @@ fn check_between(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// score
-/// |> should()
+/// |> should
 /// |> be_in_range(0, 100)
 /// |> or_fail_with("Score must be 0-100")
 /// ```
@@ -296,7 +296,7 @@ fn check_in_range(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 ///
 /// ```gleam
 /// average
-/// |> should()
+/// |> should
 /// |> be_greater_than_float(0.0)
 /// |> or_fail_with("Average should be positive")
 /// ```
@@ -340,7 +340,7 @@ fn check_greater_than_float(
 ///
 /// ```gleam
 /// error_rate
-/// |> should()
+/// |> should
 /// |> be_less_than_float(0.01)
 /// |> or_fail_with("Error rate should be under 1%")
 /// ```

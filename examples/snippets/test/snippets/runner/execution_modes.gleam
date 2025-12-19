@@ -10,7 +10,7 @@ pub fn tests() {
   describe("Execution modes demo", [
     it("runs as a suite", fn() {
       1 + 1
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("Math works")
     }),

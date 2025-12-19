@@ -9,7 +9,7 @@ pub fn tests() {
       "parse_step_pattern splits prefix/suffix placeholders (${float}USD)",
       fn() {
         step_trie.parse_step_pattern("${float}USD")
-        |> should()
+        |> should
         |> equal([
           step_trie.LiteralWord("$"),
           step_trie.FloatParam,
@@ -21,14 +21,14 @@ pub fn tests() {
 
     it("parse_step_pattern splits suffix placeholders ({int}%)", fn() {
       step_trie.parse_step_pattern("{int}%")
-      |> should()
+      |> should
       |> equal([step_trie.IntParam, step_trie.LiteralWord("%")])
       |> or_fail_with("pattern {int}% should split into int, %")
     }),
 
     it("tokenize_step_text preserves quoted strings as a single token", fn() {
       step_trie.tokenize_step_text("I add \"Red Widget\" to cart")
-      |> should()
+      |> should
       |> equal(["I", "add", "\"Red Widget\"", "to", "cart"])
       |> or_fail_with("quoted strings should be one token")
     }),
@@ -37,7 +37,7 @@ pub fn tests() {
       "tokenize_step_text splits numeric boundaries for prefix/suffix matching",
       fn() {
         step_trie.tokenize_step_text("price is $99.99USD")
-        |> should()
+        |> should
         |> equal(["price", "is", "$", "99.99", "USD"])
         |> or_fail_with("numeric boundary splitting should work")
       },
@@ -51,7 +51,7 @@ pub fn tests() {
       let int_match = step_trie.lookup(trie, "Given", "I have 42 items")
 
       int_match
-      |> should()
+      |> should
       |> equal(
         Some(step_trie.StepMatch("handler", [step_trie.CapturedInt(42)])),
       )
@@ -66,7 +66,7 @@ pub fn tests() {
       let float_match = step_trie.lookup(trie, "Then", "the total is $19.99")
 
       float_match
-      |> should()
+      |> should
       |> equal(
         Some(step_trie.StepMatch("money", [step_trie.CapturedFloat(19.99)])),
       )
@@ -76,7 +76,7 @@ pub fn tests() {
     it("lookup returns None for unmatched steps", fn() {
       let trie = step_trie.new()
       step_trie.lookup(trie, "Given", "I have 1 item")
-      |> should()
+      |> should
       |> equal(None)
       |> or_fail_with("empty trie should not match")
     }),

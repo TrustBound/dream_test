@@ -18,7 +18,7 @@ it("retrieves a stored value", fn() {
   // Assert
   cache_app.stop(cache)
   result
-  |> should()
+  |> should
   |> be_some()
   |> equal("Alice")
   |> or_fail_with("get() should return the stored value")

@@ -38,7 +38,7 @@ pub fn tests() {
       let _ = write(path, "hello")
 
       read(path)
-      |> should()
+      |> should
       |> equal(Ok("hello"))
       |> or_fail_with("expected to read back written content")
     }),
@@ -49,14 +49,14 @@ pub fn tests() {
       let _ = delete(path)
 
       read(path)
-      |> should()
+      |> should
       |> equal(Error(NotFound(path)))
       |> or_fail_with("expected deleted file to be NotFound")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
-      |> should()
+      |> should
       |> equal("File not found: /x")
       |> or_fail_with("expected NotFound formatting")
     }),
@@ -83,14 +83,14 @@ pub fn tests() {
       increment(counter)
 
       get_count(counter)
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("expected counter to be 2")
     }),
 
     it("unique_port returns a value in the safe range", fn() {
       unique_port()
-      |> should()
+      |> should
       |> be_between(10_000, 60_000)
       |> or_fail_with("expected unique_port to be within 10k..60k")
     }),
@@ -117,21 +117,21 @@ pub fn tests() {
 
       // Assert
       ms
-      |> should()
+      |> should
       |> equal("42ms")
       |> or_fail_with("expected 42ms")
     }),
 
     it("format_duration_ms formats 1500ms as seconds", fn() {
       timing.format_duration_ms(1500)
-      |> should()
+      |> should
       |> equal("1.5s")
       |> or_fail_with("expected 1.5s")
     }),
 
     it("format_duration_us formats sub-millisecond values", fn() {
       timing.format_duration_us(500)
-      |> should()
+      |> should
       |> equal("0.5ms")
       |> or_fail_with("expected 0.5ms")
     }),
@@ -142,7 +142,7 @@ pub fn tests() {
       let ok = t2 >= t1
 
       ok
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("expected now_ms to be monotonic")
     }),
@@ -174,7 +174,7 @@ pub fn tests() {
       let result = sandbox.run_isolated(config, fn() { 123 })
 
       result
-      |> should()
+      |> should
       |> equal(SandboxCompleted(123))
       |> or_fail_with("expected SandboxCompleted(123)")
     }),
@@ -186,7 +186,7 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, loop_forever)
 
         result
-        |> should()
+        |> should
         |> equal(SandboxTimedOut)
         |> or_fail_with("expected SandboxTimedOut")
       },
@@ -202,7 +202,7 @@ pub fn tests() {
       }
 
       did_crash
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("expected SandboxCrashed(...)")
     }),

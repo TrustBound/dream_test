@@ -13,20 +13,20 @@ pub fn tests() {
   describe("Calculator", [
     it("adds two numbers", fn() {
       add(2, 3)
-      |> should()
+      |> should
       |> equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
     it("handles division", fn() {
       divide(10, 2)
-      |> should()
+      |> should
       |> be_ok()
       |> equal(5)
       |> or_fail_with("10 / 2 should equal 5")
     }),
     it("returns error for division by zero", fn() {
       divide(1, 0)
-      |> should()
+      |> should
       |> be_error()
       |> or_fail_with("Division by zero should error")
     }),

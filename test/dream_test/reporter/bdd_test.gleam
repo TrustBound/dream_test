@@ -93,7 +93,7 @@ pub fn tests() {
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n"
 
         bdd.format(results)
-        |> should()
+        |> should
         |> equal(expected)
         |> or_fail_with("bdd.format should render a basic BDD-style report")
       }),

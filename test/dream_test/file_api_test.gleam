@@ -15,7 +15,7 @@ pub fn tests() {
         <> int.to_string(unique_port())
         <> ".txt"
       write(path, "hello")
-      |> should()
+      |> should
       |> equal(Ok(Nil))
       |> or_fail_with("expected write to succeed")
     }),
@@ -27,7 +27,7 @@ pub fn tests() {
         <> ".txt"
       let _ = write(path, "hello")
       read(path)
-      |> should()
+      |> should
       |> equal(Ok("hello"))
       |> or_fail_with("expected read to return written content")
     }),
@@ -39,7 +39,7 @@ pub fn tests() {
         <> ".txt"
       let _ = write(path, "hello")
       delete(path)
-      |> should()
+      |> should
       |> equal(Ok(Nil))
       |> or_fail_with("expected delete to succeed")
     }),
@@ -51,7 +51,7 @@ pub fn tests() {
         <> ".txt"
       let _ = delete(path)
       delete(path)
-      |> should()
+      |> should
       |> equal(Ok(Nil))
       |> or_fail_with("expected delete to be idempotent")
     }),
@@ -68,7 +68,7 @@ pub fn tests() {
       let _ = write(c, "c")
 
       delete_files_matching(dir, ".tmp")
-      |> should()
+      |> should
       |> equal(Ok(2))
       |> or_fail_with("expected 2 tmp files deleted")
     }),
@@ -82,7 +82,7 @@ pub fn tests() {
       let _ = delete_files_matching(dir, ".tmp")
 
       read(a)
-      |> should()
+      |> should
       |> equal(Error(NotFound(a)))
       |> or_fail_with("a.tmp should be deleted")
     }),
@@ -96,42 +96,42 @@ pub fn tests() {
       let _ = delete_files_matching(dir, ".tmp")
 
       read(c)
-      |> should()
+      |> should
       |> equal(Ok("c"))
       |> or_fail_with("c.other should remain")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
-      |> should()
+      |> should
       |> equal("File not found: /x")
       |> or_fail_with("NotFound formatting")
     }),
 
     it("error_to_string formats PermissionDenied", fn() {
       error_to_string(PermissionDenied("/x"))
-      |> should()
+      |> should
       |> equal("Permission denied: /x")
       |> or_fail_with("PermissionDenied formatting")
     }),
 
     it("error_to_string formats IsDirectory", fn() {
       error_to_string(IsDirectory("/x"))
-      |> should()
+      |> should
       |> equal("Is a directory: /x")
       |> or_fail_with("IsDirectory formatting")
     }),
 
     it("error_to_string formats NoSpace", fn() {
       error_to_string(NoSpace("/x"))
-      |> should()
+      |> should
       |> equal("No space left on device: /x")
       |> or_fail_with("NoSpace formatting")
     }),
 
     it("error_to_string formats FileSystemError", fn() {
       error_to_string(FileSystemError("/x", "enoent"))
-      |> should()
+      |> should
       |> equal("File error (enoent): /x")
       |> or_fail_with("FileSystemError formatting")
     }),

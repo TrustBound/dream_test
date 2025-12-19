@@ -19,7 +19,7 @@ pub fn tests() {
       let assert [r] = results
 
       #(r.name, r.full_name, r.status, r.tags, r.failures, r.kind)
-      |> should()
+      |> should
       |> equal(#("passes", ["inner", "passes"], Passed, ["smoke"], [], Unit))
       |> or_fail_with("runner should execute a unit suite deterministically")
     }),
@@ -41,7 +41,7 @@ pub fn tests() {
       let assert [r] = results
 
       r.tags
-      |> should()
+      |> should
       |> equal(["group", "inner", "leaf"])
       |> or_fail_with("test tags should include group tags + test tags")
     }),
@@ -64,7 +64,7 @@ pub fn tests() {
       let assert [r] = results
 
       r.status
-      |> should()
+      |> should
       |> equal(Failed)
       |> or_fail_with("failed assertion should produce Failed status")
     }),

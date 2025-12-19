@@ -72,13 +72,13 @@ pub fn tests() {
   describe("Custom Matchers", [
     it("be_even passes for even numbers", fn() {
       4
-      |> should()
+      |> should
       |> be_even()
       |> or_fail_with("4 should be even")
     }),
     it("be_valid_email passes for valid emails", fn() {
       "user@example.com"
-      |> should()
+      |> should
       |> be_valid_email()
       |> or_fail_with("Should be a valid email")
     }),

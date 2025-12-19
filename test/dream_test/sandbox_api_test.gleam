@@ -14,7 +14,7 @@ pub fn tests() {
       case sandbox.run_isolated(config, fn() { AssertionOk }) {
         sandbox.SandboxCompleted(result) ->
           result
-          |> should()
+          |> should
           |> equal(AssertionOk)
           |> or_fail_with("should return AssertionOk")
         other ->

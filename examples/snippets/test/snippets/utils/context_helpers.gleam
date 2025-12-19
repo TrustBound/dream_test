@@ -14,7 +14,7 @@ pub fn tests() {
     it("new has no failures", fn() {
       context.new()
       |> context.failures()
-      |> should()
+      |> should
       |> equal([])
       |> or_fail_with("expected new context to have no failures")
     }),
@@ -27,7 +27,7 @@ pub fn tests() {
       |> context.add_failure(f1)
       |> context.add_failure(f2)
       |> context.failures()
-      |> should()
+      |> should
       |> equal([f2, f1])
       |> or_fail_with("expected newest-first failure ordering")
     }),

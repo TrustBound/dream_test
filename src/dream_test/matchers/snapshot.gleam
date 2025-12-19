@@ -20,7 +20,7 @@
 ////
 //// it("renders user profile", fn() {
 ////   render_profile(user)
-////   |> should()
+////   |> should
 ////   |> match_snapshot("./test/snapshots/user_profile.snap")
 ////   |> or_fail_with("Profile should match snapshot")
 //// })
@@ -80,7 +80,7 @@
 ////
 //// ```gleam
 //// build_complex_result()
-//// |> should()
+//// |> should
 //// |> match_snapshot_inspect("./test/snapshots/complex.snap")
 //// |> or_fail_with("Result should match snapshot")
 //// ```
@@ -122,7 +122,7 @@ import gleam/string
 /// ```gleam
 /// it("serializes user to JSON", fn() {
 ///   user_to_json(sample_user)
-///   |> should()
+///   |> should
 ///   |> match_snapshot("./test/snapshots/user.json")
 ///   |> or_fail_with("User JSON should match snapshot")
 /// })
@@ -134,7 +134,7 @@ import gleam/string
 /// it("renders HTML correctly", fn() {
 ///   render_page(data)
 ///   |> string.trim()  // Normalize whitespace
-///   |> should()
+///   |> should
 ///   |> match_snapshot("./test/snapshots/page.html")
 ///   |> or_fail_with("Page HTML should match snapshot")
 /// })
@@ -148,7 +148,7 @@ import gleam/string
 ///     Ok(_) -> Ok(fail_with("Should have failed"))
 ///     Error(msg) ->
 ///       msg
-///       |> should()
+///       |> should
 ///       |> match_snapshot("./test/snapshots/parse_error.snap")
 ///       |> or_fail_with("Error message should match snapshot")
 ///   }
@@ -195,7 +195,7 @@ pub fn match_snapshot(
 /// ```gleam
 /// it("parses config correctly", fn() {
 ///   parse_config(raw_toml)
-///   |> should()
+///   |> should
 ///   |> match_snapshot_inspect("./test/snapshots/config.snap")
 ///   |> or_fail_with("Parsed config should match snapshot")
 /// })
@@ -207,7 +207,7 @@ pub fn match_snapshot(
 /// it("filters users correctly", fn() {
 ///   users
 ///   |> list.filter(is_active)
-///   |> should()
+///   |> should
 ///   |> match_snapshot_inspect("./test/snapshots/active_users.snap")
 ///   |> or_fail_with("Active users should match snapshot")
 /// })

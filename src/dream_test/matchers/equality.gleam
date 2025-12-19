@@ -10,13 +10,13 @@
 ////
 //// // Check equality
 //// result
-//// |> should()
+//// |> should
 //// |> equal(42)
 //// |> or_fail_with("Should be 42")
 ////
 //// // Check inequality
 //// result
-//// |> should()
+//// |> should
 //// |> not_equal(0)
 //// |> or_fail_with("Should not be zero")
 //// ```
@@ -36,7 +36,7 @@ import gleam/string
 ///
 /// ```gleam
 /// add(2, 3)
-/// |> should()
+/// |> should
 /// |> equal(5)
 /// |> or_fail_with("2 + 3 should equal 5")
 /// ```
@@ -75,7 +75,7 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
 ///
 /// ```gleam
 /// divide(10, 3)
-/// |> should()
+/// |> should
 /// |> not_equal(3)
 /// |> or_fail_with("10/3 should not equal 3 exactly")
 /// ```

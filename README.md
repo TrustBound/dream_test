@@ -38,116 +38,9 @@ It’s designed for the common case (unit + integration tests) and it scales cle
 
 **Target support:** Dream Test is built and tested for the **BEAM (Erlang target)**. The JavaScript target is **not tested or supported** at this time — if you attempt it anyway, **YMMV**.
 
-## Integration testing (behavior over time)
-
-Unit tests are great for “input → output.” Integration tests often look like “a sequence of behavior over time.”
-
-Dream Test gives you two ways to write those scenario tests:
-
-- **Inline Gherkin in Gleam** (works great when engineers own the specs)
-- **Standard `.feature` files** (great when specs come from tickets/QA)
-
-### Inline Gherkin (authored in Gleam)
-
-```gleam
-import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{new_registry, step}
-
-pub fn tests() {
-  let steps =
-    new_registry()
-    |> step("I have {int} items in my cart", step_have_items)
-    |> step("I add {int} more items", step_add_items)
-    |> step("I should have {int} items total", step_should_have)
-
-  feature("Shopping Cart", steps, [
-    scenario("Adding items to cart", [
-      given("I have 3 items in my cart"),
-      when("I add 2 more items"),
-      then("I should have 5 items total"),
-    ]),
-  ])
-}
-```
-
-- Full tested example: [`examples/snippets/test/snippets/gherkin/gherkin_hero.gleam`](examples/snippets/test/snippets/gherkin/gherkin_hero.gleam)
-- Guide: `documentation/10-gherkin-bdd.md`
-
-### `.feature` files (authored as standard Gherkin)
-
-```gherkin
-Feature: Shopping Cart
-  Background:
-    Given the server is running
-
-  Scenario: Adding items
-    Given the cart is empty
-    When I add 3 items
-    Then the cart should have 3 items
-```
-
-```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
-import dream_test/gherkin/parser
-
-pub fn tests() {
-  let assert Ok(feature) = parser.parse_file("test/cart.feature")
-  let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_test_suite("cart_test", config)
-}
-```
-
-- Full tested `.feature` example: [`examples/shopping_cart/features/shopping_cart.feature`](examples/shopping_cart/features/shopping_cart.feature)
-- Full tested runner + steps: [`examples/shopping_cart/test/shopping_cart_test.gleam`](examples/shopping_cart/test/shopping_cart_test.gleam) and [`examples/shopping_cart/test/steps/`](examples/shopping_cart/test/steps/)
-- Docs: `documentation/10-gherkin-bdd.md` (see “Loading a .feature file…” / discovery)
-
-### Snapshot testing (handy for integration outputs too)
-
-```gleam
-import dream_test/assertions/should.{match_snapshot, match_snapshot_inspect, or_fail_with, should}
-
-// Snapshot a string (great for HTML, CLI output, etc.)
-render_profile("Alice", 30)
-|> should()
-|> match_snapshot("./test/snapshots/user_profile.snap")
-|> or_fail_with("Profile should match snapshot")
-
-// Snapshot complex data with inspect output
-build_config()
-|> should()
-|> match_snapshot_inspect("./test/snapshots/config.snap")
-|> or_fail_with("Config should match snapshot")
-```
-
-- Full tested example: [`examples/snippets/test/snippets/matchers/snapshot_testing.gleam`](examples/snippets/test/snippets/matchers/snapshot_testing.gleam)
-- Guide: `documentation/09-snapshot-testing.md`
-
-## Showcase (copy/paste)
-
-If you want step-by-step setup (install + where to put the runner), start with:
-
-- [Quick Start](documentation/02-quick-start.md)
-- [Installation](documentation/01-installation.md)
-
-### Before you copy/paste
-
-1. Add Dream Test as a **dev dependency** in your `gleam.toml`:
-
-```toml
-[dev-dependencies]
-dream_test = "~> 2.0"
-```
-
-2. Create a test runner module (this is what `gleam test` executes), e.g. `test/my_project_test.gleam`.
-3. Run:
-
-```sh
-gleam test
-```
+## Feature Showcase
 
 ### Showcase: discovery runner (BEAM-only)
-
-<sub>Note: module discovery is BEAM-only (Erlang target).</sub>
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
@@ -169,6 +62,7 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>
+<sub>📖 [Guide](documentation/02-quick-start.md)</sub>
 
 ### Showcase: explicit suites + assertions
 
@@ -187,14 +81,14 @@ pub fn tests() {
     it("trims whitespace", fn() {
       "  hello  "
       |> string.trim()
-      |> should()
+      |> should
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
       "hello world"
       |> string.contains("world")
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("Should find 'world' in string")
     }),
@@ -210,6 +104,7 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/snippets/unit/quick_start.gleam)</sub>
+<sub>📖 [Guide](documentation/02-quick-start.md)</sub>
 
 ### Showcase: runner configuration (parallelism + timeouts)
 
@@ -231,6 +126,7 @@ pub fn main() {
 ```
 
 <sub>🧪 [Tested source](examples/snippets/test/snippets/runner/runner_config.gleam)</sub>
+<sub>📖 [Guide](documentation/07-runner-and-execution.md)</sub>
 
 ### More showcases (tested examples)
 
@@ -242,6 +138,214 @@ pub fn main() {
   - Inline Gleam DSL: [Feature in Gleam](examples/shopping_cart/test/features/shopping_cart.gleam)
   - Runner + steps: [Example runner](examples/shopping_cart/test/shopping_cart_test.gleam) and [step definitions](examples/shopping_cart/test/steps/)
 
+## Integration testing (behavior over time)
+
+Unit tests are great for “input → output.” Integration tests often look like “a sequence of behavior over time.”
+
+Dream Test gives you a few ways to keep integration tests readable:
+
+- **Inline Gherkin in Gleam** (works great when engineers own the specs)
+- **Standard `.feature` files** (great when specs come from tickets/QA)
+- **Snapshot testing** (great for “rendered output” and other complex results)
+
+### Inline Gherkin (authored in Gleam)
+
+```gleam
+import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/world.{get_or, put}
+import dream_test/reporters
+import dream_test/runner
+import gleam/io
+import gleam/result
+
+fn step_have_items(context: StepContext) {
+  let count = get_int(context.captures, 0) |> result.unwrap(0)
+  put(context.world, "cart", count)
+  Ok(succeed())
+}
+
+fn step_add_items(context: StepContext) {
+  let current = get_or(context.world, "cart", 0)
+  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
+  put(context.world, "cart", current + to_add)
+  Ok(succeed())
+}
+
+fn step_should_have(context: StepContext) {
+  let expected = get_int(context.captures, 0) |> result.unwrap(0)
+  get_or(context.world, "cart", 0)
+  |> should
+  |> equal(expected)
+  |> or_fail_with("Cart count mismatch")
+}
+
+pub fn tests() {
+  let steps =
+    new_registry()
+    |> step("I have {int} items in my cart", step_have_items)
+    |> step("I add {int} more items", step_add_items)
+    |> step("I should have {int} items total", step_should_have)
+
+  feature("Shopping Cart", steps, [
+    scenario("Adding items to cart", [
+      given("I have 3 items in my cart"),
+      when("I add 2 more items"),
+      then("I should have 5 items total"),
+    ]),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets/gherkin/gherkin_hero.gleam)</sub>
+<sub>📖 [Guide](documentation/10-gherkin-bdd.md)</sub>
+
+### `.feature` files (authored as standard Gherkin)
+
+```gherkin
+Feature: Shopping Cart
+  Background:
+    Given the server is running
+
+  Scenario: Adding items
+    Given the cart is empty
+    When I add 3 items
+    Then the cart should have 3 items
+```
+
+```gleam
+import dream_test/assertions/should.{equal, or_fail_with, should, succeed}
+import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/parser
+import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/world.{get_or, put}
+import dream_test/reporters
+import dream_test/runner
+import gleam/io
+import gleam/result
+
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
+  Ok(succeed())
+}
+
+fn step_empty_cart(context: StepContext) {
+  put(context.world, "cart", 0)
+  Ok(succeed())
+}
+
+fn step_add_items(context: StepContext) {
+  let current = get_or(context.world, "cart", 0)
+  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
+  put(context.world, "cart", current + to_add)
+  Ok(succeed())
+}
+
+fn step_verify_count(context: StepContext) {
+  let expected = get_int(context.captures, 0) |> result.unwrap(0)
+  get_or(context.world, "cart", 0)
+  |> should
+  |> equal(expected)
+  |> or_fail_with("Cart count mismatch")
+}
+
+pub fn tests() {
+  let steps =
+    new_registry()
+    |> step("the server is running", step_server_running)
+    |> step("the cart is empty", step_empty_cart)
+    |> step("I add {int} items", step_add_items)
+    |> step("the cart should have {int} items", step_verify_count)
+
+  // Save the feature text above as `test/cart.feature`
+  let assert Ok(feature) = parser.parse_file("test/cart.feature")
+
+  let config = FeatureConfig(feature: feature, step_registry: steps)
+  to_test_suite("cart_test", config)
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+<sub>🧪 [Tested source (.feature)](examples/snippets/test/cart.feature)</sub>
+<sub>🧪 [Tested source (runner + steps)](examples/snippets/test/snippets/gherkin/gherkin_file.gleam)</sub>
+<sub>📖 [Guide](documentation/10-gherkin-bdd.md)</sub>
+
+### Snapshot testing (handy for integration outputs too)
+
+```gleam
+import dream_test/assertions/should.{
+  match_snapshot, match_snapshot_inspect, or_fail_with, should,
+}
+import dream_test/reporters
+import dream_test/runner
+import dream_test/unit.{describe, it}
+import gleam/int
+import gleam/io
+import gleam/string
+
+fn render_profile(name, age) {
+  string.concat([
+    "<div class=\"profile\">\n",
+    "  <h1>",
+    name,
+    "</h1>\n",
+    "  <p>Age: ",
+    int.to_string(age),
+    "</p>\n",
+    "</div>",
+  ])
+}
+
+pub type Config {
+  Config(host: String, port: Int, debug: Bool)
+}
+
+fn build_config() {
+  Config(host: "localhost", port: 8080, debug: True)
+}
+
+pub fn tests() {
+  describe("Snapshot testing", [
+    it("renders user profile", fn() {
+      render_profile("Alice", 30)
+      |> should
+      |> match_snapshot("./test/snapshots/user_profile.snap")
+      |> or_fail_with("Profile should match snapshot")
+    }),
+    it("builds config correctly", fn() {
+      build_config()
+      |> should
+      |> match_snapshot_inspect("./test/snapshots/config.snap")
+      |> or_fail_with("Config should match snapshot")
+    }),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+<sub>🧪 [Tested source](examples/snippets/test/snippets/matchers/snapshot_testing.gleam)</sub>
+<sub>📖 [Guide](documentation/09-snapshot-testing.md)</sub>
+
 ## Guides (start here)
 
 If you’re new to Dream Test, this is the shortest path from “it runs” to “it scales”.
@@ -250,7 +354,7 @@ If you’re new to Dream Test, this is the shortest path from “it runs” to �
 2. [Quick Start](documentation/02-quick-start.md)
 3. [Writing unit tests (`describe`/`it`/`group`/`skip`)](documentation/03-writing-tests.md)
 4. [Context-aware tests (`unit_context`)](documentation/04-context-aware-tests.md)
-5. [Assertions & matchers (the `should()` pipeline)](documentation/05-assertions-and-matchers.md)
+5. [Assertions & matchers (the `should` pipeline)](documentation/05-assertions-and-matchers.md)
 6. [Lifecycle hooks (`before_*` / `after_*`)](documentation/06-lifecycle-hooks.md)
 7. [Runner & execution model (parallelism, timeouts, CI)](documentation/07-runner-and-execution.md)
 8. [Reporters (BDD, JSON, Progress, Gherkin)](documentation/08-reporters.md)

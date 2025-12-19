@@ -71,7 +71,7 @@ pub fn tests() {
           ),
         ] ->
           tags
-          |> should()
+          |> should
           |> equal(["smoke"])
           |> or_fail_with("scenario tags should appear in result")
         _ -> Ok(fail_with("unexpected results"))

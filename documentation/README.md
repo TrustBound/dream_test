@@ -35,7 +35,7 @@ That’s why you’ll see the same patterns repeated:
 2. [Quick Start](02-quick-start.md) — the first “real” test, with two runner styles.
 3. [Writing unit tests](03-writing-tests.md) — naming, structure, skipping, tags.
 4. [Context-aware unit tests](04-context-aware-tests.md) — when “setup returns a value” and you need to pass it into tests.
-5. [Assertions & matchers](05-assertions-and-matchers.md) — how and why the `should()` pipeline works.
+5. [Assertions & matchers](05-assertions-and-matchers.md) — how and why the `should` pipeline works.
 6. [Lifecycle hooks](06-lifecycle-hooks.md) — power tools, and how to keep them from hiding meaning.
 7. [Runner & execution model](07-runner-and-execution.md) — concurrency, timeouts, CI, and reliability.
 8. [Reporters](08-reporters.md) — humans vs machines, streaming vs post-run.

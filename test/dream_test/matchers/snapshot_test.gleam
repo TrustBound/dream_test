@@ -11,7 +11,7 @@ pub fn tests() {
       let _ = snapshot.clear_snapshot(path)
 
       "hello"
-      |> should()
+      |> should
       |> snapshot.match_snapshot(path)
       |> or_fail_with("should create snapshot on first run")
     }),
@@ -22,7 +22,7 @@ pub fn tests() {
       let _ = file.write(path, "hello")
 
       "hello"
-      |> should()
+      |> should
       |> snapshot.match_snapshot(path)
       |> or_fail_with("should match existing snapshot")
     }),
@@ -33,7 +33,7 @@ pub fn tests() {
       let _ = file.write(path, "expected")
 
       "actual"
-      |> should()
+      |> should
       |> snapshot.match_snapshot(path)
       |> have_failure_operator("match_snapshot")
       |> or_fail_with("expected mismatch to fail with operator match_snapshot")
@@ -43,7 +43,7 @@ pub fn tests() {
       let path = "./test/tmp/snapshots/clear_snapshot_idempotent.snap"
       let _ = snapshot.clear_snapshot(path)
       snapshot.clear_snapshot(path)
-      |> should()
+      |> should
       |> equal(Ok(Nil))
       |> or_fail_with("clear_snapshot should succeed even when missing")
     }),
@@ -59,7 +59,7 @@ pub fn tests() {
         let _ = snapshot.clear_snapshots_in_directory(dir)
 
         file.read(dir <> "/c.txt")
-        |> should()
+        |> should
         |> equal(Ok("c"))
         |> or_fail_with("non-.snap file should remain")
       },

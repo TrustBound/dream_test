@@ -20,7 +20,7 @@ pub fn tests() {
       let assert [r] = results
 
       #(r.status, r.tags)
-      |> should()
+      |> should
       |> equal(#(Passed, ["group", "leaf"]))
       |> or_fail_with("status and tag propagation should match")
     }),
@@ -30,14 +30,14 @@ pub fn tests() {
         describe("root", 0, [
           before_all(fn(n: Int) { Ok(n + 1) }),
           it("sees updated context", fn(n: Int) {
-            n |> should() |> equal(1) |> or_fail_with("context should be 1")
+            n |> should |> equal(1) |> or_fail_with("context should be 1")
           }),
         ])
 
       let results = runner.new([suite]) |> runner.run()
       let assert [r] = results
 
-      r.status |> should() |> equal(Passed) |> or_fail_with("test should pass")
+      r.status |> should |> equal(Passed) |> or_fail_with("test should pass")
     }),
   ])
 }

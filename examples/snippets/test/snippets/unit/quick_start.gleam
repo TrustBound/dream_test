@@ -12,14 +12,14 @@ pub fn tests() {
     it("trims whitespace", fn() {
       "  hello  "
       |> string.trim()
-      |> should()
+      |> should
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
       "hello world"
       |> string.contains("world")
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("Should find 'world' in string")
     }),

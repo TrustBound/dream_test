@@ -17,7 +17,7 @@ pub fn tests() {
       let _ = write(path, "hello")
 
       read(path)
-      |> should()
+      |> should
       |> equal(Ok("hello"))
       |> or_fail_with("expected to read back written content")
     }),
@@ -28,14 +28,14 @@ pub fn tests() {
       let _ = delete(path)
 
       read(path)
-      |> should()
+      |> should
       |> equal(Error(NotFound(path)))
       |> or_fail_with("expected deleted file to be NotFound")
     }),
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
-      |> should()
+      |> should
       |> equal("File not found: /x")
       |> or_fail_with("expected NotFound formatting")
     }),

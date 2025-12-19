@@ -20,13 +20,13 @@ pub fn tests() {
     }),
     it("creates a record", fn() {
       []
-      |> should()
+      |> should
       |> be_empty()
       |> or_fail_with("Placeholder test")
     }),
     it("queries records", fn() {
       []
-      |> should()
+      |> should
       |> be_empty()
       |> or_fail_with("Placeholder test")
     }),

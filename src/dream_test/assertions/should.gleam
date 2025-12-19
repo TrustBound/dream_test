@@ -1,13 +1,13 @@
 //// Assertion API for dream_test.
 ////
 //// This module provides a fluent, pipe-friendly assertion API. Every assertion
-//// chain starts with `should()` and ends with `or_fail_with()`.
+//// chain starts with `should` and ends with `or_fail_with()`.
 ////
 //// ## Basic Pattern
 ////
 //// ```gleam
 //// value
-//// |> should()
+//// |> should
 //// |> equal(expected)
 //// |> or_fail_with("Helpful error message")
 //// ```
@@ -32,21 +32,21 @@
 //// ```gleam
 //// // Unwrap Some, then check the inner value
 //// Some(42)
-//// |> should()
+//// |> should
 //// |> be_some()
 //// |> equal(42)
 //// |> or_fail_with("Should be Some(42)")
 ////
 //// // Unwrap Ok, then check the inner value
 //// Ok("hello")
-//// |> should()
+//// |> should
 //// |> be_ok()
 //// |> equal("hello")
 //// |> or_fail_with("Should be Ok with 'hello'")
 ////
 //// // Unwrap Ok, then check the inner Option
 //// Ok(Some(42))
-//// |> should()
+//// |> should
 //// |> be_ok()
 //// |> be_some()
 //// |> be_greater_than(40)
@@ -61,7 +61,7 @@
 //// case result {
 ////   Ok(user) -> {
 ////     user.name
-////     |> should()
+////     |> should
 ////     |> equal("Alice")
 ////     |> or_fail_with("User should be Alice")
 ////   }
@@ -102,7 +102,7 @@ import gleam/option as gleam_option
 ///
 /// ```gleam
 /// 42
-/// |> should()
+/// |> should
 /// |> equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```
@@ -123,7 +123,7 @@ pub fn should(value: a) -> MatchResult(a) {
 ///
 /// ```gleam
 /// add(2, 3)
-/// |> should()
+/// |> should
 /// |> equal(5)
 /// |> or_fail_with("2 + 3 should equal 5")
 /// ```
@@ -136,7 +136,7 @@ pub const equal = equality.equal
 ///
 /// ```gleam
 /// divide(10, 3)
-/// |> should()
+/// |> should
 /// |> not_equal(3)
 /// |> or_fail_with("10/3 should not equal 3 exactly")
 /// ```
@@ -153,7 +153,7 @@ pub const not_equal = equality.not_equal
 ///
 /// ```gleam
 /// is_valid(input)
-/// |> should()
+/// |> should
 /// |> be_true()
 /// |> or_fail_with("Input should be valid")
 /// ```
@@ -166,7 +166,7 @@ pub const be_true = boolean.be_true
 ///
 /// ```gleam
 /// is_empty(list)
-/// |> should()
+/// |> should
 /// |> be_false()
 /// |> or_fail_with("List should not be empty")
 /// ```
@@ -186,13 +186,13 @@ pub const be_false = boolean.be_false
 ///
 /// ```gleam
 /// find_user(id)
-/// |> should()
+/// |> should
 /// |> be_some()
 /// |> or_fail_with("User should exist")
 ///
 /// // With chaining:
 /// find_user(id)
-/// |> should()
+/// |> should
 /// |> be_some()
 /// |> equal(expected_user)
 /// |> or_fail_with("Should find the expected user")
@@ -206,7 +206,7 @@ pub const be_some = option.be_some
 ///
 /// ```gleam
 /// find_deleted_user(id)
-/// |> should()
+/// |> should
 /// |> be_none()
 /// |> or_fail_with("Deleted user should not exist")
 /// ```
@@ -226,13 +226,13 @@ pub const be_none = option.be_none
 ///
 /// ```gleam
 /// parse_int("42")
-/// |> should()
+/// |> should
 /// |> be_ok()
 /// |> or_fail_with("Should parse successfully")
 ///
 /// // With chaining:
 /// parse_int("42")
-/// |> should()
+/// |> should
 /// |> be_ok()
 /// |> equal(42)
 /// |> or_fail_with("Should parse to 42")
@@ -248,13 +248,13 @@ pub const be_ok = result.be_ok
 ///
 /// ```gleam
 /// parse_int("not a number")
-/// |> should()
+/// |> should
 /// |> be_error()
 /// |> or_fail_with("Should fail to parse")
 ///
 /// // With chaining:
 /// validate(input)
-/// |> should()
+/// |> should
 /// |> be_error()
 /// |> equal(ValidationError("email required"))
 /// |> or_fail_with("Should fail with email error")
@@ -272,7 +272,7 @@ pub const be_error = result.be_error
 ///
 /// ```gleam
 /// [1, 2, 3]
-/// |> should()
+/// |> should
 /// |> contain(2)
 /// |> or_fail_with("List should contain 2")
 /// ```
@@ -285,7 +285,7 @@ pub const contain = collection.contain
 ///
 /// ```gleam
 /// ["a", "b", "c"]
-/// |> should()
+/// |> should
 /// |> not_contain("d")
 /// |> or_fail_with("List should not contain 'd'")
 /// ```
@@ -298,7 +298,7 @@ pub const not_contain = collection.not_contain
 ///
 /// ```gleam
 /// get_users()
-/// |> should()
+/// |> should
 /// |> have_length(3)
 /// |> or_fail_with("Should have 3 users")
 /// ```
@@ -311,7 +311,7 @@ pub const have_length = collection.have_length
 ///
 /// ```gleam
 /// get_errors()
-/// |> should()
+/// |> should
 /// |> be_empty()
 /// |> or_fail_with("Should have no errors")
 /// ```
@@ -328,7 +328,7 @@ pub const be_empty = collection.be_empty
 ///
 /// ```gleam
 /// count_items()
-/// |> should()
+/// |> should
 /// |> be_greater_than(0)
 /// |> or_fail_with("Should have at least one item")
 /// ```
@@ -341,7 +341,7 @@ pub const be_greater_than = comparison.be_greater_than
 ///
 /// ```gleam
 /// response_time_ms
-/// |> should()
+/// |> should
 /// |> be_less_than(100)
 /// |> or_fail_with("Response should be under 100ms")
 /// ```
@@ -354,7 +354,7 @@ pub const be_less_than = comparison.be_less_than
 ///
 /// ```gleam
 /// user.age
-/// |> should()
+/// |> should
 /// |> be_at_least(18)
 /// |> or_fail_with("User must be at least 18")
 /// ```
@@ -367,7 +367,7 @@ pub const be_at_least = comparison.be_at_least
 ///
 /// ```gleam
 /// password.length
-/// |> should()
+/// |> should
 /// |> be_at_most(128)
 /// |> or_fail_with("Password must be at most 128 characters")
 /// ```
@@ -382,7 +382,7 @@ pub const be_at_most = comparison.be_at_most
 ///
 /// ```gleam
 /// port
-/// |> should()
+/// |> should
 /// |> be_between(1024, 65535)
 /// |> or_fail_with("Port must be between 1024 and 65535")
 /// ```
@@ -397,7 +397,7 @@ pub const be_between = comparison.be_between
 ///
 /// ```gleam
 /// score
-/// |> should()
+/// |> should
 /// |> be_in_range(0, 100)
 /// |> or_fail_with("Score must be 0-100")
 /// ```
@@ -410,7 +410,7 @@ pub const be_in_range = comparison.be_in_range
 ///
 /// ```gleam
 /// average
-/// |> should()
+/// |> should
 /// |> be_greater_than_float(0.0)
 /// |> or_fail_with("Average should be positive")
 /// ```
@@ -423,7 +423,7 @@ pub const be_greater_than_float = comparison.be_greater_than_float
 ///
 /// ```gleam
 /// error_rate
-/// |> should()
+/// |> should
 /// |> be_less_than_float(0.01)
 /// |> or_fail_with("Error rate should be under 1%")
 /// ```
@@ -440,7 +440,7 @@ pub const be_less_than_float = comparison.be_less_than_float
 ///
 /// ```gleam
 /// greeting
-/// |> should()
+/// |> should
 /// |> start_with("Hello")
 /// |> or_fail_with("Greeting should start with Hello")
 /// ```
@@ -453,7 +453,7 @@ pub const start_with = string.start_with
 ///
 /// ```gleam
 /// filename
-/// |> should()
+/// |> should
 /// |> end_with(".gleam")
 /// |> or_fail_with("File should be a Gleam file")
 /// ```
@@ -466,7 +466,7 @@ pub const end_with = string.end_with
 ///
 /// ```gleam
 /// log_message
-/// |> should()
+/// |> should
 /// |> contain_string("error")
 /// |> or_fail_with("Log should mention error")
 /// ```
@@ -489,7 +489,7 @@ pub const contain_string = string.contain_string
 ///
 /// ```gleam
 /// render_html()
-/// |> should()
+/// |> should
 /// |> match_snapshot("./test/snapshots/page.snap")
 /// |> or_fail_with("HTML should match snapshot")
 /// ```
@@ -505,7 +505,7 @@ pub const match_snapshot = snapshot.match_snapshot
 ///
 /// ```gleam
 /// build_config()
-/// |> should()
+/// |> should
 /// |> match_snapshot_inspect("./test/snapshots/config.snap")
 /// |> or_fail_with("Config should match snapshot")
 /// ```
@@ -553,14 +553,14 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 ///
 /// ```gleam
 /// result
-/// |> should()
+/// |> should
 /// |> equal(42)
 /// |> or_fail_with("Result should be 42")
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(a)` produced by `should()` and matchers
+/// - `result`: the `MatchResult(a)` produced by `should` and matchers
 /// - `message`: message to show if the chain failed
 ///
 /// ## Returns
@@ -604,7 +604,7 @@ pub fn or_fail_with(
 /// case result {
 ///   Ok(value) -> {
 ///     value
-///     |> should()
+///     |> should
 ///     |> equal(expected)
 ///     |> or_fail_with("Value should match")
 ///   }

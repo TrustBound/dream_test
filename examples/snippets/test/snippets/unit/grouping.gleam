@@ -17,7 +17,7 @@ pub fn tests() {
       }),
       it("adds negative numbers", fn() {
         -2 + -3
-        |> should()
+        |> should
         |> equal(-5)
         |> or_fail_with("-2 + -3 should equal -5")
       }),
@@ -25,7 +25,7 @@ pub fn tests() {
     group("division", [
       it("integer division rounds toward zero", fn() {
         7 / 2
-        |> should()
+        |> should
         |> equal(3)
         |> or_fail_with("7 / 2 should equal 3")
       }),

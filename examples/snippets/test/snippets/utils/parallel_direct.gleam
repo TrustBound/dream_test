@@ -14,7 +14,7 @@ pub fn tests() {
         ])
 
       parallel.run_root_parallel(parallel.default_config(), suite)
-      |> should()
+      |> should
       |> have_length(2)
       |> or_fail_with("expected two results")
     }),

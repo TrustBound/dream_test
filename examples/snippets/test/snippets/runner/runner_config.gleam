@@ -10,7 +10,7 @@ pub fn tests() {
   describe("Runner config demo", [
     it("runs with custom config", fn() {
       1 + 1
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("Math works")
     }),

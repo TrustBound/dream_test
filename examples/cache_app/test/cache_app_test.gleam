@@ -42,7 +42,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_some()
           |> equal("Alice")
           |> or_fail_with("get() should return the stored value")
@@ -57,7 +57,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_none()
           |> or_fail_with("get() should return None for missing keys")
         }),
@@ -73,7 +73,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_some()
           |> equal("2.0")
           |> or_fail_with("set() should overwrite existing values")
@@ -92,7 +92,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_none()
           |> or_fail_with("delete() should remove the key")
         }),
@@ -110,13 +110,13 @@ pub fn suites() {
           // Assert
           use _ <- result.try(
             kept
-            |> should()
+            |> should
             |> be_some()
             |> or_fail_with("Other keys should be unaffected"),
           )
 
           size
-          |> should()
+          |> should
           |> equal(1)
           |> or_fail_with("Size should remain unchanged")
         }),
@@ -136,7 +136,7 @@ pub fn suites() {
           // Assert
           let size = cache_app.size(cache)
           size
-          |> should()
+          |> should
           |> equal(0)
           |> or_fail_with("clear() should remove all entries")
         }),
@@ -153,7 +153,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_some()
           |> equal("data")
           |> or_fail_with("Cache should work normally after clear()")
@@ -173,7 +173,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_empty()
           |> or_fail_with("New cache should have no keys")
         }),
@@ -191,13 +191,13 @@ pub fn suites() {
           // Assert
           use _ <- result.try(
             result
-            |> should()
+            |> should
             |> have_length(3)
             |> or_fail_with("Should return all 3 keys"),
           )
 
           result
-          |> should()
+          |> should
           |> contain("second")
           |> or_fail_with("Keys should include 'second'")
         }),
@@ -213,7 +213,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> equal(0)
           |> or_fail_with("Empty cache should have size 0")
         }),
@@ -231,13 +231,13 @@ pub fn suites() {
           // Assert
           use _ <- result.try(
             after_one
-            |> should()
+            |> should
             |> equal(1)
             |> or_fail_with("Size should be 1 after first insert"),
           )
 
           after_two
-          |> should()
+          |> should
           |> equal(2)
           |> or_fail_with("Size should be 2 after second insert")
         }),
@@ -253,7 +253,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> equal(1)
           |> or_fail_with("Overwriting should not increase size")
         }),
@@ -273,7 +273,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> equal("actual")
           |> or_fail_with("Should return actual value, not default")
         }),
@@ -287,7 +287,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> equal("fallback")
           |> or_fail_with("Should return default for missing key")
         }),
@@ -304,7 +304,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_true()
           |> or_fail_with("has() should return True for existing key")
         }),
@@ -318,7 +318,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_false()
           |> or_fail_with("has() should return False for missing key")
         }),
@@ -335,7 +335,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_ok()
           |> equal(20)
           |> or_fail_with("update() should return Ok with new value")
@@ -352,7 +352,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_some()
           |> equal(8)
           |> or_fail_with("Updated value should be persisted")
@@ -367,7 +367,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_error()
           |> or_fail_with("update() should return Error for missing key")
         }),
@@ -386,14 +386,14 @@ pub fn suites() {
           // Assert
           use _ <- result.try(
             popped
-            |> should()
+            |> should
             |> be_some()
             |> equal("data")
             |> or_fail_with("pop() should return the value"),
           )
 
           after
-          |> should()
+          |> should
           |> be_none()
           |> or_fail_with("Key should be removed after pop()")
         }),
@@ -407,7 +407,7 @@ pub fn suites() {
 
           // Assert
           result
-          |> should()
+          |> should
           |> be_none()
           |> or_fail_with("pop() should return None for missing key")
         }),
@@ -424,7 +424,7 @@ pub fn suites() {
 
             // Act & Assert
             value
-            |> should()
+            |> should
             |> be_some()
             |> equal("outer")
             |> or_fail_with("Should be Some(\"outer\")")
@@ -438,13 +438,13 @@ pub fn suites() {
               // Act & Assert
               use _ <- result.try(
                 list
-                |> should()
+                |> should
                 |> have_length(3)
                 |> or_fail_with("List should have 3 elements"),
               )
 
               list
-              |> should()
+              |> should
               |> contain(2)
               |> or_fail_with("List should contain 2")
             }),
@@ -466,7 +466,7 @@ pub fn suites() {
       it("first test runs after hooks", fn() {
         // Act & Assert
         True
-        |> should()
+        |> should
         |> be_true()
         |> or_fail_with("Test should pass")
       }),
@@ -474,7 +474,7 @@ pub fn suites() {
       it("second test also gets fresh setup", fn() {
         // Act & Assert
         42
-        |> should()
+        |> should
         |> be_greater_than(0)
         |> or_fail_with("42 should be positive")
       }),

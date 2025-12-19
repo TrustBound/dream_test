@@ -13,7 +13,7 @@ pub fn tests() {
         |> list_modules()
 
       result
-      |> should()
+      |> should
       |> equal(Ok(["dream_test@unit_api_test"]))
       |> or_fail_with("expected discovery to find the unit_api_test module")
     }),
@@ -28,7 +28,7 @@ pub fn tests() {
       let assert Ok(mods) = result
 
       mods
-      |> should()
+      |> should
       |> have_length(1)
       |> contain("dream_test@unit_api_test")
       |> or_fail_with("expected no duplicates")

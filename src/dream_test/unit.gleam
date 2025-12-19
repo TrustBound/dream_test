@@ -29,7 +29,7 @@
 ////     it("trims whitespace", fn() {
 ////       "  hello  "
 ////       |> string.trim()
-////       |> should()
+////       |> should
 ////       |> equal("hello")
 ////       |> or_fail_with("Should remove surrounding whitespace")
 ////     }),

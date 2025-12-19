@@ -73,7 +73,7 @@ pub fn suite() {
     before_each(increment),
     it("receives the updated context", fn(ctx: Ctx) {
       ctx.counter
-      |> should()
+      |> should
       |> equal(1)
       |> or_fail_with("expected counter to be 1 after before_each")
     }),
@@ -81,7 +81,7 @@ pub fn suite() {
     before_each(increment),
     it("sees hook effects for subsequent tests", fn(ctx: Ctx) {
       ctx.counter
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("expected counter to be 2 after two before_each hooks")
     }),

@@ -67,7 +67,7 @@ pub fn tests() {
       let actual = "  hello  " |> trim()
 
       actual
-      |> should()
+      |> should
       |> equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
@@ -75,7 +75,7 @@ pub fn tests() {
       let has_world = "hello world" |> contains("world")
 
       has_world
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("Should find 'world' in string")
     }),

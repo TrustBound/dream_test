@@ -226,7 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Assertions Module** (`dream_test/assertions/should`)
 
-  - Fluent assertion API with `should()` builder
+  - Fluent assertion API with `should` builder
   - `or_fail_with` for custom failure messages
   - Chainable assertion pattern
 

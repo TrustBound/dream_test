@@ -11,20 +11,20 @@ pub fn tests() {
   describe("Skipping tests", [
     it("runs normally", fn() {
       add(2, 3)
-      |> should()
+      |> should
       |> equal(5)
       |> or_fail_with("2 + 3 should equal 5")
     }),
     skip("not implemented yet", fn() {
       // This test is skipped - the body is preserved but not executed
       add(100, 200)
-      |> should()
+      |> should
       |> equal(300)
       |> or_fail_with("Should add large numbers")
     }),
     it("also runs normally", fn() {
       add(0, 0)
-      |> should()
+      |> should
       |> equal(0)
       |> or_fail_with("0 + 0 should equal 0")
     }),

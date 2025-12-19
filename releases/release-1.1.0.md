@@ -196,7 +196,7 @@ pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
 }
 
 // Use it like any built-in matcher
-4 |> should() |> be_even() |> or_fail_with("Should be even")
+4 |> should |> be_even() |> or_fail_with("Should be even")
 ```
 
 ### 📊 JSON Reporter

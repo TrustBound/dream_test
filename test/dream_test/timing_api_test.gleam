@@ -8,14 +8,14 @@ pub fn tests() {
   describe("dream_test/timing", [
     it("format_duration_ms formats common ranges", fn() {
       timing.format_duration_ms(0)
-      |> should()
+      |> should
       |> equal("0ms")
       |> or_fail_with("0ms should format as 0ms")
     }),
 
     it("format_duration_us formats common ranges", fn() {
       timing.format_duration_us(500)
-      |> should()
+      |> should
       |> equal("0.5ms")
       |> or_fail_with("500us should format as 0.5ms")
     }),

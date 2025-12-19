@@ -27,7 +27,7 @@ pub fn tests() {
         |> result.map_error(file.error_to_string)
 
       output
-      |> should()
+      |> should
       |> be_ok()
       |> contain_string("\"tests\"")
       |> or_fail_with("Expected reporter output to include a JSON report")

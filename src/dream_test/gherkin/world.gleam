@@ -31,7 +31,7 @@
 ////   case world.get(context.world, "cart_count") {
 ////     Ok(count) -> {
 ////       count
-////       |> should()
+////       |> should
 ////       |> equal(expected)
 ////       |> or_fail_with("Cart count mismatch")
 ////     }

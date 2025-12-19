@@ -27,7 +27,7 @@ fn step_withdraw(context: StepContext) {
 fn step_balance_is(context: StepContext) {
   let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
   get_or(context.world, "balance", 0.0)
-  |> should()
+  |> should
   |> equal(expected)
   |> or_fail_with("Balance mismatch")
 }

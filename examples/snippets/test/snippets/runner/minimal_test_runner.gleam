@@ -13,7 +13,7 @@ pub fn tests() {
   describe("Example", [
     it("works", fn() {
       1 + 1
-      |> should()
+      |> should
       |> equal(2)
       |> or_fail_with("math should work")
     }),

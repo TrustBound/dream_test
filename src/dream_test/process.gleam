@@ -25,7 +25,7 @@
 ////       increment(counter)
 ////
 ////       get_count(counter)
-////       |> should()
+////       |> should
 ////       |> equal(2)
 ////       |> or_fail_with("Counter should be 2")
 ////     }),
@@ -383,7 +383,7 @@ pub type PollResult(a) {
 ///   Ready(True) -> {
 ///     // Server is up, proceed with test
 ///     make_request(port)
-///     |> should()
+///     |> should
 ///     |> be_ok()
 ///     |> or_fail_with("Request should succeed")
 ///   }
@@ -416,7 +416,7 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 /// case await_some(default_poll_config(), fn() { find_user(user_id) }) {
 ///   Ready(user) -> {
 ///     user.name
-///     |> should()
+///     |> should
 ///     |> equal("Alice")
 ///     |> or_fail_with("User should be Alice")
 ///   }

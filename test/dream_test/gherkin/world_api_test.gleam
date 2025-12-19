@@ -8,7 +8,7 @@ pub fn tests() {
     it("new_world stores scenario_id", fn() {
       let w = world.new_world("scenario-1")
       world.scenario_id(w)
-      |> should()
+      |> should
       |> equal("scenario-1")
       |> or_fail_with("scenario_id should be preserved")
     }),
@@ -23,7 +23,7 @@ pub fn tests() {
 
       // Assert
       result
-      |> should()
+      |> should
       |> equal(Ok(3))
       |> or_fail_with("should get the value that was put")
     }),
@@ -49,7 +49,7 @@ pub fn tests() {
     it("get_or returns default for missing keys", fn() {
       let w = world.new_world("scenario-2")
       world.get_or(w, "missing", 9)
-      |> should()
+      |> should
       |> equal(9)
       |> or_fail_with("default should be returned")
     }),

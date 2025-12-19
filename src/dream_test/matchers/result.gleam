@@ -13,14 +13,14 @@
 ////
 //// // Check that it's Ok, then check the inner value
 //// parse_int("42")
-//// |> should()
+//// |> should
 //// |> be_ok()
 //// |> equal(42)
 //// |> or_fail_with("Should parse to 42")
 ////
 //// // Check that it's Error, then check the error value
 //// validate(invalid_input)
-//// |> should()
+//// |> should
 //// |> be_error()
 //// |> equal(ValidationError("email required"))
 //// |> or_fail_with("Should fail with email error")
@@ -40,7 +40,7 @@ import gleam/string
 ///
 /// ```gleam
 /// parse_int("42")
-/// |> should()
+/// |> should
 /// |> be_ok()
 /// |> or_fail_with("Should parse successfully")
 /// ```
@@ -49,7 +49,7 @@ import gleam/string
 ///
 /// ```gleam
 /// Ok("hello")
-/// |> should()
+/// |> should
 /// |> be_ok()
 /// |> equal("hello")
 /// |> or_fail_with("Should be Ok with 'hello'")
@@ -89,7 +89,7 @@ fn check_is_ok(actual: Result(a, e)) -> MatchResult(a) {
 ///
 /// ```gleam
 /// parse_int("not a number")
-/// |> should()
+/// |> should
 /// |> be_error()
 /// |> or_fail_with("Should fail to parse")
 /// ```
@@ -98,7 +98,7 @@ fn check_is_ok(actual: Result(a, e)) -> MatchResult(a) {
 ///
 /// ```gleam
 /// Error("invalid")
-/// |> should()
+/// |> should
 /// |> be_error()
 /// |> equal("invalid")
 /// |> or_fail_with("Should be Error with 'invalid'")

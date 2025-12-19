@@ -6,14 +6,14 @@ pub fn tests() {
   describe("dream_test/matchers/equality", [
     it("equal passes for equal values", fn() {
       1
-      |> should()
+      |> should
       |> equality.equal(1)
       |> or_fail_with("1 should equal 1")
     }),
 
     it("not_equal passes for different values", fn() {
       1
-      |> should()
+      |> should
       |> equality.not_equal(2)
       |> or_fail_with("1 should not equal 2")
     }),

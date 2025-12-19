@@ -10,12 +10,12 @@
 //// import dream_test/assertions/should.{be_false, be_true, or_fail_with, should}
 ////
 //// True
-//// |> should()
+//// |> should
 //// |> be_true()
 //// |> or_fail_with("expected True")
 ////
 //// False
-//// |> should()
+//// |> should
 //// |> be_false()
 //// |> or_fail_with("expected False")
 //// ```
@@ -32,7 +32,7 @@ import gleam/option.{Some}
 /// ```gleam
 /// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
 /// True
-/// |> should()
+/// |> should
 /// |> be_true()
 /// |> or_fail_with("expected True")
 /// ```
@@ -66,7 +66,7 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 /// ```gleam
 /// // examples/snippets/test/snippets/matchers/builtin_matchers.gleam
 /// False
-/// |> should()
+/// |> should
 /// |> be_false()
 /// |> or_fail_with("expected False")
 /// ```

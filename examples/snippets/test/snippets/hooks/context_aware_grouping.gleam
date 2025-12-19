@@ -30,7 +30,7 @@ pub fn suite() {
 
       it("sees both outer + inner hooks", fn(ctx: Ctx) {
         ctx.counter
-        |> should()
+        |> should
         |> equal(2)
         |> or_fail_with("expected counter to be 2 (outer + inner before_each)")
       }),
@@ -38,7 +38,7 @@ pub fn suite() {
 
     it("sees only outer hook", fn(ctx: Ctx) {
       ctx.counter
-      |> should()
+      |> should
       |> equal(1)
       |> or_fail_with("expected counter to be 1 (outer before_each only)")
     }),

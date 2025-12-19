@@ -9,7 +9,7 @@ pub fn tests() {
     it("new starts with no failures", fn() {
       context.new()
       |> context.failures()
-      |> should()
+      |> should
       |> equal([])
       |> or_fail_with("new context should have no failures")
     }),
@@ -22,7 +22,7 @@ pub fn tests() {
       |> context.add_failure(f1)
       |> context.add_failure(f2)
       |> context.failures()
-      |> should()
+      |> should
       |> equal([f2, f1])
       |> or_fail_with("failures should be stored newest-first")
     }),

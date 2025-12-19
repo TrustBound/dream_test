@@ -24,7 +24,7 @@ pub fn tests() {
 
       // Assert
       files
-      |> should()
+      |> should
       |> contain(a)
       |> or_fail_with("expected discover_a.feature to be listed")
     }),
@@ -43,7 +43,7 @@ pub fn tests() {
 
       // Assert
       files
-      |> should()
+      |> should
       |> contain(b)
       |> or_fail_with("expected discover_b.feature to be listed")
     }),
@@ -61,7 +61,7 @@ pub fn tests() {
 
       // Assert
       errors
-      |> should()
+      |> should
       |> have_length(1)
       |> or_fail_with("expected one parse error for invalid feature")
     }),
@@ -81,7 +81,7 @@ pub fn tests() {
 
         // Assert
         features
-        |> should()
+        |> should
         |> be_empty()
         |> or_fail_with("expected no parsed features for invalid input")
       },
@@ -108,7 +108,7 @@ pub fn tests() {
           _ -> []
         }
         tags
-        |> should()
+        |> should
         |> contain("parse-error")
         |> or_fail_with("expected a parse-error test result")
       },

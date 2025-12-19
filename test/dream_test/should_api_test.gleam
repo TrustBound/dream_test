@@ -27,7 +27,7 @@ pub fn tests() {
 
     it("fail_with produces AssertionFailed with the message", fn() {
       should.fail_with("nope")
-      |> should()
+      |> should
       |> equal(
         types.AssertionFailed(types.AssertionFailure(
           operator: "fail_with",
@@ -40,7 +40,7 @@ pub fn tests() {
 
     it("succeed produces AssertionOk", fn() {
       should.succeed()
-      |> should()
+      |> should
       |> equal(types.AssertionOk)
       |> or_fail_with("succeed should return AssertionOk")
     }),

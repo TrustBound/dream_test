@@ -12,13 +12,13 @@
 ////
 //// // Check if list contains an item
 //// users
-//// |> should()
+//// |> should
 //// |> contain(alice)
 //// |> or_fail_with("Users should include Alice")
 ////
 //// // Check list length
 //// get_results()
-//// |> should()
+//// |> should
 //// |> have_length(3)
 //// |> or_fail_with("Should have 3 results")
 //// ```
@@ -37,7 +37,7 @@ import gleam/string
 ///
 /// ```gleam
 /// [1, 2, 3]
-/// |> should()
+/// |> should
 /// |> contain(2)
 /// |> or_fail_with("List should contain 2")
 /// ```
@@ -81,7 +81,7 @@ fn check_contains(
 ///
 /// ```gleam
 /// ["a", "b", "c"]
-/// |> should()
+/// |> should
 /// |> not_contain("d")
 /// |> or_fail_with("List should not contain 'd'")
 /// ```
@@ -125,7 +125,7 @@ fn check_not_contains(
 ///
 /// ```gleam
 /// get_users()
-/// |> should()
+/// |> should
 /// |> have_length(3)
 /// |> or_fail_with("Should have 3 users")
 /// ```
@@ -171,7 +171,7 @@ fn check_length(
 ///
 /// ```gleam
 /// get_errors()
-/// |> should()
+/// |> should
 /// |> be_empty()
 /// |> or_fail_with("Should have no errors")
 /// ```

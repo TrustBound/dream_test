@@ -11,17 +11,17 @@
 //// }
 ////
 //// greeting
-//// |> should()
+//// |> should
 //// |> start_with("Hello")
 //// |> or_fail_with("Greeting should start with Hello")
 ////
 //// filename
-//// |> should()
+//// |> should
 //// |> end_with(".gleam")
 //// |> or_fail_with("Should be a Gleam file")
 ////
 //// log_message
-//// |> should()
+//// |> should
 //// |> contain_string("error")
 //// |> or_fail_with("Log should mention error")
 //// ```
@@ -38,7 +38,7 @@ import gleam/string
 ///
 /// ```gleam
 /// greeting
-/// |> should()
+/// |> should
 /// |> start_with("Hello")
 /// |> or_fail_with("Greeting should start with Hello")
 /// ```
@@ -79,7 +79,7 @@ fn check_starts_with(actual: String, prefix: String) -> MatchResult(String) {
 ///
 /// ```gleam
 /// filename
-/// |> should()
+/// |> should
 /// |> end_with(".gleam")
 /// |> or_fail_with("File should be a Gleam file")
 /// ```
@@ -120,7 +120,7 @@ fn check_ends_with(actual: String, suffix: String) -> MatchResult(String) {
 ///
 /// ```gleam
 /// log_message
-/// |> should()
+/// |> should
 /// |> contain_string("error")
 /// |> or_fail_with("Log should mention error")
 /// ```

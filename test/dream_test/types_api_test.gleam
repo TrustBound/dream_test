@@ -7,7 +7,7 @@ pub fn tests() {
   describe("dream_test/types", [
     it("to_assertion_result converts match results to assertion results", fn() {
       types.to_assertion_result(types.MatchOk(1))
-      |> should()
+      |> should
       |> equal(types.AssertionOk)
       |> or_fail_with("MatchOk should map to AssertionOk")
     }),
@@ -17,7 +17,7 @@ pub fn tests() {
         types.AssertionFailure(operator: "op", message: "msg", payload: None)
 
       types.to_assertion_result(types.MatchFailed(failure))
-      |> should()
+      |> should
       |> equal(types.AssertionFailed(failure))
       |> or_fail_with("MatchFailed should map to AssertionFailed(failure)")
     }),
@@ -27,7 +27,7 @@ pub fn tests() {
       let types.Root(seed: seed, tree: _tree) = suite
 
       seed
-      |> should()
+      |> should
       |> equal(Nil)
       |> or_fail_with("seed should be preserved")
     }),
@@ -37,7 +37,7 @@ pub fn tests() {
       let types.Root(seed: _, tree: tree) = suite
 
       tree
-      |> should()
+      |> should
       |> equal(types.Group(name: "r", tags: [], children: []))
       |> or_fail_with(
         "expected Root(tree: Group(name: \"r\", tags: [], children: []))",
@@ -46,7 +46,7 @@ pub fn tests() {
 
     it("status_from_failures returns Passed for empty failures", fn() {
       types.status_from_failures([])
-      |> should()
+      |> should
       |> equal(types.Passed)
       |> or_fail_with("empty failures should be Passed")
     }),
@@ -56,7 +56,7 @@ pub fn tests() {
         types.AssertionFailure(operator: "op", message: "msg", payload: None)
 
       types.status_from_failures([failure])
-      |> should()
+      |> should
       |> equal(types.Failed)
       |> or_fail_with("non-empty failures should be Failed")
     }),

@@ -31,7 +31,7 @@ pub fn tests() {
       let counter = dt_process.start_counter()
 
       dt_process.get_count(counter)
-      |> should()
+      |> should
       |> equal(0)
       |> or_fail_with("start_counter should initialize to 0")
     }),
@@ -44,7 +44,7 @@ pub fn tests() {
       dt_process.set_count(counter, 42)
 
       dt_process.get_count(counter)
-      |> should()
+      |> should
       |> equal(42)
       |> or_fail_with("counter should end at 42")
     }),
@@ -73,7 +73,7 @@ pub fn tests() {
       let items = dt_process.call_actor(todos, GetAll, 1000)
 
       items
-      |> should()
+      |> should
       |> equal(["b", "a"])
       |> or_fail_with("actor should return items in LIFO order")
     }),

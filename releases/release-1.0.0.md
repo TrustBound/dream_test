@@ -14,7 +14,7 @@ Dream Test 1.0.0 is the initial stable release of the testing framework for Glea
 
 ### Assertions Module
 
-- Fluent assertion API with `should()` builder
+- Fluent assertion API with `should` builder
 - `or_fail_with` for custom failure messages
 - Chainable assertion pattern
 

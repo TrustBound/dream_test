@@ -17,7 +17,7 @@ pub fn tests() {
       let result = sandbox.run_isolated(config, fn() { 123 })
 
       result
-      |> should()
+      |> should
       |> equal(SandboxCompleted(123))
       |> or_fail_with("expected SandboxCompleted(123)")
     }),
@@ -29,7 +29,7 @@ pub fn tests() {
         let result = sandbox.run_isolated(config, loop_forever)
 
         result
-        |> should()
+        |> should
         |> equal(SandboxTimedOut)
         |> or_fail_with("expected SandboxTimedOut")
       },
@@ -45,7 +45,7 @@ pub fn tests() {
       }
 
       did_crash
-      |> should()
+      |> should
       |> equal(True)
       |> or_fail_with("expected SandboxCrashed(...)")
     }),

@@ -9,7 +9,7 @@ import dream_test/types.{type AssertionFailure}
 /// per-test metadata we may need later.
 ///
 /// Most users do not need this type. Dream Test’s public matcher pipeline
-/// (`should() |> ...`) carries failures via `types.MatchResult`, and the runner
+/// (`should |> ...`) carries failures via `types.MatchResult`, and the runner
 /// reports failures via `types.TestResult`.
 ///
 /// `TestContext` exists as a small, explicit record for internal bookkeeping

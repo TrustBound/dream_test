@@ -28,7 +28,7 @@
 ////
 //// fn counter_is_one(ctx: Ctx) {
 ////   ctx.counter
-////   |> should()
+////   |> should
 ////   |> equal(1)
 ////   |> or_fail_with("expected counter to be 1 after before_each")
 //// }

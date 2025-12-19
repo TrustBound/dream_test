@@ -20,7 +20,7 @@ pub fn tests() {
       let text = json.format_pretty(results)
 
       text
-      |> should()
+      |> should
       |> contain_string("\"tests\"")
       |> or_fail_with("Expected JSON report to include the tests array")
     }),

@@ -36,7 +36,7 @@ pub fn tests() {
       let assert [_r] = results
 
       file.read(log_path)
-      |> should()
+      |> should
       |> equal(Ok("outer_before\ninner_before\ninner_after\nouter_after\n"))
       |> or_fail_with("hook order should be deterministic")
     }),

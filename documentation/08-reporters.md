@@ -143,7 +143,7 @@ pub fn tests() {
       let report = bdd.format(results)
 
       report
-      |> should()
+      |> should
       |> contain_string("Example Suite")
       |> or_fail_with("Expected formatted report to include the suite name")
     }),

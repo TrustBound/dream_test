@@ -263,7 +263,7 @@ Every public function needs:
 ///
 /// ```gleam
 /// 42
-/// |> should()
+/// |> should
 /// |> equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```

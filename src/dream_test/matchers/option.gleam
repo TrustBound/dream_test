@@ -13,7 +13,7 @@
 ////
 //// // Check that it's Some, then check the inner value
 //// find_user(id)
-//// |> should()
+//// |> should
 //// |> be_some()
 //// |> equal(expected_user)
 //// |> or_fail_with("Should find the expected user")
@@ -33,7 +33,7 @@ import gleam/string
 ///
 /// ```gleam
 /// find_user(id)
-/// |> should()
+/// |> should
 /// |> be_some()
 /// |> or_fail_with("User should exist")
 /// ```
@@ -42,7 +42,7 @@ import gleam/string
 ///
 /// ```gleam
 /// Some(42)
-/// |> should()
+/// |> should
 /// |> be_some()
 /// |> equal(42)
 /// |> or_fail_with("Should be Some(42)")
@@ -76,7 +76,7 @@ fn check_is_some(actual: Option(a)) -> MatchResult(a) {
 ///
 /// ```gleam
 /// find_deleted_user(id)
-/// |> should()
+/// |> should
 /// |> be_none()
 /// |> or_fail_with("Deleted user should not exist")
 /// ```

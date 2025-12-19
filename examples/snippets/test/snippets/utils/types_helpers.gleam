@@ -9,14 +9,14 @@ pub fn tests() {
   describe("Types", [
     it("status_from_failures returns Passed for empty failures", fn() {
       types.status_from_failures([])
-      |> should()
+      |> should
       |> equal(types.Passed)
       |> or_fail_with("expected Passed for empty failures")
     }),
 
     it("to_assertion_result converts match results", fn() {
       types.to_assertion_result(types.MatchOk(1))
-      |> should()
+      |> should
       |> equal(types.AssertionOk)
       |> or_fail_with("expected MatchOk -> AssertionOk")
     }),
@@ -26,7 +26,7 @@ pub fn tests() {
         types.AssertionFailure(operator: "op", message: "msg", payload: None)
 
       types.status_from_failures([failure])
-      |> should()
+      |> should
       |> equal(types.Failed)
       |> or_fail_with("expected Failed for non-empty failures")
     }),

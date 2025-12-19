@@ -14,7 +14,7 @@ pub fn tests() {
       let suite = describe("s", [it("t", fn() { Ok(AssertionOk) })])
       let results = runner.new([suite]) |> runner.run()
       let assert [r] = results
-      r.status |> should() |> equal(Passed) |> or_fail_with("test should pass")
+      r.status |> should |> equal(Passed) |> or_fail_with("test should pass")
     }),
 
     it("filters returned results with filter_results", fn() {
@@ -31,7 +31,7 @@ pub fn tests() {
 
       let assert [r] = results
       r.name
-      |> should()
+      |> should
       |> equal("a")
       |> or_fail_with("should keep only smoke test")
     }),

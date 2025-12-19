@@ -6,14 +6,14 @@ pub fn tests() {
   describe("dream_test/matchers/boolean", [
     it("be_true passes for True", fn() {
       True
-      |> should()
+      |> should
       |> boolean.be_true()
       |> or_fail_with("True should be true")
     }),
 
     it("be_false passes for False", fn() {
       False
-      |> should()
+      |> should
       |> boolean.be_false()
       |> or_fail_with("False should be false")
     }),

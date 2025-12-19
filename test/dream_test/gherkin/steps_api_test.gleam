@@ -21,7 +21,7 @@ pub fn tests() {
       case result {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.capture_count(captures)
-          |> should()
+          |> should
           |> equal(2)
           |> or_fail_with("should have 2 captures")
         Error(msg) -> Ok(fail_with(msg))
@@ -42,7 +42,7 @@ pub fn tests() {
       case result {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_int(captures, 0)
-          |> should()
+          |> should
           |> equal(Ok(3))
           |> or_fail_with("first capture should be int 3")
         Error(msg) -> Ok(fail_with(msg))
@@ -63,7 +63,7 @@ pub fn tests() {
       case result {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_word(captures, 1)
-          |> should()
+          |> should
           |> equal(Ok("apples"))
           |> or_fail_with("second capture should be word apples")
         Error(msg) -> Ok(fail_with(msg))
@@ -83,7 +83,7 @@ pub fn tests() {
       case result {
         Ok(step_trie.StepMatch(_handler, captures)) ->
           steps.get_string(captures, 0)
-          |> should()
+          |> should
           |> equal(Ok("hello"))
           |> or_fail_with("string capture should be unquoted")
         Error(msg) -> Ok(fail_with(msg))
