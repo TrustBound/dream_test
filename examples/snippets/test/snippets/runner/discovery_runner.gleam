@@ -2,7 +2,7 @@
 ////
 //// This is the minimal “I don’t want to import 40 test modules” setup.
 ////
-//// Note: module discovery is BEAM-only (Erlang target).
+//// Note: module discovery requires compiled BEAM modules.
 
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters

@@ -1,5 +1,5 @@
-import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/matchers/snapshot
 import dream_test/unit.{describe, it}
 import matchers/failure_operator.{have_failure_operator}

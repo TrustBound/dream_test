@@ -1,6 +1,6 @@
 //// README: Chaining matchers
 
-import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should,}
+import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner
 import dream_test/unit.{describe, it}

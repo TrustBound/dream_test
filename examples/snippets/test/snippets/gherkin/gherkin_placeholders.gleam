@@ -1,11 +1,11 @@
 //// README: Gherkin placeholder types example
 
-import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
   type StepContext, get_float, get_int, get_string, get_word, new_registry, step,
 }
 import dream_test/gherkin/world.{put}
+import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
 import gleam/io

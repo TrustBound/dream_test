@@ -1,6 +1,6 @@
-import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/gherkin/feature as gfeature
 import dream_test/gherkin/steps
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}

@@ -1,10 +1,10 @@
 //// Assertion/verification steps (Then steps).
 
-import dream_test/matchers.{be_equal, be_true, or_fail_with, should}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, get_int, get_string,
 }
 import dream_test/gherkin/world.{get, get_or}
+import dream_test/matchers.{be_equal, be_true, or_fail_with, should}
 import dream_test/types.{type AssertionResult}
 import gleam/float
 import gleam/int

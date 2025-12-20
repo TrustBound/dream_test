@@ -3,7 +3,7 @@
 //// This reporter outputs test results as JSON for CI/CD integration,
 //// test aggregation, and tooling.
 ////
-//// ## Example Output
+//// ## Example Output (values will vary)
 ////
 //// ```json
 //// {
@@ -12,8 +12,8 @@
 ////   "duration_ms": 315,
 ////   "system": {
 ////     "os": "darwin",
-////     "otp_version": "27",
-////     "gleam_version": "0.67.0"
+////     "otp_version": "<otp_version>",
+////     "gleam_version": "<gleam_version>"
 ////   },
 ////   "summary": {
 ////     "total": 3,

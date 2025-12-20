@@ -6,10 +6,7 @@ If you want a complete “everything in one place” reference, see [Dream Test 
 
 ### Target support
 
-Dream Test is built and tested for the **BEAM (Erlang target)**.
-
-The JavaScript target is **not tested or supported** at this time — if you attempt it anyway, **YMMV**.
-Some functionality is inherently BEAM-specific (for example: module discovery, loading/discovering `.feature` files from disk, and process/sandbox isolation).
+Dream Test targets the **BEAM (Erlang)**.
 
 ### The 30-second mental model
 
@@ -25,7 +22,7 @@ Testing frameworks often optimize for “look how short this example is.” Drea
 
 That’s why you’ll see the same patterns repeated:
 
-- **Explicit runner module** instead of magic auto-discovery everywhere (with an opt-in discovery helper where the platform supports it).
+- **Explicit runner module** instead of magic auto-discovery everywhere (with an opt-in discovery helper when you want it).
 - **Pipe-first assertions** instead of fluent builders or macros.
 - **Process isolation + timeouts** so a single bad test can’t hang or crash the whole run.
 

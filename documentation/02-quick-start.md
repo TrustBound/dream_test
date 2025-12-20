@@ -10,17 +10,16 @@ Dream Test keeps the runner explicit on purpose. Instead of **implicit/global** 
 
 That explicitness is the source of most of Dream Test’s reliability: when a test run surprises you, there’s always a concrete `main()` you can inspect.
 
-If you’re looking for a mental model of “registration”: in Dream Test, **your suites are the registration**. You can list them explicitly, or (on BEAM) generate the list via discovery.
+If you’re looking for a mental model of “registration”: in Dream Test, **your suites are the registration**. You can list them explicitly, or generate the list via discovery.
 
 ### Choose your first runner style
 
-There are two good starting points. Pick the one that matches your target:
+There are two good starting points:
 
-- **BEAM**: use discovery to avoid maintaining an import list, or list suites explicitly.
+- **Discovery**: avoid maintaining an import list.
+- **Explicit suites**: simple and easy to reason about.
 
-### Option A: the smallest useful setup (BEAM-only discovery)
-
-<sub>Note: module discovery is BEAM-only.</sub>
+### Option A: the smallest useful setup (discovery)
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}

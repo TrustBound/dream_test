@@ -1,8 +1,8 @@
 //// Checkout steps.
 
-import dream_test/matchers.{succeed}
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{succeed}
 import dream_test/types.{type AssertionResult}
 import shopping_cart/cart
 import shopping_cart/checkout

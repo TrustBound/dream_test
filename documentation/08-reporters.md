@@ -65,8 +65,8 @@ import gleam/io
 pub fn tests() {
   describe("JSON Reporter", [
     it("outputs JSON format", fn() {
-      // The json.report function outputs machine-readable JSON
-      // while bdd.report outputs human-readable text
+      // `reporters.json(...)` prints machine-readable JSON on RunFinished.
+      // Set show_progress=True to also show a live progress bar during the run.
       Ok(succeed())
     }),
     it("includes test metadata", fn() {

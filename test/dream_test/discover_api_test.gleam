@@ -1,5 +1,5 @@
-import dream_test/matchers.{be_equal, contain, have_length, or_fail_with, should,}
 import dream_test/discover.{from_path, list_modules}
+import dream_test/matchers.{be_equal, contain, have_length, or_fail_with, should}
 import dream_test/unit.{describe, it}
 
 pub fn tests() {

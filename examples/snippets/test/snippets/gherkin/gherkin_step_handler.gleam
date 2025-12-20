@@ -1,9 +1,9 @@
 //// README: Gherkin step handler example
 
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters
 import dream_test/runner
 import gleam/io

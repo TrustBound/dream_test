@@ -1,8 +1,8 @@
-import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/file.{
   FileSystemError, IsDirectory, NoSpace, NotFound, PermissionDenied, delete,
   delete_files_matching, error_to_string, read, write,
 }
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, it}
 import gleam/int

@@ -251,6 +251,11 @@ fn step_empty_cart(context: StepContext) {
   Ok(succeed())
 }
 
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
+  Ok(succeed())
+}
+
 fn step_add_items(context: StepContext) {
   let current = get_or(context.world, "cart", 0)
   let to_add = get_int(context.captures, 0) |> result.unwrap(0)

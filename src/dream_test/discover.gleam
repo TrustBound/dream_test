@@ -32,7 +32,7 @@
 //// }
 //// ```
 ////
-//// <sub>Note: discovery is BEAM-only (Erlang target).</sub>
+//// <sub>Note: discovery requires compiled BEAM modules.</sub>
 
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,

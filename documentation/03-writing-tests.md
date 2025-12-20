@@ -133,15 +133,16 @@ The most common reason to use `group` is to scope hooks (setup/teardown) to a su
 Here’s the minimal shape:
 
 ```gleam
+import dream_test/matchers.{succeed}
 import dream_test/unit.{describe, group, it}
 
 pub fn tests() {
   describe("Thing", [
     group("Case A", [
-      it("does one thing", fn() { todo }),
+      it("does one thing", fn() { Ok(succeed()) }),
     ]),
     group("Case B", [
-      it("does another thing", fn() { todo }),
+      it("does another thing", fn() { Ok(succeed()) }),
     ]),
   ])
 }

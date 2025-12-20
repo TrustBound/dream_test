@@ -9,7 +9,7 @@ Rather than forcing every project to reinvent these helpers slightly differently
 These are small helper modules that make tests more reliable and less repetitive:
 
 - `file`: predictable IO + structured errors (great for temp files/snapshots)
-- `process`: small BEAM helpers for test isolation (counters, unique ports)
+- `process`: small helpers for test isolation (counters, unique ports)
 - `timing`: monotonic time + formatting
 - `sandbox`: run code in an isolated process with timeout/crash reporting
 
@@ -66,7 +66,7 @@ pub fn tests() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/file_helpers.gleam)</sub>
 
-### `dream_test/process` (small BEAM helpers for tests)
+### `dream_test/process` (small helpers for tests)
 
 These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
 

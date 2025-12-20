@@ -1,10 +1,10 @@
 //// Cart setup and manipulation steps.
 
-import dream_test/matchers.{succeed}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_int, get_string,
 }
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{succeed}
 import dream_test/types.{type AssertionResult}
 import gleam/result
 import gleam/string

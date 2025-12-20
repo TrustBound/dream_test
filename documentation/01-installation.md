@@ -30,7 +30,7 @@ In your own project, you typically run:
 gleam test
 ```
 
-**Note:** In this repo (and in typical Gleam projects), `gleam test` uses a test runner module in `test/`. A common convention is `test/{project_name}_test.gleam` (matching your `name` in `gleam.toml`), containing a `pub fn main()` entrypoint.
+**Note:** `gleam test` runs the test runner module at `test/{project_name}_test.gleam` (where `project_name` matches the `name` in your `gleam.toml`). This file must define `pub fn main()`. See the `gleeunit` docs for the standard runner shape. ([hexdocs.pm/gleeunit](https://hexdocs.pm/gleeunit/index.html))
 
 ### Required: a test runner module (`pub fn main()`)
 
@@ -42,7 +42,7 @@ Dream Test requires an explicit runner module. This is a design choice:
 
 Create a file under `test/` (for example, `test/{project_name}_test.gleam`) with a `pub fn main()`.
 
-On BEAM, you can use module discovery to avoid maintaining an import list.
+You can use module discovery to avoid maintaining an import list.
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
@@ -67,7 +67,7 @@ pub fn main() {
 
 ### What you just setup
 
-- `discover` turns files into suites (BEAM-only convenience).
+- `discover` turns files into suites (a convenience).
 - `runner` executes suites with isolation, timeouts, and configurable parallelism.
 - `reporters` decide how results are rendered (human output vs JSON vs more).
 

@@ -1,12 +1,12 @@
 //// README: Gherkin feature definition example
 
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{
   and, background, feature_with_background, given, scenario, then, when,
   with_tags,
 }
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters
 import dream_test/runner
 import gleam/int
