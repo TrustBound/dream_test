@@ -6,13 +6,115 @@ The goal of Dream Test’s hook design is to keep hooks **predictable and debugg
 
 ### Mental model
 
-Hooks are nodes in the suite tree that the runner executes around tests:
+Hooks are part of the nested test structure that the runner executes around tests:
 
-- Setup flows **outer → inner**
-- Teardown flows **inner → outer**
-- Failures in setup can mark tests as setup-failed without running the body
+- Setup flows **enclosing scope → nested scope**
+- Teardown flows **nested scope → enclosing scope**
+- If a setup hook fails, Dream Test fails the affected tests **without running the test body**
 
 Hooks let you run setup/teardown logic around tests while keeping the test bodies focused on behavior.
+
+#### Example: hook order (enclosing → nested, then nested → enclosing)
+
+This example prints the execution order so you can see the flow directly:
+
+```gleam
+import dream_test/matchers.{succeed}
+import dream_test/reporters
+import dream_test/runner
+import dream_test/unit.{after_each, before_each, describe, group, it}
+import gleam/io
+
+pub fn tests() {
+  describe("Enclosing", [
+    before_each(fn() {
+      io.println("1. enclosing before_each")
+      Ok(Nil)
+    }),
+    after_each(fn() {
+      io.println("4. enclosing after_each")
+      Ok(Nil)
+    }),
+    group("Nested", [
+      before_each(fn() {
+        io.println("2. nested before_each")
+        Ok(Nil)
+      }),
+      after_each(fn() {
+        io.println("3. nested after_each")
+        Ok(Nil)
+      }),
+      it("test body runs here", fn() {
+        io.println("(test)")
+        Ok(succeed())
+      }),
+    ]),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+Expected print order:
+
+1. enclosing before_each
+2. nested before_each
+   (test)
+3. nested after_each
+4. enclosing after_each
+
+#### Diagram: enclosing scope vs nested scope
+
+```mermaid
+sequenceDiagram
+  participant Enclosing as Enclosing scope (surrounding describe/group)
+  participant Nested as Nested scope (nested group)
+  participant Test as Test body
+
+  Note over Enclosing,Test: Setup (before_each) runs enclosing → nested
+  Enclosing->>Enclosing: before_each
+  Nested->>Nested: before_each
+  Test->>Test: run
+
+  Note over Enclosing,Test: Teardown (after_each) runs nested → enclosing
+  Nested->>Nested: after_each
+  Enclosing->>Enclosing: after_each
+```
+
+#### Example: setup failure skips the test body
+
+If a `before_each` hook returns `Error("...")`, the test body does not run:
+
+```gleam
+import dream_test/matchers.{succeed}
+import dream_test/reporters
+import dream_test/runner
+import dream_test/unit.{before_each, describe, it}
+import gleam/io
+
+pub fn tests() {
+  describe("Setup failures", [
+    before_each(fn() { Error("could not connect to database") }),
+    it("will not run", fn() {
+      // This won't execute.
+      io.println("nope")
+      Ok(succeed())
+    }),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
 
 ### When to use hooks
 
@@ -103,7 +205,7 @@ pub fn main() {
 
 ### Hook inheritance (nested groups)
 
-Nested groups inherit hooks. Setup runs **outer → inner**, teardown runs **inner → outer**.
+Nested groups inherit hooks. Setup runs **enclosing → nested**, teardown runs **nested → enclosing**.
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -151,7 +253,7 @@ pub fn main() {
 
 ### Hook failure behavior (important for reliability)
 
-If a hook fails, Dream Test records that failure and marks affected tests appropriately (e.g. setup failures).
+If a hook fails, Dream Test records that failure and fails the affected tests.
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -160,19 +262,10 @@ import dream_test/runner
 import dream_test/unit.{before_all, describe, it}
 import gleam/io
 
-fn connect_to_database() {
-  Ok(Nil)
-}
-
 pub fn tests() {
   describe("Handles failures", [
-    before_all(fn() {
-      case connect_to_database() {
-        Ok(_) -> Ok(Nil)
-        Error(e) -> Error("Database connection failed: " <> e)
-      }
-    }),
-    // If before_all fails, these tests are marked SetupFailed (not run)
+    before_all(fn() { Error("Database connection failed") }),
+    // If before_all fails, these tests do not run, and they are reported as failed.
     it("test1", fn() { Ok(succeed()) }),
     it("test2", fn() { Ok(succeed()) }),
   ])
@@ -190,7 +283,7 @@ pub fn main() {
 
 ### Hooks and parallelism (the source of most flaky tests)
 
-Dream Test runs tests in parallel by default (configurable). Hooks don’t change that: they run *around* tests, but they don’t automatically serialize tests that share resources.
+Dream Test runs tests in parallel by default (configurable). Hooks don’t change that: they run _around_ tests, but they don’t automatically serialize tests that share resources.
 
 If your hooks touch shared external state (ports, filesystem paths, database schemas), you have two options:
 
@@ -202,4 +295,3 @@ If your hooks touch shared external state (ports, filesystem paths, database sch
 - Go back to [Assertions & matchers](05-assertions-and-matchers.md)
 - Go back to [Documentation README](README.md)
 - Continue to [Runner & execution model](07-runner-and-execution.md)
-

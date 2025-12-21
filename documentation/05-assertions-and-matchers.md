@@ -15,7 +15,7 @@ Read it left-to-right:
 
 - Start from the value you’re checking.
 - `should` starts an assertion chain.
-- Each matcher either confirms something (“equal”) or unwraps something (“be_ok”, “be_some”).
+- Each matcher either confirms something (“be_equal”) or unwraps something (“be_ok”, “be_some”).
 - `or_fail_with(...)` attaches the message you’ll see when this fails.
 
 ### Why this pattern?
@@ -246,7 +246,7 @@ pub fn main() {
 
 - **Forgetting `or_fail_with(...)`**: without it, failures tend to be harder to interpret in CI logs. Treat it like part of the assertion, not an optional extra.
 - **Asserting too much in one chain**: long chains can hide which step mattered. Split into smaller checks when it improves clarity.
-- **Using snapshots where equality is clearer**: if a value is tiny, prefer `equal(...)` over snapshot matchers (see the snapshot chapter for the tradeoff).
+- **Using snapshots where equality is clearer**: if a value is tiny, prefer `be_equal(...)` over snapshot matchers (see the snapshot chapter for the tradeoff).
 
 ### What's Next?
 

@@ -45,7 +45,7 @@ The `seed` might look redundant at first (“why not let `before_all` create the
 
 That matters in Gleam because:
 
-- The suite tree is built as ordinary data, and its nodes (`before_each`, `it`, etc.) are typed with a concrete `context` type.
+- The test structure is built as ordinary data, and its parts (`before_each`, `it`, etc.) are typed with a concrete `context` type.
 - Hooks run at test time, but the compiler needs the context type at compile time so `it("...", fn(context) { ... })` is type-checked correctly.
 - Practically: it keeps context-aware suites simple and predictable—no special “first hook defines the context” rule, and no loss of type-safety.
 

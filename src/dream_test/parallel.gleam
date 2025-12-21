@@ -142,6 +142,7 @@ fn execute_node(
 ) -> List(TestResult) {
   case node {
     Group(name, tags, children) -> {
+      let group_scope = list.append(scope, [name])
       let combined_tags = list.append(inherited_tags, tags)
       let empty_hooks =
         GroupHooks(
@@ -155,7 +156,7 @@ fn execute_node(
       let #(ctx2, _before_each2, _after_each2, failures_rev) =
         run_before_all_chain(
           config,
-          scope,
+          group_scope,
           context,
           hooks.before_all,
           inherited_before_each,
@@ -163,48 +164,160 @@ fn execute_node(
           [],
         )
 
-      let combined_before_each =
-        list.append(inherited_before_each, hooks.before_each)
-      let combined_after_each =
-        list.append(hooks.after_each, inherited_after_each)
+      case list.is_empty(failures_rev) {
+        False -> {
+          // If before_all fails, do not execute any tests in this scope.
+          // Instead, mark all tests under this group as failed and skip bodies.
+          let results_rev =
+            fail_tests_due_to_before_all(
+              group_scope,
+              combined_tags,
+              tests,
+              groups,
+              failures_rev,
+              [],
+            )
 
-      let results_rev =
-        run_tests_in_group(
-          config,
-          list.append(scope, [name]),
-          combined_tags,
-          ctx2,
-          combined_before_each,
-          combined_after_each,
-          tests,
-          failures_rev,
-        )
+          let final_rev =
+            run_after_all_chain(
+              config,
+              group_scope,
+              ctx2,
+              hooks.after_all,
+              results_rev,
+            )
 
-      let after_group_rev =
-        run_child_groups_sequentially(
-          config,
-          list.append(scope, [name]),
-          combined_tags,
-          ctx2,
-          combined_before_each,
-          combined_after_each,
-          groups,
-          results_rev,
-        )
+          list.append(final_rev, acc_rev)
+        }
 
-      let final_rev =
-        run_after_all_chain(
-          config,
-          list.append(scope, [name]),
-          ctx2,
-          hooks.after_all,
-          after_group_rev,
-        )
+        True -> {
+          let combined_before_each =
+            list.append(inherited_before_each, hooks.before_each)
+          let combined_after_each =
+            list.append(hooks.after_each, inherited_after_each)
 
-      list.append(final_rev, acc_rev)
+          let results_rev =
+            run_tests_in_group(
+              config,
+              group_scope,
+              combined_tags,
+              ctx2,
+              combined_before_each,
+              combined_after_each,
+              tests,
+              failures_rev,
+            )
+
+          let after_group_rev =
+            run_child_groups_sequentially(
+              config,
+              group_scope,
+              combined_tags,
+              ctx2,
+              combined_before_each,
+              combined_after_each,
+              groups,
+              results_rev,
+            )
+
+          let final_rev =
+            run_after_all_chain(
+              config,
+              group_scope,
+              ctx2,
+              hooks.after_all,
+              after_group_rev,
+            )
+
+          list.append(final_rev, acc_rev)
+        }
+      }
     }
 
     _ -> acc_rev
+  }
+}
+
+fn fail_tests_due_to_before_all(
+  scope: List(String),
+  inherited_tags: List(String),
+  tests: List(Node(context)),
+  groups: List(Node(context)),
+  failures_rev: List(AssertionFailure),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  let after_tests =
+    fail_test_nodes(scope, inherited_tags, tests, failures_rev, acc_rev)
+  fail_group_nodes(scope, inherited_tags, groups, failures_rev, after_tests)
+}
+
+fn fail_test_nodes(
+  scope: List(String),
+  inherited_tags: List(String),
+  nodes: List(Node(context)),
+  failures_rev: List(AssertionFailure),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case nodes {
+    [] -> acc_rev
+    [Test(name, tags, kind, _run, _timeout_ms), ..rest] -> {
+      let full_name = list.append(scope, [name])
+      let all_tags = list.append(inherited_tags, tags)
+      let failures = list.reverse(failures_rev)
+      let result =
+        TestResult(
+          name: name,
+          full_name: full_name,
+          status: Failed,
+          duration_ms: 0,
+          tags: all_tags,
+          failures: failures,
+          kind: kind,
+        )
+      fail_test_nodes(scope, inherited_tags, rest, failures_rev, [
+        result,
+        ..acc_rev
+      ])
+    }
+    [_other, ..rest] ->
+      fail_test_nodes(scope, inherited_tags, rest, failures_rev, acc_rev)
+  }
+}
+
+fn fail_group_nodes(
+  scope: List(String),
+  inherited_tags: List(String),
+  nodes: List(Node(context)),
+  failures_rev: List(AssertionFailure),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case nodes {
+    [] -> acc_rev
+    [Group(name, tags, children), ..rest] -> {
+      let group_scope = list.append(scope, [name])
+      let combined_tags = list.append(inherited_tags, tags)
+      let empty_hooks =
+        GroupHooks(
+          before_all: [],
+          before_each: [],
+          after_each: [],
+          after_all: [],
+        )
+      let #(_hooks, tests, groups) =
+        collect_children(children, empty_hooks, [], [])
+      let next =
+        fail_tests_due_to_before_all(
+          group_scope,
+          combined_tags,
+          tests,
+          groups,
+          failures_rev,
+          acc_rev,
+        )
+      fail_group_nodes(scope, inherited_tags, rest, failures_rev, next)
+    }
+    [_other, ..rest] ->
+      fail_group_nodes(scope, inherited_tags, rest, failures_rev, acc_rev)
   }
 }
 

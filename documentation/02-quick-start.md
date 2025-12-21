@@ -2,7 +2,7 @@
 
 When you’re adopting Dream Test, the first goal is simple: **write one passing test, run it, and see readable output**.
 
-Dream Test keeps the runner explicit on purpose. Instead of **implicit/global** test registration (tests registering themselves at import time), you build **suite values** and pass them to a tiny runner module where you decide:
+Dream Test keeps the runner explicit on purpose. Instead of tests “just running” because a file exists or was imported, you build **suite values** and pass them to a tiny runner module where you decide:
 
 - What suites to run
 - What output to produce
@@ -10,7 +10,7 @@ Dream Test keeps the runner explicit on purpose. Instead of **implicit/global** 
 
 That explicitness is the source of most of Dream Test’s reliability: when a test run surprises you, there’s always a concrete `main()` you can inspect.
 
-If you’re looking for a mental model of “registration”: in Dream Test, **your suites are the registration**. You can list them explicitly, or generate the list via discovery.
+If you’re looking for a mental model of “how does the runner find my tests?”: in Dream Test, **`main()` chooses what runs** by passing suites to the runner. You can list suites explicitly, or generate the list via discovery.
 
 ### Choose your first runner style
 

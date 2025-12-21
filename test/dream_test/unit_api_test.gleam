@@ -3,7 +3,7 @@ import dream_test/runner
 import dream_test/types.{
   AssertionFailed, AssertionFailure, AssertionOk, Failed, Passed, Unit,
 }
-import dream_test/unit.{describe, group, it, with_tags}
+import dream_test/unit.{before_all, describe, group, it, with_tags}
 import gleam/option.{None}
 
 pub fn tests() {
@@ -67,6 +67,32 @@ pub fn tests() {
       |> should
       |> be_equal(Failed)
       |> or_fail_with("failed assertion should produce Failed status")
+    }),
+
+    it("before_all failure fails tests and skips the test body", fn() {
+      let suite =
+        describe("root", [
+          before_all(fn() { Error("nope") }),
+          it("should not run", fn() { panic as "should not run" }),
+        ])
+
+      let results = runner.new([suite]) |> runner.run()
+      let assert [r] = results
+
+      #(r.status, r.failures)
+      |> should
+      |> be_equal(
+        #(Failed, [
+          AssertionFailure(
+            operator: "before_all",
+            message: "nope",
+            payload: None,
+          ),
+        ]),
+      )
+      |> or_fail_with(
+        "before_all error should fail the test without running the body",
+      )
     }),
   ])
 }

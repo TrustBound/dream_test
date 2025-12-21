@@ -8,7 +8,7 @@ Most of the time, you want tests that read like a conversation with the code:
 Dream Test’s unit DSL is built for that style, but there’s a deeper design goal behind the surface syntax:
 
 - **Suites are just values** you can build, pass around, and run explicitly.
-- **Your test module stays ordinary Gleam** (no magic registration).
+- **Your test module stays ordinary Gleam** (no hidden discovery side-effects).
 - **Failures should read well** (because tests are communication, not just verification).
 
 ### `describe` + `it` (the core loop)
@@ -59,18 +59,12 @@ pub fn main() {
 
 ### How to think about `describe` and `it`
 
-Treat the suite tree as documentation:
+Treat the test structure (nested describes/groups/tests) as documentation:
 
 - Use **`describe("Thing", [...])`** to name the unit of behavior you’re testing (a module, type, feature, capability).
 - Use **short `it` names** that describe the outcome (“returns error for division by zero”), not the implementation (“calls divide with 0”).
 - Keep `it` bodies small: arrange → act → assert.
 - If setup gets noisy, prefer **named helpers** first. Reach for hooks when you truly need cross-cutting setup/teardown (see the lifecycle chapter).
-
-### A note on anonymous functions
-
-In Dream Test documentation you’ll often see `fn() { ... }` bodies inline for readability. That’s fine for tests.
-
-If an `it` body starts to get long, consider extracting it into a named helper function—mostly so failures are easier to localize and the suite stays skimmable.
 
 ### `skip` (keep the test, don’t run it)
 
@@ -152,32 +146,94 @@ pub fn tests() {
 
 You’ll also see `group` used in the hook inheritance example (outer hooks apply to inner groups):
 
+```gleam
+import dream_test/matchers.{succeed}
+import dream_test/unit.{after_each, before_each, describe, group, it}
+import gleam/io
+
+pub fn tests() {
+  describe("Outer", [
+    before_each(fn() { io.println("outer setup") Ok(Nil) }),
+    after_each(fn() { io.println("outer teardown") Ok(Nil) }),
+    group("Inner", [
+      before_each(fn() { io.println("inner setup") Ok(Nil) }),
+      after_each(fn() { io.println("inner teardown") Ok(Nil) }),
+      it("test", fn() { Ok(succeed()) }),
+    ]),
+  ])
+}
+```
+
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_inheritance.gleam)</sub>
 
 ### Tags (when you need a “slice” of a suite)
 
-Tags are lightweight metadata on tests/groups. They become part of the `TestResult.tags` list, which you can use to filter or post-process results.
+Tags are lightweight labels you can attach to tests and groups. Use them to slice a run (“smoke”, “slow”, “integration”) or to filter/process results in your own tooling and CI.
+
+What you can tag in unit tests:
+
+- A **test** (an `it(...)` or `skip(...)` node)
+- A **group** (a `group(...)` node)
+
+Tags on a group apply to all tests inside that group (including nested groups).
 
 Why tags exist:
 
 - They let you annotate intent (“slow”, “integration”, “smoke”) without encoding that in names.
 - They’re structured data that tools and reporters can use without parsing strings.
 
-This repo also uses tags heavily in Gherkin suites (see the Gherkin guide), where tags come from `with_tags(...)` on scenarios.
+This repo also uses tags heavily in Gherkin specs (see the Gherkin guide), where tags live on scenarios/features.
+
+### Filtering by tag
+
+You can use tags to run only a subset of tests.
+
+```gleam
+import dream_test/reporters
+import dream_test/runner
+import dream_test/types.{AssertionOk}
+import dream_test/unit.{describe, it, with_tags}
+import gleam/io
+import gleam/list
+
+fn is_smoke(info: runner.TestInfo) -> Bool {
+  list.contains(info.tags, "smoke")
+}
+
+pub fn main() {
+  let suite =
+    describe("Tagged tests", [
+      it("smoke: fast", fn() { Ok(AssertionOk) }) |> with_tags(["smoke"]),
+      it("not smoke", fn() { Ok(AssertionOk) }),
+    ])
+
+  runner.new([suite])
+  |> runner.filter_tests(is_smoke)
+  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
 
 ```gleam
 import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner
-import dream_test/unit.{describe, it, with_tags}
+import dream_test/unit.{describe, group, it, with_tags}
 import gleam/io
 
 pub fn tests() {
   describe("Tagged tests", [
-    it("fast", fn() { Ok(succeed()) })
-      |> with_tags(["unit", "fast"]),
-    it("slow", fn() { Ok(succeed()) })
+    // Tag a whole group (all tests inside inherit these tags)
+    group("integration", [
+      it("slow path", fn() { Ok(succeed()) }),
+      it("another slow path", fn() { Ok(succeed()) }),
+    ])
       |> with_tags(["integration", "slow"]),
+
+    // Or tag a single test
+    it("smoke", fn() { Ok(succeed()) })
+      |> with_tags(["smoke"]),
   ])
 }
 
