@@ -16,12 +16,14 @@
 //// - Use `dream_test/unit_context` only when you want a **real context value**
 ////   threaded through hooks and test bodies.
 ////
-//// ## Example (from snippets)
+//// ## Example
 ////
 //// ```gleam
-//// // examples/snippets/test/snippets/unit/quick_start.gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/reporters
+//// import dream_test/runner
 //// import dream_test/unit.{describe, it}
+//// import gleam/io
 //// import gleam/string
 ////
 //// pub fn tests() {
@@ -33,7 +35,21 @@
 ////       |> be_equal("hello")
 ////       |> or_fail_with("Should remove surrounding whitespace")
 ////     }),
+////     it("finds substrings", fn() {
+////       "hello world"
+////       |> string.contains("world")
+////       |> should
+////       |> be_equal(True)
+////       |> or_fail_with("Should find 'world' in string")
+////     }),
 ////   ])
+//// }
+////
+//// pub fn main() {
+////   runner.new([tests()])
+////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.exit_on_failure()
+////   |> runner.run()
 //// }
 //// ```
 
@@ -47,6 +63,11 @@ import gleam/option.{None}
 ///
 /// You generally don’t need to construct nodes directly; use `group`, `it`,
 /// and the hook helpers in this module.
+///
+/// ## Parameters
+///
+/// `UnitNode` is an alias of `types.Node(Nil)`, where the context type is `Nil`.
+/// This module creates these nodes for you.
 pub type UnitNode =
   Node(Nil)
 
@@ -56,7 +77,49 @@ pub type UnitNode =
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/unit/quick_start.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+/// import gleam/string
+///
+/// pub fn tests() {
+///   describe("String utilities", [
+///     it("trims whitespace", fn() {
+///       "  hello  "
+///       |> string.trim()
+///       |> should
+///       |> be_equal("hello")
+///       |> or_fail_with("Should remove surrounding whitespace")
+///     }),
+///     it("finds substrings", fn() {
+///       "hello world"
+///       |> string.contains("world")
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("Should find 'world' in string")
+///     }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `name`: the suite name (shown in reports)
+/// - `children`: the suite contents (tests, groups, and hooks)
+///
+/// ## Returns
+///
+/// A `TestSuite(Nil)` you can pass to `runner.new([ ... ])`.
 pub fn describe(name: String, children: List(UnitNode)) -> TestSuite(Nil) {
   Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
 }
@@ -68,7 +131,56 @@ pub fn describe(name: String, children: List(UnitNode)) -> TestSuite(Nil) {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/hooks/hook_inheritance.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{describe, group, it}
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Calculator", [
+///     group("addition", [
+///       it("adds small numbers", fn() {
+///         2 + 3
+///         |> should
+///         |> be_equal(5)
+///         |> or_fail_with("2 + 3 should equal 5")
+///       }),
+///       it("adds negative numbers", fn() {
+///         -2 + -3
+///         |> should
+///         |> be_equal(-5)
+///         |> or_fail_with("-2 + -3 should equal -5")
+///       }),
+///     ]),
+///     group("division", [
+///       it("integer division rounds toward zero", fn() {
+///         7 / 2
+///         |> should
+///         |> be_equal(3)
+///         |> or_fail_with("7 / 2 should equal 3")
+///       }),
+///     ]),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `name`: the group name (shown in reports and in `runner.TestInfo.full_name`)
+/// - `children`: nested tests/groups/hooks under this group
+///
+/// ## Returns
+///
+/// A `UnitNode` you include in a parent `describe`/`group` children list.
 pub fn group(name: String, children: List(UnitNode)) -> UnitNode {
   Group(name: name, tags: [], children: children)
 }
@@ -81,7 +193,49 @@ pub fn group(name: String, children: List(UnitNode)) -> UnitNode {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/unit/quick_start.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+/// import gleam/string
+///
+/// pub fn tests() {
+///   describe("String utilities", [
+///     it("trims whitespace", fn() {
+///       "  hello  "
+///       |> string.trim()
+///       |> should
+///       |> be_equal("hello")
+///       |> or_fail_with("Should remove surrounding whitespace")
+///     }),
+///     it("finds substrings", fn() {
+///       "hello world"
+///       |> string.contains("world")
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("Should find 'world' in string")
+///     }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `name`: the test name (shown in reports)
+/// - `run`: a **0-argument** test body that returns `Result(AssertionResult, String)`
+///
+/// ## Returns
+///
+/// A `UnitNode` representing the test.
 pub fn it(
   name: String,
   run: fn() -> Result(AssertionResult, String),
@@ -101,7 +255,54 @@ pub fn it(
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/unit/skipping_tests.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it, skip}
+/// import gleam/io
+/// import snippets.{add}
+///
+/// pub fn tests() {
+///   describe("Skipping tests", [
+///     it("runs normally", fn() {
+///       add(2, 3)
+///       |> should
+///       |> be_equal(5)
+///       |> or_fail_with("2 + 3 should equal 5")
+///     }),
+///     skip("not implemented yet", fn() {
+///       // This test is skipped - the body is preserved but not executed
+///       add(100, 200)
+///       |> should
+///       |> be_equal(300)
+///       |> or_fail_with("Should add large numbers")
+///     }),
+///     it("also runs normally", fn() {
+///       add(0, 0)
+///       |> should
+///       |> be_equal(0)
+///       |> or_fail_with("0 + 0 should equal 0")
+///     }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `name`: the test name
+/// - `_run`: a **0-argument** function (accepted but never executed)
+///
+/// ## Returns
+///
+/// A `UnitNode` representing a skipped test (`AssertionSkipped`).
 pub fn skip(
   name: String,
   _run: fn() -> Result(AssertionResult, String),
@@ -123,7 +324,79 @@ pub fn skip(
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{
+///   after_all, after_each, before_all, before_each, describe, it,
+/// }
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Database tests", [
+///     before_all(fn() {
+///       // Start database once for all tests
+///       start_database()
+///     }),
+///     before_each(fn() {
+///       // Begin transaction before each test
+///       begin_transaction()
+///     }),
+///     it("creates a record", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     it("queries records", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     after_each(fn() {
+///       // Rollback transaction after each test
+///       rollback_transaction()
+///     }),
+///     after_all(fn() {
+///       // Stop database after all tests
+///       stop_database()
+///     }),
+///   ])
+/// }
+///
+/// fn start_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn stop_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn begin_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// fn rollback_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `setup`: a **0-argument** function that returns `Ok(Nil)` on success or `Error(message)` on failure
+///
+/// ## Returns
+///
+/// A `UnitNode` representing a `before_all` hook.
 pub fn before_all(setup: fn() -> Result(Nil, String)) -> UnitNode {
   BeforeAll(fn(_nil: Nil) {
     case setup() {
@@ -141,7 +414,79 @@ pub fn before_all(setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{
+///   after_all, after_each, before_all, before_each, describe, it,
+/// }
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Database tests", [
+///     before_all(fn() {
+///       // Start database once for all tests
+///       start_database()
+///     }),
+///     before_each(fn() {
+///       // Begin transaction before each test
+///       begin_transaction()
+///     }),
+///     it("creates a record", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     it("queries records", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     after_each(fn() {
+///       // Rollback transaction after each test
+///       rollback_transaction()
+///     }),
+///     after_all(fn() {
+///       // Stop database after all tests
+///       stop_database()
+///     }),
+///   ])
+/// }
+///
+/// fn start_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn stop_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn begin_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// fn rollback_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `setup`: a **0-argument** function that returns `Ok(Nil)` on success or `Error(message)` on failure
+///
+/// ## Returns
+///
+/// A `UnitNode` representing a `before_each` hook.
 pub fn before_each(setup: fn() -> Result(Nil, String)) -> UnitNode {
   BeforeEach(fn(_nil: Nil) {
     case setup() {
@@ -158,7 +503,79 @@ pub fn before_each(setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{
+///   after_all, after_each, before_all, before_each, describe, it,
+/// }
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Database tests", [
+///     before_all(fn() {
+///       // Start database once for all tests
+///       start_database()
+///     }),
+///     before_each(fn() {
+///       // Begin transaction before each test
+///       begin_transaction()
+///     }),
+///     it("creates a record", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     it("queries records", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     after_each(fn() {
+///       // Rollback transaction after each test
+///       rollback_transaction()
+///     }),
+///     after_all(fn() {
+///       // Stop database after all tests
+///       stop_database()
+///     }),
+///   ])
+/// }
+///
+/// fn start_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn stop_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn begin_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// fn rollback_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `teardown`: a **0-argument** function that returns `Ok(Nil)` or `Error(message)`
+///
+/// ## Returns
+///
+/// A `UnitNode` representing an `after_each` hook.
 pub fn after_each(teardown: fn() -> Result(Nil, String)) -> UnitNode {
   AfterEach(fn(_nil: Nil) { teardown() })
 }
@@ -167,7 +584,79 @@ pub fn after_each(teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam`.
+/// ```gleam
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{
+///   after_all, after_each, before_all, before_each, describe, it,
+/// }
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Database tests", [
+///     before_all(fn() {
+///       // Start database once for all tests
+///       start_database()
+///     }),
+///     before_each(fn() {
+///       // Begin transaction before each test
+///       begin_transaction()
+///     }),
+///     it("creates a record", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     it("queries records", fn() {
+///       []
+///       |> should
+///       |> be_empty()
+///       |> or_fail_with("Placeholder test")
+///     }),
+///     after_each(fn() {
+///       // Rollback transaction after each test
+///       rollback_transaction()
+///     }),
+///     after_all(fn() {
+///       // Stop database after all tests
+///       stop_database()
+///     }),
+///   ])
+/// }
+///
+/// fn start_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn stop_database() {
+///   Ok(Nil)
+/// }
+///
+/// fn begin_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// fn rollback_transaction() {
+///   Ok(Nil)
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `teardown`: a **0-argument** function that returns `Ok(Nil)` or `Error(message)`
+///
+/// ## Returns
+///
+/// A `UnitNode` representing an `after_all` hook.
 pub fn after_all(teardown: fn() -> Result(Nil, String)) -> UnitNode {
   AfterAll(fn(_nil: Nil) { teardown() })
 }
@@ -179,8 +668,38 @@ pub fn after_all(teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
-/// See `examples/snippets/test/snippets/gherkin/gherkin_feature.gleam` for scenario tags (Gherkin),
-/// and see `test/dream_test/unit_api_test.gleam` for unit tag propagation.
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it, with_tags}
+/// import gleam/io
+///
+/// pub fn tests() {
+///   describe("Tagged tests", [
+///     it("fast", fn() { Ok(succeed()) })
+///       |> with_tags(["unit", "fast"]),
+///     it("slow", fn() { Ok(succeed()) })
+///       |> with_tags(["integration", "slow"]),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `node`: a test or group node to tag (tags do not apply to hooks)
+/// - `tags`: tags to attach; group tags are inherited by descendant tests
+///
+/// ## Returns
+///
+/// The updated `UnitNode` with tags set.
 pub fn with_tags(node: UnitNode, tags: List(String)) -> UnitNode {
   case node {
     Group(name, _, children) ->

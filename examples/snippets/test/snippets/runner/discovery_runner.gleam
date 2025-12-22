@@ -1,9 +1,3 @@
-//// Quick start: module discovery runner
-////
-//// This is the minimal “I don’t want to import 40 test modules” setup.
-////
-//// Note: module discovery requires compiled BEAM modules.
-
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters
 import dream_test/runner.{exit_on_failure, reporter, run}

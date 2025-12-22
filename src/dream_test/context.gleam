@@ -1,7 +1,11 @@
-//// Per-test context bookkeeping.
+//// Per-test context.
 ////
-//// Most users should not need this module directly; it exists to support
-//// internal plumbing and future extensibility.
+//// This module provides a small record (`TestContext`) for storing
+//// `types.AssertionFailure` values. Most test code won’t interact with it
+//// directly—matchers already turn failures into `types.AssertionResult`.
+////
+//// You may find it useful if you’re building custom integrations where you want
+//// to accumulate multiple failures during a single test run.
 
 import dream_test/types.{type AssertionFailure}
 
@@ -15,6 +19,45 @@ import dream_test/types.{type AssertionFailure}
 /// `TestContext` exists as a small, explicit record for internal bookkeeping
 /// and future extension (e.g. if the framework needs to accumulate multiple
 /// failures during a single test run).
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{AssertionFailure}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// pub fn tests() {
+///   describe("dream_test/context", [
+///     it("new has no failures", fn() {
+///       context.new()
+///       |> context.failures()
+///       |> should
+///       |> be_equal([])
+///       |> or_fail_with("expected new context to have no failures")
+///     }),
+///
+///     it("add_failure stores failures newest-first", fn() {
+///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///
+///       context.new()
+///       |> context.add_failure(f1)
+///       |> context.add_failure(f2)
+///       |> context.failures()
+///       |> should
+///       |> be_equal([f2, f1])
+///       |> or_fail_with("expected newest-first failure ordering")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Fields
+///
+/// - `failures`: stored newest-first
 pub type TestContext {
   TestContext(failures: List(AssertionFailure))
 }
@@ -25,13 +68,43 @@ pub type TestContext {
 ///
 /// A `TestContext` with no recorded failures.
 ///
+/// ## Parameters
+///
+/// None.
+///
 /// ## Example
 ///
 /// ```gleam
-/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{AssertionFailure}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
 ///
-/// let failures = context.new() |> context.failures()
+/// pub fn tests() {
+///   describe("dream_test/context", [
+///     it("new has no failures", fn() {
+///       context.new()
+///       |> context.failures()
+///       |> should
+///       |> be_equal([])
+///       |> or_fail_with("expected new context to have no failures")
+///     }),
+///
+///     it("add_failure stores failures newest-first", fn() {
+///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///
+///       context.new()
+///       |> context.add_failure(f1)
+///       |> context.add_failure(f2)
+///       |> context.failures()
+///       |> should
+///       |> be_equal([f2, f1])
+///       |> or_fail_with("expected newest-first failure ordering")
+///     }),
+///   ])
+/// }
 /// ```
 pub fn new() -> TestContext {
   TestContext(failures: [])
@@ -48,10 +121,36 @@ pub fn new() -> TestContext {
 /// ## Example
 ///
 /// ```gleam
-/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{AssertionFailure}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
 ///
-/// let all = context.new() |> context.failures()
+/// pub fn tests() {
+///   describe("dream_test/context", [
+///     it("new has no failures", fn() {
+///       context.new()
+///       |> context.failures()
+///       |> should
+///       |> be_equal([])
+///       |> or_fail_with("expected new context to have no failures")
+///     }),
+///
+///     it("add_failure stores failures newest-first", fn() {
+///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///
+///       context.new()
+///       |> context.add_failure(f1)
+///       |> context.add_failure(f2)
+///       |> context.failures()
+///       |> should
+///       |> be_equal([f2, f1])
+///       |> or_fail_with("expected newest-first failure ordering")
+///     }),
+///   ])
+/// }
 /// ```
 ///
 /// ## Returns
@@ -81,20 +180,36 @@ pub fn failures(context: TestContext) -> List(AssertionFailure) {
 /// ## Example
 ///
 /// ```gleam
-/// // examples/snippets/test/snippets/utils/context_helpers.gleam
 /// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/types.{AssertionFailure}
+/// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
-/// let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-/// let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+/// pub fn tests() {
+///   describe("dream_test/context", [
+///     it("new has no failures", fn() {
+///       context.new()
+///       |> context.failures()
+///       |> should
+///       |> be_equal([])
+///       |> or_fail_with("expected new context to have no failures")
+///     }),
 ///
-/// let failures =
-///   context.new()
-///   |> context.add_failure(f1)
-///   |> context.add_failure(f2)
-///   |> context.failures()
-/// // failures == [f2, f1]
+///     it("add_failure stores failures newest-first", fn() {
+///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///
+///       context.new()
+///       |> context.add_failure(f1)
+///       |> context.add_failure(f2)
+///       |> context.failures()
+///       |> should
+///       |> be_equal([f2, f1])
+///       |> or_fail_with("expected newest-first failure ordering")
+///     }),
+///   ])
+/// }
 /// ```
 pub fn add_failure(
   context: TestContext,

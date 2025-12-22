@@ -1,8 +1,3 @@
-//// README: Built-in matchers
-////
-//// This snippet exists so hexdocs examples for the matcher modules can be
-//// copied from real, compiled code.
-
 import dream_test/matchers.{
   be_between, be_equal, be_false, be_ok, be_some, be_true, contain,
   contain_string, have_length, or_fail_with, should,

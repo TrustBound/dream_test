@@ -1,5 +1,3 @@
-//// README: Explicit failures
-
 import dream_test/matchers.{fail_with, succeed}
 import dream_test/reporters
 import dream_test/runner

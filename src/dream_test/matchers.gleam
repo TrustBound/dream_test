@@ -1,16 +1,13 @@
-//// Matcher API for dream_test.
+//// Matcher API for Dream Test.
 ////
-//// This module provides a fluent, pipe-friendly matcher API. Every matcher
-//// chain starts with `should` and ends with `or_fail_with()`.
+//// Matchers are small functions you pipe values through to produce the value a
+//// Dream Test `it(...)` body returns: `Result(AssertionResult, String)`.
 ////
-//// ## Basic Pattern
+//// You’ll typically:
 ////
-//// ```gleam
-//// value
-//// |> should
-//// |> be_equal(expected)
-//// |> or_fail_with("Helpful error message")
-//// ```
+//// - Start with `should` (wrap a value for matching)
+//// - Apply one or more matchers (like `be_equal`, `be_some`, `contain_string`)
+//// - Finish with `or_fail_with("...")` to produce the final test result
 ////
 //// ## Available Matchers
 ////
@@ -27,57 +24,22 @@
 ////
 //// ## Chaining Matchers
 ////
-//// Matchers can be chained. Each matcher passes its unwrapped value to the next:
+//// Some matchers “unwrap” values:
+//// - `be_some()` turns `Option(a)` into `a`
+//// - `be_ok()` turns `Result(a, e)` into `a`
 ////
-//// ```gleam
-//// // Unwrap Some, then check the inner value
-//// Some(42)
-//// |> should
-//// |> be_some()
-//// |> be_equal(42)
-//// |> or_fail_with("Should be Some(42)")
+//// That’s why you can chain checks after them.
 ////
-//// // Unwrap Ok, then check the inner value
-//// Ok("hello")
-//// |> should
-//// |> be_ok()
-//// |> be_equal("hello")
-//// |> or_fail_with("Should be Ok with 'hello'")
+//// ## Explicit failures
 ////
-//// // Unwrap Ok, then check the inner Option
-//// Ok(Some(42))
-//// |> should
-//// |> be_ok()
-//// |> be_some()
-//// |> be_greater_than(40)
-//// |> or_fail_with("Should be Ok(Some(n)) where n > 40")
-//// ```
+//// Sometimes you need to explicitly return “pass” or “fail” from a branch of a
+//// `case` expression. Use `succeed()` / `fail_with("...")` for that.
 ////
-//// ## Explicit Failures
+//// ## Imports
 ////
-//// Sometimes you need to fail a test explicitly in a conditional branch:
-////
-//// ```gleam
-//// case result {
-////   Ok(user) -> {
-////     user.name
-////     |> should
-////     |> be_equal("Alice")
-////     |> or_fail_with("User should be Alice")
-////   }
-////   Error(_) -> Ok(fail_with("Should have returned a user"))
-//// }
-//// ```
-////
-//// ## Import Style
-////
-//// For best readability, import the commonly used functions unqualified:
-////
-//// ```gleam
-//// import dream_test/matchers.{
-////   should, be_equal, be_ok, be_some, or_fail_with, fail_with, succeed,
-//// }
-//// ```
+//// You can import individual matchers, or import the whole module and qualify
+//// with `matchers.`. The examples in these docs assume you imported the matcher
+//// functions you’re using.
 
 import dream_test/matchers/boolean
 import dream_test/matchers/collection
@@ -95,18 +57,39 @@ import gleam/option as gleam_option
 
 /// Start a matcher chain.
 ///
-/// This wraps any value in a `MatchResult` so it can be piped into matchers.
-/// Every matcher chain should start with this function.
+/// This wraps a value so it can be piped through matchers.
+/// Every matcher chain starts with `should`.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// 42
-/// |> should
-/// |> be_equal(42)
-/// |> or_fail_with("Should be 42")
+/// import dream_test/matchers.{be_true, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   True
+///   |> should
+///   |> be_true()
+///   |> or_fail_with("expected True")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.should", [
+///     it("wraps a value so it can be matched", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `value`: any value you want to make assertions about
+///
+/// ## Returns
+///
+/// A `MatchResult(a)` containing `value`. Subsequent matchers will either:
+/// - preserve this value (for “checking” matchers), or
+/// - transform it (for “unwrapping” matchers like `be_some` / `be_ok`).
 pub fn should(value: a) -> MatchResult(a) {
   MatchOk(value)
 }
@@ -122,12 +105,35 @@ pub fn should(value: a) -> MatchResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// add(2, 3)
-/// |> should
-/// |> be_equal(5)
-/// |> or_fail_with("2 + 3 should equal 5")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import snippets.{add}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   add(2, 3)
+///   |> should
+///   |> be_equal(5)
+///   |> or_fail_with("2 + 3 should equal 5")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_equal", [
+///     it("compares two values for equality", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `expected`: the value you expect the actual value to equal
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On success, the original value is preserved for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 pub const be_equal = equality.be_equal
 
 /// Assert that a value does not equal the unexpected value.
@@ -135,12 +141,35 @@ pub const be_equal = equality.be_equal
 /// ## Example
 ///
 /// ```gleam
-/// divide(10, 3)
-/// |> should
-/// |> not_equal(3)
-/// |> or_fail_with("10/3 should not equal 3 exactly")
+/// import dream_test/matchers.{not_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import snippets.{add}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   add(10, 3)
+///   |> should
+///   |> not_equal(3)
+///   |> or_fail_with("10 + 3 should not equal 3")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.not_equal", [
+///     it("asserts two values are different", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `unexpected`: the value you expect the actual value to *not* equal
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On success, the original value is preserved for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 pub const not_equal = equality.not_equal
 
 // =============================================================================
@@ -152,12 +181,31 @@ pub const not_equal = equality.not_equal
 /// ## Example
 ///
 /// ```gleam
-/// is_valid(input)
-/// |> should
-/// |> be_true()
-/// |> or_fail_with("Input should be valid")
+/// import dream_test/matchers.{be_true, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   True
+///   |> should
+///   |> be_true()
+///   |> or_fail_with("expected True")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_true", [
+///     it("passes for True", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Bool)` preserving the boolean for further chaining.
 pub const be_true = boolean.be_true
 
 /// Assert that a value is `False`.
@@ -165,12 +213,31 @@ pub const be_true = boolean.be_true
 /// ## Example
 ///
 /// ```gleam
-/// is_empty(list)
-/// |> should
-/// |> be_false()
-/// |> or_fail_with("List should not be empty")
+/// import dream_test/matchers.{be_false, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   False
+///   |> should
+///   |> be_false()
+///   |> or_fail_with("expected False")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_false", [
+///     it("passes for False", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Bool)` preserving the boolean for further chaining.
 pub const be_false = boolean.be_false
 
 // =============================================================================
@@ -185,19 +252,35 @@ pub const be_false = boolean.be_false
 /// ## Example
 ///
 /// ```gleam
-/// find_user(id)
-/// |> should
-/// |> be_some()
-/// |> or_fail_with("User should exist")
+/// import dream_test/matchers.{be_equal, be_some, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{Some}
 ///
-/// // With chaining:
-/// find_user(id)
-/// |> should
-/// |> be_some()
-/// |> be_equal(expected_user)
-/// |> or_fail_with("Should find the expected user")
+/// pub fn example() -> Result(AssertionResult, String) {
+///   Some(42)
+///   |> should
+///   |> be_some()
+///   |> be_equal(42)
+///   |> or_fail_with("Should contain 42")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_some", [
+///     it("unwraps Some(value) so you can keep matching", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On `Some(value)`, the chain continues with the unwrapped `value`.
+/// - On `None`, the chain becomes failed and later matchers are skipped.
 pub const be_some = option.be_some
 
 /// Assert that an `Option` is `None`.
@@ -205,12 +288,32 @@ pub const be_some = option.be_some
 /// ## Example
 ///
 /// ```gleam
-/// find_deleted_user(id)
-/// |> should
-/// |> be_none()
-/// |> or_fail_with("Deleted user should not exist")
+/// import dream_test/matchers.{be_none, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   None
+///   |> should
+///   |> be_none()
+///   |> or_fail_with("expected None")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_none", [
+///     it("passes for None", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Nil)` that continues the chain with `Nil` on success.
 pub const be_none = option.be_none
 
 // =============================================================================
@@ -225,19 +328,32 @@ pub const be_none = option.be_none
 /// ## Example
 ///
 /// ```gleam
-/// parse_int("42")
-/// |> should
-/// |> be_ok()
-/// |> or_fail_with("Should parse successfully")
+/// import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
 ///
-/// // With chaining:
-/// parse_int("42")
-/// |> should
-/// |> be_ok()
-/// |> be_equal(42)
-/// |> or_fail_with("Should parse to 42")
+/// pub fn example() -> Result(AssertionResult, String) {
+///   Ok("success")
+///   |> should
+///   |> be_ok()
+///   |> be_equal("success")
+///   |> or_fail_with("Should be Ok with 'success'")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_ok", [
+///     it("unwraps Ok(value) so you can keep matching", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(a)` containing the unwrapped `Ok` value on success.
 pub const be_ok = result.be_ok
 
 /// Assert that a `Result` is `Error` and extract the error value.
@@ -247,19 +363,32 @@ pub const be_ok = result.be_ok
 /// ## Example
 ///
 /// ```gleam
-/// parse_int("not a number")
-/// |> should
-/// |> be_error()
-/// |> or_fail_with("Should fail to parse")
+/// import dream_test/matchers.{be_equal, be_error, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
 ///
-/// // With chaining:
-/// validate(input)
-/// |> should
-/// |> be_error()
-/// |> be_equal(ValidationError("email required"))
-/// |> or_fail_with("Should fail with email error")
+/// pub fn example() -> Result(AssertionResult, String) {
+///   Error("nope")
+///   |> should
+///   |> be_error()
+///   |> be_equal("nope")
+///   |> or_fail_with("Should be Error(\"nope\")")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_error", [
+///     it("unwraps Error(value) so you can keep matching", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(e)` containing the unwrapped error value on success.
 pub const be_error = result.be_error
 
 // =============================================================================
@@ -271,12 +400,32 @@ pub const be_error = result.be_error
 /// ## Example
 ///
 /// ```gleam
-/// [1, 2, 3]
-/// |> should
-/// |> contain(2)
-/// |> or_fail_with("List should contain 2")
+/// import dream_test/matchers.{contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   [1, 2, 3]
+///   |> should
+///   |> contain(2)
+///   |> or_fail_with("List should contain 2")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.contain", [
+///     it("passes when the item is present", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `expected_item`: the item that must be present in the list
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))` preserving the list for further chaining.
 pub const contain = collection.contain
 
 /// Assert that a list does not contain a specific item.
@@ -284,12 +433,32 @@ pub const contain = collection.contain
 /// ## Example
 ///
 /// ```gleam
-/// ["a", "b", "c"]
-/// |> should
-/// |> not_contain("d")
-/// |> or_fail_with("List should not contain 'd'")
+/// import dream_test/matchers.{not_contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   ["a", "b", "c"]
+///   |> should
+///   |> not_contain("d")
+///   |> or_fail_with("List should not contain 'd'")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.not_contain", [
+///     it("passes when the item is absent", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `unexpected_item`: the item that must *not* be present in the list
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))` preserving the list for further chaining.
 pub const not_contain = collection.not_contain
 
 /// Assert that a list has a specific length.
@@ -297,12 +466,32 @@ pub const not_contain = collection.not_contain
 /// ## Example
 ///
 /// ```gleam
-/// get_users()
-/// |> should
-/// |> have_length(3)
-/// |> or_fail_with("Should have 3 users")
+/// import dream_test/matchers.{have_length, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   [1, 2, 3]
+///   |> should
+///   |> have_length(3)
+///   |> or_fail_with("expected list length 3")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.have_length", [
+///     it("checks the length of a list", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `expected_length`: the exact length the list must have
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))` preserving the list for further chaining.
 pub const have_length = collection.have_length
 
 /// Assert that a list is empty.
@@ -310,12 +499,31 @@ pub const have_length = collection.have_length
 /// ## Example
 ///
 /// ```gleam
-/// get_errors()
-/// |> should
-/// |> be_empty()
-/// |> or_fail_with("Should have no errors")
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   []
+///   |> should
+///   |> be_empty()
+///   |> or_fail_with("expected empty list")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_empty", [
+///     it("passes for an empty list", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))` preserving the list for further chaining.
 pub const be_empty = collection.be_empty
 
 // =============================================================================
@@ -327,12 +535,32 @@ pub const be_empty = collection.be_empty
 /// ## Example
 ///
 /// ```gleam
-/// count_items()
-/// |> should
-/// |> be_greater_than(0)
-/// |> or_fail_with("Should have at least one item")
+/// import dream_test/matchers.{be_greater_than, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_greater_than(0)
+///   |> or_fail_with("expected 10 to be greater than 0")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_greater_than", [
+///     it("checks an int is greater than a minimum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual integer must be greater than
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_greater_than = comparison.be_greater_than
 
 /// Assert that an integer is less than a threshold.
@@ -340,12 +568,32 @@ pub const be_greater_than = comparison.be_greater_than
 /// ## Example
 ///
 /// ```gleam
-/// response_time_ms
-/// |> should
-/// |> be_less_than(100)
-/// |> or_fail_with("Response should be under 100ms")
+/// import dream_test/matchers.{be_less_than, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_less_than(100)
+///   |> or_fail_with("expected 10 to be less than 100")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_less_than", [
+///     it("checks an int is less than a maximum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual integer must be less than
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_less_than = comparison.be_less_than
 
 /// Assert that an integer is at least a minimum value (>=).
@@ -353,12 +601,32 @@ pub const be_less_than = comparison.be_less_than
 /// ## Example
 ///
 /// ```gleam
-/// user.age
-/// |> should
-/// |> be_at_least(18)
-/// |> or_fail_with("User must be at least 18")
+/// import dream_test/matchers.{be_at_least, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_at_least(10)
+///   |> or_fail_with("expected 10 to be at least 10")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_at_least", [
+///     it("checks an int is >= a minimum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `minimum`: the minimum allowed value (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_at_least = comparison.be_at_least
 
 /// Assert that an integer is at most a maximum value (<=).
@@ -366,12 +634,32 @@ pub const be_at_least = comparison.be_at_least
 /// ## Example
 ///
 /// ```gleam
-/// password.length
-/// |> should
-/// |> be_at_most(128)
-/// |> or_fail_with("Password must be at most 128 characters")
+/// import dream_test/matchers.{be_at_most, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_at_most(10)
+///   |> or_fail_with("expected 10 to be at most 10")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_at_most", [
+///     it("checks an int is <= a maximum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `maximum`: the maximum allowed value (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_at_most = comparison.be_at_most
 
 /// Assert that an integer is between two values (exclusive).
@@ -381,12 +669,33 @@ pub const be_at_most = comparison.be_at_most
 /// ## Example
 ///
 /// ```gleam
-/// port
-/// |> should
-/// |> be_between(1024, 65535)
-/// |> or_fail_with("Port must be between 1024 and 65535")
+/// import dream_test/matchers.{be_between, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   5
+///   |> should
+///   |> be_between(1, 10)
+///   |> or_fail_with("expected 5 to be between 1 and 10")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_between", [
+///     it("checks an int is between two bounds", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `min`: lower bound (exclusive)
+/// - `max`: upper bound (exclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_between = comparison.be_between
 
 /// Assert that an integer is within a range (inclusive).
@@ -396,12 +705,33 @@ pub const be_between = comparison.be_between
 /// ## Example
 ///
 /// ```gleam
-/// score
-/// |> should
-/// |> be_in_range(0, 100)
-/// |> or_fail_with("Score must be 0-100")
+/// import dream_test/matchers.{be_in_range, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_in_range(0, 100)
+///   |> or_fail_with("expected 10 to be in range 0..100")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_in_range", [
+///     it("checks an int is within an inclusive range", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `min`: lower bound (inclusive)
+/// - `max`: upper bound (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
 pub const be_in_range = comparison.be_in_range
 
 /// Assert that a float is greater than a threshold.
@@ -409,12 +739,32 @@ pub const be_in_range = comparison.be_in_range
 /// ## Example
 ///
 /// ```gleam
-/// average
-/// |> should
-/// |> be_greater_than_float(0.0)
-/// |> or_fail_with("Average should be positive")
+/// import dream_test/matchers.{be_greater_than_float, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   0.5
+///   |> should
+///   |> be_greater_than_float(0.0)
+///   |> or_fail_with("expected 0.5 to be greater than 0.0")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_greater_than_float", [
+///     it("checks a float is greater than a minimum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual float must be greater than
+///
+/// ## Returns
+///
+/// A `MatchResult(Float)` preserving the float for further chaining.
 pub const be_greater_than_float = comparison.be_greater_than_float
 
 /// Assert that a float is less than a threshold.
@@ -422,12 +772,32 @@ pub const be_greater_than_float = comparison.be_greater_than_float
 /// ## Example
 ///
 /// ```gleam
-/// error_rate
-/// |> should
-/// |> be_less_than_float(0.01)
-/// |> or_fail_with("Error rate should be under 1%")
+/// import dream_test/matchers.{be_less_than_float, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   0.5
+///   |> should
+///   |> be_less_than_float(1.0)
+///   |> or_fail_with("expected 0.5 to be less than 1.0")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.be_less_than_float", [
+///     it("checks a float is less than a maximum", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual float must be less than
+///
+/// ## Returns
+///
+/// A `MatchResult(Float)` preserving the float for further chaining.
 pub const be_less_than_float = comparison.be_less_than_float
 
 // =============================================================================
@@ -439,12 +809,32 @@ pub const be_less_than_float = comparison.be_less_than_float
 /// ## Example
 ///
 /// ```gleam
-/// greeting
-/// |> should
-/// |> start_with("Hello")
-/// |> or_fail_with("Greeting should start with Hello")
+/// import dream_test/matchers.{or_fail_with, should, start_with}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   "hello world"
+///   |> should
+///   |> start_with("hello")
+///   |> or_fail_with("expected string to start with 'hello'")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.start_with", [
+///     it("checks the start of a string", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `prefix`: required starting substring
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
 pub const start_with = string.start_with
 
 /// Assert that a string ends with a suffix.
@@ -452,12 +842,32 @@ pub const start_with = string.start_with
 /// ## Example
 ///
 /// ```gleam
-/// filename
-/// |> should
-/// |> end_with(".gleam")
-/// |> or_fail_with("File should be a Gleam file")
+/// import dream_test/matchers.{end_with, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   "hello.gleam"
+///   |> should
+///   |> end_with(".gleam")
+///   |> or_fail_with("expected .gleam suffix")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.end_with", [
+///     it("checks the end of a string", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `suffix`: required ending substring
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
 pub const end_with = string.end_with
 
 /// Assert that a string contains a substring.
@@ -465,12 +875,32 @@ pub const end_with = string.end_with
 /// ## Example
 ///
 /// ```gleam
-/// log_message
-/// |> should
-/// |> contain_string("error")
-/// |> or_fail_with("Log should mention error")
+/// import dream_test/matchers.{contain_string, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   "hello world"
+///   |> should
+///   |> contain_string("world")
+///   |> or_fail_with("expected substring 'world'")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.contain_string", [
+///     it("checks a string contains a substring", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `substring`: required substring that must be present
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
 pub const contain_string = string.contain_string
 
 // =============================================================================
@@ -488,12 +918,40 @@ pub const contain_string = string.contain_string
 /// ## Example
 ///
 /// ```gleam
-/// render_html()
-/// |> should
-/// |> match_snapshot("./test/snapshots/page.snap")
-/// |> or_fail_with("HTML should match snapshot")
+/// import dream_test/matchers.{match_snapshot, or_fail_with, should}
+/// import dream_test/matchers/snapshot as snapshot
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   let path = "./test/tmp/match_snapshot_example.snap"
+///   let _ = snapshot.clear_snapshot(path)
+///
+///   let result =
+///     "hello"
+///     |> should
+///     |> match_snapshot(path)
+///     |> or_fail_with("expected snapshot match")
+///
+///   let _ = snapshot.clear_snapshot(path)
+///   result
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.match_snapshot", [
+///     it("compares a string against a snapshot file", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `snapshot_path`: file path used to store/compare the snapshot
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
 pub const match_snapshot = snapshot.match_snapshot
 
 /// Assert that any value matches a snapshot (using string.inspect).
@@ -504,12 +962,41 @@ pub const match_snapshot = snapshot.match_snapshot
 /// ## Example
 ///
 /// ```gleam
-/// build_config()
-/// |> should
-/// |> match_snapshot_inspect("./test/snapshots/config.snap")
-/// |> or_fail_with("Config should match snapshot")
+/// import dream_test/matchers.{match_snapshot_inspect, or_fail_with, should}
+/// import dream_test/matchers/snapshot as snapshot
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{Some}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   let path = "./test/tmp/match_snapshot_inspect_example.snap"
+///   let _ = snapshot.clear_snapshot(path)
+///
+///   let result =
+///     Some(1)
+///     |> should
+///     |> match_snapshot_inspect(path)
+///     |> or_fail_with("expected inspect snapshot match")
+///
+///   let _ = snapshot.clear_snapshot(path)
+///   result
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.match_snapshot_inspect", [
+///     it("snapshots any value by using string.inspect", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(value)` produced by `should` (or a previous matcher)
+/// - `snapshot_path`: file path used to store/compare the snapshot
+///
+/// ## Returns
+///
+/// A `MatchResult(value)` preserving the unwrapped value for further chaining.
 pub const match_snapshot_inspect = snapshot.match_snapshot_inspect
 
 /// Delete a snapshot file.
@@ -519,9 +1006,41 @@ pub const match_snapshot_inspect = snapshot.match_snapshot_inspect
 /// ## Example
 ///
 /// ```gleam
-/// let _ = clear_snapshot("./test/snapshots/old.snap")
+/// import dream_test/matchers.{
+///   clear_snapshot, match_snapshot, or_fail_with, should, succeed,
+/// }
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   let path = "./test/tmp/clear_snapshot_example.snap"
+///
+///   let _ =
+///     "hello"
+///     |> should
+///     |> match_snapshot(path)
+///     |> or_fail_with("expected to create snapshot")
+///
+///   let _ = clear_snapshot(path)
+///   Ok(succeed())
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.clear_snapshot", [
+///     it("deletes a snapshot file (so next run recreates it)", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `snapshot_path`: the file path to delete
+///
+/// ## Returns
+///
+/// `Result(Nil, String)`:
+/// - `Ok(Nil)` if the snapshot was deleted (or didn't exist)
+/// - `Error(message)` if deletion failed
 pub const clear_snapshot = snapshot.clear_snapshot
 
 /// Delete all snapshot files in a directory.
@@ -531,9 +1050,61 @@ pub const clear_snapshot = snapshot.clear_snapshot
 /// ## Example
 ///
 /// ```gleam
-/// let _ = clear_snapshots_in_directory("./test/snapshots")
+/// import dream_test/matchers.{
+///   be_equal, clear_snapshots_in_directory, match_snapshot, or_fail_with, should,
+/// }
+/// import dream_test/matchers/snapshot as snapshot
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   let directory = "./test/tmp/clear_snapshots_in_directory_example"
+///   let a = directory <> "/a.snap"
+///   let b = directory <> "/b.snap"
+///
+///   // Ensure clean slate
+///   let _ = clear_snapshots_in_directory(directory)
+///
+///   let _ =
+///     "a"
+///     |> should
+///     |> match_snapshot(a)
+///     |> or_fail_with("expected to create snapshot a")
+///
+///   let _ =
+///     "b"
+///     |> should
+///     |> match_snapshot(b)
+///     |> or_fail_with("expected to create snapshot b")
+///
+///   let deleted = clear_snapshots_in_directory(directory)
+///
+///   // Best-effort extra cleanup for repeatability
+///   let _ = snapshot.clear_snapshot(a)
+///   let _ = snapshot.clear_snapshot(b)
+///
+///   deleted
+///   |> should
+///   |> be_equal(Ok(2))
+///   |> or_fail_with("expected two deleted snapshots")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.clear_snapshots_in_directory", [
+///     it("deletes all .snap files in a directory", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
+/// ## Parameters
+///
+/// - `directory`: the directory to scan (non-recursively)
+///
+/// ## Returns
+///
+/// `Result(Int, String)`:
+/// - `Ok(count)` with the number of `.snap` files deleted
+/// - `Error(message)` if deletion failed
 pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 
 // =============================================================================
@@ -552,10 +1123,23 @@ pub const clear_snapshots_in_directory = snapshot.clear_snapshots_in_directory
 /// ## Example
 ///
 /// ```gleam
-/// result
-/// |> should
-/// |> be_equal(42)
-/// |> or_fail_with("Result should be 42")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import snippets.{add}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   add(2, 3)
+///   |> should
+///   |> be_equal(5)
+///   |> or_fail_with("2 + 3 should equal 5")
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.or_fail_with", [
+///     it("finishes a matcher chain and provides a message", fn() { example() }),
+///   ])
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -601,14 +1185,22 @@ pub fn or_fail_with(
 /// ## Example
 ///
 /// ```gleam
-/// case result {
-///   Ok(value) -> {
-///     value
-///     |> should
-///     |> be_equal(expected)
-///     |> or_fail_with("Value should match")
-///   }
-///   Error(_) -> Ok(fail_with("Should have succeeded but got an error"))
+/// import dream_test/matchers.{fail_with, succeed}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import snippets.{add}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   Ok(case add(1, 1) {
+///     2 -> succeed()
+///     _ -> fail_with("expected 1 + 1 to be 2")
+///   })
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.fail_with", [
+///     it("produces a failing AssertionResult", fn() { example() }),
+///   ])
 /// }
 /// ```
 ///
@@ -641,9 +1233,22 @@ pub fn fail_with(message: String) -> AssertionResult {
 /// ## Example
 ///
 /// ```gleam
-/// case result {
-///   Ok(_) -> Ok(succeed())
-///   Error(_) -> Ok(fail_with("Should have succeeded"))
+/// import dream_test/matchers.{fail_with, succeed}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it}
+/// import snippets.{add}
+///
+/// pub fn example() -> Result(AssertionResult, String) {
+///   Ok(case add(1, 1) {
+///     2 -> succeed()
+///     _ -> fail_with("expected 1 + 1 to be 2")
+///   })
+/// }
+///
+/// pub fn tests() {
+///   describe("matchers.succeed", [
+///     it("produces AssertionOk", fn() { example() }),
+///   ])
 /// }
 /// ```
 ///

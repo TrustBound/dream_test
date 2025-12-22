@@ -1,5 +1,3 @@
-//// README: JSON formatting (post-run, string output)
-
 import dream_test/matchers.{contain_string, or_fail_with, should, succeed}
 import dream_test/reporters/json
 import dream_test/runner

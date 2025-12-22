@@ -1,5 +1,3 @@
-//// README: Timing helpers
-
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/timing
 import dream_test/unit.{describe, it}

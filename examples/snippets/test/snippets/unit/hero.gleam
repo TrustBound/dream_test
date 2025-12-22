@@ -1,5 +1,3 @@
-//// README: Hero example (Calculator)
-
 import dream_test/matchers.{be_equal, be_error, be_ok, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner

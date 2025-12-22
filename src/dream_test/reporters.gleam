@@ -28,21 +28,25 @@
 //// Most users will construct one of these reporters and attach it to the runner:
 ////
 //// ```gleam
+//// import dream_test/matchers.{succeed}
 //// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
-//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
-//// let suite =
-////   describe("Example", [
-////     it("passes", fn() { Ok(AssertionOk) }),
+//// pub fn tests() {
+////   describe("BDD reporter", [
+////     it("passes", fn() { Ok(succeed()) }),
+////     it("also passes", fn() { Ok(succeed()) }),
 ////   ])
+//// }
 ////
-//// runner.new([suite])
-//// |> runner.reporter(reporters.bdd(io.print, True))
-//// |> runner.exit_on_failure()
-//// |> runner.run()
+//// pub fn main() {
+////   runner.new([tests()])
+////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.exit_on_failure()
+////   |> runner.run()
+//// }
 //// ```
 
 import dream_test/reporters/bdd as bdd_reporter
@@ -94,14 +98,25 @@ pub type Reporter {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters
 /// import dream_test/runner
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// runner.new([suite])
-/// |> runner.reporter(reporters.bdd(io.print, True))
-/// |> runner.exit_on_failure()
-/// |> runner.run()
+/// pub fn tests() {
+///   describe("BDD reporter", [
+///     it("passes", fn() { Ok(succeed()) }),
+///     it("also passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
 /// ```
 pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
   Bdd(
@@ -126,14 +141,32 @@ pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters
 /// import dream_test/runner
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// runner.new([suite])
-/// |> runner.reporter(reporters.json(io.print, False))
-/// |> runner.exit_on_failure()
-/// |> runner.run()
+/// pub fn tests() {
+///   describe("JSON Reporter", [
+///     it("outputs JSON format", fn() {
+///       // The json.report function outputs machine-readable JSON
+///       // while bdd.report outputs human-readable text
+///       Ok(succeed())
+///     }),
+///     it("includes test metadata", fn() {
+///       // JSON output includes name, full_name, status, duration, tags
+///       Ok(succeed())
+///     }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.json(io.print, True))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
 /// ```
 pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
   Json(write: write, show_progress: show_progress, results_rev: [])
@@ -146,14 +179,25 @@ pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters
 /// import dream_test/runner
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// runner.new([suite])
-/// |> runner.reporter(reporters.progress(io.print))
-/// |> runner.exit_on_failure()
-/// |> runner.run()
+/// pub fn tests() {
+///   describe("Progress reporter", [
+///     it("passes", fn() { Ok(succeed()) }),
+///     it("also passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.reporter(reporters.progress(io.print))
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
 /// ```
 pub fn progress(write: fn(String) -> Nil) -> Reporter {
   Progress(write: write)
@@ -169,11 +213,54 @@ pub fn progress(write: fn(String) -> Nil) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
-/// // For most users: prefer `runner.reporter(...)` and let the runner drive events.
-/// //
-/// // If you're building custom tooling, you can drive a reporter manually:
-/// //
-/// // See: examples/snippets/test/snippets/reporters/reporter_api_handle_event.gleam
+/// import dream_test/file
+/// import dream_test/matchers.{be_ok, contain_string, or_fail_with, should}
+/// import dream_test/reporters
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/unit.{describe, it}
+/// import gleam/result
+///
+/// pub fn tests() {
+///   describe("Reporter API: handle_event", [
+///     it("can be driven manually with ReporterEvent values", fn() {
+///       let path = "test/tmp/reporter_api_handle_event.json"
+///       let _ = ignore_file_errors(file.delete(path))
+///
+///       let r0 = reporters.json(write_to_file(path), False)
+///       let r1 = reporters.handle_event(r0, reporter_types.RunStarted(total: 1))
+///       let r2 =
+///         reporters.handle_event(
+///           r1,
+///           reporter_types.RunFinished(completed: 1, total: 1),
+///         )
+///
+///       let _ = r2
+///       let output =
+///         file.read(path)
+///         |> result.map_error(file.error_to_string)
+///
+///       output
+///       |> should
+///       |> be_ok()
+///       |> contain_string("\"tests\"")
+///       |> or_fail_with("Expected reporter output to include a JSON report")
+///     }),
+///   ])
+/// }
+///
+/// fn write_to_file(path: String) -> fn(String) -> Nil {
+///   fn(text) {
+///     let _ = ignore_file_errors(file.write(path, text))
+///     Nil
+///   }
+/// }
+///
+/// fn ignore_file_errors(value: Result(a, e)) -> Nil {
+///   case value {
+///     Ok(_) -> Nil
+///     Error(_) -> Nil
+///   }
+/// }
 /// ```
 pub fn handle_event(
   reporter: Reporter,

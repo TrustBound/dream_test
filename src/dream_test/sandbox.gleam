@@ -30,24 +30,57 @@
 //// ## Example
 ////
 //// ```gleam
-//// import dream_test/sandbox.{SandboxConfig, SandboxCrashed}
-//// import dream_test/types.{AssertionOk}
-////
-//// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
-//// let result = sandbox.run_isolated(config, fn() { AssertionOk })
-//// ```
-////
-//// ## Example (from snippets)
-////
-//// ```gleam
-//// // examples/snippets/test/snippets/utils/sandboxing.gleam
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/sandbox.{
 ////   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 //// }
+//// import dream_test/unit.{describe, it}
 ////
-//// let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-//// let result = sandbox.run_isolated(config, fn() { 123 })
-//// // result == SandboxCompleted(123)
+//// fn loop_forever() {
+////   loop_forever()
+//// }
+////
+//// pub fn tests() {
+////   describe("Sandboxing", [
+////     it("run_isolated returns SandboxCompleted(value) on success", fn() {
+////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+////       let result = sandbox.run_isolated(config, fn() { 123 })
+////
+////       result
+////       |> should
+////       |> be_equal(SandboxCompleted(123))
+////       |> or_fail_with("expected SandboxCompleted(123)")
+////     }),
+////
+////     it(
+////       "run_isolated returns SandboxTimedOut when the function is too slow",
+////       fn() {
+////         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
+////         let result = sandbox.run_isolated(config, loop_forever)
+////
+////         result
+////         |> should
+////         |> be_equal(SandboxTimedOut)
+////         |> or_fail_with("expected SandboxTimedOut")
+////       },
+////     ),
+////
+////     it("run_isolated returns SandboxCrashed when the function panics", fn() {
+////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+////       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+////
+////       let did_crash = case result {
+////         SandboxCrashed(_) -> True
+////         _ -> False
+////       }
+////
+////       did_crash
+////       |> should
+////       |> be_equal(True)
+////       |> or_fail_with("expected SandboxCrashed(...)")
+////     }),
+////   ])
+//// }
 //// ```
 
 import gleam/erlang/process.{
@@ -68,6 +101,15 @@ import gleam/string
 ///
 /// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
 /// ```
+///
+/// ## Parameters
+///
+/// - `timeout_ms`: how long to wait before returning `SandboxTimedOut`
+/// - `show_crash_reports`: whether to allow the BEAM to print crash reports
+///
+/// ## Returns
+///
+/// A `SandboxConfig` value.
 pub type SandboxConfig {
   SandboxConfig(timeout_ms: Int, show_crash_reports: Bool)
 }
@@ -100,31 +142,70 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 /// If the process completes normally, its result is returned.
 /// If the process crashes or times out, an appropriate SandboxResult is returned.
 ///
-/// ## Example (quiet crash handling)
+/// ## Example
 ///
 /// ```gleam
-/// import dream_test/sandbox.{SandboxConfig}
-/// import dream_test/types.{AssertionOk}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{
+///   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
+/// }
+/// import dream_test/unit.{describe, it}
 ///
-/// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
-/// let result = sandbox.run_isolated(config, fn() { AssertionOk })
+/// fn loop_forever() {
+///   loop_forever()
+/// }
+///
+/// pub fn tests() {
+///   describe("Sandboxing", [
+///     it("run_isolated returns SandboxCompleted(value) on success", fn() {
+///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+///       let result = sandbox.run_isolated(config, fn() { 123 })
+///
+///       result
+///       |> should
+///       |> be_equal(SandboxCompleted(123))
+///       |> or_fail_with("expected SandboxCompleted(123)")
+///     }),
+///
+///     it(
+///       "run_isolated returns SandboxTimedOut when the function is too slow",
+///       fn() {
+///         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
+///         let result = sandbox.run_isolated(config, loop_forever)
+///
+///         result
+///         |> should
+///         |> be_equal(SandboxTimedOut)
+///         |> or_fail_with("expected SandboxTimedOut")
+///       },
+///     ),
+///
+///     it("run_isolated returns SandboxCrashed when the function panics", fn() {
+///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+///       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+///
+///       let did_crash = case result {
+///         SandboxCrashed(_) -> True
+///         _ -> False
+///       }
+///
+///       did_crash
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("expected SandboxCrashed(...)")
+///     }),
+///   ])
+/// }
 /// ```
 ///
-/// ## Example (timeout)
+/// ## Parameters
 ///
-/// ```gleam
-/// import dream_test/sandbox.{SandboxConfig, SandboxTimedOut}
-/// import dream_test/types.{AssertionOk}
-/// import gleam/erlang/process
+/// - `config`: sandbox configuration (timeout + crash report behavior)
+/// - `test_function`: function to run in an isolated process
 ///
-/// let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-/// let result =
-///   sandbox.run_isolated(config, fn() {
-///     process.sleep(100)
-///     AssertionOk
-///   })
-/// // result == SandboxTimedOut
-/// ```
+/// ## Returns
+///
+/// A `SandboxResult(a)` describing completion, timeout, or crash.
 pub fn run_isolated(
   config: SandboxConfig,
   test_function: fn() -> a,
@@ -229,6 +310,10 @@ fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
 /// ## Returns
 ///
 /// A `SandboxConfig` suitable for most tests.
+///
+/// ## Parameters
+///
+/// None.
 pub fn default_config() -> SandboxConfig {
   SandboxConfig(timeout_ms: 5000, show_crash_reports: False)
 }
@@ -242,6 +327,14 @@ pub fn default_config() -> SandboxConfig {
 /// ```gleam
 /// let config = sandbox.default_config() |> sandbox.with_crash_reports()
 /// ```
+///
+/// ## Parameters
+///
+/// - `config`: an existing `SandboxConfig`
+///
+/// ## Returns
+///
+/// A new `SandboxConfig` with `show_crash_reports: True`.
 pub fn with_crash_reports(config: SandboxConfig) -> SandboxConfig {
   SandboxConfig(..config, show_crash_reports: True)
 }

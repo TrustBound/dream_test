@@ -10,24 +10,29 @@
 //// This module is public so advanced users can embed the executor in other
 //// tooling (custom runners, IDE integrations, etc.).
 ////
-//// ## Example (from snippets)
+//// ## Example
 ////
 //// ```gleam
-//// // examples/snippets/test/snippets/utils/parallel_direct.gleam
+//// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 //// import dream_test/parallel
 //// import dream_test/unit.{describe, it}
-//// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 ////
-//// let suite =
-////   describe("Suite", [
-////     it("a", fn() { Ok(succeed()) }),
-////     it("b", fn() { Ok(succeed()) }),
+//// pub fn tests() {
+////   describe("Parallel executor", [
+////     it("can run a suite and return a list of results", fn() {
+////       let suite =
+////         describe("Suite", [
+////           it("a", fn() { Ok(succeed()) }),
+////           it("b", fn() { Ok(succeed()) }),
+////         ])
+////
+////       parallel.run_root_parallel(parallel.default_config(), suite)
+////       |> should
+////       |> have_length(2)
+////       |> or_fail_with("expected two results")
+////     }),
 ////   ])
-////
-//// parallel.run_root_parallel(parallel.default_config(), suite)
-//// |> should
-//// |> have_length(2)
-//// |> or_fail_with("expected two results")
+//// }
 //// ```
 
 import dream_test/reporters.{type Reporter, handle_event}
@@ -56,8 +61,94 @@ import gleam/string
 /// - `max_concurrency`: how many tests may run at once
 /// - `default_timeout_ms`: default per-test timeout (used when a test doesn’t
 ///   specify its own timeout)
+///
+/// ## Fields
+///
+/// - `max_concurrency`: maximum number of tests to run concurrently within a group
+/// - `default_timeout_ms`: timeout used when a test does not set its own timeout
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
+/// import dream_test/parallel.{ParallelConfig}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() {
+///   let config = ParallelConfig(max_concurrency: 2, default_timeout_ms: 1000)
+///
+///   describe("ParallelConfig", [
+///     it("can be constructed to customize execution", fn() {
+///       let suite =
+///         describe("Suite", [
+///           it("a", fn() { Ok(succeed()) }),
+///         ])
+///
+///       parallel.run_root_parallel(config, suite)
+///       |> should
+///       |> have_length(1)
+///       |> or_fail_with("expected one result")
+///     }),
+///   ])
+/// }
+/// ```
 pub type ParallelConfig {
   ParallelConfig(max_concurrency: Int, default_timeout_ms: Int)
+}
+
+/// Configuration for `run_root_parallel_with_reporter`.
+///
+/// This is an advanced API intended for building custom runners that want to
+/// drive a reporter while executing a single suite.
+pub type RunRootParallelWithReporterConfig(context) {
+  RunRootParallelWithReporterConfig(
+    config: ParallelConfig,
+    suite: TestSuite(context),
+    reporter: Reporter,
+    total: Int,
+    completed: Int,
+  )
+}
+
+/// Result of `run_root_parallel_with_reporter`.
+///
+/// This is returned as a semantic type (not a tuple) so callers can use named
+/// fields and avoid positional destructuring.
+pub type RunRootParallelWithReporterResult {
+  RunRootParallelWithReporterResult(
+    results: List(TestResult),
+    completed: Int,
+    reporter: Reporter,
+  )
+}
+
+type ExecuteNodeWithReporterConfig(context) {
+  ExecuteNodeWithReporterConfig(
+    config: ParallelConfig,
+    scope: List(String),
+    inherited_tags: List(String),
+    context: context,
+    inherited_before_each: List(fn(context) -> Result(context, String)),
+    inherited_after_each: List(fn(context) -> Result(Nil, String)),
+    node: Node(context),
+    reporter: Reporter,
+    total: Int,
+    completed: Int,
+    results_rev: List(TestResult),
+  )
+}
+
+type ExecuteNodeConfig(context) {
+  ExecuteNodeConfig(
+    config: ParallelConfig,
+    scope: List(String),
+    inherited_tags: List(String),
+    context: context,
+    inherited_before_each: List(fn(context) -> Result(context, String)),
+    inherited_after_each: List(fn(context) -> Result(Nil, String)),
+    node: Node(context),
+    results_rev: List(TestResult),
+  )
 }
 
 type IndexedResult {
@@ -66,6 +157,52 @@ type IndexedResult {
 
 type RunningTest {
   RunningTest(index: Int, pid: Pid, deadline_ms: Int)
+}
+
+type RunParallelLoopConfig(context) {
+  RunParallelLoopConfig(
+    config: ParallelConfig,
+    subject: Subject(WorkerMessage),
+    scope: List(String),
+    inherited_tags: List(String),
+    context: context,
+    before_each_hooks: List(fn(context) -> Result(context, String)),
+    after_each_hooks: List(fn(context) -> Result(Nil, String)),
+    failures_rev: List(AssertionFailure),
+    pending: List(#(Int, Node(context))),
+    running: List(RunningTest),
+    pending_emit: List(IndexedResult),
+    emitted_rev: List(TestResult),
+    next_emit_index: Int,
+    max_concurrency: Int,
+  )
+}
+
+type StartWorkersUpToLimitConfig(context) {
+  StartWorkersUpToLimitConfig(
+    config: ParallelConfig,
+    subject: Subject(WorkerMessage),
+    scope: List(String),
+    inherited_tags: List(String),
+    context: context,
+    before_each_hooks: List(fn(context) -> Result(context, String)),
+    after_each_hooks: List(fn(context) -> Result(Nil, String)),
+    failures_rev: List(AssertionFailure),
+    pending: List(#(Int, Node(context))),
+    running: List(RunningTest),
+    max_concurrency: Int,
+  )
+}
+
+type WaitForEventOrTimeoutConfig(context) {
+  WaitForEventOrTimeoutConfig(
+    config: ParallelConfig,
+    subject: Subject(WorkerMessage),
+    scope: List(String),
+    pending: List(#(Int, Node(context))),
+    running: List(RunningTest),
+    pending_emit: List(IndexedResult),
+  )
 }
 
 type WorkerMessage {
@@ -80,6 +217,39 @@ fn run_catching(fn_to_run: fn() -> a) -> Result(a, String)
 ///
 /// Prefer configuring these values via `dream_test/runner` unless you are using
 /// the executor directly.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
+/// import dream_test/parallel
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() {
+///   describe("Parallel executor", [
+///     it("can run a suite and return a list of results", fn() {
+///       let suite =
+///         describe("Suite", [
+///           it("a", fn() { Ok(succeed()) }),
+///           it("b", fn() { Ok(succeed()) }),
+///         ])
+///
+///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       |> should
+///       |> have_length(2)
+///       |> or_fail_with("expected two results")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// None.
+///
+/// ## Returns
+///
+/// A `ParallelConfig` with sensible defaults.
 pub fn default_config() -> ParallelConfig {
   ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 }
@@ -87,12 +257,58 @@ pub fn default_config() -> ParallelConfig {
 /// Run a single suite and return results.
 ///
 /// This does **not** drive a reporter.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
+/// import dream_test/parallel
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() {
+///   describe("Parallel executor", [
+///     it("can run a suite and return a list of results", fn() {
+///       let suite =
+///         describe("Suite", [
+///           it("a", fn() { Ok(succeed()) }),
+///           it("b", fn() { Ok(succeed()) }),
+///         ])
+///
+///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       |> should
+///       |> have_length(2)
+///       |> or_fail_with("expected two results")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `config`: execution settings (concurrency + default timeout)
+/// - `suite`: the suite to execute
+///
+/// ## Returns
+///
+/// A list of `TestResult` values, in deterministic (declaration) order.
 pub fn run_root_parallel(
   config: ParallelConfig,
   suite: TestSuite(context),
 ) -> List(TestResult) {
   let Root(seed, tree) = suite
-  execute_node(config, [], [], seed, [], [], tree, []) |> list.reverse
+  let executor_input =
+    ExecuteNodeConfig(
+      config: config,
+      scope: [],
+      inherited_tags: [],
+      context: seed,
+      inherited_before_each: [],
+      inherited_after_each: [],
+      node: tree,
+      results_rev: [],
+    )
+
+  execute_node(executor_input) |> list.reverse
 }
 
 /// Run a single suite while driving a reporter.
@@ -101,45 +317,127 @@ pub fn run_root_parallel(
 ///
 /// - `total` is the total number of tests across all suites in the run
 /// - `completed` is how many tests have already completed before this suite
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/parallel
+/// import dream_test/reporters
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/types.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+/// 
+/// pub fn suite() -> TestSuite(Nil) {
+///   describe("suite", [
+///     it("passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+/// 
+/// pub fn main() {
+///   let total = 1
+///   let completed = 0
+/// 
+///   let initial_reporter = reporters.progress(io.print)
+///   let reporter_after_start =
+///     reporters.handle_event(
+///       initial_reporter,
+///       reporter_types.RunStarted(total: total),
+///     )
+/// 
+///   let parallel_result =
+///     parallel.run_root_parallel_with_reporter(
+///       parallel.RunRootParallelWithReporterConfig(
+///         config: parallel.default_config(),
+///         suite: suite(),
+///         reporter: reporter_after_start,
+///         total: total,
+///         completed: completed,
+///       ),
+///     )
+///   let parallel.RunRootParallelWithReporterResult(
+///     results: results,
+///     completed: completed_after_suite,
+///     reporter: reporter_after_suite,
+///   ) = parallel_result
+/// 
+///   let _ =
+///     reporters.handle_event(
+///       reporter_after_suite,
+///       reporter_types.RunFinished(completed: completed_after_suite, total: total),
+///     )
+/// 
+///   results
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `config`: execution settings for this suite
+/// - `suite`: the suite to execute
+/// - `reporter`: initial reporter state (accumulated from earlier suites)
+/// - `total`: total number of tests in the overall run (across all suites)
+/// - `completed`: number of tests already completed before this suite starts
+///
+/// ## Returns
+///
+/// A `RunRootParallelWithReporterResult` containing:
+/// - `results`: this suite’s results, in deterministic (declaration) order
+/// - `completed`: updated completed count after driving `TestFinished` events
+/// - `reporter`: updated reporter state after handling events
 pub fn run_root_parallel_with_reporter(
-  config: ParallelConfig,
-  suite: TestSuite(context),
-  reporter0: Reporter,
-  total: Int,
-  completed: Int,
-) -> #(List(TestResult), Int, Reporter) {
+  config: RunRootParallelWithReporterConfig(context),
+) -> RunRootParallelWithReporterResult {
+  let RunRootParallelWithReporterConfig(
+    config: executor_config,
+    suite: suite,
+    reporter: reporter,
+    total: total,
+    completed: completed,
+  ) = config
+
   let Root(seed, tree) = suite
-  let #(results_rev, reporter1, completed1) =
-    execute_node_with_reporter(
-      config,
-      [],
-      [],
-      seed,
-      [],
-      [],
-      tree,
-      reporter0,
-      total,
-      completed,
-      [],
+  let executor_input =
+    ExecuteNodeWithReporterConfig(
+      config: executor_config,
+      scope: [],
+      inherited_tags: [],
+      context: seed,
+      inherited_before_each: [],
+      inherited_after_each: [],
+      node: tree,
+      reporter: reporter,
+      total: total,
+      completed: completed,
+      results_rev: [],
     )
-  #(list.reverse(results_rev), completed1, reporter1)
+
+  let #(results_rev, reporter_after_suite, completed_after_suite) =
+    execute_node_with_reporter(executor_input)
+  RunRootParallelWithReporterResult(
+    results: list.reverse(results_rev),
+    completed: completed_after_suite,
+    reporter: reporter_after_suite,
+  )
 }
 
 // =============================================================================
 // Execution (sequential groups, tests executed with sandbox + timeout)
 // =============================================================================
 
-fn execute_node(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  inherited_before_each: List(fn(context) -> Result(context, String)),
-  inherited_after_each: List(fn(context) -> Result(Nil, String)),
-  node: Node(context),
-  acc_rev: List(TestResult),
-) -> List(TestResult) {
+fn execute_node(executor_input: ExecuteNodeConfig(context)) -> List(TestResult) {
+  let ExecuteNodeConfig(
+    config: config,
+    scope: scope,
+    inherited_tags: inherited_tags,
+    context: context,
+    inherited_before_each: inherited_before_each,
+    inherited_after_each: inherited_after_each,
+    node: node,
+    results_rev: acc_rev,
+  ) = executor_input
+
   case node {
     Group(name, tags, children) -> {
       let group_scope = list.append(scope, [name])
@@ -489,22 +787,22 @@ fn run_tests_parallel(
   let ParallelConfig(max_concurrency: max_concurrency, default_timeout_ms: _) =
     config
 
-  run_parallel_loop(
-    config,
-    subject,
-    scope,
-    inherited_tags,
-    context,
-    before_each_hooks,
-    after_each_hooks,
-    failures_rev,
-    indexed,
-    [],
-    [],
-    [],
-    0,
-    max_concurrency,
-  )
+  run_parallel_loop(RunParallelLoopConfig(
+    config: config,
+    subject: subject,
+    scope: scope,
+    inherited_tags: inherited_tags,
+    context: context,
+    before_each_hooks: before_each_hooks,
+    after_each_hooks: after_each_hooks,
+    failures_rev: failures_rev,
+    pending: indexed,
+    running: [],
+    pending_emit: [],
+    emitted_rev: [],
+    next_emit_index: 0,
+    max_concurrency: max_concurrency,
+  ))
 }
 
 fn index_tests(
@@ -520,36 +818,38 @@ fn index_tests(
   }
 }
 
-fn run_parallel_loop(
-  config: ParallelConfig,
-  subject: Subject(WorkerMessage),
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
-  failures_rev: List(AssertionFailure),
-  pending: List(#(Int, Node(context))),
-  running: List(RunningTest),
-  pending_emit: List(IndexedResult),
-  emitted_rev: List(TestResult),
-  next_emit_index: Int,
-  max_concurrency: Int,
-) -> List(TestResult) {
+fn run_parallel_loop(loop: RunParallelLoopConfig(context)) -> List(TestResult) {
+  let RunParallelLoopConfig(
+    config: config,
+    subject: subject,
+    scope: scope,
+    inherited_tags: inherited_tags,
+    context: context,
+    before_each_hooks: before_each_hooks,
+    after_each_hooks: after_each_hooks,
+    failures_rev: failures_rev,
+    pending: pending,
+    running: running,
+    pending_emit: pending_emit,
+    emitted_rev: emitted_rev,
+    next_emit_index: next_emit_index,
+    max_concurrency: max_concurrency,
+  ) = loop
+
   let #(pending2, running2) =
-    start_workers_up_to_limit(
-      config,
-      subject,
-      scope,
-      inherited_tags,
-      context,
-      before_each_hooks,
-      after_each_hooks,
-      failures_rev,
-      pending,
-      running,
-      max_concurrency,
-    )
+    start_workers_up_to_limit(StartWorkersUpToLimitConfig(
+      config: config,
+      subject: subject,
+      scope: scope,
+      inherited_tags: inherited_tags,
+      context: context,
+      before_each_hooks: before_each_hooks,
+      after_each_hooks: after_each_hooks,
+      failures_rev: failures_rev,
+      pending: pending,
+      running: running,
+      max_concurrency: max_concurrency,
+    ))
 
   case list.is_empty(pending2) && list.is_empty(running2) {
     True ->
@@ -559,14 +859,14 @@ fn run_parallel_loop(
       )
     False -> {
       let #(pending3, running3, pending_emit2) =
-        wait_for_event_or_timeout(
-          config,
-          subject,
-          scope,
-          pending2,
-          running2,
-          pending_emit,
-        )
+        wait_for_event_or_timeout(WaitForEventOrTimeoutConfig(
+          config: config,
+          subject: subject,
+          scope: scope,
+          pending: pending2,
+          running: running2,
+          pending_emit: pending_emit,
+        ))
 
       let #(maybe_ready, remaining_emit) =
         take_indexed_result(next_emit_index, pending_emit2, [])
@@ -574,37 +874,23 @@ fn run_parallel_loop(
       case maybe_ready {
         None ->
           run_parallel_loop(
-            config,
-            subject,
-            scope,
-            inherited_tags,
-            context,
-            before_each_hooks,
-            after_each_hooks,
-            failures_rev,
-            pending3,
-            running3,
-            remaining_emit,
-            emitted_rev,
-            next_emit_index,
-            max_concurrency,
+            RunParallelLoopConfig(
+              ..loop,
+              pending: pending3,
+              running: running3,
+              pending_emit: remaining_emit,
+            ),
           )
         Some(IndexedResult(_, result)) ->
           run_parallel_loop(
-            config,
-            subject,
-            scope,
-            inherited_tags,
-            context,
-            before_each_hooks,
-            after_each_hooks,
-            failures_rev,
-            pending3,
-            running3,
-            remaining_emit,
-            [result, ..emitted_rev],
-            next_emit_index + 1,
-            max_concurrency,
+            RunParallelLoopConfig(
+              ..loop,
+              pending: pending3,
+              running: running3,
+              pending_emit: remaining_emit,
+              emitted_rev: [result, ..emitted_rev],
+              next_emit_index: next_emit_index + 1,
+            ),
           )
       }
     }
@@ -626,18 +912,22 @@ fn emit_all_results(
 }
 
 fn start_workers_up_to_limit(
-  config: ParallelConfig,
-  subject: Subject(WorkerMessage),
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
-  failures_rev: List(AssertionFailure),
-  pending: List(#(Int, Node(context))),
-  running: List(RunningTest),
-  max_concurrency: Int,
+  input: StartWorkersUpToLimitConfig(context),
 ) -> #(List(#(Int, Node(context))), List(RunningTest)) {
+  let StartWorkersUpToLimitConfig(
+    config: config,
+    subject: subject,
+    scope: scope,
+    inherited_tags: inherited_tags,
+    context: context,
+    before_each_hooks: before_each_hooks,
+    after_each_hooks: after_each_hooks,
+    failures_rev: failures_rev,
+    pending: pending,
+    running: running,
+    max_concurrency: max_concurrency,
+  ) = input
+
   let slots = max_concurrency - list.length(running)
   case slots > 0 && !list.is_empty(pending) {
     False -> #(pending, running)
@@ -659,20 +949,10 @@ fn start_workers_up_to_limit(
               test_node,
             )
           start_workers_up_to_limit(
-            config,
-            subject,
-            scope,
-            inherited_tags,
-            context,
-            before_each_hooks,
-            after_each_hooks,
-            failures_rev,
-            rest,
-            [
+            StartWorkersUpToLimitConfig(..input, pending: rest, running: [
               RunningTest(index: index, pid: pid, deadline_ms: deadline_ms),
               ..running
-            ],
-            max_concurrency,
+            ]),
           )
         }
       }
@@ -729,13 +1009,17 @@ fn test_timeout_ms(config: ParallelConfig, node: Node(context)) -> Int {
 }
 
 fn wait_for_event_or_timeout(
-  config: ParallelConfig,
-  subject: Subject(WorkerMessage),
-  scope: List(String),
-  pending: List(#(Int, Node(context))),
-  running: List(RunningTest),
-  pending_emit: List(IndexedResult),
+  input: WaitForEventOrTimeoutConfig(context),
 ) -> #(List(#(Int, Node(context))), List(RunningTest), List(IndexedResult)) {
+  let WaitForEventOrTimeoutConfig(
+    config: config,
+    subject: subject,
+    scope: scope,
+    pending: pending,
+    running: running,
+    pending_emit: pending_emit,
+  ) = input
+
   let selector = new_selector() |> select(subject)
 
   let now = timing.now_ms()
@@ -1060,16 +1344,16 @@ fn run_child_groups_sequentially(
     [] -> acc_rev
     [group_node, ..rest] -> {
       let next_rev =
-        execute_node(
-          config,
-          scope,
-          inherited_tags,
-          context,
-          before_each_hooks,
-          after_each_hooks,
-          group_node,
-          acc_rev,
-        )
+        execute_node(ExecuteNodeConfig(
+          config: config,
+          scope: scope,
+          inherited_tags: inherited_tags,
+          context: context,
+          inherited_before_each: before_each_hooks,
+          inherited_after_each: after_each_hooks,
+          node: group_node,
+          results_rev: acc_rev,
+        ))
       run_child_groups_sequentially(
         config,
         scope,
@@ -1275,32 +1559,36 @@ fn run_in_sandbox(
 // =============================================================================
 
 fn execute_node_with_reporter(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  inherited_before_each: List(fn(context) -> Result(context, String)),
-  inherited_after_each: List(fn(context) -> Result(Nil, String)),
-  node: Node(context),
-  reporter0: Reporter,
-  total: Int,
-  completed: Int,
-  acc_rev: List(TestResult),
+  executor_input: ExecuteNodeWithReporterConfig(context),
 ) -> #(List(TestResult), Reporter, Int) {
+  let ExecuteNodeWithReporterConfig(
+    config: config,
+    scope: scope,
+    inherited_tags: inherited_tags,
+    context: context,
+    inherited_before_each: inherited_before_each,
+    inherited_after_each: inherited_after_each,
+    node: node,
+    reporter: reporter,
+    total: total,
+    completed: completed,
+    results_rev: results_rev,
+  ) = executor_input
+
   let results =
-    execute_node(
-      config,
-      scope,
-      inherited_tags,
-      context,
-      inherited_before_each,
-      inherited_after_each,
-      node,
-      acc_rev,
-    )
-  let #(next_completed, next_reporter) =
-    emit_test_finished_events(results, completed, total, reporter0)
-  #(results, next_reporter, next_completed)
+    execute_node(ExecuteNodeConfig(
+      config: config,
+      scope: scope,
+      inherited_tags: inherited_tags,
+      context: context,
+      inherited_before_each: inherited_before_each,
+      inherited_after_each: inherited_after_each,
+      node: node,
+      results_rev: results_rev,
+    ))
+  let #(completed_after_suite, reporter_after_suite) =
+    emit_test_finished_events(results, completed, total, reporter)
+  #(results, reporter_after_suite, completed_after_suite)
 }
 
 fn emit_test_finished_events(
@@ -1324,19 +1612,19 @@ fn emit_test_finished_events_from_list(
   current: TestResult,
 ) -> #(Int, Reporter) {
   let next_completed = completed + 1
-  let reporter1 =
+  let reporter_after_test =
     handle_event(
       reporter,
       reporter_types.TestFinished(next_completed, total, current),
     )
   case remaining {
-    [] -> #(next_completed, reporter1)
+    [] -> #(next_completed, reporter_after_test)
     [r, ..rest] ->
       emit_test_finished_events_from_list(
         rest,
         next_completed,
         total,
-        reporter1,
+        reporter_after_test,
         r,
       )
   }

@@ -1,5 +1,3 @@
-//// README: Runner config
-
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner

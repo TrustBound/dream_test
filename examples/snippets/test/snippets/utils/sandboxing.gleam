@@ -1,5 +1,3 @@
-//// README: Sandboxing (timeouts + crash isolation)
-
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox.{
   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,

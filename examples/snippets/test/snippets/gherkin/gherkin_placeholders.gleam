@@ -1,5 +1,3 @@
-//// README: Gherkin placeholder types example
-
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
   type StepContext, get_float, get_int, get_string, get_word, new_registry, step,

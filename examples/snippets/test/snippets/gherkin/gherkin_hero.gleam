@@ -1,5 +1,3 @@
-//// README: Gherkin hero example (featured at top)
-
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}

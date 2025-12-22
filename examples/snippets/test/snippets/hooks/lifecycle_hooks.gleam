@@ -1,5 +1,3 @@
-//// README: Lifecycle hooks
-
 import dream_test/matchers.{be_empty, or_fail_with, should}
 import dream_test/reporters
 import dream_test/runner

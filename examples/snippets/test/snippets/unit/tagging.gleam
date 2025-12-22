@@ -1,5 +1,3 @@
-//// README: Tagging tests
-
 import dream_test/matchers.{succeed}
 import dream_test/reporters
 import dream_test/runner

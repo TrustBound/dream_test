@@ -1,5 +1,3 @@
-//// README: Gherkin feature definition example
-
 import dream_test/gherkin/feature.{
   and, background, feature_with_background, given, scenario, then, when,
   with_tags,

@@ -1,5 +1,3 @@
-//// README: Process helpers
-
 import dream_test/matchers.{be_between, be_equal, or_fail_with, should}
 import dream_test/process.{get_count, increment, start_counter, unique_port}
 import dream_test/unit.{describe, it}

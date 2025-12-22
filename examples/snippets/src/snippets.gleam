@@ -1,5 +1,3 @@
-//// Simple calculator for README examples.
-
 /// Add two numbers
 pub fn add(a: Int, b: Int) -> Int {
   a + b

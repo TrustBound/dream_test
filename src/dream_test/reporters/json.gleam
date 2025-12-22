@@ -3,73 +3,44 @@
 //// This reporter outputs test results as JSON for CI/CD integration,
 //// test aggregation, and tooling.
 ////
-//// ## Example Output (values will vary)
+//// The JSON object includes:
 ////
-//// ```json
-//// {
-////   "version": "1.0",
-////   "timestamp_ms": 1733151045123,
-////   "duration_ms": 315,
-////   "system": {
-////     "os": "darwin",
-////     "otp_version": "<otp_version>",
-////     "gleam_version": "<gleam_version>"
-////   },
-////   "summary": {
-////     "total": 3,
-////     "passed": 2,
-////     "failed": 1,
-////     "skipped": 0,
-////     "pending": 0,
-////     "timed_out": 0,
-////     "setup_failed": 0
-////   },
-////   "tests": [
-////     {
-////       "name": "adds numbers",
-////       "full_name": ["Calculator", "add", "adds numbers"],
-////       "status": "passed",
-////       "duration_ms": 2,
-////       "tags": [],
-////       "kind": "unit",
-////       "failures": []
-////     }
-////   ]
-//// }
-//// ```
+//// - `version`: schema version
+//// - `timestamp_ms`: when the report was created
+//// - `duration_ms`: total duration (sum of test durations)
+//// - `system`: `os`, `otp_version`, `gleam_version`
+//// - `summary`: counts by status
+//// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
 ////
 //// ## Usage
 ////
 //// ```gleam
+//// import dream_test/matchers.{succeed}
 //// import dream_test/reporters
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
-//// import dream_test/types.{AssertionOk}
 //// import gleam/io
 ////
-//// pub fn main() {
-////   let suite =
-////     describe("Example", [
-////       it("passes", fn() { Ok(AssertionOk) }),
-////     ])
+//// pub fn tests() {
+////   describe("JSON Reporter", [
+////     it("outputs JSON format", fn() {
+////       // The json.report function outputs machine-readable JSON
+////       // while bdd.report outputs human-readable text
+////       Ok(succeed())
+////     }),
+////     it("includes test metadata", fn() {
+////       // JSON output includes name, full_name, status, duration, tags
+////       Ok(succeed())
+////     }),
+////   ])
+//// }
 ////
-////   runner.new([suite])
-////   |> runner.reporter(reporters.json(io.print, False))
+//// pub fn main() {
+////   runner.new([tests()])
+////   |> runner.reporter(reporters.json(io.print, True))
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
-//// ```
-////
-//// ## Combining with BDD Reporter
-////
-//// ```gleam
-//// import dream_test/runner
-//// import dream_test/reporters/bdd
-//// import dream_test/reporters/json
-////
-//// let results = runner.new([suite]) |> runner.run()
-//// results |> bdd.report(io.print)
-//// results |> json.report(write_to_file)
 //// ```
 
 import dream_test/types.{
@@ -95,8 +66,21 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// let json_string = format(results)
-/// file.write("test-results.json", json_string)
+/// import dream_test/reporters/json
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+///
+/// fn example_suite() {
+///   describe("Example Suite", [
+///     it("passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   let results = runner.new([example_suite()]) |> runner.run()
+///   json.format(results)
+/// }
 /// ```
 ///
 pub fn format(results: List(TestResult)) -> String {
@@ -111,8 +95,30 @@ pub fn format(results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// let json_string = format_pretty(results)
-/// io.println(json_string)
+/// import dream_test/matchers.{contain_string, or_fail_with, should, succeed}
+/// import dream_test/reporters/json
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+///
+/// fn example_suite() {
+///   describe("Example Suite", [
+///     it("passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn tests() {
+///   describe("JSON formatting", [
+///     it("format_pretty returns JSON containing tests", fn() {
+///       let results = runner.new([example_suite()]) |> runner.run()
+///       let text = json.format_pretty(results)
+///
+///       text
+///       |> should
+///       |> contain_string("\"tests\"")
+///       |> or_fail_with("Expected JSON report to include the tests array")
+///     }),
+///   ])
+/// }
 /// ```
 ///
 pub fn format_pretty(results: List(TestResult)) -> String {
@@ -129,28 +135,26 @@ pub fn format_pretty(results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// // Print to stdout
-/// let _ = json.report(results, io.print)
-///
-/// // Write to file
-/// let _ = json.report(results, fn(s) { file.write("results.json", s) })
-/// ```
-///
-/// ## Returns
-///
-/// Returns the input results unchanged, enabling pipeline composition:
-///
-/// ```gleam
-/// import dream_test/reporters/bdd
 /// import dream_test/reporters/json
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
 ///
-/// let _ = bdd.report(results, io.print)
-/// let _ = json.report(results, write_to_file)
+/// fn example_suite() {
+///   describe("Example Suite", [
+///     it("passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   let results = runner.new([example_suite()]) |> runner.run()
+///   results |> json.report(io.print)
+/// }
 /// ```
-///
 pub fn report(
-  results: List(TestResult),
-  write: fn(String) -> Nil,
+  results results: List(TestResult),
+  write write: fn(String) -> Nil,
 ) -> List(TestResult) {
   write(format(results))
   results
@@ -163,12 +167,27 @@ pub fn report(
 /// ## Example
 ///
 /// ```gleam
-/// results |> json.report_pretty(io.print)
+/// import dream_test/reporters/json
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// fn example_suite() {
+///   describe("Example Suite", [
+///     it("passes", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() {
+///   let results = runner.new([example_suite()]) |> runner.run()
+///   results |> json.report_pretty(io.print)
+/// }
 /// ```
 ///
 pub fn report_pretty(
-  results: List(TestResult),
-  write: fn(String) -> Nil,
+  results results: List(TestResult),
+  write write: fn(String) -> Nil,
 ) -> List(TestResult) {
   write(format_pretty(results))
   results
@@ -314,16 +333,34 @@ fn kind_to_string(kind: TestKind) -> String {
 }
 
 fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  list.fold(results, 0, fn(count, result) {
-    case result.status == wanted {
-      True -> count + 1
-      False -> count
-    }
-  })
+  count_by_status_loop(results, wanted, 0)
+}
+
+fn count_by_status_loop(
+  results: List(TestResult),
+  wanted: Status,
+  count: Int,
+) -> Int {
+  case results {
+    [] -> count
+    [result, ..rest] ->
+      case result.status == wanted {
+        True -> count_by_status_loop(rest, wanted, count + 1)
+        False -> count_by_status_loop(rest, wanted, count)
+      }
+  }
 }
 
 fn calculate_total_duration(results: List(TestResult)) -> Int {
-  list.fold(results, 0, fn(total, result) { total + result.duration_ms })
+  calculate_total_duration_loop(results, 0)
+}
+
+fn calculate_total_duration_loop(results: List(TestResult), total: Int) -> Int {
+  case results {
+    [] -> total
+    [result, ..rest] ->
+      calculate_total_duration_loop(rest, total + result.duration_ms)
+  }
 }
 
 // ============================================================================

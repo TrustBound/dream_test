@@ -1,5 +1,3 @@
-//// README: Gherkin reporter (Cucumber-style formatting)
-
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{new_registry, step}
 import dream_test/matchers.{succeed}
@@ -24,6 +22,5 @@ pub fn tests() {
 
 pub fn main() {
   let results = runner.new([tests()]) |> runner.run()
-  let _ = gherkin_reporter.report(results, io.print)
-  Nil
+  gherkin_reporter.report(results, io.print)
 }
