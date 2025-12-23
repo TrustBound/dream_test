@@ -7,7 +7,7 @@
 //// ## Mental model
 ////
 //// - You provide one or more **module path globs** (e.g. `"unit/**_test.gleam"`).
-//// - Dream Test finds matching `*_test` modules that export `tests/0`.
+//// - Dream Test finds matching modules under `./test/` that export `tests/0`.
 //// - It calls `tests/0` to get `TestSuite(Nil)` values.
 ////
 //// ## Example

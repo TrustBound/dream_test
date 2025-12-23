@@ -11,30 +11,11 @@
 //// ## Example
 ////
 //// ```gleam
-//// import dream_test/matchers.{match_snapshot, or_fail_with, should}
-//// import dream_test/matchers/snapshot as snapshot
-//// import dream_test/types.{type AssertionResult}
-//// import dream_test/unit.{describe, it}
-////
-//// pub fn example() -> Result(AssertionResult, String) {
-////   let path = "./test/tmp/match_snapshot_example.snap"
-////   let _ = snapshot.clear_snapshot(path)
-////
-////   let result =
-////     "hello"
-////     |> should
-////     |> match_snapshot(path)
-////     |> or_fail_with("expected snapshot match")
-////
-////   let _ = snapshot.clear_snapshot(path)
-////   result
-//// }
-////
-//// pub fn tests() {
-////   describe("matchers.match_snapshot", [
-////     it("compares a string against a snapshot file", fn() { example() }),
-////   ])
-//// }
+//// let path = "./test/tmp/match_snapshot_example.snap"
+//// "hello"
+//// |> should
+//// |> match_snapshot(path)
+//// |> or_fail_with("expected snapshot match")
 //// ```
 
 import dream_test/file
@@ -68,31 +49,18 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{match_snapshot, or_fail_with, should}
-/// import dream_test/matchers/snapshot as snapshot
-/// import dream_test/types.{type AssertionResult}
-/// import dream_test/unit.{describe, it}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   let path = "./test/tmp/match_snapshot_example.snap"
-///   let _ = snapshot.clear_snapshot(path)
-///
-///   let result =
-///     "hello"
-///     |> should
-///     |> match_snapshot(path)
-///     |> or_fail_with("expected snapshot match")
-///
-///   let _ = snapshot.clear_snapshot(path)
-///   result
-/// }
-///
-/// pub fn tests() {
-///   describe("matchers.match_snapshot", [
-///     it("compares a string against a snapshot file", fn() { example() }),
-///   ])
-/// }
+/// let path = "./test/tmp/match_snapshot_example.snap"
+/// "hello"
+/// |> should
+/// |> match_snapshot(path)
+/// |> or_fail_with("expected snapshot match")
 /// ```
+///
+/// ## Returns
+///
+/// A `MatchResult(String)`:
+/// - On success, preserves the original string for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 ///
 pub fn match_snapshot(
   value_or_result value_or_result: MatchResult(String),
@@ -124,32 +92,18 @@ pub fn match_snapshot(
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{match_snapshot_inspect, or_fail_with, should}
-/// import dream_test/matchers/snapshot as snapshot
-/// import dream_test/types.{type AssertionResult}
-/// import dream_test/unit.{describe, it}
-/// import gleam/option.{Some}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   let path = "./test/tmp/match_snapshot_inspect_example.snap"
-///   let _ = snapshot.clear_snapshot(path)
-///
-///   let result =
-///     Some(1)
-///     |> should
-///     |> match_snapshot_inspect(path)
-///     |> or_fail_with("expected inspect snapshot match")
-///
-///   let _ = snapshot.clear_snapshot(path)
-///   result
-/// }
-///
-/// pub fn tests() {
-///   describe("matchers.match_snapshot_inspect", [
-///     it("snapshots any value by using string.inspect", fn() { example() }),
-///   ])
-/// }
+/// let path = "./test/tmp/match_snapshot_inspect_example.snap"
+/// Some(1)
+/// |> should
+/// |> match_snapshot_inspect(path)
+/// |> or_fail_with("expected inspect snapshot match")
 /// ```
+///
+/// ## Returns
+///
+/// A `MatchResult(value)`:
+/// - On success, preserves the original value for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 ///
 pub fn match_snapshot_inspect(
   value_or_result value_or_result: MatchResult(value),
@@ -182,30 +136,17 @@ pub fn match_snapshot_inspect(
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/file
-/// import dream_test/matchers.{
-///   be_equal, clear_snapshot, or_fail_with, should,
-/// }
-/// import dream_test/unit.{describe, it}
-/// import gleam/result
+/// let path = "./test/tmp/clear_snapshot_example.snap"
 ///
-/// pub fn tests() {
-///   describe("matchers.clear_snapshot", [
-///     it("deletes a snapshot file (so next run recreates it)", fn() {
-///       let path = "./test/tmp/clear_snapshot_example.snap"
+/// // Setup: create a snapshot file (no assertions during setup)
+/// use _ <- result.try(
+///   file.write(path, "hello") |> result.map_error(file.error_to_string),
+/// )
 ///
-///       // Setup: create a snapshot file (no assertions during setup)
-///       use _ <- result.try(
-///         file.write(path, "hello") |> result.map_error(file.error_to_string)
-///       )
-///
-///       clear_snapshot(path)
-///       |> should
-///       |> be_equal(Ok(Nil))
-///       |> or_fail_with("expected clear_snapshot to succeed")
-///     }),
-///   ])
-/// }
+/// clear_snapshot(path)
+/// |> should
+/// |> be_equal(Ok(Nil))
+/// |> or_fail_with("expected clear_snapshot to succeed")
 /// ```
 ///
 pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
@@ -232,35 +173,22 @@ pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{
-///   be_equal, clear_snapshots_in_directory, or_fail_with, should,
-/// }
-/// import dream_test/file
-/// import dream_test/unit.{describe, it}
-/// import gleam/result
+/// let directory = "./test/tmp/clear_snapshots_in_directory_example"
+/// let a = directory <> "/a.snap"
+/// let b = directory <> "/b.snap"
 ///
-/// pub fn tests() {
-///   describe("matchers.clear_snapshots_in_directory", [
-///     it("deletes all .snap files in a directory", fn() {
-///       let directory = "./test/tmp/clear_snapshots_in_directory_example"
-///       let a = directory <> "/a.snap"
-///       let b = directory <> "/b.snap"
+/// // Setup: create two snapshot files (no assertions during setup)
+/// use _ <- result.try(
+///   file.write(a, "a") |> result.map_error(file.error_to_string),
+/// )
+/// use _ <- result.try(
+///   file.write(b, "b") |> result.map_error(file.error_to_string),
+/// )
 ///
-///       // Setup: create two snapshot files (no assertions during setup)
-///       use _ <- result.try(
-///         file.write(a, "a") |> result.map_error(file.error_to_string)
-///       )
-///       use _ <- result.try(
-///         file.write(b, "b") |> result.map_error(file.error_to_string)
-///       )
-///
-///       clear_snapshots_in_directory(directory)
-///       |> should
-///       |> be_equal(Ok(2))
-///       |> or_fail_with("expected two deleted snapshots")
-///     }),
-///   ])
-/// }
+/// clear_snapshots_in_directory(directory)
+/// |> should
+/// |> be_equal(Ok(2))
+/// |> or_fail_with("expected two deleted snapshots")
 /// ```
 ///
 pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {

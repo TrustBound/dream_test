@@ -1,29 +1,18 @@
 //// String matchers for dream_test.
 ////
-//// These matchers work with strings.
-//// They're re-exported through `dream_test/matchers`.
+//// These matchers work with `String` values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// ## Usage
+//// Use them to assert string structure (prefix/suffix/substring) while
+//// preserving the original string for further chaining.
+////
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/matchers.{
-////   should, start_with, end_with, contain_string, or_fail_with,
-//// }
-////
-//// greeting
+//// "hello world"
 //// |> should
-//// |> start_with("Hello")
-//// |> or_fail_with("Greeting should start with Hello")
-////
-//// filename
-//// |> should
-//// |> end_with(".gleam")
-//// |> or_fail_with("Should be a Gleam file")
-////
-//// log_message
-//// |> should
-//// |> contain_string("error")
-//// |> or_fail_with("Log should mention error")
+//// |> start_with("hello")
+//// |> or_fail_with("expected string to start with \"hello\"")
 //// ```
 
 import dream_test/types.{
@@ -34,18 +23,27 @@ import gleam/string
 
 /// Assert that a string starts with a prefix.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `prefix`: required starting substring
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// greeting
+/// "hello world"
 /// |> should
-/// |> start_with("Hello")
-/// |> or_fail_with("Greeting should start with Hello")
+/// |> start_with("hello")
+/// |> or_fail_with("expected string to start with \"hello\"")
 /// ```
 ///
 pub fn start_with(
-  value_or_result: MatchResult(String),
-  prefix: String,
+  value_or_result value_or_result: MatchResult(String),
+  prefix prefix: String,
 ) -> MatchResult(String) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -75,18 +73,27 @@ fn check_starts_with(actual: String, prefix: String) -> MatchResult(String) {
 
 /// Assert that a string ends with a suffix.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `suffix`: required ending substring
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// filename
+/// "hello.gleam"
 /// |> should
 /// |> end_with(".gleam")
-/// |> or_fail_with("File should be a Gleam file")
+/// |> or_fail_with("expected .gleam suffix")
 /// ```
 ///
 pub fn end_with(
-  value_or_result: MatchResult(String),
-  suffix: String,
+  value_or_result value_or_result: MatchResult(String),
+  suffix suffix: String,
 ) -> MatchResult(String) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -116,18 +123,27 @@ fn check_ends_with(actual: String, suffix: String) -> MatchResult(String) {
 
 /// Assert that a string contains a substring.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `substring`: required substring that must be present
+///
+/// ## Returns
+///
+/// A `MatchResult(String)` preserving the string for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// log_message
+/// "hello world"
 /// |> should
-/// |> contain_string("error")
-/// |> or_fail_with("Log should mention error")
+/// |> contain_string("world")
+/// |> or_fail_with("expected substring match")
 /// ```
 ///
 pub fn contain_string(
-  value_or_result: MatchResult(String),
-  substring: String,
+  value_or_result value_or_result: MatchResult(String),
+  substring substring: String,
 ) -> MatchResult(String) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
