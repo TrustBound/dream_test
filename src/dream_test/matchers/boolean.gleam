@@ -1,30 +1,17 @@
 //// Boolean matchers for dream_test.
 ////
-//// These matchers check boolean values.
-//// They're re-exported through `dream_test/matchers`.
+//// These matchers check boolean values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// These are the simplest matchers: they assert that a boolean is `True` or
-//// `False`.
+//// Use them in a matcher chain when you want to assert a boolean condition.
 ////
 //// ## Example
 ////
 //// ```gleam
-//// import dream_test/matchers.{be_true, or_fail_with, should}
-//// import dream_test/types.{type AssertionResult}
-//// import dream_test/unit.{describe, it}
-////
-//// pub fn example() -> Result(AssertionResult, String) {
-////   True
-////   |> should
-////   |> be_true()
-////   |> or_fail_with("expected True")
-//// }
-////
-//// pub fn tests() {
-////   describe("matchers.be_true", [
-////     it("passes for True", fn() { example() }),
-////   ])
-//// }
+//// True
+//// |> should
+//// |> be_true()
+//// |> or_fail_with("expected True")
 //// ```
 
 import dream_test/types.{
@@ -34,30 +21,21 @@ import gleam/option.{Some}
 
 /// Assert that a value is `True`.
 ///
+/// Use this when your value is expected to be `True` and you want a useful
+/// failure payload when it isn't.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_true, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
-/// import dream_test/unit.{describe, it}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   True
-///   |> should
-///   |> be_true()
-///   |> or_fail_with("expected True")
-/// }
-///
-/// pub fn tests() {
-///   describe("matchers.be_true", [
-///     it("passes for True", fn() { example() }),
-///   ])
-/// }
+/// True
+/// |> should
+/// |> be_true()
+/// |> or_fail_with("expected True")
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -87,30 +65,21 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 
 /// Assert that a value is `False`.
 ///
+/// Use this when your value is expected to be `False` and you want a useful
+/// failure payload when it isn't.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_false, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
-/// import dream_test/unit.{describe, it}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   False
-///   |> should
-///   |> be_false()
-///   |> or_fail_with("expected False")
-/// }
-///
-/// pub fn tests() {
-///   describe("matchers.be_false", [
-///     it("passes for False", fn() { example() }),
-///   ])
-/// }
+/// False
+/// |> should
+/// |> be_false()
+/// |> or_fail_with("expected False")
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///

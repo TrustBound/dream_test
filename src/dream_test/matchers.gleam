@@ -63,20 +63,23 @@ import gleam/option as gleam_option
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_true, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
+/// import dream_test/matchers.{be_true, fail_with, or_fail_with, should, succeed}
 /// import dream_test/unit.{describe, it}
 ///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   True
-///   |> should
-///   |> be_true()
-///   |> or_fail_with("expected True")
-/// }
-///
 /// pub fn tests() {
-///   describe("matchers.should", [
-///     it("wraps a value so it can be matched", fn() { example() }),
+///   describe("Matchers: getting started", [
+///     it("starts a matcher chain with should", fn() {
+///       True
+///       |> should
+///       |> be_true()
+///       |> or_fail_with("expected True")
+///     }),
+///     it("use succeed/fail_with in conditional branches", fn() {
+///       Ok(case 1 + 1 {
+///         2 -> succeed()
+///         _ -> fail_with("expected 1 + 1 to be 2")
+///       })
+///     }),
 ///   ])
 /// }
 /// ```
@@ -105,21 +108,23 @@ pub fn should(value: a) -> MatchResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
+/// import dream_test/matchers.{be_equal, not_equal, or_fail_with, should}
 /// import dream_test/unit.{describe, it}
-/// import snippets.{add}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   add(2, 3)
-///   |> should
-///   |> be_equal(5)
-///   |> or_fail_with("2 + 3 should equal 5")
-/// }
 ///
 /// pub fn tests() {
-///   describe("matchers.be_equal", [
-///     it("compares two values for equality", fn() { example() }),
+///   describe("Matchers: equality", [
+///     it("be_equal compares two values for equality", fn() {
+///       2 + 3
+///       |> should
+///       |> be_equal(5)
+///       |> or_fail_with("2 + 3 should equal 5")
+///     }),
+///     it("not_equal asserts two values are different", fn() {
+///       10 + 3
+///       |> should
+///       |> not_equal(3)
+///       |> or_fail_with("10 + 3 should not equal 3")
+///     }),
 ///   ])
 /// }
 /// ```
@@ -141,21 +146,23 @@ pub const be_equal = equality.be_equal
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{not_equal, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
+/// import dream_test/matchers.{be_equal, not_equal, or_fail_with, should}
 /// import dream_test/unit.{describe, it}
-/// import snippets.{add}
-///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   add(10, 3)
-///   |> should
-///   |> not_equal(3)
-///   |> or_fail_with("10 + 3 should not equal 3")
-/// }
 ///
 /// pub fn tests() {
-///   describe("matchers.not_equal", [
-///     it("asserts two values are different", fn() { example() }),
+///   describe("Matchers: equality", [
+///     it("be_equal compares two values for equality", fn() {
+///       2 + 3
+///       |> should
+///       |> be_equal(5)
+///       |> or_fail_with("2 + 3 should equal 5")
+///     }),
+///     it("not_equal asserts two values are different", fn() {
+///       10 + 3
+///       |> should
+///       |> not_equal(3)
+///       |> or_fail_with("10 + 3 should not equal 3")
+///     }),
 ///   ])
 /// }
 /// ```
@@ -181,20 +188,23 @@ pub const not_equal = equality.not_equal
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_true, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
+/// import dream_test/matchers.{be_false, be_true, or_fail_with, should}
 /// import dream_test/unit.{describe, it}
 ///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   True
-///   |> should
-///   |> be_true()
-///   |> or_fail_with("expected True")
-/// }
-///
 /// pub fn tests() {
-///   describe("matchers.be_true", [
-///     it("passes for True", fn() { example() }),
+///   describe("Matchers: booleans", [
+///     it("be_true passes for True", fn() {
+///       True
+///       |> should
+///       |> be_true()
+///       |> or_fail_with("expected True")
+///     }),
+///     it("be_false passes for False", fn() {
+///       False
+///       |> should
+///       |> be_false()
+///       |> or_fail_with("expected False")
+///     }),
 ///   ])
 /// }
 /// ```
@@ -213,20 +223,23 @@ pub const be_true = boolean.be_true
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_false, or_fail_with, should}
-/// import dream_test/types.{type AssertionResult}
+/// import dream_test/matchers.{be_false, be_true, or_fail_with, should}
 /// import dream_test/unit.{describe, it}
 ///
-/// pub fn example() -> Result(AssertionResult, String) {
-///   False
-///   |> should
-///   |> be_false()
-///   |> or_fail_with("expected False")
-/// }
-///
 /// pub fn tests() {
-///   describe("matchers.be_false", [
-///     it("passes for False", fn() { example() }),
+///   describe("Matchers: booleans", [
+///     it("be_true passes for True", fn() {
+///       True
+///       |> should
+///       |> be_true()
+///       |> or_fail_with("expected True")
+///     }),
+///     it("be_false passes for False", fn() {
+///       False
+///       |> should
+///       |> be_false()
+///       |> or_fail_with("expected False")
+///     }),
 ///   ])
 /// }
 /// ```
