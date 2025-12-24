@@ -43,7 +43,10 @@ import gleam/string
 /// - On success, preserves the original value for further chaining.
 /// - On failure, the chain becomes failed and later matchers are skipped.
 ///
-pub fn be_equal(value_or_result: MatchResult(a), expected: a) -> MatchResult(a) {
+pub fn be_equal(
+  value_or_result value_or_result: MatchResult(a),
+  expected expected: a,
+) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_equal(actual, expected)
@@ -94,8 +97,8 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
 /// - On failure, the chain becomes failed and later matchers are skipped.
 ///
 pub fn not_equal(
-  value_or_result: MatchResult(a),
-  unexpected: a,
+  value_or_result value_or_result: MatchResult(a),
+  unexpected unexpected: a,
 ) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)

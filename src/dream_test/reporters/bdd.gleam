@@ -1,59 +1,10 @@
-//// BDD-style test reporter for dream_test.
+//// BDD-style test report formatting.
 ////
-//// This reporter formats test results in a hierarchical, spec-like format
-//// that mirrors your `describe`/`it` structure. It's inspired by RSpec, Jest,
-//// and Mocha.
-////
-//// ## Example Output
-////
-//// ```text
-//// Calculator
-////   add
-////     ✓ adds positive numbers (1ms)
-////     ✓ handles zero
-////   subtract
-////     ✓ subtracts positive numbers
-////     ✗ handles negative results (2ms)
-////       equal
-////         Message: Should handle negative subtraction
-////         Expected: -5
-////         Actual:   5
-////
-//// Summary: 4 run, 1 failed, 3 passed in 3ms
-//// ```
-////
-//// ## Usage
-////
-//// ```gleam
-//// import dream_test/reporters
-//// import dream_test/runner
-//// import dream_test/unit.{describe, it}
-//// import dream_test/types.{AssertionOk}
-//// import gleam/io
-////
-//// pub fn main() {
-////   let suite =
-////     describe("Example", [
-////       it("passes", fn() { Ok(AssertionOk) }),
-////     ])
-////
-////   runner.new([suite])
-////   |> runner.reporter(reporters.bdd(io.print, True))
-////   |> runner.exit_on_failure()
-////   |> runner.run()
-//// }
-//// ```
-////
-//// ## Status Markers
-////
-//// | Status      | Marker | Meaning                        |
-//// |-------------|--------|--------------------------------|
-//// | Passed      | ✓      | All assertions succeeded       |
-//// | Failed      | ✗      | One or more assertions failed  |
-//// | Skipped     | -      | Test was skipped               |
-//// | Pending     | ~      | Test is a placeholder          |
-//// | TimedOut    | !      | Test exceeded timeout          |
-//// | SetupFailed | ⚠      | A setup hook failed            |
+//// This module formats `TestResult` values in a hierarchical, spec-like layout
+//// that mirrors your `describe` / `it` structure. It’s primarily used by
+//// `dream_test/reporters` (the reporter constructors), but it’s also useful
+//// directly when you want the formatted output as a `String` or when you’re
+//// streaming results as they complete.
 
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/timing
@@ -67,6 +18,33 @@ import gleam/option.{Some}
 import gleam/order
 import gleam/string
 
+/// The result of formatting a single test result incrementally.
+///
+/// ## Fields
+///
+/// - `text`: The output to print for this test result (including any new suite/group headers)
+/// - `new_path`: The describe/group path for this result. Pass this as `previous_path`
+///   when formatting the next result.
+pub type FormatIncrementalResult {
+  FormatIncrementalResult(text: String, new_path: List(String))
+}
+
+/// The result of formatting a single test result incrementally as separate parts.
+///
+/// ## Fields
+///
+/// - `headers`: Any new suite/group lines required for this result
+/// - `test_line`: The test line (and any failure details) for this result
+/// - `new_path`: The describe/group path for this result. Pass this as `previous_path`
+///   when formatting the next result.
+pub type FormatIncrementalPartsResult {
+  FormatIncrementalPartsResult(
+    headers: String,
+    test_line: String,
+    new_path: List(String),
+  )
+}
+
 /// Format test results as a BDD-style report string.
 ///
 /// Returns the complete report including:
@@ -79,14 +57,26 @@ import gleam/string
 /// Use this when you need the report as a string (e.g., for testing the
 /// reporter itself or writing to a file).
 ///
+/// ## Parameters
+///
+/// - `results`: The test results to format
+///
+/// ## Returns
+///
+/// A single `String` containing the formatted report and trailing summary line.
+///
 /// ## Example
 ///
 /// ```gleam
-/// let report_string = format(results)
-/// file.write("test-results.txt", report_string)
+/// let report = bdd.format(sample_results())
+///
+/// report
+/// |> should
+/// |> match_snapshot("./test/snapshots/bdd_format_report.snap")
+/// |> or_fail_with("expected formatted report snapshot match")
 /// ```
 ///
-pub fn format(results: List(TestResult)) -> String {
+pub fn format(results results: List(TestResult)) -> String {
   // Split results by kind
   let #(gherkin_results, unit_results) = partition_by_kind(results)
 
@@ -184,35 +174,31 @@ fn remove_gherkin_summary(
 /// ## Example
 ///
 /// ```gleam
-/// // Print to stdout
-/// let _ = report(results, io.print)
+/// bdd.report([passing_result()], write_bdd_report_to_file)
 ///
-/// // Print each line separately (for flushing)
-/// let _ = report(results, io.println)
+/// use text <- result.try(
+///   file.read("test/tmp/bdd_report.txt")
+///   |> result.map_error(file.error_to_string),
+/// )
 ///
-/// // Custom handling
-/// let _ = report(results, fn(s) { logger.info(s) })
+/// text
+/// |> should
+/// |> match_snapshot("./test/snapshots/bdd_report_file_output.snap")
+/// |> or_fail_with("expected report output snapshot match")
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `results` - List of test results from the runner
-/// - `write` - Function that handles the formatted output string
+/// - `results`: List of test results from the runner
+/// - `write`: Function that handles the formatted output string
 ///
 /// ## Returns
 ///
-/// Returns the input results unchanged, enabling pipeline composition:
-///
-/// ```gleam
-/// import dream_test/reporters/bdd
-///
-/// results
-/// |> bdd.report(io.print)
-/// ```
+/// Returns the input results unchanged, enabling pipeline composition.
 ///
 pub fn report(
-  results: List(TestResult),
-  write: fn(String) -> Nil,
+  results results: List(TestResult),
+  write write: fn(String) -> Nil,
 ) -> List(TestResult) {
   write(format(results))
   results
@@ -227,39 +213,100 @@ pub fn report(
 ///   of the previously printed result.
 /// - Returns the formatted output for this result, and the updated
 ///   describe-path to use as `previous_path` for the next call.
+///
+/// ## Parameters
+///
+/// - `result`: The test result to format
+/// - `previous_path`: The previous describe/group path (from the prior call)
+///
+/// ## Returns
+///
+/// A `FormatIncrementalResult` containing the text to print and the new
+/// describe/group path to pass as `previous_path` for the next call.
 pub fn format_incremental(
-  result: TestResult,
-  previous_path: List(String),
-) -> #(String, List(String)) {
-  let formatted = format_one_result_with_test_indent(result, previous_path, 0)
+  result result: TestResult,
+  previous_path previous_path: List(String),
+) -> FormatIncrementalResult {
+  let text = format_one_result_with_test_indent(result, previous_path, 0)
   let new_path = extract_describe_segments(result.full_name)
-  #(formatted, new_path)
+  FormatIncrementalResult(text: text, new_path: new_path)
 }
 
+/// ## Example
+///
+/// ```gleam
+/// use first <- result.try(first_result([passing_result()]))
+///
+/// let bdd.FormatIncrementalResult(text: _text, new_path: new_path) =
+///   bdd.format_incremental(first, [])
+///
+/// new_path
+/// |> should
+/// |> be_equal(["Example Suite"])
+/// |> or_fail_with("expected new_path to be the describe path")
+/// ```
 /// Format a single test result as BDD output, allowing an extra indent level
 /// for the test line.
+///
+/// ## Parameters
+///
+/// - `result`: The test result to format
+/// - `previous_path`: The previous describe/group path (from the prior call)
+/// - `extra_test_indent`: Additional indentation to apply to the test line
+///
+/// ## Returns
+///
+/// A `FormatIncrementalResult` containing the text to print and the new
+/// describe/group path to pass as `previous_path` for the next call.
 pub fn format_incremental_with_test_indent(
-  result: TestResult,
-  previous_path: List(String),
-  extra_test_indent: Int,
-) -> #(String, List(String)) {
-  let formatted =
+  result result: TestResult,
+  previous_path previous_path: List(String),
+  extra_test_indent extra_test_indent: Int,
+) -> FormatIncrementalResult {
+  let text =
     format_one_result_with_test_indent(result, previous_path, extra_test_indent)
   let new_path = extract_describe_segments(result.full_name)
-  #(formatted, new_path)
+  FormatIncrementalResult(text: text, new_path: new_path)
 }
 
+/// ## Example
+///
+/// ```gleam
+/// let result = passing_result()
+/// let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
+///   bdd.format_incremental_with_test_indent(result, [], 0)
+///
+/// text
+/// |> should
+/// |> match_snapshot(
+///   "./test/snapshots/bdd_format_incremental_with_test_indent.snap",
+/// )
+/// |> or_fail_with("expected incremental output snapshot match")
+/// ```
 /// Format a single incremental result as two parts:
 /// - `headers`: any new describe/group lines required for this result
 /// - `test_line`: the test line (and any failure details)
 ///
 /// This allows callers to insert additional lines (like lifecycle hooks)
 /// between headers and the test line while maintaining correct ordering.
+///
+/// ## Parameters
+///
+/// - `result`: The test result to format
+/// - `previous_path`: The previous describe/group path (from the prior call)
+/// - `extra_test_indent`: Additional indentation to apply to the test line
+///
+/// ## Returns
+///
+/// A `FormatIncrementalPartsResult` containing:
+/// - `headers`: any new describe/group lines required for this result
+/// - `test_line`: the test line (and any failure details)
+/// - `new_path`: the updated describe/group path to pass as `previous_path` for the next call
 pub fn format_incremental_parts_with_test_indent(
-  result: TestResult,
-  previous_path: List(String),
-  extra_test_indent: Int,
-) -> #(String, String, List(String)) {
+  result result: TestResult,
+  previous_path previous_path: List(String),
+  extra_test_indent extra_test_indent: Int,
+) -> FormatIncrementalPartsResult {
   let #(headers, test_line) =
     format_one_result_parts_with_test_indent(
       result,
@@ -267,14 +314,51 @@ pub fn format_incremental_parts_with_test_indent(
       extra_test_indent,
     )
   let new_path = extract_describe_segments(result.full_name)
-  #(headers, test_line, new_path)
+  FormatIncrementalPartsResult(
+    headers: headers,
+    test_line: test_line,
+    new_path: new_path,
+  )
 }
 
+/// ## Example
+///
+/// ```gleam
+/// let result = passing_result()
+/// let text =
+///   bdd.format_incremental_parts_with_test_indent(result, [], 0)
+///   |> incremental_parts_text
+///
+/// text
+/// |> should
+/// |> match_snapshot(
+///   "./test/snapshots/bdd_format_incremental_parts_with_test_indent.snap",
+/// )
+/// |> or_fail_with("expected incremental parts snapshot match")
+/// ```
 /// Format only the trailing summary line (no per-test output).
-pub fn format_summary_only(results: List(TestResult)) -> String {
+///
+/// ## Parameters
+///
+/// - `results`: The test results to summarize
+///
+/// ## Returns
+///
+/// A single summary line as a `String` (including a trailing newline).
+pub fn format_summary_only(results results: List(TestResult)) -> String {
   format_summary(results)
 }
 
+/// ## Example
+///
+/// ```gleam
+/// let summary = bdd.format_summary_only([passing_result()])
+///
+/// summary
+/// |> should
+/// |> match_snapshot("./test/snapshots/bdd_format_summary_only.snap")
+/// |> or_fail_with("expected summary snapshot match")
+/// ```
 fn format_all_results(
   results: List(TestResult),
   previous_path: List(String),

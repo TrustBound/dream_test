@@ -118,7 +118,10 @@ pub type Reporter {
 ///   |> runner.run()
 /// }
 /// ```
-pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
+pub fn bdd(
+  write write: fn(String) -> Nil,
+  show_progress show_progress: Bool,
+) -> Reporter {
   Bdd(
     write: write,
     show_progress: show_progress,
@@ -168,7 +171,10 @@ pub fn bdd(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 ///   |> runner.run()
 /// }
 /// ```
-pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
+pub fn json(
+  write write: fn(String) -> Nil,
+  show_progress show_progress: Bool,
+) -> Reporter {
   Json(write: write, show_progress: show_progress, results_rev: [])
 }
 
@@ -199,7 +205,7 @@ pub fn json(write: fn(String) -> Nil, show_progress: Bool) -> Reporter {
 ///   |> runner.run()
 /// }
 /// ```
-pub fn progress(write: fn(String) -> Nil) -> Reporter {
+pub fn progress(write write: fn(String) -> Nil) -> Reporter {
   Progress(write: write)
 }
 
@@ -213,58 +219,16 @@ pub fn progress(write: fn(String) -> Nil) -> Reporter {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/file
-/// import dream_test/matchers.{be_ok, contain_string, or_fail_with, should}
-/// import dream_test/reporters
-/// import dream_test/reporters/types as reporter_types
-/// import dream_test/unit.{describe, it}
-/// import gleam/result
-///
-/// pub fn tests() {
-///   describe("Reporter API: handle_event", [
-///     it("can be driven manually with ReporterEvent values", fn() {
-///       let path = "test/tmp/reporter_api_handle_event.json"
-///       let _ = ignore_file_errors(file.delete(path))
-///
-///       let r0 = reporters.json(write_to_file(path), False)
-///       let r1 = reporters.handle_event(r0, reporter_types.RunStarted(total: 1))
-///       let r2 =
-///         reporters.handle_event(
-///           r1,
-///           reporter_types.RunFinished(completed: 1, total: 1),
-///         )
-///
-///       let _ = r2
-///       let output =
-///         file.read(path)
-///         |> result.map_error(file.error_to_string)
-///
-///       output
-///       |> should
-///       |> be_ok()
-///       |> contain_string("\"tests\"")
-///       |> or_fail_with("Expected reporter output to include a JSON report")
-///     }),
-///   ])
-/// }
-///
-/// fn write_to_file(path: String) -> fn(String) -> Nil {
-///   fn(text) {
-///     let _ = ignore_file_errors(file.write(path, text))
-///     Nil
-///   }
-/// }
-///
-/// fn ignore_file_errors(value: Result(a, e)) -> Nil {
-///   case value {
-///     Ok(_) -> Nil
-///     Error(_) -> Nil
-///   }
-/// }
+/// reporters.json(write_to_file, False)
+/// |> reporters.handle_event(reporter_types.RunStarted(total: 1))
+/// |> reporters.handle_event(reporter_types.RunFinished(
+///   completed: 1,
+///   total: 1,
+/// ))
 /// ```
 pub fn handle_event(
-  reporter: Reporter,
-  event: reporter_types.ReporterEvent,
+  reporter reporter: Reporter,
+  event event: reporter_types.ReporterEvent,
 ) -> Reporter {
   case reporter {
     Bdd(
@@ -272,80 +236,141 @@ pub fn handle_event(
       show_progress: show_progress,
       results_rev: results_rev,
       pending_hooks: pending_hooks,
-    ) -> {
-      let next_results_rev = accumulate_results(results_rev, event)
-      let next_pending_hooks = accumulate_pending_hooks(pending_hooks, event)
+    ) ->
+      handle_event_bdd(write, show_progress, results_rev, pending_hooks, event)
 
-      case show_progress {
-        True -> handle_bdd_live_event(event, results_rev, pending_hooks, write)
-        False -> Nil
-      }
+    Json(write: write, show_progress: show_progress, results_rev: results_rev) ->
+      handle_event_json(write, show_progress, results_rev, event)
 
-      case event {
-        reporter_types.RunFinished(..) -> {
-          case show_progress {
-            True -> {
-              let results = list.reverse(next_results_rev)
-              write("\n" <> bdd_reporter.format_summary_only(results))
-            }
-
-            False -> {
-              let results = list.reverse(next_results_rev)
-              write(bdd_reporter.format(results))
-            }
-          }
-
-          Bdd(
-            write: write,
-            show_progress: show_progress,
-            results_rev: next_results_rev,
-            pending_hooks: dict.new(),
-          )
-        }
-
-        _ ->
-          Bdd(
-            write: write,
-            show_progress: show_progress,
-            results_rev: next_results_rev,
-            pending_hooks: next_pending_hooks,
-          )
-      }
-    }
-
-    Json(write: write, show_progress: show_progress, results_rev: results_rev) -> {
-      let next_results_rev = accumulate_results(results_rev, event)
-
-      case show_progress {
-        True -> progress_reporter.handle_event(event, write)
-        False -> Nil
-      }
-
-      case event {
-        reporter_types.RunFinished(..) -> {
-          let results = list.reverse(next_results_rev)
-          write(json_reporter.format(results))
-          Json(
-            write: write,
-            show_progress: show_progress,
-            results_rev: next_results_rev,
-          )
-        }
-
-        _ ->
-          Json(
-            write: write,
-            show_progress: show_progress,
-            results_rev: next_results_rev,
-          )
-      }
-    }
-
-    Progress(write: write) -> {
-      progress_reporter.handle_event(event, write)
-      reporter
-    }
+    Progress(write: write) -> handle_event_progress(write, event, reporter)
   }
+}
+
+fn handle_event_bdd(
+  write: fn(String) -> Nil,
+  show_progress: Bool,
+  results_rev: List(TestResult),
+  pending_hooks: Dict(String, #(Option(String), Option(String))),
+  event: reporter_types.ReporterEvent,
+) -> Reporter {
+  let next_results_rev = accumulate_results(results_rev, event)
+  let next_pending_hooks = accumulate_pending_hooks(pending_hooks, event)
+
+  maybe_write_bdd_live_output(
+    show_progress,
+    event,
+    results_rev,
+    pending_hooks,
+    write,
+  )
+
+  case event {
+    reporter_types.RunFinished(..) ->
+      handle_bdd_run_finished(write, show_progress, next_results_rev)
+
+    _ ->
+      handle_bdd_continue(
+        write,
+        show_progress,
+        next_results_rev,
+        next_pending_hooks,
+      )
+  }
+}
+
+fn maybe_write_bdd_live_output(
+  show_progress: Bool,
+  event: reporter_types.ReporterEvent,
+  results_rev: List(TestResult),
+  pending_hooks: Dict(String, #(Option(String), Option(String))),
+  write: fn(String) -> Nil,
+) -> Nil {
+  case show_progress {
+    True -> handle_bdd_live_event(event, results_rev, pending_hooks, write)
+    False -> Nil
+  }
+}
+
+fn handle_bdd_run_finished(
+  write: fn(String) -> Nil,
+  show_progress: Bool,
+  results_rev: List(TestResult),
+) -> Reporter {
+  let results = list.reverse(results_rev)
+  write_bdd_final_output(write, show_progress, results)
+  Bdd(
+    write: write,
+    show_progress: show_progress,
+    results_rev: results_rev,
+    pending_hooks: dict.new(),
+  )
+}
+
+fn write_bdd_final_output(
+  write: fn(String) -> Nil,
+  show_progress: Bool,
+  results: List(TestResult),
+) -> Nil {
+  case show_progress {
+    True -> write("\n" <> bdd_reporter.format_summary_only(results))
+    False -> write(bdd_reporter.format(results))
+  }
+}
+
+fn handle_bdd_continue(
+  write: fn(String) -> Nil,
+  show_progress: Bool,
+  results_rev: List(TestResult),
+  pending_hooks: Dict(String, #(Option(String), Option(String))),
+) -> Reporter {
+  Bdd(
+    write: write,
+    show_progress: show_progress,
+    results_rev: results_rev,
+    pending_hooks: pending_hooks,
+  )
+}
+
+fn handle_event_json(
+  write: fn(String) -> Nil,
+  show_progress: Bool,
+  results_rev: List(TestResult),
+  event: reporter_types.ReporterEvent,
+) -> Reporter {
+  let next_results_rev = accumulate_results(results_rev, event)
+
+  case show_progress {
+    True -> progress_reporter.handle_event(event, write)
+    False -> Nil
+  }
+
+  case event {
+    reporter_types.RunFinished(..) -> {
+      let results = list.reverse(next_results_rev)
+      write(json_reporter.format(results))
+      Json(
+        write: write,
+        show_progress: show_progress,
+        results_rev: next_results_rev,
+      )
+    }
+
+    _ ->
+      Json(
+        write: write,
+        show_progress: show_progress,
+        results_rev: next_results_rev,
+      )
+  }
+}
+
+fn handle_event_progress(
+  write: fn(String) -> Nil,
+  event: reporter_types.ReporterEvent,
+  reporter: Reporter,
+) -> Reporter {
+  progress_reporter.handle_event(event, write)
+  reporter
 }
 
 fn handle_bdd_live_event(
@@ -355,80 +380,130 @@ fn handle_bdd_live_event(
   write: fn(String) -> Nil,
 ) -> Nil {
   case event {
-    reporter_types.TestFinished(completed: _c, total: _t, result: result) -> {
-      let previous_path = previous_describe_path(results_rev)
-      let key = full_name_key(result.full_name)
-      let pending = dict.get(pending_hooks, key)
-
-      let before_each_line = case pending {
-        Ok(#(line, _)) -> line
-        Error(Nil) -> None
-      }
-
-      let after_each_line = case pending {
-        Ok(#(_, line)) -> line
-        Error(Nil) -> None
-      }
-
-      let extra_indent = case before_each_line {
-        Some(_) -> 1
-        None -> 0
-      }
-
-      let #(headers, test_line, _new_path) =
-        bdd_reporter.format_incremental_parts_with_test_indent(
-          result,
-          previous_path,
-          extra_indent,
-        )
-
-      // Ensure describe/group headers print before lifecycle hook lines so the
-      // hook appears under the correct suite/group.
-      write(headers)
-
-      case before_each_line {
-        Some(line) -> write(line)
-        None -> Nil
-      }
-
-      write(test_line)
-
-      case after_each_line {
-        Some(line) -> write(line)
-        None -> Nil
-      }
-    }
+    reporter_types.TestFinished(completed: _c, total: _t, result: result) ->
+      handle_bdd_live_test_finished(result, results_rev, pending_hooks, write)
 
     reporter_types.HookStarted(kind: kind, scope: scope, test_name: test_name) ->
-      case kind, test_name {
-        reporter_types.BeforeAll, _ ->
-          write(format_hook_line(kind, scope, test_name, None))
-        reporter_types.AfterAll, _ ->
-          write(format_hook_line(kind, scope, test_name, None))
-        _, _ -> Nil
-      }
+      handle_bdd_live_hook_started(kind, scope, test_name, write)
 
     reporter_types.HookFinished(
       kind: kind,
       scope: scope,
       test_name: test_name,
       outcome: outcome,
-    ) -> {
-      case outcome {
-        reporter_types.HookOk -> Nil
-        reporter_types.HookError(message: message) ->
-          case kind, test_name {
-            reporter_types.BeforeAll, _ ->
-              write(format_hook_line(kind, scope, test_name, Some(message)))
-            reporter_types.AfterAll, _ ->
-              write(format_hook_line(kind, scope, test_name, Some(message)))
-            _, _ -> Nil
-          }
-      }
-    }
+    ) -> handle_bdd_live_hook_finished(kind, scope, test_name, outcome, write)
 
     // For RunStarted we currently print nothing. The first TestFinished will
     // emit the initial suite headers.
+    _ -> Nil
+  }
+}
+
+fn handle_bdd_live_test_finished(
+  result: TestResult,
+  results_rev: List(TestResult),
+  pending_hooks: Dict(String, #(Option(String), Option(String))),
+  write: fn(String) -> Nil,
+) -> Nil {
+  let previous_path = previous_describe_path(results_rev)
+  let pending = dict.get(pending_hooks, full_name_key(result.full_name))
+
+  let before_each_line = before_each_line_from_pending(pending)
+  let after_each_line = after_each_line_from_pending(pending)
+  let extra_indent = extra_indent_for_before_each(before_each_line)
+
+  let bdd_reporter.FormatIncrementalPartsResult(
+    headers: headers,
+    test_line: test_line,
+    new_path: _new_path,
+  ) =
+    bdd_reporter.format_incremental_parts_with_test_indent(
+      result,
+      previous_path,
+      extra_indent,
+    )
+
+  // Ensure describe/group headers print before lifecycle hook lines so the
+  // hook appears under the correct suite/group.
+  write(headers)
+  write_if_some(write, before_each_line)
+  write(test_line)
+  write_if_some(write, after_each_line)
+}
+
+fn before_each_line_from_pending(
+  pending: Result(#(Option(String), Option(String)), Nil),
+) -> Option(String) {
+  case pending {
+    Ok(#(line, _)) -> line
+    Error(Nil) -> None
+  }
+}
+
+fn after_each_line_from_pending(
+  pending: Result(#(Option(String), Option(String)), Nil),
+) -> Option(String) {
+  case pending {
+    Ok(#(_, line)) -> line
+    Error(Nil) -> None
+  }
+}
+
+fn extra_indent_for_before_each(before_each_line: Option(String)) -> Int {
+  case before_each_line {
+    Some(_) -> 1
+    None -> 0
+  }
+}
+
+fn write_if_some(write: fn(String) -> Nil, line: Option(String)) -> Nil {
+  case line {
+    Some(text) -> write(text)
+    None -> Nil
+  }
+}
+
+fn handle_bdd_live_hook_started(
+  kind: reporter_types.HookKind,
+  scope: List(String),
+  test_name: Option(String),
+  write: fn(String) -> Nil,
+) -> Nil {
+  case kind {
+    reporter_types.BeforeAll ->
+      write(format_hook_line(kind, scope, test_name, None))
+    reporter_types.AfterAll ->
+      write(format_hook_line(kind, scope, test_name, None))
+    _ -> Nil
+  }
+}
+
+fn handle_bdd_live_hook_finished(
+  kind: reporter_types.HookKind,
+  scope: List(String),
+  test_name: Option(String),
+  outcome: reporter_types.HookOutcome,
+  write: fn(String) -> Nil,
+) -> Nil {
+  case outcome {
+    reporter_types.HookOk -> Nil
+    reporter_types.HookError(message: message) ->
+      handle_bdd_hook_error(kind, scope, test_name, message, write)
+  }
+}
+
+fn handle_bdd_hook_error(
+  kind: reporter_types.HookKind,
+  scope: List(String),
+  test_name: Option(String),
+  message: String,
+  write: fn(String) -> Nil,
+) -> Nil {
+  case kind {
+    reporter_types.BeforeAll ->
+      write(format_hook_line(kind, scope, test_name, Some(message)))
+    reporter_types.AfterAll ->
+      write(format_hook_line(kind, scope, test_name, Some(message)))
     _ -> Nil
   }
 }

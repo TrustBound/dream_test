@@ -223,7 +223,9 @@ fn check_length(
 /// - On success, preserves the list for further chaining.
 /// - On failure, the chain becomes failed and later matchers are skipped.
 ///
-pub fn be_empty(value_or_result: MatchResult(List(a))) -> MatchResult(List(a)) {
+pub fn be_empty(
+  value_or_result value_or_result: MatchResult(List(a)),
+) -> MatchResult(List(a)) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual_list) -> check_is_empty(actual_list)

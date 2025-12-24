@@ -1,46 +1,14 @@
-//// Gherkin-style test reporter for dream_test.
+//// Gherkin-style report formatting.
 ////
-//// This reporter formats Gherkin test results in a Cucumber-like format
-//// that mirrors the Given/When/Then structure of your scenarios.
+//// This module formats `TestResult` values with kind `GherkinScenario(_ )` in a
+//// Cucumber-like layout (Feature → Scenario), so you can print or persist a
+//// human-readable report for BDD runs.
 ////
-//// ## Example Output
+//// Most users won’t call this module directly—`dream_test/reporters` wires it
+//// in automatically—but it’s useful when you want:
 ////
-//// ```text
-//// Feature: Shopping Cart
-////   Scenario: Adding items ✓ (2ms)
-////   Scenario: Removing items ✗ (3ms)
-////       ✗ equal
-////         Message: Item count mismatch
-////         Expected: 7
-////         Actual:   10
-////
-//// Summary: 2 run, 1 failed, 1 passed in 5ms
-//// ```
-////
-//// ## Usage
-////
-//// ```gleam
-//// import dream_test/gherkin/feature
-//// import dream_test/runner
-//// import dream_test/reporters/gherkin as gherkin_reporter
-//// import gleam/io
-////
-//// pub fn main() {
-////   let results = runner.new([my_feature_suite()]) |> runner.run()
-////   let _ = gherkin_reporter.report(results, io.print)
-//// }
-//// ```
-////
-//// ## Status Markers
-////
-//// | Status      | Marker | Meaning                        |
-//// |-------------|--------|--------------------------------|
-//// | Passed      | ✓      | All steps succeeded            |
-//// | Failed      | ✗      | One or more steps failed       |
-//// | Skipped     | -      | Scenario was skipped           |
-//// | Pending     | ~      | Scenario is a placeholder      |
-//// | TimedOut    | !      | Scenario exceeded timeout      |
-//// | SetupFailed | ⚠      | A setup hook failed            |
+//// - a Gherkin report as a `String` (`format`)
+//// - to write the report using a custom function (`report`)
 
 import dream_test/timing
 import dream_test/types.{
@@ -68,11 +36,20 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// let report_string = format(results)
-/// file.write("cucumber-results.txt", report_string)
+/// gherkin_reporter.format(sample_results())
+/// |> should
+/// |> match_snapshot("./test/snapshots/gherkin_format_report.snap")
+/// |> or_fail_with("expected formatted report snapshot match")
 /// ```
 ///
-pub fn format(results: List(TestResult)) -> String {
+/// ## Parameters
+///
+/// - `results`: The test results to format
+///
+/// ## Returns
+///
+/// The formatted report as a `String`.
+pub fn format(results results: List(TestResult)) -> String {
   let formatted_results = format_all_results(results, "", "")
   let summary_text = format_summary(results)
   string.concat([formatted_results, "\n", summary_text])
@@ -85,21 +62,22 @@ pub fn format(results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// let _ = report(results, io.print)
+/// let results = runner.new([tests()]) |> runner.run()
+/// gherkin_reporter.report(results, io.print)
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `results` - List of test results from the runner
-/// - `write` - Function that handles the formatted output string
+/// - `results`: List of test results from the runner
+/// - `write`: Function that handles the formatted output string
 ///
 /// ## Returns
 ///
 /// Returns the input results unchanged, enabling pipeline composition.
 ///
 pub fn report(
-  results: List(TestResult),
-  write: fn(String) -> Nil,
+  results results: List(TestResult),
+  write write: fn(String) -> Nil,
 ) -> List(TestResult) {
   write(format(results))
   results
@@ -112,11 +90,20 @@ pub fn report(
 /// ## Example
 ///
 /// ```gleam
-/// let gherkin_results = list.filter(results, is_gherkin_result)
-/// let unit_results = list.filter(results, fn(r) { !is_gherkin_result(r) })
+/// gherkin_reporter.is_gherkin_result(gherkin_result())
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("expected True for gherkin results")
 /// ```
 ///
-pub fn is_gherkin_result(result: TestResult) -> Bool {
+/// ## Parameters
+///
+/// - `result`: A single `TestResult` to inspect
+///
+/// ## Returns
+///
+/// `True` when `result.kind` is `GherkinScenario(_)`, otherwise `False`.
+pub fn is_gherkin_result(result result: TestResult) -> Bool {
   case result.kind {
     GherkinScenario(_) -> True
     _ -> False
@@ -323,10 +310,26 @@ fn add_summary_part_if_nonzero(
 }
 
 fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  list.fold(results, 0, fn(count, result) {
-    case result.status == wanted {
-      True -> count + 1
-      False -> count
+  count_matching_status(results, wanted, 0)
+}
+
+fn count_matching_status(
+  results: List(TestResult),
+  wanted: Status,
+  count: Int,
+) -> Int {
+  case results {
+    [] -> count
+    [result, ..rest] -> {
+      let next_count = increment_if_matches(result.status, wanted, count)
+      count_matching_status(rest, wanted, next_count)
     }
-  })
+  }
+}
+
+fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
+  case status == wanted {
+    True -> count + 1
+    False -> count
+  }
 }

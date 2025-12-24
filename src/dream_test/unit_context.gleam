@@ -242,8 +242,11 @@ pub fn it(
 
 /// Define a skipped context-aware test.
 ///
-/// This is useful for temporarily disabling a test while keeping its name and
-/// place in the suite.
+/// `skip` has the same shape as `it` so you can easily switch a test between
+/// running and skipped without rewriting the test body.
+///
+/// The provided test body is preserved for that purpose, but it is **not
+/// executed** while the test is skipped.
 ///
 /// ## Parameters
 ///

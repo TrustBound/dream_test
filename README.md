@@ -301,7 +301,7 @@ pub fn tests() {
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
 
   let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_test_suite("cart_test", config)
+  to_test_suite(config)
 }
 
 pub fn main() {

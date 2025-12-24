@@ -39,5 +39,16 @@ pub fn tests() {
       |> be_equal(True)
       |> or_fail_with("expected now_ms to be monotonic")
     }),
+
+    it("now_us is monotonic (non-decreasing)", fn() {
+      let t1 = timing.now_us()
+      let t2 = timing.now_us()
+      let ok = t2 >= t1
+
+      ok
+      |> should
+      |> be_equal(True)
+      |> or_fail_with("expected now_us to be monotonic")
+    }),
   ])
 }

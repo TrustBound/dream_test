@@ -120,7 +120,10 @@ pub type UnitNode =
 /// ## Returns
 ///
 /// A `TestSuite(Nil)` you can pass to `runner.new([ ... ])`.
-pub fn describe(name: String, children: List(UnitNode)) -> TestSuite(Nil) {
+pub fn describe(
+  name name: String,
+  children children: List(UnitNode),
+) -> TestSuite(Nil) {
   Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
 }
 
@@ -181,7 +184,7 @@ pub fn describe(name: String, children: List(UnitNode)) -> TestSuite(Nil) {
 /// ## Returns
 ///
 /// A `UnitNode` you include in a parent `describe`/`group` children list.
-pub fn group(name: String, children: List(UnitNode)) -> UnitNode {
+pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
   Group(name: name, tags: [], children: children)
 }
 
@@ -251,7 +254,11 @@ pub fn it(
 
 /// Define a skipped test.
 ///
-/// The function is accepted for ergonomics, but it is **not executed**.
+/// `skip` has the same shape as `it` so you can easily switch a test between
+/// running and skipped without rewriting the test body.
+///
+/// The provided test body is preserved for that purpose, but it is **not
+/// executed** while the test is skipped.
 ///
 /// ## Example
 ///
@@ -298,22 +305,27 @@ pub fn it(
 /// ## Parameters
 ///
 /// - `name`: the test name
-/// - `_run`: a **0-argument** function (accepted but never executed)
+/// - `run`: a **0-argument** function (accepted but never executed)
 ///
 /// ## Returns
 ///
 /// A `UnitNode` representing a skipped test (`AssertionSkipped`).
 pub fn skip(
   name: String,
-  _run: fn() -> Result(AssertionResult, String),
+  run: fn() -> Result(AssertionResult, String),
 ) -> UnitNode {
-  Test(
-    name: name,
-    tags: [],
-    kind: Unit,
-    run: fn(_nil: Nil) { Ok(AssertionSkipped) },
-    timeout_ms: None,
-  )
+  let node = it(name, run)
+  case node {
+    Test(name: name, tags: tags, kind: kind, run: _run, timeout_ms: timeout_ms) ->
+      Test(
+        name: name,
+        tags: tags,
+        kind: kind,
+        run: fn(_nil: Nil) { Ok(AssertionSkipped) },
+        timeout_ms: timeout_ms,
+      )
+    other -> other
+  }
 }
 
 /// Run once before any tests in the current suite/group.
@@ -700,7 +712,7 @@ pub fn after_all(teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// ## Returns
 ///
 /// The updated `UnitNode` with tags set.
-pub fn with_tags(node: UnitNode, tags: List(String)) -> UnitNode {
+pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
   case node {
     Group(name, _, children) ->
       Group(name: name, tags: tags, children: children)

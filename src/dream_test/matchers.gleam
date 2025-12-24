@@ -78,7 +78,7 @@ import gleam/option as gleam_option
 /// A `MatchResult(a)` containing `value`. Subsequent matchers will either:
 /// - preserve this value (for “checking” matchers), or
 /// - transform it (for “unwrapping” matchers like `be_some` / `be_ok`).
-pub fn should(value: a) -> MatchResult(a) {
+pub fn should(value value: a) -> MatchResult(a) {
   MatchOk(value)
 }
 
@@ -101,7 +101,7 @@ pub fn should(value: a) -> MatchResult(a) {
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
 /// - `expected`: the value you expect the actual value to equal
 ///
 /// ## Returns
@@ -124,7 +124,7 @@ pub const be_equal = equality.be_equal
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
 /// - `unexpected`: the value you expect the actual value to *not* equal
 ///
 /// ## Returns
@@ -151,7 +151,7 @@ pub const not_equal = equality.not_equal
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -171,7 +171,7 @@ pub const be_true = boolean.be_true
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -199,7 +199,7 @@ pub const be_false = boolean.be_false
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -221,7 +221,7 @@ pub const be_some = option.be_some
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -249,7 +249,7 @@ pub const be_none = option.be_none
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -272,7 +272,7 @@ pub const be_ok = result.be_ok
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Result(a, e))` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -296,7 +296,7 @@ pub const be_error = result.be_error
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
 /// - `expected_item`: the item that must be present in the list
 ///
 /// ## Returns
@@ -317,7 +317,7 @@ pub const contain = collection.contain
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
 /// - `unexpected_item`: the item that must *not* be present in the list
 ///
 /// ## Returns
@@ -338,7 +338,7 @@ pub const not_contain = collection.not_contain
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
 /// - `expected_length`: the exact length the list must have
 ///
 /// ## Returns
@@ -359,7 +359,7 @@ pub const have_length = collection.have_length
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
 ///
 /// ## Returns
 ///
@@ -383,7 +383,7 @@ pub const be_empty = collection.be_empty
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `threshold`: the value the actual integer must be greater than
 ///
 /// ## Returns
@@ -404,7 +404,7 @@ pub const be_greater_than = comparison.be_greater_than
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `threshold`: the value the actual integer must be less than
 ///
 /// ## Returns
@@ -425,7 +425,7 @@ pub const be_less_than = comparison.be_less_than
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `minimum`: the minimum allowed value (inclusive)
 ///
 /// ## Returns
@@ -446,7 +446,7 @@ pub const be_at_least = comparison.be_at_least
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `maximum`: the maximum allowed value (inclusive)
 ///
 /// ## Returns
@@ -469,7 +469,7 @@ pub const be_at_most = comparison.be_at_most
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `min`: lower bound (exclusive)
 /// - `max`: upper bound (exclusive)
 ///
@@ -493,7 +493,7 @@ pub const be_between = comparison.be_between
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
 /// - `min`: lower bound (inclusive)
 /// - `max`: upper bound (inclusive)
 ///
@@ -515,7 +515,7 @@ pub const be_in_range = comparison.be_in_range
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
 /// - `threshold`: the value the actual float must be greater than
 ///
 /// ## Returns
@@ -536,7 +536,7 @@ pub const be_greater_than_float = comparison.be_greater_than_float
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
 /// - `threshold`: the value the actual float must be less than
 ///
 /// ## Returns
@@ -561,7 +561,7 @@ pub const be_less_than_float = comparison.be_less_than_float
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
 /// - `prefix`: required starting substring
 ///
 /// ## Returns
@@ -582,7 +582,7 @@ pub const start_with = string.start_with
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
 /// - `suffix`: required ending substring
 ///
 /// ## Returns
@@ -603,7 +603,7 @@ pub const end_with = string.end_with
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
 /// - `substring`: required substring that must be present
 ///
 /// ## Returns
@@ -635,7 +635,7 @@ pub const contain_string = string.contain_string
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(String)` produced by `should` (or a previous matcher)
 /// - `snapshot_path`: file path used to store/compare the snapshot
 ///
 /// ## Returns
@@ -660,7 +660,7 @@ pub const match_snapshot = snapshot.match_snapshot
 ///
 /// ## Parameters
 ///
-/// - `result`: the `MatchResult(value)` produced by `should` (or a previous matcher)
+/// - `value_or_result`: the `MatchResult(value)` produced by `should` (or a previous matcher)
 /// - `snapshot_path`: file path used to store/compare the snapshot
 ///
 /// ## Returns
@@ -784,12 +784,18 @@ pub fn or_fail_with(
   result result: MatchResult(a),
   message message: String,
 ) -> Result(AssertionResult, String) {
-  Ok(case result {
-    MatchOk(_) -> AssertionOk
+  Ok(or_fail_with_assertion(result, message))
+}
 
+fn or_fail_with_assertion(
+  result: MatchResult(a),
+  message: String,
+) -> AssertionResult {
+  case result {
+    MatchOk(_) -> AssertionOk
     MatchFailed(failure) ->
       AssertionFailed(AssertionFailure(..failure, message: message))
-  })
+  }
 }
 
 /// Explicitly fail a test with a message.
@@ -819,7 +825,7 @@ pub fn or_fail_with(
 /// If you want to abort a test immediately (rather than “failing a matcher”),
 /// return `Error("...")` from the test body instead.
 ///
-pub fn fail_with(message: String) -> AssertionResult {
+pub fn fail_with(message message: String) -> AssertionResult {
   AssertionFailed(AssertionFailure(
     operator: "fail_with",
     message: message,

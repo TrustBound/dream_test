@@ -15,15 +15,17 @@ pub fn tests() {
     }),
 
     it("add_failure stores failures newest-first", fn() {
-      let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-      let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+      let first_failure =
+        AssertionFailure(operator: "op1", message: "m1", payload: None)
+      let second_failure =
+        AssertionFailure(operator: "op2", message: "m2", payload: None)
 
       context.new()
-      |> context.add_failure(f1)
-      |> context.add_failure(f2)
+      |> context.add_failure(first_failure)
+      |> context.add_failure(second_failure)
       |> context.failures()
       |> should
-      |> be_equal([f2, f1])
+      |> be_equal([second_failure, first_failure])
       |> or_fail_with("expected newest-first failure ordering")
     }),
   ])

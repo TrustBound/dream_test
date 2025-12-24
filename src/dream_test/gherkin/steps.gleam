@@ -1,77 +1,33 @@
 //// Step definition registry for Gherkin scenarios.
 ////
-//// This module provides the user-facing API for defining step definitions
-//// that match Gherkin steps (Given/When/Then) to Gleam handler functions.
+//// Use this module to:
 ////
-//// ## Quick Start
+//// - Build a `StepRegistry` by registering patterns and handlers.
+//// - Match step text against registered patterns (including typed placeholders).
+//// - Extract typed captures (`{int}`, `{float}`, `{string}`, `{word}`, `{}`).
 ////
-//// ```gleam
-//// import dream_test/matchers.{fail_with}
-//// import dream_test/gherkin/steps.{
-////   type StepContext, given, new_registry, then_, when_, get_int, get_float,
-//// }
-//// import dream_test/gherkin/world as world
-//// import dream_test/types.{AssertionOk, type AssertionResult}
-////
-//// pub fn cart_steps() -> StepRegistry {
-////   new_registry()
-////   |> given("I have {int} items in my cart", have_items)
-////   |> when_("I add {int} items of {word}", add_items)
-////   |> then_("the total should be ${float}", check_total)
-//// }
-////
-//// fn have_items(context: StepContext) -> Result(AssertionResult, String) {
-////   case get_int(context.captures, 0) {
-////     Ok(count) -> {
-////       world.put(context.world, "count", count)
-////       Ok(AssertionOk)
-////     }
-////     Error(msg) -> Ok(fail_with(msg))
-////   }
-//// }
-//// ```
-////
-//// ## Pattern Syntax
-////
-//// Step patterns use Cucumber Expression syntax with typed placeholders:
-////
-//// | Placeholder | Matches               | Example        |
-//// |-------------|-----------------------|----------------|
-//// | `{int}`     | Integers              | `42`, `-5`     |
-//// | `{float}`   | Decimals              | `3.14`, `-0.5` |
-//// | `{string}`  | Quoted strings        | `"hello"`      |
-//// | `{word}`    | Single unquoted word  | `apple`        |
-//// | `{}`        | Any single token      | (anonymous)    |
-////
-//// ## Prefix and Suffix Support
-////
-//// Placeholders can have literal prefixes and suffixes attached:
-////
-//// | Pattern | Matches | Captures |
-//// |---------|---------|----------|
-//// | `${float}` | `$19.99` | `19.99` as Float |
-//// | `{int}%` | `50%` | `50` as Int |
-//// | `${float}USD` | `$99.99USD` | `99.99` as Float |
-////
-//// This is useful for currency, percentages, and other formatted values.
-////
-//// ## Capture Extraction
-////
-//// Use the typed extraction helpers to get captured values:
+//// ## Example
 ////
 //// ```gleam
-//// fn check_total(context: StepContext) -> Result(AssertionResult, String) {
-////   // Pattern was "the total should be ${float}"
-////   // Step text was "the total should be $19.99"
-////   case get_float(context.captures, 0) {
-////     Ok(amount) -> {
-////       // amount is 19.99 (the $ prefix was matched but not captured)
-////       Ok(AssertionOk)
-////     }
-////     Error(msg) -> Ok(fail_with(msg))
-////   }
-//// }
+////   let steps =
+////     new_registry()
+////     |> step("I have {int} items in my cart", step_have_items)
+////     |> step("I add {int} more items", step_add_items)
+////     |> step("I should have {int} items total", step_should_have)
 //// ```
+////
+//// ## Placeholder types
+////
+//// Step patterns use typed placeholders:
+////
+//// - `{int}`: integers (e.g. `42`, `-5`)
+//// - `{float}`: decimals (e.g. `3.14`, `-0.5`)
+//// - `{string}`: quoted strings (e.g. `"hello world"`)
+//// - `{word}`: a single unquoted word (e.g. `alice`)
+//// - `{}`: any single token
+////
+//// Placeholders can include literal prefixes/suffixes. For example, `${float}`
+//// matches `$19.99` but captures `19.99` as a `Float`.
 
 import dream_test/gherkin/step_trie.{
   type CapturedValue, type StepMatch, type StepTrie, CapturedFloat, CapturedInt,
@@ -116,15 +72,12 @@ pub type StepContext {
 /// This means you can use the exact same assertion style inside steps:
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
-/// import dream_test/gherkin/world as world
-///
-/// fn check_count(context: StepContext) -> Result(AssertionResult, String) {
-///   world.get(context.world, "count")
+/// fn step_should_have(context: StepContext) {
+///   let expected = get_int(context.captures, 0) |> result.unwrap(0)
+///   get_or(context.world, "cart", 0)
 ///   |> should
-///   |> be_ok()
-///   |> be_equal(3)
-///   |> or_fail_with("count should be 3")
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
 /// }
 /// ```
 ///
@@ -133,7 +86,10 @@ pub type StepHandler =
 
 /// Step registry backed by radix trie.
 ///
-/// Stores step definitions and provides O(words) lookup.
+/// Stores step definitions and provides fast lookup.
+///
+/// “Fast” here means lookup cost grows with the **length of the step text**,
+/// not with how many step definitions you’ve registered.
 ///
 pub opaque type StepRegistry {
   StepRegistry(trie: StepTrie(StepHandler))
@@ -150,10 +106,13 @@ pub opaque type StepRegistry {
 /// ## Example
 ///
 /// ```gleam
-/// let steps = new_registry()
-/// |> given("I have {int} items", have_items)
-/// |> when_("I add {int} more", add_items)
-/// |> then_("I should have {int} total", check_total)
+/// let steps =
+///   new_registry()
+///   |> step("I have {int} items", step_int)
+///   |> step("the price is ${float}", step_float)
+///   |> step("the message is {string}", step_string)
+///   |> step("the user is {word}", step_word)
+///   |> step("everything works", step_pass)
 /// ```
 ///
 pub fn new_registry() -> StepRegistry {
@@ -170,18 +129,20 @@ pub fn new_registry() -> StepRegistry {
 /// - `pattern`: Step pattern with placeholders
 /// - `handler`: Handler function to execute
 ///
+/// ## Returns
+///
+/// A new registry containing the added step.
+///
 /// ## Example
 ///
 /// ```gleam
-/// new_registry()
-/// |> given("I have {int} items in my cart", have_items)
-/// |> given("I am logged in as {string}", logged_in_as)
+///       let registry = new_registry() |> given("I have {int} items", step_pass)
 /// ```
 ///
 pub fn given(
-  registry: StepRegistry,
-  pattern: String,
-  handler: StepHandler,
+  registry registry: StepRegistry,
+  pattern pattern: String,
+  handler handler: StepHandler,
 ) -> StepRegistry {
   let updated = step_trie.insert(registry.trie, "Given", pattern, handler)
   StepRegistry(trie: updated)
@@ -199,18 +160,20 @@ pub fn given(
 /// - `pattern`: Step pattern with placeholders
 /// - `handler`: Handler function to execute
 ///
+/// ## Returns
+///
+/// A new registry containing the added step.
+///
 /// ## Example
 ///
 /// ```gleam
-/// new_registry()
-/// |> when_("I add {int} items of {string}", add_items)
-/// |> when_("I click the {string} button", click_button)
+///       let registry = new_registry() |> when_("I add {int} items", step_pass)
 /// ```
 ///
 pub fn when_(
-  registry: StepRegistry,
-  pattern: String,
-  handler: StepHandler,
+  registry registry: StepRegistry,
+  pattern pattern: String,
+  handler handler: StepHandler,
 ) -> StepRegistry {
   let updated = step_trie.insert(registry.trie, "When", pattern, handler)
   StepRegistry(trie: updated)
@@ -228,18 +191,20 @@ pub fn when_(
 /// - `pattern`: Step pattern with placeholders
 /// - `handler`: Handler function to execute
 ///
+/// ## Returns
+///
+/// A new registry containing the added step.
+///
 /// ## Example
 ///
 /// ```gleam
-/// new_registry()
-/// |> then_("my cart should have {int} items", check_count)
-/// |> then_("I should see {string}", check_text)
+///       let registry = new_registry() |> then_("I should have {int} items", step_pass)
 /// ```
 ///
 pub fn then_(
-  registry: StepRegistry,
-  pattern: String,
-  handler: StepHandler,
+  registry registry: StepRegistry,
+  pattern pattern: String,
+  handler handler: StepHandler,
 ) -> StepRegistry {
   let updated = step_trie.insert(registry.trie, "Then", pattern, handler)
   StepRegistry(trie: updated)
@@ -255,17 +220,24 @@ pub fn then_(
 /// - `pattern`: Step pattern with placeholders
 /// - `handler`: Handler function to execute
 ///
+/// ## Returns
+///
+/// A new registry containing the added step.
+///
 /// ## Example
 ///
 /// ```gleam
-/// new_registry()
-/// |> step("I wait {int} seconds", wait_seconds)
+/// let steps =
+///     new_registry()
+///     |> step("I have {int} items in my cart", step_have_items)
+///     |> step("I add {int} more items", step_add_items)
+///     |> step("I should have {int} items total", step_should_have)
 /// ```
 ///
 pub fn step(
-  registry: StepRegistry,
-  pattern: String,
-  handler: StepHandler,
+  registry registry: StepRegistry,
+  pattern pattern: String,
+  handler handler: StepHandler,
 ) -> StepRegistry {
   let updated = step_trie.insert(registry.trie, "*", pattern, handler)
   StepRegistry(trie: updated)
@@ -280,7 +252,26 @@ pub fn step(
 /// Searches the registry for a handler matching the given keyword and text.
 /// Returns the handler and captured values on success, or an error message.
 ///
-/// This is O(words in step text), not O(number of step definitions).
+/// ## Performance
+///
+/// Lookup cost scales with the number of **tokens** in the step text after
+/// tokenization (the same tokenization used by the step trie).
+///
+/// Concretely: this is the **total number of tokens** in the input step text,
+/// not the number of *unique* words.
+///
+/// In practice:
+/// - Tokens are usually “words” separated by spaces.
+/// - Quoted strings are treated as a single token.
+/// - Some punctuation/number boundaries are split so patterns like `{int}%` or
+///   `${float}USD` can match predictably.
+///
+/// Examples:
+/// - `"I add 2 items"` → 4 tokens (`["I", "add", "2", "items"]`)
+/// - `"the message is \"hello world\""` → 4 tokens (`["the", "message", "is", "\"hello world\""]`)
+///
+/// This does **not** scale with the number of registered steps: you can register
+/// hundreds of steps and lookup still stays proportional to the tokenized input.
 ///
 /// ## Parameters
 ///
@@ -293,10 +284,23 @@ pub fn step(
 /// - `Ok(StepMatch)`: Contains matched handler and captured values
 /// - `Error(String)`: Error message if no match found
 ///
+/// ## Example
+///
+/// ```gleam
+///       let registry = new_registry() |> given("I have {int} items", step_pass)
+///
+///       use matched <- result.try(find_step(registry, Given, "I have 3 items"))
+///
+///       capture_count(matched.captures)
+///       |> should
+///       |> be_equal(1)
+///       |> or_fail_with("expected exactly one capture")
+/// ```
+///
 pub fn find_step(
-  registry: StepRegistry,
-  keyword: StepKeyword,
-  text: String,
+  registry registry: StepRegistry,
+  keyword keyword: StepKeyword,
+  text text: String,
 ) -> Result(StepMatch(StepHandler), String) {
   let keyword_str = keyword_to_string(keyword)
   case step_trie.lookup(registry.trie, keyword_str, text) {
@@ -332,18 +336,17 @@ fn keyword_to_string(keyword: StepKeyword) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// // Pattern: "I have {int} items"
-/// // Step: "I have 42 items"
-/// import dream_test/types.{AssertionOk, type AssertionResult}
-///
-/// fn have_items(context: StepContext) -> Result(AssertionResult, String) {
-///   use count <- get_int(context.captures, 0)
-///   // count == 42
-///   Ok(AssertionOk)
+/// fn step_int(context: StepContext) {
+///   let value = get_int(context.captures, 0) |> result.unwrap(0)
+///   put(context.world, "int", value)
+///   Ok(succeed())
 /// }
 /// ```
 ///
-pub fn get_int(captures: List(CapturedValue), index: Int) -> Result(Int, String) {
+pub fn get_int(
+  captures captures: List(CapturedValue),
+  index index: Int,
+) -> Result(Int, String) {
   case list_at(captures, index) {
     Some(CapturedInt(value)) -> Ok(value)
     Some(_) -> Error("Capture at index is not an integer")
@@ -364,20 +367,16 @@ pub fn get_int(captures: List(CapturedValue), index: Int) -> Result(Int, String)
 /// ## Example
 ///
 /// ```gleam
-/// // Pattern: "the price is {float} dollars"
-/// // Step: "the price is 19.99 dollars"
-/// import dream_test/types.{AssertionOk, type AssertionResult}
-///
-/// fn check_price(context: StepContext) -> Result(AssertionResult, String) {
-///   use price <- get_float(context.captures, 0)
-///   // price == 19.99
-///   Ok(AssertionOk)
+/// fn step_float(context: StepContext) {
+///   let value = get_float(context.captures, 0) |> result.unwrap(0.0)
+///   put(context.world, "float", value)
+///   Ok(succeed())
 /// }
 /// ```
 ///
 pub fn get_float(
-  captures: List(CapturedValue),
-  index: Int,
+  captures captures: List(CapturedValue),
+  index index: Int,
 ) -> Result(Float, String) {
   case list_at(captures, index) {
     Some(CapturedFloat(value)) -> Ok(value)
@@ -399,20 +398,16 @@ pub fn get_float(
 /// ## Example
 ///
 /// ```gleam
-/// // Pattern: "I add items of {string}"
-/// // Step: "I add items of \"Red Widget\""
-/// import dream_test/types.{AssertionOk, type AssertionResult}
-///
-/// fn add_items(context: StepContext) -> Result(AssertionResult, String) {
-///   use product <- get_string(context.captures, 0)
-///   // product == "Red Widget"
-///   Ok(AssertionOk)
+/// fn step_string(context: StepContext) {
+///   let value = get_string(context.captures, 0) |> result.unwrap("")
+///   put(context.world, "string", value)
+///   Ok(succeed())
 /// }
 /// ```
 ///
 pub fn get_string(
-  captures: List(CapturedValue),
-  index: Int,
+  captures captures: List(CapturedValue),
+  index index: Int,
 ) -> Result(String, String) {
   case list_at(captures, index) {
     Some(CapturedString(value)) -> Ok(value)
@@ -435,20 +430,16 @@ pub fn get_string(
 /// ## Example
 ///
 /// ```gleam
-/// // Pattern: "the user {word} exists"
-/// // Step: "the user alice exists"
-/// import dream_test/types.{AssertionOk, type AssertionResult}
-///
-/// fn user_exists(context: StepContext) -> Result(AssertionResult, String) {
-///   use username <- get_word(context.captures, 0)
-///   // username == "alice"
-///   Ok(AssertionOk)
+/// fn step_word(context: StepContext) {
+///   let value = get_word(context.captures, 0) |> result.unwrap("")
+///   put(context.world, "word", value)
+///   Ok(succeed())
 /// }
 /// ```
 ///
 pub fn get_word(
-  captures: List(CapturedValue),
-  index: Int,
+  captures captures: List(CapturedValue),
+  index index: Int,
 ) -> Result(String, String) {
   case list_at(captures, index) {
     Some(CapturedWord(value)) -> Ok(value)
@@ -469,11 +460,13 @@ pub fn get_word(
 /// ## Example
 ///
 /// ```gleam
-/// let count = capture_count(context.captures)
-/// // For "I add {int} items of {string}", count would be 2
+///       capture_count(matched.captures)
+///       |> should
+///       |> be_equal(1)
+///       |> or_fail_with("expected exactly one capture")
 /// ```
 ///
-pub fn capture_count(captures: List(CapturedValue)) -> Int {
+pub fn capture_count(captures captures: List(CapturedValue)) -> Int {
   list.length(captures)
 }
 

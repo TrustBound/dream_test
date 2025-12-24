@@ -41,7 +41,9 @@ import gleam/option.{Some}
 ///
 /// A `MatchResult(Bool)` preserving the boolean for further chaining.
 ///
-pub fn be_true(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {
+pub fn be_true(
+  value_or_result value_or_result: MatchResult(Bool),
+) -> MatchResult(Bool) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_true(actual)
@@ -85,7 +87,9 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 ///
 /// A `MatchResult(Bool)` preserving the boolean for further chaining.
 ///
-pub fn be_false(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {
+pub fn be_false(
+  value_or_result value_or_result: MatchResult(Bool),
+) -> MatchResult(Bool) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_false(actual)

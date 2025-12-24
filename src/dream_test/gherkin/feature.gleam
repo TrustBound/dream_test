@@ -15,36 +15,17 @@
 //// Parse a `.feature` file and convert to TestSuite:
 ////
 //// ```gleam
-//// import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
-//// import dream_test/gherkin/parser
-//// import dream_test/gherkin/steps.{type StepContext, given, new_registry, then_, when_}
-//// import dream_test/types.{AssertionOk, type AssertionResult}
-//// import dream_test/runner
+//// let steps =
+////   new_registry()
+////   |> step("the server is running", step_server_running)
+////   |> step("the cart is empty", step_empty_cart)
+////   |> step("I add {int} items", step_add_items)
+////   |> step("the cart should have {int} items", step_verify_count)
 ////
-//// fn have_items(_context: StepContext) -> Result(AssertionResult, String) {
-////   Ok(AssertionOk)
-//// }
+//// let assert Ok(feature) = parser.parse_file("test/cart.feature")
 ////
-//// fn add_items(_context: StepContext) -> Result(AssertionResult, String) {
-////   Ok(AssertionOk)
-//// }
-////
-//// fn check_total(_context: StepContext) -> Result(AssertionResult, String) {
-////   Ok(AssertionOk)
-//// }
-////
-//// pub fn main() {
-////   let steps = new_registry()
-////   |> given("I have {int} items", have_items)
-////   |> when_("I add {int} items", add_items)
-////   |> then_("the total is ${float}", check_total)
-////
-////   let assert Ok(parsed) = parser.parse_file("features/cart.feature")
-////   let config = FeatureConfig(feature: parsed, step_registry: steps)
-////   
-////   let suite = to_test_suite("", config)
-////   runner.new([suite]) |> runner.run()
-//// }
+//// let config = FeatureConfig(feature: feature, step_registry: steps)
+//// to_test_suite(config)
 //// ```
 ////
 //// ## Inline DSL Usage
@@ -52,27 +33,13 @@
 //// Define features directly in Gleam without `.feature` files:
 ////
 //// ```gleam
-//// import dream_test/gherkin/feature.{
-////   feature, scenario, given, when, then, and, with_tags,
-//// }
-//// import dream_test/gherkin/steps.{type StepContext, given as define_given, new_registry}
-//// import dream_test/types.{AssertionOk, type AssertionResult}
-////
-//// pub fn tests() -> TestSuite(Nil) {
-////   let steps =
-////     new_registry()
-////     |> define_given("I have an empty cart", fn(_context: StepContext) { Ok(AssertionOk) })
-////   
-////   feature("Shopping Cart", steps, [
-////     scenario("Adding items", [
-////       given("I have an empty cart"),
-////       when("I add 2 apples to the cart"),
-////       then("the cart should contain 2 items"),
-////       and("the total should be $3.00"),
-////     ])
-////     |> with_tags(["happy-path"]),
-////   ])
-//// }
+//// feature("Shopping Cart", steps, [
+////   scenario("Adding items to cart", [
+////     given("I have 3 items in my cart"),
+////     when("I add 2 more items"),
+////     then("I should have 5 items total"),
+////   ]),
+//// ])
 //// ```
 ////
 
@@ -147,17 +114,13 @@ pub type InlineStep {
 ///
 /// ## Parameters
 ///
-/// - `module_name`: Deprecated; ignored. (Kept for historical compatibility.)
 /// - `config`: FeatureConfig with feature and step registry
 ///
 /// ## Returns
 ///
 /// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
 ///
-pub fn to_test_suite(
-  _module_name: String,
-  config: FeatureConfig,
-) -> TestSuite(Nil) {
+pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
   let feature = config.feature
   let children = build_suite_items(feature, config)
 
@@ -431,9 +394,9 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 /// ```gleam
 /// feature("Shopping Cart", steps, [
 pub fn feature(
-  name: String,
-  registry: StepRegistry,
-  scenarios: List(InlineScenario),
+  name name: String,
+  registry registry: StepRegistry,
+  scenarios scenarios: List(InlineScenario),
 ) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
@@ -446,7 +409,7 @@ pub fn feature(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(name <> "_test", config)
+  to_test_suite(config)
 }
 
 /// Define an inline scenario.
@@ -466,7 +429,10 @@ pub fn feature(
 /// ])
 /// ```
 ///
-pub fn scenario(name: String, inline_steps: List(InlineStep)) -> InlineScenario {
+pub fn scenario(
+  name name: String,
+  inline_steps inline_steps: List(InlineStep),
+) -> InlineScenario {
   InlineScenario(name: name, steps: inline_steps, tags: [])
 }
 
@@ -488,8 +454,8 @@ pub fn scenario(name: String, inline_steps: List(InlineStep)) -> InlineScenario 
 /// `dream_test/unit.with_tags` instead.
 ///
 pub fn with_tags(
-  inline_scenario: InlineScenario,
-  tags: List(String),
+  inline_scenario inline_scenario: InlineScenario,
+  tags tags: List(String),
 ) -> InlineScenario {
   InlineScenario(..inline_scenario, tags: tags)
 }
@@ -502,7 +468,7 @@ pub fn with_tags(
 /// given("I have {int} items in my cart")
 /// ```
 ///
-pub fn given(text: String) -> InlineStep {
+pub fn given(text text: String) -> InlineStep {
   InlineStep(keyword: "Given", text: text)
 }
 
@@ -514,7 +480,7 @@ pub fn given(text: String) -> InlineStep {
 /// when("I add {int} items")
 /// ```
 ///
-pub fn when(text: String) -> InlineStep {
+pub fn when(text text: String) -> InlineStep {
   InlineStep(keyword: "When", text: text)
 }
 
@@ -526,7 +492,7 @@ pub fn when(text: String) -> InlineStep {
 /// then("I should have {int} items")
 /// ```
 ///
-pub fn then(text: String) -> InlineStep {
+pub fn then(text text: String) -> InlineStep {
   InlineStep(keyword: "Then", text: text)
 }
 
@@ -538,7 +504,7 @@ pub fn then(text: String) -> InlineStep {
 /// and("I have a coupon")
 /// ```
 ///
-pub fn and(text: String) -> InlineStep {
+pub fn and(text text: String) -> InlineStep {
   InlineStep(keyword: "And", text: text)
 }
 
@@ -550,7 +516,7 @@ pub fn and(text: String) -> InlineStep {
 /// but("I should not see errors")
 /// ```
 ///
-pub fn but(text: String) -> InlineStep {
+pub fn but(text text: String) -> InlineStep {
   InlineStep(keyword: "But", text: text)
 }
 
@@ -598,7 +564,9 @@ fn parse_keyword(keyword_str: String) -> gherkin_types.StepKeyword {
 /// feature_with_background("Shopping", steps, bg, [...scenarios...])
 /// ```
 ///
-pub fn background(inline_steps: List(InlineStep)) -> List(gherkin_types.Step) {
+pub fn background(
+  inline_steps inline_steps: List(InlineStep),
+) -> List(gherkin_types.Step) {
   list.map(inline_steps, inline_to_parsed_step)
 }
 
@@ -612,10 +580,10 @@ pub fn background(inline_steps: List(InlineStep)) -> List(gherkin_types.Step) {
 /// - `scenarios`: List of inline scenarios
 ///
 pub fn feature_with_background(
-  name: String,
-  registry: StepRegistry,
-  background_steps: List(gherkin_types.Step),
-  scenarios: List(InlineScenario),
+  name name: String,
+  registry registry: StepRegistry,
+  background_steps background_steps: List(gherkin_types.Step),
+  scenarios scenarios: List(InlineScenario),
 ) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
@@ -628,5 +596,5 @@ pub fn feature_with_background(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(name <> "_test", config)
+  to_test_suite(config)
 }

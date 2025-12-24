@@ -216,11 +216,19 @@ fn check_snapshot(actual: String, snapshot_path: String) -> MatchResult(String) 
 }
 
 fn normalize_snapshot_expected(expected: String) -> String {
-  let graphemes = string.to_graphemes(expected)
-  case list.reverse(graphemes) {
-    ["\n", "\r", ..rest] -> string.join(list.reverse(rest), "")
-    ["\n", ..rest] -> string.join(list.reverse(rest), "")
-    _ -> expected
+  expected
+  |> string.to_graphemes
+  |> list.reverse
+  |> drop_trailing_newlines
+  |> list.reverse
+  |> string.join("")
+}
+
+fn drop_trailing_newlines(graphemes_reversed: List(String)) -> List(String) {
+  case graphemes_reversed {
+    ["\n", ..rest] -> drop_trailing_newlines(rest)
+    ["\r", ..rest] -> drop_trailing_newlines(rest)
+    other -> other
   }
 }
 
@@ -229,7 +237,10 @@ fn compare_snapshot(
   expected: String,
   snapshot_path: String,
 ) -> MatchResult(String) {
-  case actual == expected {
+  // Normalize both sides so trailing newlines in either the snapshot file
+  // or the produced output don't create noisy, meaningless mismatches.
+  let normalized_actual = normalize_snapshot_expected(actual)
+  case normalized_actual == expected {
     True -> MatchOk(actual)
     False -> make_mismatch_failure(actual, expected, snapshot_path)
   }

@@ -47,7 +47,7 @@ pub fn tests() {
 
   // Convert to TestSuite and run
   let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_test_suite("cart_test", config)
+  to_test_suite(config)
 }
 
 pub fn main() {

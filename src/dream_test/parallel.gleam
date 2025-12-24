@@ -292,8 +292,8 @@ pub fn default_config() -> ParallelConfig {
 ///
 /// A list of `TestResult` values, in deterministic (declaration) order.
 pub fn run_root_parallel(
-  config: ParallelConfig,
-  suite: TestSuite(context),
+  config config: ParallelConfig,
+  suite suite: TestSuite(context),
 ) -> List(TestResult) {
   let Root(seed, tree) = suite
   let executor_input =
@@ -387,7 +387,7 @@ pub fn run_root_parallel(
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `reporter`: updated reporter state after handling events
 pub fn run_root_parallel_with_reporter(
-  config: RunRootParallelWithReporterConfig(context),
+  config config: RunRootParallelWithReporterConfig(context),
 ) -> RunRootParallelWithReporterResult {
   let RunRootParallelWithReporterConfig(
     config: executor_config,

@@ -49,6 +49,16 @@ import gleam/string
 ///
 /// Discovery is built incrementally by adding one or more module-path glob
 /// patterns (see `from_path` / `tests`).
+///
+/// `TestDiscovery` is **opaque**: you can only build/consume it through the
+/// functions in this module.
+///
+/// ## Example
+///
+/// ```gleam
+/// discover.tests("snippets/unit/**.gleam")
+/// |> discover.load()
+/// ```
 pub opaque type TestDiscovery {
   TestDiscovery(patterns: List(String))
 }
@@ -57,6 +67,19 @@ pub opaque type TestDiscovery {
 ///
 /// This is returned by `load` so callers can decide how to handle errors:
 /// return them, log them, or convert them into failing suites via `to_suites`.
+///
+/// ## Fields
+///
+/// - `suites`: successfully loaded suites
+/// - `errors`: discovery or load errors (human-readable strings)
+///
+/// ## Example
+///
+/// ```gleam
+/// let discover.LoadResult(suites: suites, errors: _errors) =
+///   discover.tests("snippets/**.gleam")
+///   |> discover.load()
+/// ```
 pub type LoadResult {
   LoadResult(suites: List(TestSuite(Nil)), errors: List(String))
 }
@@ -174,7 +197,7 @@ pub fn from_path(
 ///   |> run()
 /// }
 /// ```
-pub fn tests(pattern: String) -> TestDiscovery {
+pub fn tests(pattern pattern: String) -> TestDiscovery {
   new() |> from_path(pattern)
 }
 
@@ -202,7 +225,9 @@ pub fn tests(pattern: String) -> TestDiscovery {
 ///   |> discover.list_modules()
 /// }
 /// ```
-pub fn list_modules(discovery: TestDiscovery) -> Result(List(String), String) {
+pub fn list_modules(
+  discovery discovery: TestDiscovery,
+) -> Result(List(String), String) {
   let #(modules, errors) = discover_all_modules(discovery.patterns)
   case errors {
     [] -> Ok(modules)
@@ -234,7 +259,7 @@ pub fn list_modules(discovery: TestDiscovery) -> Result(List(String), String) {
 ///   |> discover.load()
 /// }
 /// ```
-pub fn load(discovery: TestDiscovery) -> LoadResult {
+pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
   let #(module_names, discover_errors) =
     discover_all_modules(discovery.patterns)
   let LoadResult(suites: suites, errors: load_errors) =
@@ -277,7 +302,7 @@ pub fn load(discovery: TestDiscovery) -> LoadResult {
 ///   |> run()
 /// }
 /// ```
-pub fn to_suites(discovery: TestDiscovery) -> List(TestSuite(Nil)) {
+pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
   let LoadResult(suites: suites, errors: errors) = load(discovery)
 
   case list.is_empty(errors) {
@@ -355,12 +380,19 @@ fn to_beam_glob(pattern: String) -> String {
   let flattened = normalized |> string.replace("**", "*")
 
   case string.ends_with(flattened, ".gleam") {
-    True -> flattened |> string.replace(".gleam", ".beam")
-    False ->
-      case string.ends_with(flattened, ".beam") {
-        True -> flattened
-        False -> flattened <> ".beam"
-      }
+    True -> replace_gleam_extension(flattened)
+    False -> ensure_beam_extension(flattened)
+  }
+}
+
+fn replace_gleam_extension(path: String) -> String {
+  path |> string.replace(".gleam", ".beam")
+}
+
+fn ensure_beam_extension(path: String) -> String {
+  case string.ends_with(path, ".beam") {
+    True -> path
+    False -> path <> ".beam"
   }
 }
 
@@ -377,16 +409,24 @@ fn load_suites_from_modules(
       )
 
     [module_name, ..rest] ->
-      case call_tests(module_name) {
-        Ok(suite) ->
-          load_suites_from_modules(rest, [suite, ..suites_rev], errors_rev)
+      load_suites_from_modules_next(module_name, rest, suites_rev, errors_rev)
+  }
+}
 
-        Error(message) ->
-          load_suites_from_modules(rest, suites_rev, [
-            format_load_error(module_name, message),
-            ..errors_rev
-          ])
-      }
+fn load_suites_from_modules_next(
+  module_name: String,
+  rest: List(String),
+  suites_rev: List(TestSuite(Nil)),
+  errors_rev: List(String),
+) -> LoadResult {
+  case call_tests(module_name) {
+    Ok(suite) ->
+      load_suites_from_modules(rest, [suite, ..suites_rev], errors_rev)
+    Error(message) ->
+      load_suites_from_modules(rest, suites_rev, [
+        format_load_error(module_name, message),
+        ..errors_rev
+      ])
   }
 }
 
@@ -410,20 +450,29 @@ fn discover_all_modules_loop(
 ) -> #(List(String), List(String)) {
   case patterns {
     [] -> #(list.reverse(acc_rev), list.reverse(errors_rev))
-    [pattern, ..rest] -> {
-      let beam_glob = to_beam_glob(pattern)
-      case discover_test_modules(beam_glob) {
-        Ok(mods) -> {
-          let #(seen2, acc2) = add_unique_modules(mods, seen, acc_rev)
-          discover_all_modules_loop(rest, seen2, acc2, errors_rev)
-        }
-        Error(message) ->
-          discover_all_modules_loop(rest, seen, acc_rev, [
-            format_discover_error(pattern, message),
-            ..errors_rev
-          ])
-      }
+    [pattern, ..rest] ->
+      discover_all_modules_loop_next(pattern, rest, seen, acc_rev, errors_rev)
+  }
+}
+
+fn discover_all_modules_loop_next(
+  pattern: String,
+  rest: List(String),
+  seen: List(String),
+  acc_rev: List(String),
+  errors_rev: List(String),
+) -> #(List(String), List(String)) {
+  let beam_glob = to_beam_glob(pattern)
+  case discover_test_modules(beam_glob) {
+    Ok(mods) -> {
+      let #(seen2, acc2) = add_unique_modules(mods, seen, acc_rev)
+      discover_all_modules_loop(rest, seen2, acc2, errors_rev)
     }
+    Error(message) ->
+      discover_all_modules_loop(rest, seen, acc_rev, [
+        format_discover_error(pattern, message),
+        ..errors_rev
+      ])
   }
 }
 
@@ -434,11 +483,20 @@ fn add_unique_modules(
 ) -> #(List(String), List(String)) {
   case modules {
     [] -> #(seen, acc_rev)
-    [m, ..rest] ->
-      case list.contains(seen, m) {
-        True -> add_unique_modules(rest, seen, acc_rev)
-        False -> add_unique_modules(rest, [m, ..seen], [m, ..acc_rev])
-      }
+    [m, ..rest] -> add_unique_modules_next(m, rest, seen, acc_rev)
+  }
+}
+
+fn add_unique_modules_next(
+  module_name: String,
+  rest: List(String),
+  seen: List(String),
+  acc_rev: List(String),
+) -> #(List(String), List(String)) {
+  case list.contains(seen, module_name) {
+    True -> add_unique_modules(rest, seen, acc_rev)
+    False ->
+      add_unique_modules(rest, [module_name, ..seen], [module_name, ..acc_rev])
   }
 }
 

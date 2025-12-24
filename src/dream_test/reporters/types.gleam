@@ -1,36 +1,45 @@
-//// Reporter event types for live/progress reporting.
+//// Reporter event types emitted during a run.
 ////
-//// These types are emitted by the runner/parallel execution code and consumed
-//// by event-driven reporters (see `dream_test/reporters`).
-////
-//// Most users should not need to construct these values directly; you’ll
-//// typically choose a reporter with `dream_test/reporters` and attach it to
-//// `runner` so events are handled automatically.
+//// These types are produced by Dream Test’s runner/executors and consumed by
+//// reporters (see `dream_test/reporters`). You usually don’t construct events
+//// yourself; you pattern match on them if you’re implementing a custom
+//// reporter.
 ////
 //// ## Terminology
 ////
-//// - **scope**: the describe/group path for where something happened.
-////   Example: `["File", "delete"]`
-//// - **test_name**: the leaf `it(...)` name for per-test hooks (BeforeEach/AfterEach).
-//// - **completed / total**: monotonically increasing counts used by progress UIs.
+//// - **scope**: the describe/group path for where something happened
+////   (example: `["file", "delete"]`)
+//// - **test_name**: the leaf `it(...)` name for per-test hooks
+//// - **completed / total**: counts for progress UIs; `completed` is 1-based and
+////   increases monotonically
 ////
-//// ## Event model (high level)
+//// ## Event model
 ////
-//// A run looks like:
+//// A typical run looks like:
 ////
 //// - `RunStarted(total)`
 //// - many `TestFinished(completed, total, result)` (in completion order)
 //// - `RunFinished(completed, total)`
 ////
-//// Hook events may be interleaved for suites that declare hooks.
+//// Hook events (`HookStarted` / `HookFinished`) can be interleaved when you use
+//// lifecycle hooks.
 
 import dream_test/types.{type TestResult}
 import gleam/option.{type Option}
 
-/// Lifecycle hook kinds.
+/// Which lifecycle hook is running.
 ///
-/// Hook events include a `kind` plus contextual information (`scope` and an
-/// optional `test_name` for per-test hooks).
+/// ## Example
+///
+/// ```gleam
+/// let event =
+///   reporter_types.HookFinished(
+///     kind: reporter_types.AfterEach,
+///     scope: ["file"],
+///     test_name: Some("delete"),
+///     outcome: reporter_types.HookError(message: "boom"),
+///   )
+/// ```
 pub type HookKind {
   BeforeAll
   BeforeEach
@@ -38,9 +47,18 @@ pub type HookKind {
   AfterAll
 }
 
-/// Outcome of a hook run.
+/// Whether a hook succeeded or failed.
 ///
-/// Hook failures are represented as `HookError(String)`.
+/// ## Example
+///
+/// ```gleam
+/// use message <- result.try(hook_error_message(event))
+///
+/// message
+/// |> should
+/// |> be_equal("boom")
+/// |> or_fail_with("expected hook error message 'boom'")
+/// ```
 pub type HookOutcome {
   HookOk
   HookError(message: String)
@@ -50,6 +68,19 @@ pub type HookOutcome {
 ///
 /// `scope` is the describe/group path (e.g. `["file", "delete"]`).
 /// For per-test hooks, `test_name` is the leaf `it` name.
+///
+/// ## Example
+///
+/// ```gleam
+/// use total <- result.try(
+///   run_started_total(reporter_types.RunStarted(total: 3)),
+/// )
+///
+/// total
+/// |> should
+/// |> be_equal(3)
+/// |> or_fail_with("expected total to be 3")
+/// ```
 pub type ReporterEvent {
   /// The run is starting, and this many tests will be attempted.
   RunStarted(total: Int)

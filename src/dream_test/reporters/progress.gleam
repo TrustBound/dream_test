@@ -18,22 +18,11 @@
 //// but most users should not call it directly. Prefer attaching a reporter via
 //// `dream_test/reporters` and letting the runner drive events.
 ////
-//// ## Usage
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/reporters
-//// import dream_test/runner
-//// import dream_test/unit.{describe, it}
-//// import dream_test/types.{AssertionOk}
-//// import gleam/io
-////
 //// pub fn main() {
-////   let suite =
-////     describe("Example", [
-////       it("passes", fn() { Ok(AssertionOk) }),
-////     ])
-////
-////   runner.new([suite])
+////   runner.new([tests()])
 ////   |> runner.reporter(reporters.progress(io.print))
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
@@ -72,30 +61,33 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporters
-/// import dream_test/runner
-/// import gleam/io
+/// progress.handle_event(
+///   reporter_types.RunStarted(total: 10),
+///   write_progress_line_to_file,
+/// )
 ///
-/// runner.new([suite])
-/// |> runner.reporter(reporters.progress(io.print))
-/// |> runner.exit_on_failure()
-/// |> runner.run()
+/// use text <- result.try(
+///   file.read("test/tmp/progress_handle_event.txt")
+///   |> result.map_error(file.error_to_string),
+/// )
+///
+/// text
+/// |> should
+/// |> match_snapshot("./test/snapshots/progress_handle_event_run_started.snap")
+/// |> or_fail_with("expected handle_event output snapshot match")
 /// ```
 pub fn handle_event(
-  event: reporter_types.ReporterEvent,
-  write: fn(String) -> Nil,
+  event event: reporter_types.ReporterEvent,
+  write write: fn(String) -> Nil,
 ) -> Nil {
+  let cols = terminal_columns()
+  let line = render(cols, event)
+
   case event {
     reporter_types.HookStarted(..) -> Nil
     reporter_types.HookFinished(..) -> Nil
-    _ -> {
-      let cols = terminal_columns()
-      let line = render(cols, event)
-      case event {
-        reporter_types.RunFinished(..) -> write("\r" <> line <> "\n")
-        _ -> write("\r" <> line)
-      }
-    }
+    reporter_types.RunFinished(..) -> write("\r" <> line <> "\n")
+    _ -> write("\r" <> line)
   }
 }
 
@@ -123,9 +115,15 @@ pub fn handle_event(
 /// ## Example
 ///
 /// ```gleam
-/// let line = progress.render(30, reporter_types.RunStarted(total: 10))
+/// progress.render(30, reporter_types.RunStarted(total: 10))
+/// |> should
+/// |> match_snapshot("./test/snapshots/progress_render_run_started.snap")
+/// |> or_fail_with("expected render output snapshot match")
 /// ```
-pub fn render(columns: Int, event: reporter_types.ReporterEvent) -> String {
+pub fn render(
+  columns columns: Int,
+  event event: reporter_types.ReporterEvent,
+) -> String {
   let cols = clamp_min(columns, 20)
   case event {
     reporter_types.RunStarted(total: total) -> render_line(cols, 0, total, "")

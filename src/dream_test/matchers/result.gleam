@@ -47,7 +47,9 @@ import gleam/string
 /// - On `Ok(value)`, the chain continues with the unwrapped `value`.
 /// - On `Error(_)`, the chain becomes failed and later matchers are skipped.
 ///
-pub fn be_ok(value_or_result: MatchResult(Result(a, e))) -> MatchResult(a) {
+pub fn be_ok(
+  value_or_result value_or_result: MatchResult(Result(a, e)),
+) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_ok(actual)
@@ -98,7 +100,9 @@ fn check_is_ok(actual: Result(a, e)) -> MatchResult(a) {
 /// - On `Error(value)`, the chain continues with the unwrapped error `value`.
 /// - On `Ok(_)`, the chain becomes failed and later matchers are skipped.
 ///
-pub fn be_error(value_or_result: MatchResult(Result(a, e))) -> MatchResult(e) {
+pub fn be_error(
+  value_or_result value_or_result: MatchResult(Result(a, e)),
+) -> MatchResult(e) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_error(actual)

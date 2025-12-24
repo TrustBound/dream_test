@@ -63,11 +63,19 @@ import gleam/string
 ///
 /// Returns a single-line JSON string suitable for machine parsing.
 ///
+/// ## Parameters
+///
+/// - `results`: The test results to encode into the JSON report
+///
+/// ## Returns
+///
+/// A compact (single-line) JSON string.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporters/json
 /// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 ///
@@ -83,7 +91,7 @@ import gleam/string
 /// }
 /// ```
 ///
-pub fn format(results: List(TestResult)) -> String {
+pub fn format(results results: List(TestResult)) -> String {
   build_report_json(results)
   |> json.to_string
 }
@@ -92,10 +100,18 @@ pub fn format(results: List(TestResult)) -> String {
 ///
 /// Returns an indented, human-readable JSON string with 2-space indentation.
 ///
+/// ## Parameters
+///
+/// - `results`: The test results to encode into the JSON report
+///
+/// ## Returns
+///
+/// A pretty-printed JSON string with 2-space indentation.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{contain_string, or_fail_with, should, succeed}
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
@@ -106,22 +122,13 @@ pub fn format(results: List(TestResult)) -> String {
 ///   ])
 /// }
 ///
-/// pub fn tests() {
-///   describe("JSON formatting", [
-///     it("format_pretty returns JSON containing tests", fn() {
-///       let results = runner.new([example_suite()]) |> runner.run()
-///       let text = json.format_pretty(results)
-///
-///       text
-///       |> should
-///       |> contain_string("\"tests\"")
-///       |> or_fail_with("Expected JSON report to include the tests array")
-///     }),
-///   ])
+/// pub fn main() {
+///   let results = runner.new([example_suite()]) |> runner.run()
+///   json.format_pretty(results)
 /// }
 /// ```
 ///
-pub fn format_pretty(results: List(TestResult)) -> String {
+pub fn format_pretty(results results: List(TestResult)) -> String {
   build_report_json(results)
   |> json.to_string
   |> prettify_json
@@ -132,11 +139,20 @@ pub fn format_pretty(results: List(TestResult)) -> String {
 /// This is the main entry point for JSON reporting. The writer function
 /// receives the JSON string and can print it, log it, or write it to a file.
 ///
+/// ## Parameters
+///
+/// - `results`: The test results to encode and write
+/// - `write`: Output sink for the JSON string (for example `io.print`)
+///
+/// ## Returns
+///
+/// Returns the input `results` unchanged, enabling pipeline composition.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporters/json
 /// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -164,11 +180,20 @@ pub fn report(
 ///
 /// Same as `report` but with indented, human-readable output.
 ///
+/// ## Parameters
+///
+/// - `results`: The test results to encode and write
+/// - `write`: Output sink for the JSON string (for example `io.print`)
+///
+/// ## Returns
+///
+/// Returns the input `results` unchanged, enabling pipeline composition.
+///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/reporters/json
 /// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io

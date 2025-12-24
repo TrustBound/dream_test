@@ -335,6 +335,6 @@ pub fn default_config() -> SandboxConfig {
 /// ## Returns
 ///
 /// A new `SandboxConfig` with `show_crash_reports: True`.
-pub fn with_crash_reports(config: SandboxConfig) -> SandboxConfig {
+pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
   SandboxConfig(..config, show_crash_reports: True)
 }

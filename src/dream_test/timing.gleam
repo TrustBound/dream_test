@@ -16,11 +16,10 @@
 //// ## Example
 ////
 //// ```gleam
-//// import dream_test/timing
-////
-//// timing.format_duration_ms(42)      // "42ms"
-//// timing.format_duration_ms(1500)    // "1.5s"
-//// timing.format_duration_ms(90_000)  // "1m 30s"
+//// timing.format_duration_ms(1500)
+//// |> should
+//// |> be_equal("1.5s")
+//// |> or_fail_with("expected 1.5s")
 //// ```
 
 import gleam/float
@@ -38,17 +37,28 @@ import gleam/int
 /// - Minutes and seconds for durations under 1 hour
 /// - Hours and minutes for longer durations
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```gleam
-/// format_duration_ms(0)        // "0ms"
-/// format_duration_ms(42)       // "42ms"
-/// format_duration_ms(1500)     // "1.5s"
-/// format_duration_ms(65_000)   // "1m 5s"
-/// format_duration_ms(3_665_000) // "1h 1m"
+/// // Arrange & Act
+/// let ms = timing.format_duration_ms(42)
+///
+/// // Assert
+/// ms
+/// |> should
+/// |> be_equal("42ms")
+/// |> or_fail_with("expected 42ms")
 /// ```
 ///
-pub fn format_duration_ms(duration_ms: Int) -> String {
+/// ## Parameters
+///
+/// - `duration_ms`: Duration in milliseconds
+///
+/// ## Returns
+///
+/// A human-readable duration string (for example `"42ms"` or `"1.5s"`).
+///
+pub fn format_duration_ms(duration_ms duration_ms: Int) -> String {
   case duration_ms {
     // Zero or negative
     ms if ms <= 0 -> "0ms"
@@ -75,12 +85,20 @@ pub fn format_duration_ms(duration_ms: Int) -> String {
 /// ## Examples
 ///
 /// ```gleam
-/// format_duration_us(500)       // "0.5ms"
-/// format_duration_us(42_000)    // "42ms"
-/// format_duration_us(1_500_000) // "1.5s"
+/// timing.format_duration_us(500)
+/// |> should
+/// |> be_equal("0.5ms")
+/// |> or_fail_with("expected 0.5ms")
 /// ```
 ///
-pub fn format_duration_us(duration_us: Int) -> String {
+/// ## Parameters
+///
+/// - `duration_us`: Duration in microseconds
+///
+/// ## Returns
+///
+/// A human-readable duration string (for example `"0.5ms"` or `"42ms"`).
+pub fn format_duration_us(duration_us duration_us: Int) -> String {
   case duration_us {
     // Under 1ms: show fractional milliseconds
     us if us < 1000 -> format_sub_millisecond(us)
@@ -98,15 +116,19 @@ pub fn format_duration_us(duration_us: Int) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/timing
-/// import gleam/io
+/// let t1 = timing.now_ms()
+/// let t2 = timing.now_ms()
+/// let ok = t2 >= t1
 ///
-/// let start = now_ms()
-/// // ... do work ...
-/// let elapsed = now_ms() - start
-/// io.println("Took " <> format_duration_ms(elapsed))
+/// ok
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("expected now_ms to be monotonic")
 /// ```
 ///
+/// ## Returns
+///
+/// A monotonic timestamp in milliseconds.
 pub fn now_ms() -> Int {
   erlang_monotonic_time_ms()
 }
@@ -118,15 +140,19 @@ pub fn now_ms() -> Int {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/timing
-/// import gleam/io
+/// let t1 = timing.now_us()
+/// let t2 = timing.now_us()
+/// let ok = t2 >= t1
 ///
-/// let start = now_us()
-/// // ... do work ...
-/// let elapsed_us = now_us() - start
-/// io.println("Took " <> format_duration_us(elapsed_us))
+/// ok
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("expected now_us to be monotonic")
 /// ```
 ///
+/// ## Returns
+///
+/// A monotonic timestamp in microseconds.
 pub fn now_us() -> Int {
   erlang_monotonic_time_us()
 }

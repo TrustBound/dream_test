@@ -40,15 +40,17 @@ import dream_test/types.{type AssertionFailure}
 ///     }),
 ///
 ///     it("add_failure stores failures newest-first", fn() {
-///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///       let first_failure =
+///         AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let second_failure =
+///         AssertionFailure(operator: "op2", message: "m2", payload: None)
 ///
 ///       context.new()
-///       |> context.add_failure(f1)
-///       |> context.add_failure(f2)
+///       |> context.add_failure(first_failure)
+///       |> context.add_failure(second_failure)
 ///       |> context.failures()
 ///       |> should
-///       |> be_equal([f2, f1])
+///       |> be_equal([second_failure, first_failure])
 ///       |> or_fail_with("expected newest-first failure ordering")
 ///     }),
 ///   ])
@@ -92,15 +94,17 @@ pub type TestContext {
 ///     }),
 ///
 ///     it("add_failure stores failures newest-first", fn() {
-///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///       let first_failure =
+///         AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let second_failure =
+///         AssertionFailure(operator: "op2", message: "m2", payload: None)
 ///
 ///       context.new()
-///       |> context.add_failure(f1)
-///       |> context.add_failure(f2)
+///       |> context.add_failure(first_failure)
+///       |> context.add_failure(second_failure)
 ///       |> context.failures()
 ///       |> should
-///       |> be_equal([f2, f1])
+///       |> be_equal([second_failure, first_failure])
 ///       |> or_fail_with("expected newest-first failure ordering")
 ///     }),
 ///   ])
@@ -138,15 +142,17 @@ pub fn new() -> TestContext {
 ///     }),
 ///
 ///     it("add_failure stores failures newest-first", fn() {
-///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///       let first_failure =
+///         AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let second_failure =
+///         AssertionFailure(operator: "op2", message: "m2", payload: None)
 ///
 ///       context.new()
-///       |> context.add_failure(f1)
-///       |> context.add_failure(f2)
+///       |> context.add_failure(first_failure)
+///       |> context.add_failure(second_failure)
 ///       |> context.failures()
 ///       |> should
-///       |> be_equal([f2, f1])
+///       |> be_equal([second_failure, first_failure])
 ///       |> or_fail_with("expected newest-first failure ordering")
 ///     }),
 ///   ])
@@ -156,7 +162,7 @@ pub fn new() -> TestContext {
 /// ## Returns
 ///
 /// A list of `AssertionFailure` values (newest-first).
-pub fn failures(context: TestContext) -> List(AssertionFailure) {
+pub fn failures(context context: TestContext) -> List(AssertionFailure) {
   context.failures
 }
 
@@ -197,23 +203,25 @@ pub fn failures(context: TestContext) -> List(AssertionFailure) {
 ///     }),
 ///
 ///     it("add_failure stores failures newest-first", fn() {
-///       let f1 = AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let f2 = AssertionFailure(operator: "op2", message: "m2", payload: None)
+///       let first_failure =
+///         AssertionFailure(operator: "op1", message: "m1", payload: None)
+///       let second_failure =
+///         AssertionFailure(operator: "op2", message: "m2", payload: None)
 ///
 ///       context.new()
-///       |> context.add_failure(f1)
-///       |> context.add_failure(f2)
+///       |> context.add_failure(first_failure)
+///       |> context.add_failure(second_failure)
 ///       |> context.failures()
 ///       |> should
-///       |> be_equal([f2, f1])
+///       |> be_equal([second_failure, first_failure])
 ///       |> or_fail_with("expected newest-first failure ordering")
 ///     }),
 ///   ])
 /// }
 /// ```
 pub fn add_failure(
-  context: TestContext,
-  failure: AssertionFailure,
+  context context: TestContext,
+  failure failure: AssertionFailure,
 ) -> TestContext {
   TestContext(failures: [failure, ..context.failures])
 }

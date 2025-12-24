@@ -47,7 +47,9 @@ import gleam/string
 /// - On `Some(value)`, the chain continues with the unwrapped `value`.
 /// - On `None`, the chain becomes failed and later matchers are skipped.
 ///
-pub fn be_some(value_or_result: MatchResult(Option(a))) -> MatchResult(a) {
+pub fn be_some(
+  value_or_result value_or_result: MatchResult(Option(a)),
+) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_some(actual)
@@ -88,7 +90,9 @@ fn check_is_some(actual: Option(a)) -> MatchResult(a) {
 ///
 /// A `MatchResult(Nil)` that continues the chain with `Nil` on success.
 ///
-pub fn be_none(value_or_result: MatchResult(Option(a))) -> MatchResult(Nil) {
+pub fn be_none(
+  value_or_result value_or_result: MatchResult(Option(a)),
+) -> MatchResult(Nil) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_none(actual)
