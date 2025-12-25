@@ -21,10 +21,9 @@
 ////       |> should
 ////       |> be_equal(
 ////         Some(
-////           step_trie.StepMatch(
-////             handler: "total_usd",
-////             captures: [step_trie.CapturedFloat(19.99)],
-////           ),
+////           step_trie.StepMatch(handler: "total_usd", captures: [
+////             step_trie.CapturedFloat(19.99),
+////           ]),
 ////         ),
 ////       )
 ////       |> or_fail_with("expected float capture for $19.99USD")
@@ -371,7 +370,9 @@ fn get_or_create_literal_child(
 ///         step_trie.FloatParam,
 ///         step_trie.LiteralWord("USD"),
 ///       ])
-///       |> or_fail_with("expected ${float}USD to split into literal + FloatParam segments")
+///       |> or_fail_with(
+///         "expected ${float}USD to split into literal + FloatParam segments",
+///       )
 /// ```
 ///
 pub fn parse_step_pattern(pattern pattern: String) -> List(StepSegment) {
@@ -516,10 +517,9 @@ fn split_numeric_with_regex(token: String, re: regexp.Regexp) -> List(String) {
 ///       |> should
 ///       |> be_equal(
 ///         Some(
-///           step_trie.StepMatch(
-///             handler: "total_usd",
-///             captures: [step_trie.CapturedFloat(19.99)],
-///           ),
+///           step_trie.StepMatch(handler: "total_usd", captures: [
+///             step_trie.CapturedFloat(19.99),
+///           ]),
 ///         ),
 ///       )
 ///       |> or_fail_with("expected float capture for $19.99USD")
@@ -556,8 +556,19 @@ pub fn lookup(
 /// ```gleam
 ///       step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
 ///       |> should
-///       |> be_equal(["I", "add", "\"Red Widget\"", "and", "pay", "$", "19.99", "USD"])
-///       |> or_fail_with("expected tokenization to preserve quotes and split $19.99USD")
+///       |> be_equal([
+///         "I",
+///         "add",
+///         "\"Red Widget\"",
+///         "and",
+///         "pay",
+///         "$",
+///         "19.99",
+///         "USD",
+///       ])
+///       |> or_fail_with(
+///         "expected tokenization to preserve quotes and split $19.99USD",
+///       )
 /// ```
 ///
 pub fn tokenize_step_text(text text: String) -> List(String) {

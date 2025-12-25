@@ -38,7 +38,7 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(feature) = parser.parse_file("test/cart.feature")
+///   let assert Ok(feature) = parser.parse_file("test/cart.feature")
 /// ```
 ///
 pub fn parse_file(path path: String) -> Result(Feature, String) {
@@ -65,19 +65,19 @@ pub fn parse_file(path path: String) -> Result(Feature, String) {
 /// ## Example
 ///
 /// ```gleam
-/// let content =
-///   "@smoke\n"
-///   <> "Feature: Demo\n"
-///   <> "\n"
-///   <> "  Scenario: One\n"
-///   <> "    Given a thing\n"
+///       let content =
+///         "@smoke\n"
+///         <> "Feature: Demo\n"
+///         <> "\n"
+///         <> "  Scenario: One\n"
+///         <> "    Given a thing\n"
 ///
-/// use feature <- result.try(parser.parse_string(content))
+///       use feature <- result.try(parser.parse_string(content))
 ///
-/// feature.name
-/// |> should
-/// |> be_equal("Demo")
-/// |> or_fail_with("expected feature name Demo")
+///       feature.name
+///       |> should
+///       |> be_equal("Demo")
+///       |> or_fail_with("expected feature name Demo")
 /// ```
 ///
 pub fn parse_string(content content: String) -> Result(Feature, String) {

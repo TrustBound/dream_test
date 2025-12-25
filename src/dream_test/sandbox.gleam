@@ -118,6 +118,12 @@ pub type SandboxConfig {
 ///
 /// This is intentionally simple so it can be used in higher-level code (like a
 /// runner) without pulling in reporter concerns.
+///
+/// ## Variants
+///
+/// - `SandboxCompleted(value)`: the function completed successfully and returned `value`
+/// - `SandboxTimedOut`: the function did not finish within `SandboxConfig.timeout_ms`
+/// - `SandboxCrashed(reason)`: the function crashed; `reason` is a best-effort description
 pub type SandboxResult(a) {
   /// Function completed successfully and returned a value.
   SandboxCompleted(a)
@@ -207,8 +213,8 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 ///
 /// A `SandboxResult(a)` describing completion, timeout, or crash.
 pub fn run_isolated(
-  config: SandboxConfig,
-  test_function: fn() -> a,
+  config config: SandboxConfig,
+  test_function test_function: fn() -> a,
 ) -> SandboxResult(a) {
   let result_subject = new_subject()
   let worker_pid =

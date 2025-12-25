@@ -22,23 +22,14 @@
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
 //// import gleam/io
-//// import gleam/string
 ////
 //// pub fn tests() {
-////   describe("String utilities", [
-////     it("trims whitespace", fn() {
-////       "  hello  "
-////       |> string.trim()
+////   describe("Example", [
+////     it("works", fn() {
+////       1 + 1
 ////       |> should
-////       |> be_equal("hello")
-////       |> or_fail_with("Should remove surrounding whitespace")
-////     }),
-////     it("finds substrings", fn() {
-////       "hello world"
-////       |> string.contains("world")
-////       |> should
-////       |> be_equal(True)
-////       |> or_fail_with("Should find 'world' in string")
+////       |> be_equal(2)
+////       |> or_fail_with("math should work")
 ////     }),
 ////   ])
 //// }
@@ -199,7 +190,7 @@ pub opaque type RunBuilder(ctx) {
 ///
 /// A `RunBuilder(ctx)` you can pipe through configuration helpers and finally
 /// `runner.run()`.
-pub fn new(suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
+pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
   RunBuilder(
     suites: suites,
     config: parallel.default_config(),
@@ -260,7 +251,10 @@ pub fn new(suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 /// ## Returns
 ///
 /// The updated `RunBuilder(ctx)`.
-pub fn max_concurrency(builder: RunBuilder(ctx), max: Int) -> RunBuilder(ctx) {
+pub fn max_concurrency(
+  builder builder: RunBuilder(ctx),
+  max max: Int,
+) -> RunBuilder(ctx) {
   let parallel.ParallelConfig(max_concurrency: _, default_timeout_ms: timeout) =
     builder.config
   RunBuilder(
@@ -315,8 +309,8 @@ pub fn max_concurrency(builder: RunBuilder(ctx), max: Int) -> RunBuilder(ctx) {
 ///
 /// The updated `RunBuilder(ctx)`.
 pub fn default_timeout_ms(
-  builder: RunBuilder(ctx),
-  timeout_ms: Int,
+  builder builder: RunBuilder(ctx),
+  timeout_ms timeout_ms: Int,
 ) -> RunBuilder(ctx) {
   let parallel.ParallelConfig(max_concurrency: max, default_timeout_ms: _) =
     builder.config
@@ -368,7 +362,7 @@ pub fn default_timeout_ms(
 /// ## Returns
 ///
 /// The updated `RunBuilder(ctx)`.
-pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+pub fn exit_on_failure(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
   RunBuilder(..builder, should_exit_on_failure: True)
 }
 
@@ -413,8 +407,8 @@ pub fn exit_on_failure(builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 ///
 /// The updated `RunBuilder(ctx)`.
 pub fn reporter(
-  builder: RunBuilder(ctx),
-  reporter: reporters.Reporter,
+  builder builder: RunBuilder(ctx),
+  reporter reporter: reporters.Reporter,
 ) -> RunBuilder(ctx) {
   RunBuilder(..builder, reporter: Some(reporter))
 }
@@ -473,8 +467,8 @@ pub fn reporter(
 ///
 /// The updated `RunBuilder(ctx)`.
 pub fn filter_tests(
-  builder: RunBuilder(ctx),
-  predicate: fn(TestInfo) -> Bool,
+  builder builder: RunBuilder(ctx),
+  predicate predicate: fn(TestInfo) -> Bool,
 ) -> RunBuilder(ctx) {
   RunBuilder(..builder, test_filter: Some(predicate))
 }
@@ -518,7 +512,7 @@ pub fn filter_tests(
 /// ## Returns
 ///
 /// A list of `TestResult` values, in deterministic order.
-pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
+pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   let selected_suites = apply_test_filter(builder.suites, builder.test_filter)
   let total = count_total_tests(selected_suites)
 
@@ -555,16 +549,17 @@ pub fn run(builder: RunBuilder(ctx)) -> List(TestResult) {
     }
   }
 
-  case builder.should_exit_on_failure {
-    True ->
-      case has_failures(results) {
-        True -> halt(1)
-        False -> Nil
-      }
-    False -> Nil
-  }
+  maybe_exit_on_failure(builder.should_exit_on_failure, results)
 
   results
+}
+
+fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
+  let should_halt = should_exit && has_failures(results)
+  case should_halt {
+    True -> halt(1)
+    False -> Nil
+  }
 }
 
 fn run_without_reporter(builder: RunBuilder(ctx)) -> List(TestResult) {
@@ -830,7 +825,7 @@ fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
 /// ## Returns
 ///
 /// `True` when any result has status `Failed`, `SetupFailed`, or `TimedOut`.
-pub fn has_failures(results: List(TestResult)) -> Bool {
+pub fn has_failures(results results: List(TestResult)) -> Bool {
   case results {
     [] -> False
     [r, ..rest] ->

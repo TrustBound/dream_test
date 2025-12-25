@@ -240,8 +240,8 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///
 /// A `UnitNode` representing the test.
 pub fn it(
-  name: String,
-  run: fn() -> Result(AssertionResult, String),
+  name name: String,
+  run run: fn() -> Result(AssertionResult, String),
 ) -> UnitNode {
   Test(
     name: name,
@@ -250,6 +250,10 @@ pub fn it(
     run: fn(_nil: Nil) { run() },
     timeout_ms: None,
   )
+}
+
+fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+  Ok(AssertionSkipped)
 }
 
 /// Define a skipped test.
@@ -311,8 +315,8 @@ pub fn it(
 ///
 /// A `UnitNode` representing a skipped test (`AssertionSkipped`).
 pub fn skip(
-  name: String,
-  run: fn() -> Result(AssertionResult, String),
+  name name: String,
+  run run: fn() -> Result(AssertionResult, String),
 ) -> UnitNode {
   let node = it(name, run)
   case node {
@@ -321,7 +325,7 @@ pub fn skip(
         name: name,
         tags: tags,
         kind: kind,
-        run: fn(_nil: Nil) { Ok(AssertionSkipped) },
+        run: skipped_test_run,
         timeout_ms: timeout_ms,
       )
     other -> other
@@ -409,7 +413,7 @@ pub fn skip(
 /// ## Returns
 ///
 /// A `UnitNode` representing a `before_all` hook.
-pub fn before_all(setup: fn() -> Result(Nil, String)) -> UnitNode {
+pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
   BeforeAll(fn(_nil: Nil) {
     case setup() {
       Ok(_) -> Ok(Nil)
@@ -499,7 +503,7 @@ pub fn before_all(setup: fn() -> Result(Nil, String)) -> UnitNode {
 /// ## Returns
 ///
 /// A `UnitNode` representing a `before_each` hook.
-pub fn before_each(setup: fn() -> Result(Nil, String)) -> UnitNode {
+pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
   BeforeEach(fn(_nil: Nil) {
     case setup() {
       Ok(_) -> Ok(Nil)
@@ -588,7 +592,7 @@ pub fn before_each(setup: fn() -> Result(Nil, String)) -> UnitNode {
 /// ## Returns
 ///
 /// A `UnitNode` representing an `after_each` hook.
-pub fn after_each(teardown: fn() -> Result(Nil, String)) -> UnitNode {
+pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
   AfterEach(fn(_nil: Nil) { teardown() })
 }
 
@@ -669,7 +673,7 @@ pub fn after_each(teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// ## Returns
 ///
 /// A `UnitNode` representing an `after_all` hook.
-pub fn after_all(teardown: fn() -> Result(Nil, String)) -> UnitNode {
+pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
   AfterAll(fn(_nil: Nil) { teardown() })
 }
 

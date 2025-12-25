@@ -1,4 +1,4 @@
-import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -40,6 +40,7 @@ pub fn tests() {
       given("I have 3 items in my cart"),
       when("I add 2 more items"),
       then("I should have 5 items total"),
+      but("I should have 5 items total"),
     ]),
   ])
 }

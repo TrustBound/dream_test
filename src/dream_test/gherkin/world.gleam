@@ -113,7 +113,7 @@ type EtsTable
 /// }
 /// ```
 ///
-pub fn new_world(scenario_id: String) -> World {
+pub fn new_world(scenario_id scenario_id: String) -> World {
   let table_name = "gherkin_world_" <> scenario_id <> "_" <> unique_id()
   let table = create_ets_table(table_name)
   World(id: scenario_id, table: table)
@@ -140,7 +140,7 @@ pub fn new_world(scenario_id: String) -> World {
 /// }
 /// ```
 ///
-pub fn cleanup(world: World) -> Nil {
+pub fn cleanup(world world: World) -> Nil {
   delete_ets_table(world.table)
 }
 
@@ -543,7 +543,7 @@ pub fn delete(world world: World, key key: String) -> Nil {
 /// }
 /// ```
 ///
-pub fn scenario_id(world: World) -> String {
+pub fn scenario_id(world world: World) -> String {
   world.id
 }
 

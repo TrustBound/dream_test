@@ -307,28 +307,28 @@ pub fn skip(
 
 /// Run once before any tests and produce/transform the context.
 pub fn before_all(
-  setup: fn(context) -> Result(context, String),
+  setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
   BeforeAll(setup)
 }
 
 /// Run before each test and transform the context for that test.
 pub fn before_each(
-  setup: fn(context) -> Result(context, String),
+  setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
   BeforeEach(setup)
 }
 
 /// Run after each test for cleanup.
 pub fn after_each(
-  teardown: fn(context) -> Result(Nil, String),
+  teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
   AfterEach(teardown)
 }
 
 /// Run once after all tests for cleanup.
 pub fn after_all(
-  teardown: fn(context) -> Result(Nil, String),
+  teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
   AfterAll(teardown)
 }

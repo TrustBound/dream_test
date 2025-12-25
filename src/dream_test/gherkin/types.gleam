@@ -216,13 +216,15 @@ pub type Scenario {
 ///   scenarios: [scenario],
 /// )
 /// |> should
-/// |> be_equal(Feature(
-///   name: "Example feature",
-///   description: None,
-///   tags: [],
-///   background: None,
-///   scenarios: [scenario],
-/// ))
+/// |> be_equal(
+///   Feature(
+///     name: "Example feature",
+///     description: None,
+///     tags: [],
+///     background: None,
+///     scenarios: [scenario],
+///   ),
+/// )
 /// |> or_fail_with("expected Feature to be constructible")
 /// ```
 ///

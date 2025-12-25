@@ -1,13 +1,45 @@
 //// Discover and load Gherkin `.feature` files.
 ////
-//// This module finds feature files via a glob pattern and can either:
-//// - load/parse them (`load`) for inspection, or
-//// - convert them to runnable `TestSuite`s (`to_suite`) when you provide a step
-////   registry (definitions for Given/When/Then steps).
+//// Use this module to:
+//// - find `.feature` files via a glob pattern
+//// - parse them (`load`) for inspection, or
+//// - convert them into runnable `TestSuite`s (`to_suite`) when you provide a
+////   step registry (your Given/When/Then handlers).
 ////
 //// ## Example
 ////
 //// ```gleam
+//// import dream_test/gherkin/discover
+//// import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+//// import dream_test/gherkin/world.{get_or, put}
+//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+//// import gleam/result
+////
+//// fn step_server_running(context: StepContext) {
+////   put(context.world, "server_running", True)
+////   Ok(succeed())
+//// }
+////
+//// fn step_empty_cart(context: StepContext) {
+////   put(context.world, "cart", 0)
+////   Ok(succeed())
+//// }
+////
+//// fn step_add_items(context: StepContext) {
+////   let current = get_or(context.world, "cart", 0)
+////   let to_add = get_int(context.captures, 0) |> result.unwrap(0)
+////   put(context.world, "cart", current + to_add)
+////   Ok(succeed())
+//// }
+////
+//// fn step_verify_count(context: StepContext) {
+////   let expected = get_int(context.captures, 0) |> result.unwrap(0)
+////   get_or(context.world, "cart", 0)
+////   |> should
+////   |> be_equal(expected)
+////   |> or_fail_with("Cart count mismatch")
+//// }
+////
 //// pub fn tests() {
 ////   // Define step handlers
 ////   let steps =
@@ -41,8 +73,8 @@ import gleam/option.{type Option, None, Some}
 
 /// Builder for discovering and loading feature files.
 ///
-/// Use `features()` to create, then chain with `with_registry()` and
-/// `to_suite()` to build a TestSuite.
+/// Use `features()` to create a discovery, then chain with `with_registry()` and
+/// `to_suite()` to build a runnable `TestSuite`.
 ///
 /// This is opaque so callers can’t depend on internal fields that may change.
 pub opaque type FeatureDiscovery {
@@ -62,6 +94,11 @@ pub opaque type FeatureDiscovery {
 ///
 /// This is useful if you want to control how parse errors are handled rather
 /// than converting them to failing tests.
+///
+/// ## Fields
+///
+/// - `features`: successfully parsed feature values
+/// - `errors`: parse errors as strings (typically `"path: message"`)
 pub type LoadResult {
   LoadResult(features: List(gherkin_types.Feature), errors: List(String))
 }
@@ -77,11 +114,18 @@ pub type LoadResult {
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/gherkin/discover
-///
-/// let discovery = discover.features("test/*.feature")
+/// discover.features("test/*.feature")
 /// ```
-pub fn features(pattern: String) -> FeatureDiscovery {
+///
+/// ## Parameters
+///
+/// - `pattern`: glob pattern used to find `.feature` files
+///
+/// ## Returns
+///
+/// A `FeatureDiscovery` builder you can pipe into `with_registry`, `load`,
+/// `list_files`, or `to_suite`.
+pub fn features(pattern pattern: String) -> FeatureDiscovery {
   FeatureDiscovery(pattern: pattern, registry: None, features: [], errors: [])
 }
 
@@ -106,6 +150,15 @@ pub fn features(pattern: String) -> FeatureDiscovery {
 /// |> discover.with_registry(steps)
 /// |> discover.to_suite("cart_features")
 /// ```
+///
+/// ## Parameters
+///
+/// - `discovery`: a `FeatureDiscovery` created with `features`
+/// - `registry`: step definitions used to execute scenarios
+///
+/// ## Returns
+///
+/// The updated discovery.
 pub fn with_registry(
   discovery discovery: FeatureDiscovery,
   registry registry: StepRegistry,
@@ -133,6 +186,16 @@ pub fn with_registry(
 /// |> discover.with_registry(steps)
 /// |> discover.to_suite("cart_features")
 /// ```
+///
+/// ## Parameters
+///
+/// - `discovery`: a `FeatureDiscovery` with a registry attached via `with_registry`
+/// - `suite_name`: name to show for the top-level suite/group in reports
+///
+/// ## Returns
+///
+/// A `TestSuite(Nil)` containing one test per discovered scenario, plus failing
+/// tests for any parse errors (tagged `"parse-error"`).
 pub fn to_suite(
   discovery discovery: FeatureDiscovery,
   suite_name suite_name: String,
@@ -174,7 +237,15 @@ pub fn to_suite(
 /// |> have_length(1)
 /// |> or_fail_with("expected one parsed feature")
 /// ```
-pub fn load(discovery: FeatureDiscovery) -> LoadResult {
+///
+/// ## Parameters
+///
+/// - `discovery`: a `FeatureDiscovery` created with `features`
+///
+/// ## Returns
+///
+/// A `LoadResult` containing parsed features and any parse errors.
+pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
   let files = discover_files(discovery.pattern)
   load_all_features(files)
 }
@@ -192,7 +263,15 @@ pub fn load(discovery: FeatureDiscovery) -> LoadResult {
 /// |> contain("test/cart.feature")
 /// |> or_fail_with("expected list_files to include test/cart.feature")
 /// ```
-pub fn list_files(discovery: FeatureDiscovery) -> List(String) {
+///
+/// ## Parameters
+///
+/// - `discovery`: a `FeatureDiscovery` created with `features`
+///
+/// ## Returns
+///
+/// A list of file paths matching the glob pattern.
+pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
   discover_files(discovery.pattern)
 }
 

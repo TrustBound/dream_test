@@ -26,19 +26,27 @@
 //// If you're writing custom matchers, you'll work with `MatchResult(a)`:
 ////
 //// ```gleam
-//// import dream_test/types.{type MatchResult, MatchOk, MatchFailed, AssertionFailure}
-////
-//// pub fn be_positive(result: MatchResult(Int)) -> MatchResult(Int) {
+//// pub fn be_even(result) {
 ////   case result {
-////     MatchFailed(f) -> MatchFailed(f)
-////     MatchOk(n) -> check_positive(n)
+////     // If already failed, propagate the failure
+////     MatchFailed(failure) -> MatchFailed(failure)
+////     // Otherwise, check our condition
+////     MatchOk(value) -> check_even(value)
 ////   }
 //// }
 ////
-//// fn check_positive(n: Int) -> MatchResult(Int) {
-////   case n > 0 {
-////     True -> MatchOk(n)
-////     False -> MatchFailed(AssertionFailure(...))
+//// fn check_even(value) {
+////   case value % 2 == 0 {
+////     True -> MatchOk(value)
+////     False ->
+////       MatchFailed(AssertionFailure(
+////         operator: "be_even",
+////         message: "",
+////         payload: Some(CustomMatcherFailure(
+////           actual: int.to_string(value),
+////           description: "expected an even number",
+////         )),
+////       ))
 ////   }
 //// }
 //// ```
@@ -82,13 +90,16 @@ import gleam/option.{type Option}
 /// When `before_each` fails, only that test becomes `SetupFailed`.
 ///
 /// ```gleam
-/// import dream_test/unit.{before_all, describe, it}
-/// import dream_test/types.{AssertionOk}
-///
-/// describe("Database", [
-///   before_all(fn() { Error("could not connect to database") }),
-///   it("test1", fn() { Ok(AssertionOk) }), // Never runs → SetupFailed
-///   it("test2", fn() { Ok(AssertionOk) }), // Never runs → SetupFailed
+/// describe("Handles failures", [
+///   before_all(fn() {
+///     case connect_to_database() {
+///       Ok(_) -> Ok(Nil)
+///       Error(e) -> Error("Database connection failed: " <> e)
+///     }
+///   }),
+///   // If before_all fails, these tests are marked SetupFailed (not run)
+///   it("test1", fn() { Ok(succeed()) }),
+///   it("test2", fn() { Ok(succeed()) }),
 /// ])
 /// ```
 ///
@@ -193,12 +204,10 @@ pub type AssertionFailure {
 /// Most users won't construct this directly. It's returned by `or_fail_with`:
 ///
 /// ```gleam
-/// let result: Result(AssertionResult, String) =
-///   42
-///   |> should
-///   |> be_equal(42)
-///   |> or_fail_with("Should be 42")
-/// // result == Ok(AssertionOk)
+/// 2 + 3
+/// |> should
+/// |> be_equal(5)
+/// |> or_fail_with("2 + 3 should equal 5")
 /// ```
 ///
 pub type AssertionResult {
@@ -215,43 +224,15 @@ pub type AssertionResult {
 /// ## How Chaining Works
 ///
 /// ```gleam
-/// Some(42)           // Start with a value
-/// |> should        // -> MatchOk(Some(42))
-/// |> be_some()       // -> MatchOk(42)  (unwrapped!)
-/// |> be_equal(42)       // -> MatchOk(42)
-/// |> or_fail_with("expected Some(42)")  // -> Ok(AssertionOk)
+/// Some(42)
+/// |> should
+/// |> be_some()
+/// |> be_equal(42)
+/// |> or_fail_with("expected Some(42)")
 /// ```
 ///
 /// If any matcher fails, the `MatchFailed` propagates through the rest of
 /// the chain without executing further checks.
-///
-/// ## For Custom Matchers
-///
-/// When writing a custom matcher, follow this pattern:
-///
-/// ```gleam
-/// import dream_test/types.{AssertionFailure, MatchFailed, MatchOk}
-/// import gleam/option.{None}
-///
-/// pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
-///   case result {
-///     MatchFailed(failure) -> MatchFailed(failure)  // Propagate failure
-///     MatchOk(value) -> check_is_even(value)        // Check the value
-///   }
-/// }
-///
-/// fn check_is_even(value: Int) -> MatchResult(Int) {
-///   case value % 2 == 0 {
-///     True -> MatchOk(value)
-///     False ->
-///       MatchFailed(AssertionFailure(
-///         operator: "be_even",
-///         message: "expected an even number",
-///         payload: None,
-///       ))
-///   }
-/// }
-/// ```
 ///
 pub type MatchResult(a) {
   MatchOk(a)
@@ -275,12 +256,13 @@ pub type MatchResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// let match_result = MatchOk(42)
-/// let assertion_result = to_assertion_result(match_result)
-/// // assertion_result == AssertionOk
+/// types.to_assertion_result(types.MatchOk(1))
+/// |> should
+/// |> be_equal(types.AssertionOk)
+/// |> or_fail_with("expected MatchOk -> AssertionOk")
 /// ```
 ///
-pub fn to_assertion_result(result: MatchResult(a)) -> AssertionResult {
+pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
   case result {
     MatchOk(_) -> AssertionOk
     MatchFailed(failure) -> AssertionFailed(failure)
@@ -327,17 +309,7 @@ pub type CoverageSummary {
 /// After running suites, you get a list of these:
 ///
 /// ```gleam
-/// import dream_test/runner
-/// import dream_test/unit.{describe, it}
-/// import dream_test/types.{AssertionOk}
-///
-/// let suite =
-///   describe("Example", [
-///     it("passes", fn() { Ok(AssertionOk) }),
-///   ])
-///
-/// let results = runner.new([suite]) |> runner.run()
-/// // results: List(TestResult)
+/// let results = runner.new([example_suite()]) |> runner.run()
 /// ```
 ///
 pub type TestResult {
@@ -395,10 +367,20 @@ pub type TestSuiteItem(context) =
 ///
 /// This is primarily a low-level helper; most users should start from
 /// `dream_test/unit.describe` or `dream_test/unit_context.describe`.
+///
+/// ## Parameters
+///
+/// - `name`: name of the top-level group
+/// - `seed`: the initial context value stored in the `Root`
+/// - `children`: children under the top-level group
+///
+/// ## Returns
+///
+/// A `Root(context)` containing a `Group(name: name, ...)` at the top.
 pub fn root(
-  name: String,
-  seed: context,
-  children: List(Node(context)),
+  name name: String,
+  seed seed: context,
+  children children: List(Node(context)),
 ) -> Root(context) {
   Root(seed: seed, tree: Group(name: name, tags: [], children: children))
 }
@@ -422,11 +404,13 @@ pub fn root(
 /// ## Example
 ///
 /// ```gleam
-/// status_from_failures([])  // -> Passed
-/// status_from_failures([some_failure])  // -> Failed
+/// types.status_from_failures([])
+/// |> should
+/// |> be_equal(types.Passed)
+/// |> or_fail_with("expected Passed for empty failures")
 /// ```
 ///
-pub fn status_from_failures(failures: List(AssertionFailure)) -> Status {
+pub fn status_from_failures(failures failures: List(AssertionFailure)) -> Status {
   case failures {
     [] -> Passed
     _ -> Failed
