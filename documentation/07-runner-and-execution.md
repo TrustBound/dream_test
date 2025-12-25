@@ -146,4 +146,3 @@ pub fn tests() {
 - Go back to [Lifecycle hooks](06-lifecycle-hooks.md)
 - Go back to [Documentation README](README.md)
 - Continue to [Reporters](08-reporters.md)
-

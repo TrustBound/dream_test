@@ -11,7 +11,7 @@ value
 |> or_fail_with("human-friendly message")
 ```
 
-Read it left-to-right:
+Read it as a pipeline (top-to-bottom):
 
 - Start from the value you’re checking.
 - `should` starts an assertion chain.
@@ -143,6 +143,38 @@ pub fn tests() {
 ```
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/builtin_matchers.gleam)</sub>
+
+### Built-in matchers (table)
+
+All built-in matchers are re-exported from `dream_test/matchers` and are designed to be used in the `should |> matcher(...) |> or_fail_with(...)` pipeline.
+
+| Category               | Matcher                        | What it asserts / does                                               |
+| ---------------------- | ------------------------------ | -------------------------------------------------------------------- |
+| **Equality**           | `be_equal(expected)`           | Structural equality (`==`).                                          |
+| **Equality**           | `not_equal(unexpected)`        | Structural inequality (`!=`).                                        |
+| **Boolean**            | `be_true()`                    | Value is `True`.                                                     |
+| **Boolean**            | `be_false()`                   | Value is `False`.                                                    |
+| **Option**             | `be_some()`                    | Value is `Some(_)` and **unwraps** to the inner value for chaining.  |
+| **Option**             | `be_none()`                    | Value is `None`.                                                     |
+| **Result**             | `be_ok()`                      | Value is `Ok(_)` and **unwraps** to the `Ok` value for chaining.     |
+| **Result**             | `be_error()`                   | Value is `Error(_)` and **unwraps** to the error value for chaining. |
+| **Collections (List)** | `contain(item)`                | List contains `item`.                                                |
+| **Collections (List)** | `not_contain(item)`            | List does not contain `item`.                                        |
+| **Collections (List)** | `have_length(n)`               | List length is exactly `n`.                                          |
+| **Collections (List)** | `be_empty()`                   | List is empty (`[]`).                                                |
+| **Comparison (Int)**   | `be_greater_than(n)`           | Value is `> n`.                                                      |
+| **Comparison (Int)**   | `be_less_than(n)`              | Value is `< n`.                                                      |
+| **Comparison (Int)**   | `be_at_least(n)`               | Value is `>= n`.                                                     |
+| **Comparison (Int)**   | `be_at_most(n)`                | Value is `<= n`.                                                     |
+| **Comparison (Int)**   | `be_between(min, max)`         | Value is strictly between: `min < value < max`.                      |
+| **Comparison (Int)**   | `be_in_range(min, max)`        | Value is in inclusive range: `min <= value <= max`.                  |
+| **Comparison (Float)** | `be_greater_than_float(n)`     | Value is `> n`.                                                      |
+| **Comparison (Float)** | `be_less_than_float(n)`        | Value is `< n`.                                                      |
+| **String**             | `start_with(prefix)`           | String starts with `prefix`.                                         |
+| **String**             | `end_with(suffix)`             | String ends with `suffix`.                                           |
+| **String**             | `contain_string(substring)`    | String contains `substring`.                                         |
+| **Snapshot**           | `match_snapshot(path)`         | Compares a `String` to a snapshot file (creates it on first run).    |
+| **Snapshot**           | `match_snapshot_inspect(path)` | Snapshot testing for any value via `string.inspect` serialization.   |
 
 ### Writing custom matchers (the matcher pattern)
 
