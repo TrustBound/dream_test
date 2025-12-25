@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Suite-first runner builder** (`dream_test/runner`)
 
   - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
-  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `reporter`, `exit_on_failure`, `filter_results`)
+  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `reporter`, `exit_on_failure`, `filter_tests`)
 
 - **Event-driven reporters** (`dream_test/reporters`, `dream_test/reporters/types`)
 

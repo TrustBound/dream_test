@@ -43,7 +43,7 @@ import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Node, type Status,
   type TestResult, type TestSuite, AfterAll, AfterEach, AssertionFailed,
   AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeEach, Failed,
-  Group, Passed, Root, SetupFailed, Test, TestResult, TimedOut, Unit,
+  Group, Passed, Root, SetupFailed, Skipped, Test, TestResult, TimedOut, Unit,
 }
 import gleam/erlang/process.{
   type Pid, type Subject, kill, new_selector, new_subject, select,
@@ -1526,7 +1526,7 @@ fn assertion_to_status_and_failures(
       ..list.append(setup_failures_rev, inherited_failures_rev)
     ])
     AssertionSkipped -> #(
-      Passed,
+      Skipped,
       list.append(setup_failures_rev, inherited_failures_rev),
     )
   }

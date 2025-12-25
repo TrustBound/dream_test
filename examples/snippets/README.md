@@ -50,7 +50,7 @@ This project contains **small, compile-ready examples** for every `dream_test` f
 - **Custom matchers**:
   - `test/snippets/matchers/custom_matchers.gleam`
 - **Snapshot testing**:
-  - `test/snippets/matchers/snapshot_testing.gleam`
+  - `test/snippets/matchers/snapshots.gleam`
 - **Gherkin (inline DSL, placeholders, step registry, discovery, feature files)**:
   - `test/snippets/gherkin/gherkin_hero.gleam`
   - `test/snippets/gherkin/gherkin_feature.gleam`

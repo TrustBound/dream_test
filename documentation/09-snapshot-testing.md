@@ -118,7 +118,7 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/snapshot_testing.gleam)</sub>
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/snapshots.gleam)</sub>
 
 ### Practical workflow
 

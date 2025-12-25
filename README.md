@@ -162,7 +162,7 @@ pub fn main() {
 
 ### More showcases (tested examples)
 
-- **Snapshot testing**: [Snapshot testing example](examples/snippets/test/snippets/matchers/snapshot_testing.gleam)
+- **Snapshot testing**: [Snapshot testing example](examples/snippets/test/snippets/matchers/snapshots.gleam)
 - **Lifecycle hooks**: [Lifecycle hooks](examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam)
 - **Context-aware tests**: [Context-aware tests](examples/snippets/test/snippets/hooks/context_aware_tests.gleam)
 - **Gherkin BDD**:
@@ -375,7 +375,7 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](examples/snippets/test/snippets/matchers/snapshot_testing.gleam)</sub>
+<sub>🧪 [Tested source](examples/snippets/test/snippets/matchers/snapshots.gleam)</sub>
 <sub>📖 [Guide](documentation/09-snapshot-testing.md)</sub>
 
 ## Guides (start here)
