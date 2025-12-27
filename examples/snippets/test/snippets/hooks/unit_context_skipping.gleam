@@ -1,8 +1,8 @@
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit_context.{describe, it, skip}
-import gleam/io
 
 pub type Context {
   Context(counter: Int)
@@ -25,7 +25,8 @@ pub fn suite() {
 
 pub fn main() {
   runner.new([suite()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

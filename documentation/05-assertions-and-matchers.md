@@ -32,10 +32,10 @@ There’s also a human reason:
 
 ```gleam
 import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 import gleam/option.{Some}
 
 pub fn tests() {
@@ -61,7 +61,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -241,10 +242,10 @@ Use `succeed()` and `fail_with("...")` to keep the return type consistent.
 
 ```gleam
 import dream_test/matchers.{fail_with, succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 import snippets.{divide}
 
 pub fn tests() {
@@ -266,7 +267,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

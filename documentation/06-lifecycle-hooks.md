@@ -20,10 +20,10 @@ This example prints the execution order so you can see the flow directly:
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
-import gleam/io
 
 pub fn tests() {
   describe("Enclosing", [
@@ -54,7 +54,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -92,10 +93,10 @@ If a `before_each` hook returns `Error("...")`, the test body does not run:
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{before_each, describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("Setup failures", [
@@ -110,7 +111,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -137,12 +139,12 @@ Two practical rules of thumb:
 
 ```gleam
 import dream_test/matchers.{be_empty, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, it,
 }
-import gleam/io
 
 pub fn tests() {
   describe("Database tests", [
@@ -195,7 +197,8 @@ fn rollback_transaction() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -209,10 +212,10 @@ Nested groups inherit hooks. Setup runs **enclosing → nested**, teardown runs 
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
-import gleam/io
 
 pub fn tests() {
   describe("Outer", [
@@ -243,7 +246,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -257,10 +261,10 @@ If a hook fails, Dream Test records that failure and fails the affected tests.
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{before_all, describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("Handles failures", [
@@ -273,7 +277,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

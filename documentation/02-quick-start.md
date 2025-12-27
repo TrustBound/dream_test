@@ -23,9 +23,9 @@ There are two good starting points:
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
-import dream_test/reporters
-import dream_test/runner.{reporter, exit_on_failure, run}
-import gleam/io
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 
 pub fn main() {
   let suites =
@@ -34,7 +34,8 @@ pub fn main() {
     |> to_suites()
 
   runner.new(suites)
-  |> reporter(reporters.bdd(io.print, True))
+  |> progress_reporter(progress.new())
+  |> results_reporters([bdd.new()])
   |> exit_on_failure()
   |> run()
 }
@@ -54,10 +55,10 @@ This is the most “teachable” version because nothing is implicit: `tests()` 
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 import gleam/string.{contains, trim}
 
 pub fn tests() {
@@ -83,7 +84,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

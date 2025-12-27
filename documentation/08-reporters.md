@@ -6,33 +6,26 @@ This chapter helps you choose an output style for humans (local dev), for machin
 
 ### Mental model
 
-Dream Test has two reporting styles:
+Dream Test reporting is split into two phases:
 
-- **During the run (event-driven)**: `runner.reporter(reporters.*(...))`
-- **After the run (post-run formatting)**: take `List(TestResult)` and format/report later
+- **Progress reporter (during the run)**: reacts to events in completion order and renders live progress.
+- **Results reporters (end of run)**: print whole report blocks from the final, traversal-ordered results.
 
-Dream Test supports two “reporting modes”:
+This keeps output readable under parallel execution:
 
-- **Event-driven reporters**: stream output while tests run (best for humans + CI logs).
-- **Post-run formatting/reporting**: take `List(TestResult)` and render later (best for tooling, saving artifacts, custom output).
+- Progress stays responsive and keeps CI logs alive.
+- Final reports are deterministic and easy to scan/tail.
 
-### Why there are two modes
+### Recommended default: progress + BDD
 
-Parallel test execution changes what “nice output” means:
-
-- Streaming output gives fast feedback and keeps CI logs alive.
-- Post-run formatting gives you a complete picture and is easier to integrate with tooling (upload artifacts, dashboards).
-
-### BDD reporter (event-driven)
-
-This is the default “human” output: nested suite names, checkmarks, and failures.
+This is the standard “human” output: live progress while tests run, then a full BDD report (with failures repeated near the end) and a summary.
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("BDD reporter", [
@@ -43,7 +36,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -51,22 +45,21 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/bdd_reporter.gleam)</sub>
 
-### JSON reporter (event-driven)
+### JSON results reporter (end of run)
 
 Use JSON output for CI/CD integration and tooling (parsing, dashboards, artifact uploads).
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/json
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("JSON Reporter", [
     it("outputs JSON format", fn() {
-      // `reporters.json(...)` prints machine-readable JSON on RunFinished.
-      // Set show_progress=True to also show a live progress bar during the run.
+      // `json.new()` prints machine-readable JSON at the end of the run.
       Ok(succeed())
     }),
     it("includes test metadata", fn() {
@@ -78,7 +71,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.json(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([json.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -86,16 +80,15 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/json_reporter.gleam)</sub>
 
-### Progress reporter (event-driven)
+### Progress reporter (during the run)
 
 Use progress output when you want compact logs, especially for large suites.
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("Progress reporter", [
@@ -106,7 +99,7 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.progress(io.print))
+  |> runner.progress_reporter(progress.new())
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -201,5 +194,3 @@ pub fn main() {
 - Go back to [Runner & execution model](07-runner-and-execution.md)
 - Go back to [Documentation README](README.md)
 - Continue to [Snapshot testing](09-snapshot-testing.md)
-
-

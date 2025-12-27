@@ -19,13 +19,45 @@
 ////
 //// - `RunStarted(total)`
 //// - many `TestFinished(completed, total, result)` (in completion order)
-//// - `RunFinished(completed, total)`
+//// - `RunFinished(completed, total, results)`
 ////
 //// Hook events (`HookStarted` / `HookFinished`) can be interleaved when you use
 //// lifecycle hooks.
 
 import dream_test/types.{type TestResult}
 import gleam/option.{type Option}
+
+// ============================================================================
+// Results reporter configuration (end-of-run)
+// ============================================================================
+
+/// Which parts of a BDD report to print at the end of the run.
+pub type BddOutputMode {
+  /// Print the full hierarchical results, then repeat failures, then summary.
+  BddFull
+  /// Print failures (repeated) and summary only.
+  BddFailuresOnly
+  /// Print summary only.
+  BddSummaryOnly
+}
+
+/// Configuration for the BDD results reporter.
+pub type BddReporterConfig {
+  BddReporterConfig(color: Bool, mode: BddOutputMode)
+}
+
+/// Configuration for the JSON results reporter.
+pub type JsonReporterConfig {
+  JsonReporterConfig(pretty: Bool)
+}
+
+/// Results reporters format the end-of-run results into one output block each.
+///
+/// They are executed in the order provided to `runner.results_reporters(...)`.
+pub type ResultsReporter {
+  Bdd(BddReporterConfig)
+  Json(JsonReporterConfig)
+}
 
 /// Which lifecycle hook is running.
 ///
@@ -98,5 +130,7 @@ pub type ReporterEvent {
     outcome: HookOutcome,
   )
   /// The run finished. `completed` should equal `total`.
-  RunFinished(completed: Int, total: Int)
+  ///
+  /// `results` are in traversal order (deterministic), regardless of parallel execution.
+  RunFinished(completed: Int, total: Int, results: List(TestResult))
 }

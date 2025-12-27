@@ -12,5 +12,5 @@ fn example_suite() {
 
 pub fn main() {
   let results = runner.new([example_suite()]) |> runner.run()
-  results |> json.report_pretty(io.print)
+  results |> json.format_pretty |> io.print
 }

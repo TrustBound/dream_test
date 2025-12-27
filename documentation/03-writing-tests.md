@@ -17,10 +17,10 @@ Dream Test’s unit DSL is built for that style, but there’s a deeper design g
 import dream_test/matchers.{
   be_equal, be_error, be_ok, or_fail_with, should,
 }
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 import snippets.{add, divide}
 
 pub fn tests() {
@@ -49,7 +49,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -72,10 +73,10 @@ Use `skip` when you want to keep the test structure and body around, but tempora
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it, skip}
-import gleam/io
 import snippets.{add}
 
 pub fn tests() {
@@ -104,7 +105,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -189,11 +191,11 @@ This repo also uses tags heavily in Gherkin specs (see the Gherkin guide), where
 You can use tags to run only a subset of tests.
 
 ```gleam
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it, with_tags}
-import gleam/io
 import gleam/list
 
 fn is_smoke(info: runner.TestInfo) -> Bool {
@@ -209,7 +211,8 @@ pub fn main() {
 
   runner.new([suite])
   |> runner.filter_tests(is_smoke)
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -217,10 +220,10 @@ pub fn main() {
 
 ```gleam
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, group, it, with_tags}
-import gleam/io
 
 pub fn tests() {
   describe("Tagged tests", [
@@ -239,7 +242,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

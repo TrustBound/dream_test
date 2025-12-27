@@ -1,10 +1,14 @@
-import dream_test/reporters
-import dream_test/reporters/types as reporter_types
+import dream_test/reporters/bdd
+import dream_test/reporters/json
+import dream_test/reporters/progress
+import dream_test/runner
 import dream_test/types
 import dream_test/unit.{describe, it}
 import gleam/erlang/process as beam_process
+import gleam/list
 import gleam/option.{None}
 import gleam/otp/actor
+import gleam/string
 
 pub type OutMsg {
   Write(String)
@@ -37,53 +41,45 @@ fn read_out(out: beam_process.Subject(OutMsg)) -> List(String) {
 }
 
 pub fn tests() {
-  describe("dream_test/reporters", [
-    it(
-      "bdd/json/progress constructors and handle_event do not crash and write on RunFinished",
-      fn() {
-        let out = start_out()
-        let write = fn(s: String) { beam_process.send(out, Write(s)) }
+  describe("dream_test reporting", [
+    it("progress + results reporters write output and do not crash", fn() {
+      let out = start_out()
+      let write = fn(s: String) { beam_process.send(out, Write(s)) }
 
-        let result =
-          types.TestResult(
-            name: "t",
-            full_name: ["suite", "t"],
-            status: types.Passed,
-            duration_ms: 1,
-            tags: [],
-            failures: [],
-            kind: types.Unit,
+      let output = runner.Output(out: write, error: write)
+
+      let _results =
+        runner.new([example_suite()])
+        |> runner.progress_reporter(progress.new())
+        |> runner.results_reporters([
+          bdd.new() |> bdd.summary_only(),
+          json.new(),
+        ])
+        |> runner.output(output)
+        |> runner.run()
+
+      let combined =
+        read_out(out)
+        |> list.reverse
+        |> string.concat
+
+      case string.contains(combined, "Summary:") {
+        True -> Ok(types.AssertionOk)
+        False ->
+          Ok(
+            types.AssertionFailed(types.AssertionFailure(
+              operator: "reporting",
+              message: "expected output to include a Summary line",
+              payload: None,
+            )),
           )
+      }
+    }),
+  ])
+}
 
-        let r0 = reporters.bdd(write, False)
-        let r1 = reporters.handle_event(r0, reporter_types.RunStarted(total: 1))
-        let r2 =
-          reporters.handle_event(
-            r1,
-            reporter_types.TestFinished(completed: 1, total: 1, result: result),
-          )
-        let _r3 =
-          reporters.handle_event(
-            r2,
-            reporter_types.RunFinished(completed: 1, total: 1),
-          )
-
-        // Also ensure constructors exist and don't crash.
-        let _ = reporters.json(write, False)
-        let _ = reporters.progress(write)
-
-        case read_out(out) {
-          [] ->
-            Ok(
-              types.AssertionFailed(types.AssertionFailure(
-                operator: "reporter",
-                message: "expected reporter to write output on RunFinished",
-                payload: None,
-              )),
-            )
-          _ -> Ok(types.AssertionOk)
-        }
-      },
-    ),
+fn example_suite() {
+  describe("Example Suite", [
+    it("passes", fn() { Ok(types.AssertionOk) }),
   ])
 }

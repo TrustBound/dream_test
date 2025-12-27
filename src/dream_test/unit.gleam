@@ -20,10 +20,10 @@
 ////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
-//// import dream_test/reporters
+//// import dream_test/reporters/bdd
+//// import dream_test/reporters/progress
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
-//// import gleam/io
 //// import gleam/string
 ////
 //// pub fn tests() {
@@ -47,7 +47,8 @@
 ////
 //// pub fn main() {
 ////   runner.new([tests()])
-////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.progress_reporter(progress.new())
+////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
@@ -79,10 +80,10 @@ pub type UnitNode =
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 /// import gleam/string
 ///
 /// pub fn tests() {
@@ -106,7 +107,8 @@ pub type UnitNode =
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -136,7 +138,8 @@ pub fn describe(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, group, it}
 /// import gleam/io
@@ -170,7 +173,8 @@ pub fn describe(
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -198,7 +202,8 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -225,7 +230,8 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -268,7 +274,8 @@ fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it, skip}
 /// import gleam/io
@@ -299,7 +306,8 @@ fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -341,7 +349,8 @@ pub fn skip(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
@@ -399,7 +408,8 @@ pub fn skip(
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -431,7 +441,8 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
@@ -489,7 +500,8 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -520,7 +532,8 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
@@ -578,7 +591,8 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -601,7 +615,8 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
@@ -659,7 +674,8 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -685,7 +701,8 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it, with_tags}
 /// import gleam/io
@@ -701,7 +718,8 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }

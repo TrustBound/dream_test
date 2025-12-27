@@ -28,10 +28,10 @@ This project contains **small, compile-ready examples** for every `dream_test` f
   - `test/snippets/runner/sequential_execution.gleam`
   - `test/snippets/runner/execution_modes.gleam`
 - **Reporters**:
-  - **BDD + JSON (event-driven)**: `test/snippets/reporters/json_reporter.gleam` (and `snippets_test.gleam` uses BDD by default)
-  - **BDD (event-driven)**: `test/snippets/reporters/bdd_reporter.gleam`
+  - **Progress (live) + BDD (end-of-run)**: `test/snippets/reporters/bdd_reporter.gleam` (and `snippets_test.gleam` uses progress + BDD by default)
+  - **JSON (end-of-run)**: `test/snippets/reporters/json_reporter.gleam`
   - **BDD (formatting)**: `test/snippets/reporters/bdd_formatting.gleam`
-  - **Progress bar (event-driven)**: `test/snippets/reporters/progress_reporter.gleam`
+  - **Progress bar (live)**: `test/snippets/reporters/progress_reporter.gleam`
   - **Gherkin formatting**: `test/snippets/reporters/gherkin_reporter.gleam` (runs, then formats results)
   - **JSON (formatting)**: `test/snippets/reporters/json_formatting.gleam`
   - **Reporter events (advanced/custom tooling)**: `test/snippets/reporters/reporter_api_handle_event.gleam`

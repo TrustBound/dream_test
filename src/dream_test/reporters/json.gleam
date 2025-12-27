@@ -16,16 +16,15 @@
 ////
 //// ```gleam
 //// import dream_test/matchers.{succeed}
-//// import dream_test/reporters
+//// import dream_test/reporters/json
+//// import dream_test/reporters/progress
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
-//// import gleam/io
 ////
 //// pub fn tests() {
 ////   describe("JSON Reporter", [
 ////     it("outputs JSON format", fn() {
-////       // The json.report function outputs machine-readable JSON
-////       // while bdd.report outputs human-readable text
+////       // The json reporter prints machine-readable JSON at the end of the run.
 ////       Ok(succeed())
 ////     }),
 ////     it("includes test metadata", fn() {
@@ -37,12 +36,14 @@
 ////
 //// pub fn main() {
 ////   runner.new([tests()])
-////   |> runner.reporter(reporters.json(io.print, True))
+////   |> runner.progress_reporter(progress.new())
+////   |> runner.results_reporters([json.new()])
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
 //// ```
 
+import dream_test/reporters/types as reporter_types
 import dream_test/types.{
   type AssertionFailure, type FailurePayload, type Status, type TestKind,
   type TestResult, BooleanFailure, CollectionFailure, ComparisonFailure,
@@ -58,6 +59,34 @@ import gleam/string
 // ============================================================================
 // Public API
 // ============================================================================
+
+/// Create a JSON results reporter (printed at the end of the run).
+pub fn new() -> reporter_types.ResultsReporter {
+  reporter_types.Json(reporter_types.JsonReporterConfig(pretty: False))
+}
+
+/// Enable pretty-printed JSON output.
+pub fn pretty(
+  reporter reporter: reporter_types.ResultsReporter,
+) -> reporter_types.ResultsReporter {
+  case reporter {
+    reporter_types.Json(_config) ->
+      reporter_types.Json(reporter_types.JsonReporterConfig(pretty: True))
+    other -> other
+  }
+}
+
+/// Render JSON output for a completed run.
+pub fn render(
+  config config: reporter_types.JsonReporterConfig,
+  results results: List(TestResult),
+) -> String {
+  let reporter_types.JsonReporterConfig(pretty: pretty) = config
+  case pretty {
+    True -> format_pretty(results)
+    False -> format(results)
+  }
+}
 
 /// Format test results as a compact JSON string.
 ///

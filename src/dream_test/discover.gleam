@@ -14,9 +14,9 @@
 ////
 //// ```gleam
 //// import dream_test/discover.{from_path, to_suites}
-//// import dream_test/reporters
-//// import dream_test/runner.{exit_on_failure, reporter, run}
-//// import gleam/io
+//// import dream_test/reporters/bdd
+//// import dream_test/reporters/progress
+//// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 ////
 //// pub fn main() {
 ////   let suites =
@@ -25,7 +25,8 @@
 ////     |> to_suites()
 ////
 ////   runner.new(suites)
-////   |> reporter(reporters.bdd(io.print, True))
+////   |> progress_reporter(progress.new())
+////   |> results_reporters([bdd.new()])
 ////   |> exit_on_failure()
 ////   |> run()
 //// }
@@ -100,7 +101,8 @@ pub type LoadResult {
 ///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{exit_on_failure, reporter, run}
 /// import gleam/io
 ///
@@ -111,7 +113,8 @@ pub type LoadResult {
 ///     |> to_suites()
 ///
 ///   runner.new(suites)
-///   |> reporter(reporters.bdd(io.print, True))
+///   |> progress_reporter(progress.new())
+///   |> results_reporters([bdd.new()])
 ///   |> exit_on_failure()
 ///   |> run()
 /// }
@@ -137,7 +140,8 @@ pub fn new() -> TestDiscovery {
 ///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{exit_on_failure, reporter, run}
 /// import gleam/io
 ///
@@ -148,7 +152,8 @@ pub fn new() -> TestDiscovery {
 ///     |> to_suites()
 ///
 ///   runner.new(suites)
-///   |> reporter(reporters.bdd(io.print, True))
+///   |> progress_reporter(progress.new())
+///   |> results_reporters([bdd.new()])
 ///   |> exit_on_failure()
 ///   |> run()
 /// }
@@ -182,7 +187,8 @@ pub fn from_path(
 ///
 /// ```gleam
 /// import dream_test/discover
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{exit_on_failure, reporter, run}
 /// import gleam/io
 ///
@@ -192,7 +198,8 @@ pub fn from_path(
 ///     |> discover.to_suites()
 ///
 ///   runner.new(suites)
-///   |> reporter(reporters.bdd(io.print, True))
+///   |> progress_reporter(progress.new())
+///   |> results_reporters([bdd.new()])
 ///   |> exit_on_failure()
 ///   |> run()
 /// }
@@ -286,7 +293,8 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{exit_on_failure, reporter, run}
 /// import gleam/io
 ///
@@ -297,7 +305,8 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///     |> to_suites()
 ///
 ///   runner.new(suites)
-///   |> reporter(reporters.bdd(io.print, True))
+///   |> progress_reporter(progress.new())
+///   |> results_reporters([bdd.new()])
 ///   |> exit_on_failure()
 ///   |> run()
 /// }
@@ -331,7 +340,8 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 ///
 /// ```gleam
 /// import dream_test/discover
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{exit_on_failure, reporter, run}
 /// import gleam/io
 ///
@@ -341,7 +351,8 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 ///     |> discover.to_suite("discovered tests")
 ///
 ///   runner.new([suite])
-///   |> reporter(reporters.bdd(io.print, True))
+///   |> progress_reporter(progress.new())
+///   |> results_reporters([bdd.new()])
 ///   |> exit_on_failure()
 ///   |> run()
 /// }

@@ -23,12 +23,29 @@ fn normalize_timestamp_ms(json: String) -> String {
   before <> "\"timestamp_ms\":0," <> rest
 }
 
+fn normalize_duration_ms(json: String) -> String {
+  normalize_duration_ms_loop(json, "")
+}
+
+fn normalize_duration_ms_loop(remaining: String, acc: String) -> String {
+  case string.split_once(remaining, "\"duration_ms\":") {
+    Ok(#(before, after)) -> {
+      let #(_duration_digits, rest) =
+        string.split_once(after, ",")
+        |> result.unwrap(#("MISSING_DURATION_VALUE", after))
+
+      normalize_duration_ms_loop(rest, acc <> before <> "\"duration_ms\": 0,")
+    }
+    Error(_) -> acc <> remaining
+  }
+}
+
 pub fn tests() {
   describe("JSON formatting", [
     it("format_pretty returns JSON containing tests", fn() {
       let results = runner.new([example_suite()]) |> runner.run()
       let text = json.format_pretty(results)
-      let normalized = normalize_timestamp_ms(text)
+      let normalized = normalize_timestamp_ms(text) |> normalize_duration_ms
 
       normalized
       |> should

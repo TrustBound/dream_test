@@ -4,9 +4,9 @@ import dream_test/gherkin/steps.{
 }
 import dream_test/gherkin/world.{put}
 import dream_test/matchers.{succeed}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
-import gleam/io
 import gleam/result
 
 // {int} captures integers
@@ -63,7 +63,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

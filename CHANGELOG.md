@@ -14,15 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Suite-first runner builder** (`dream_test/runner`)
 
   - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
-  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `reporter`, `exit_on_failure`, `filter_tests`)
+  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `progress_reporter`, `results_reporters`, `output`, `silent`, `exit_on_failure`, `filter_tests`)
 
-- **Event-driven reporters** (`dream_test/reporters`, `dream_test/reporters/types`)
+- **Reporting split** (`dream_test/reporters/types`, `dream_test/reporters/bdd`, `dream_test/reporters/json`, `dream_test/reporters/progress`)
 
   - Runner emits structured `ReporterEvent`s (`RunStarted`, `TestFinished`, `RunFinished`, plus hook events)
-  - Unified reporter API:
-    - `reporters.bdd(write, show_progress)`
-    - `reporters.json(write, show_progress)`
-    - `reporters.progress(write)`
+  - Live progress via `runner.progress_reporter(progress.new())`
+  - End-of-run reporting via `runner.results_reporters([bdd.new(), json.new(), ...])`
 
 - **Live progress bar reporter** (`dream_test/reporters/progress`)
 

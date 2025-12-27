@@ -15,7 +15,8 @@
 //// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
 //// import dream_test/gherkin/world.{get_or, put}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-//// import dream_test/reporters
+//// import dream_test/reporters/bdd
+//// import dream_test/reporters/progress
 //// import dream_test/runner
 //// import gleam/io
 //// import gleam/result
@@ -64,7 +65,8 @@
 ////
 //// pub fn main() {
 ////   runner.new([tests()])
-////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.progress_reporter(progress.new())
+////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
@@ -166,7 +168,8 @@ pub fn cleanup(world world: World) -> Nil {
 /// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import gleam/io
 /// import gleam/result
@@ -215,7 +218,8 @@ pub fn cleanup(world world: World) -> Nil {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -247,7 +251,8 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 /// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
 /// import dream_test/gherkin/world.{get, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import gleam/io
 ///
@@ -286,7 +291,8 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -317,7 +323,8 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 /// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import gleam/io
 /// import gleam/result
@@ -366,7 +373,8 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -395,7 +403,8 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 /// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import gleam/io
 ///
@@ -437,7 +446,8 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -466,7 +476,8 @@ pub fn has(world world: World, key key: String) -> Bool {
 /// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import gleam/io
 ///
@@ -508,7 +519,8 @@ pub fn has(world world: World, key key: String) -> Bool {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }

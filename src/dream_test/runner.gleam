@@ -18,10 +18,10 @@
 ////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
-//// import dream_test/reporters
+//// import dream_test/reporters/bdd
+//// import dream_test/reporters/progress
 //// import dream_test/runner
 //// import dream_test/unit.{describe, it}
-//// import gleam/io
 ////
 //// pub fn tests() {
 ////   describe("Example", [
@@ -36,19 +36,23 @@
 ////
 //// pub fn main() {
 ////   runner.new([tests()])
-////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.progress_reporter(progress.new())
+////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
 //// ```
 
 import dream_test/parallel
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/json
+import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
   type Node, type TestKind, type TestResult, type TestSuite, AfterAll, AfterEach,
   BeforeAll, BeforeEach, Failed, Group, Root, SetupFailed, Test, TimedOut,
 }
+import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 
@@ -65,10 +69,10 @@ import gleam/option.{type Option, None, Some}
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{type TestInfo}
 /// import dream_test/unit.{describe, it, with_tags}
-/// import gleam/io
 /// import gleam/list
 ///
 /// pub fn tests() {
@@ -92,7 +96,8 @@ import gleam/option.{type Option, None, Some}
 /// pub fn main() {
 ///   runner.new([tests()])
 ///   |> runner.filter_tests(only_smoke)
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -109,13 +114,15 @@ pub type TestInfo {
 /// Builder for configuring and running suites.
 ///
 /// You typically construct one with `runner.new(...)` and then pipe through
-/// configuration helpers like `runner.reporter`, `runner.max_concurrency`, etc.
+/// configuration helpers like `runner.progress_reporter`, `runner.results_reporters`,
+/// `runner.max_concurrency`, etc.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -133,7 +140,8 @@ pub type TestInfo {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -144,8 +152,18 @@ pub opaque type RunBuilder(ctx) {
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
     should_exit_on_failure: Bool,
-    reporter: Option(reporters.Reporter),
+    progress_reporter: Option(progress.ProgressReporter),
+    results_reporters: List(reporter_types.ResultsReporter),
+    output: Option(Output),
   )
+}
+
+/// Output sinks used by `runner.run()`.
+///
+/// Reporters write to `out`. Runner-internal errors (not test failures) may be
+/// written to `error` as well.
+pub type Output {
+  Output(out: fn(String) -> Nil, error: fn(String) -> Nil)
 }
 
 /// Create a new runner builder for a list of suites.
@@ -158,7 +176,8 @@ pub opaque type RunBuilder(ctx) {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -176,7 +195,8 @@ pub opaque type RunBuilder(ctx) {
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -196,7 +216,9 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
     config: parallel.default_config(),
     test_filter: None,
     should_exit_on_failure: False,
-    reporter: None,
+    progress_reporter: None,
+    results_reporters: [],
+    output: None,
   )
 }
 
@@ -209,7 +231,8 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -237,7 +260,8 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 ///   runner.new([tests()])
 ///   |> runner.max_concurrency(1)
 ///   |> runner.default_timeout_ms(30_000)
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -274,7 +298,8 @@ pub fn max_concurrency(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -294,7 +319,8 @@ pub fn max_concurrency(
 ///   runner.new([tests()])
 ///   |> runner.max_concurrency(8)
 ///   |> runner.default_timeout_ms(10_000)
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -331,7 +357,8 @@ pub fn default_timeout_ms(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
@@ -349,7 +376,8 @@ pub fn default_timeout_ms(
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -366,51 +394,55 @@ pub fn exit_on_failure(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
   RunBuilder(..builder, should_exit_on_failure: True)
 }
 
-/// Attach an event-driven reporter.
+/// Attach a progress reporter (live output during the run).
 ///
-/// Use `dream_test/reporters` to construct a reporter (BDD/JSON/Progress).
+/// This reporter is driven by `TestFinished` events in completion order.
+/// It is intended for a single in-place progress bar UI.
+pub fn progress_reporter(
+  builder builder: RunBuilder(ctx),
+  reporter reporter: progress.ProgressReporter,
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, progress_reporter: Some(reporter))
+}
+
+/// Attach results reporters (printed at the end, in the order provided).
+///
+/// Results reporters receive the full traversal-ordered results list from the
+/// `RunFinished` event, so their output is deterministic under parallel execution.
+pub fn results_reporters(
+  builder builder: RunBuilder(ctx),
+  reporters reporters: List(reporter_types.ResultsReporter),
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, results_reporters: reporters)
+}
+
+/// Configure output sinks for `runner.run()`.
+///
+/// This is how you route reporter output (stdout vs stderr, capturing output in
+/// tests, etc).
 ///
 /// ## Example
 ///
 /// ```gleam
-/// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
 /// import dream_test/runner
-/// import dream_test/unit.{describe, it}
 /// import gleam/io
-///
-/// pub fn tests() {
-///   describe("Example", [
-///     it("works", fn() {
-///       1 + 1
-///       |> should
-///       |> be_equal(2)
-///       |> or_fail_with("math should work")
-///     }),
-///   ])
-/// }
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
-///   |> runner.exit_on_failure()
+///   |> runner.output(runner.Output(out: io.print, error: io.eprint))
 ///   |> runner.run()
 /// }
 /// ```
-///
-/// ## Parameters
-///
-/// - `builder`: the runner builder you’re configuring
-/// - `reporter`: reporter instance created via `dream_test/reporters`
-///
-/// ## Returns
-///
-/// The updated `RunBuilder(ctx)`.
-pub fn reporter(
+pub fn output(
   builder builder: RunBuilder(ctx),
-  reporter reporter: reporters.Reporter,
+  output output: Output,
 ) -> RunBuilder(ctx) {
-  RunBuilder(..builder, reporter: Some(reporter))
+  RunBuilder(..builder, output: Some(output))
+}
+
+/// Disable all reporter output (still returns results from `runner.run()`).
+pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+  RunBuilder(..builder, output: Some(silent_output()))
 }
 
 /// Filter which tests are executed.
@@ -425,7 +457,8 @@ pub fn reporter(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner.{type TestInfo}
 /// import dream_test/unit.{describe, it, with_tags}
 /// import gleam/io
@@ -452,7 +485,8 @@ pub fn reporter(
 /// pub fn main() {
 ///   runner.new([tests()])
 ///   |> runner.filter_tests(only_smoke)
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -475,16 +509,17 @@ pub fn filter_tests(
 
 /// Run all suites and return a list of `TestResult`.
 ///
-/// If a reporter is attached, the runner will emit `ReporterEvent`s during the run.
+/// If a progress reporter is attached, the runner will emit progress output during
+/// the run. Results reporters print at the end of the run.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -499,7 +534,8 @@ pub fn filter_tests(
 ///
 /// pub fn main() {
 ///   runner.new([tests()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -516,42 +552,66 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   let selected_suites = apply_test_filter(builder.suites, builder.test_filter)
   let total = count_total_tests(selected_suites)
 
-  let #(results, _completed, _final_reporter) = case builder.reporter {
-    None -> #(
-      run_without_reporter(RunBuilder(..builder, suites: selected_suites)),
-      total,
-      None,
-    )
-    Some(initial_reporter) -> {
-      let reporter_after_start =
-        reporters.handle_event(
-          initial_reporter,
-          reporter_types.RunStarted(total),
-        )
+  let output = case builder.output {
+    Some(output) -> output
+    None -> default_output()
+  }
 
-      let #(results, completed, reporter_after_suites) =
-        run_with_reporter(
-          selected_suites,
-          builder.config,
-          reporter_after_start,
-          total,
-          0,
-          [],
-        )
-
-      let reporter_after_finish =
-        reporters.handle_event(
-          reporter_after_suites,
-          reporter_types.RunFinished(completed, total),
-        )
-
-      #(results, completed, Some(reporter_after_finish))
+  let completed0 = 0
+  let completed1 = case builder.progress_reporter {
+    None -> completed0
+    Some(progress_reporter) -> {
+      write_progress_event(
+        progress_reporter,
+        reporter_types.RunStarted(total: total),
+        output,
+      )
+      completed0
     }
   }
+
+  let #(results, completed2) =
+    run_suites_with_progress(
+      selected_suites,
+      builder.config,
+      builder.progress_reporter,
+      output,
+      total,
+      completed1,
+      [],
+    )
+
+  case builder.progress_reporter {
+    None -> Nil
+    Some(progress_reporter) ->
+      write_progress_event(
+        progress_reporter,
+        reporter_types.RunFinished(
+          completed: completed2,
+          total: total,
+          results: results,
+        ),
+        output,
+      )
+  }
+
+  write_results_reporters(builder.results_reporters, results, output)
 
   maybe_exit_on_failure(builder.should_exit_on_failure, results)
 
   results
+}
+
+fn default_output() -> Output {
+  Output(out: io.print, error: io.print_error)
+}
+
+fn silent_output() -> Output {
+  Output(out: discard_output, error: discard_output)
+}
+
+fn discard_output(_text: String) -> Nil {
+  Nil
 }
 
 fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
@@ -560,10 +620,6 @@ fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
     True -> halt(1)
     False -> Nil
   }
-}
-
-fn run_without_reporter(builder: RunBuilder(ctx)) -> List(TestResult) {
-  run_suites_no_reporter(builder.suites, builder.config, [])
 }
 
 fn apply_test_filter(
@@ -696,39 +752,25 @@ fn filter_children(
   }
 }
 
-fn run_suites_no_reporter(
+fn run_suites_with_progress(
   suites: List(TestSuite(ctx)),
   config: parallel.ParallelConfig,
-  acc_rev: List(TestResult),
-) -> List(TestResult) {
-  case suites {
-    [] -> list.reverse(acc_rev)
-    [suite, ..rest] ->
-      run_suites_no_reporter(
-        rest,
-        config,
-        list.append(parallel.run_root_parallel(config, suite), acc_rev),
-      )
-  }
-}
-
-fn run_with_reporter(
-  suites: List(TestSuite(ctx)),
-  config: parallel.ParallelConfig,
-  reporter: reporters.Reporter,
+  progress_reporter: Option(progress.ProgressReporter),
+  output: Output,
   total: Int,
   completed: Int,
-  acc_rev: List(TestResult),
-) -> #(List(TestResult), Int, reporters.Reporter) {
+  acc: List(TestResult),
+) -> #(List(TestResult), Int) {
   case suites {
-    [] -> #(list.reverse(acc_rev), completed, reporter)
+    [] -> #(acc, completed)
     [suite, ..rest] -> {
       let parallel_result =
         parallel.run_root_parallel_with_reporter(
           parallel.RunRootParallelWithReporterConfig(
             config: config,
             suite: suite,
-            reporter: reporter,
+            progress_reporter: progress_reporter,
+            write: output_out(output),
             total: total,
             completed: completed,
           ),
@@ -736,19 +778,68 @@ fn run_with_reporter(
       let parallel.RunRootParallelWithReporterResult(
         results: results,
         completed: completed_after_suite,
-        reporter: next_reporter,
+        progress_reporter: next_progress_reporter,
       ) = parallel_result
 
-      run_with_reporter(
+      run_suites_with_progress(
         rest,
         config,
-        next_reporter,
+        next_progress_reporter,
+        output,
         total,
         completed_after_suite,
-        list.append(results, acc_rev),
+        list.append(acc, results),
       )
     }
   }
+}
+
+fn write_progress_event(
+  reporter: progress.ProgressReporter,
+  event: reporter_types.ReporterEvent,
+  output: Output,
+) -> Nil {
+  case progress.handle_event(reporter, event) {
+    None -> Nil
+    Some(text) -> output_out(output)(text)
+  }
+}
+
+fn write_results_reporters(
+  reporters: List(reporter_types.ResultsReporter),
+  results: List(TestResult),
+  output: Output,
+) -> Nil {
+  write_results_reporters_loop(reporters, results, output_out(output))
+}
+
+fn write_results_reporters_loop(
+  reporters: List(reporter_types.ResultsReporter),
+  results: List(TestResult),
+  write: fn(String) -> Nil,
+) -> Nil {
+  case reporters {
+    [] -> Nil
+    [reporter, ..rest] -> {
+      write(render_results_reporter(reporter, results))
+      write_results_reporters_loop(rest, results, write)
+    }
+  }
+}
+
+fn render_results_reporter(
+  reporter: reporter_types.ResultsReporter,
+  results: List(TestResult),
+) -> String {
+  case reporter {
+    reporter_types.Bdd(config) -> bdd.render(config, results)
+    reporter_types.Json(config) -> json.render(config, results)
+  }
+}
+
+fn output_out(output: Output) -> fn(String) -> Nil {
+  let Output(out: out, error: _error) = output
+  out
 }
 
 fn count_total_tests(suites: List(TestSuite(ctx))) -> Int {

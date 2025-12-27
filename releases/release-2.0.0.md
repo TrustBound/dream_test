@@ -5,7 +5,8 @@
 Dream Test 2.0 is a **major** release that makes test execution and reporting more explicit:
 
 - A **suite-first runner** with a pipe-friendly builder (`runner.new([suite]) |> ... |> runner.run()`).
-- **Event-driven reporters** (BDD / JSON / Progress) driven by structured `ReporterEvent`s.
+- **Split reporting**: a live **progress reporter** during the run, and one or more
+  deterministic **results reporters** printed at the end.
 - **Result-returning tests + hooks**: test bodies and lifecycle hooks can return `Result(..., String)`, which enables clean multi-step setup using `use <- result.try(...)` (no more awkward “wrap everything in a `let result = { ... }` block” patterns).
 - A unified public assertions surface under `dream_test/matchers`.
 - Clearer, safer behavior for hooks, timeouts, and crashes (with optional crash reports).
@@ -37,10 +38,10 @@ The runner is now a single, explicit pipeline:
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("Example", [
@@ -57,7 +58,8 @@ pub fn main() {
   runner.new([tests()])
   |> runner.max_concurrency(8)
   |> runner.default_timeout_ms(10_000)
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -111,28 +113,29 @@ pub fn tests() {
 }
 ```
 
-### 📣 Reporting: event-driven reporters (`dream_test/reporters`)
+### 📣 Reporting: progress + results reporters
 
-**Why this change:** parallel execution means completion order is not declaration order. An explicit `ReporterEvent` stream lets reporters be deterministic and keeps CI output alive without scrambling hook/test output.
+**Why this change:** parallel execution means completion order is not declaration order.
+Dream Test splits reporting so live progress can react to completion order, while
+final reports are printed in traversal order (deterministic).
 
-Reporters are state machines driven by structured events (`reporters/types.ReporterEvent`):
+The runner emits structured events (`reporters/types.ReporterEvent`):
 
 - `RunStarted(total)`
 - `TestFinished(completed, total, result)`
 - `HookStarted(...)` / `HookFinished(...)`
-- `RunFinished(completed, total)`
+- `RunFinished(completed, total, results)` (results are traversal-ordered)
 
 Built-in reporters:
 
-- `reporters.bdd(write, show_progress)`
-- `reporters.json(write, show_progress)`
-- `reporters.progress(write)`
+- `progress.new()` (live progress during the run)
+- `bdd.new()` (human-readable BDD report printed at the end)
+- `json.new()` (machine-readable JSON printed at the end)
 
 Practical guidance:
 
-- Use **BDD** for readable local output.
-- Use **JSON** for CI/tooling. Set `show_progress: True` to also show a live progress bar.
-- Use **Progress** for very large suites where you want compact logs.
+- Use **progress + bdd** for readable local output.
+- Use **json** for CI/tooling (optionally alongside progress).
 
 ### 🧯 Sandbox: optional crash reports (`dream_test/sandbox`)
 
@@ -174,13 +177,14 @@ gleam deps download
 Most 1.x projects had a “run test cases then report” entrypoint. In 2.0, you **run suites directly**:
 
 ```gleam
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
-import gleam/io
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -268,9 +272,9 @@ If your 1.x setup relied on “test files being present” or you had a long man
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}
-import dream_test/reporters
-import dream_test/runner.{exit_on_failure, reporter, run}
-import gleam/io
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 
 pub fn main() {
   let suites =
@@ -279,7 +283,8 @@ pub fn main() {
     |> to_suites()
 
   runner.new(suites)
-  |> reporter(reporters.bdd(io.print, True))
+  |> progress_reporter(progress.new())
+  |> results_reporters([bdd.new()])
   |> exit_on_failure()
   |> run()
 }

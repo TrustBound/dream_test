@@ -19,10 +19,10 @@
 ////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
-//// import dream_test/reporters
+//// import dream_test/reporters/bdd
+//// import dream_test/reporters/progress
 //// import dream_test/runner
 //// import dream_test/unit_context.{before_each, describe, it}
-//// import gleam/io
 ////
 //// pub type Context {
 ////   Context(counter: Int)
@@ -46,7 +46,8 @@
 ////
 //// pub fn main() {
 ////   runner.new([suite()])
-////   |> runner.reporter(reporters.bdd(io.print, True))
+////   |> runner.progress_reporter(progress.new())
+////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
@@ -78,10 +79,10 @@ pub type ContextNode(context) =
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit_context.{before_each, describe, it}
-/// import gleam/io
 ///
 /// pub type Context {
 ///   Context(counter: Int)
@@ -105,7 +106,8 @@ pub type ContextNode(context) =
 ///
 /// pub fn main() {
 ///   runner.new([suite()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -133,7 +135,8 @@ pub fn describe(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit_context.{before_each, describe, group, it}
 /// import gleam/io
@@ -171,7 +174,8 @@ pub fn describe(
 ///
 /// pub fn main() {
 ///   runner.new([suite()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -201,7 +205,8 @@ pub fn group(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit_context.{before_each, describe, it}
 /// import gleam/io
@@ -228,7 +233,8 @@ pub fn group(
 ///
 /// pub fn main() {
 ///   runner.new([suite()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -261,7 +267,8 @@ pub fn it(
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit_context.{describe, it, skip}
 /// import gleam/io
@@ -287,7 +294,8 @@ pub fn it(
 ///
 /// pub fn main() {
 ///   runner.new([suite()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }
@@ -351,7 +359,8 @@ pub fn after_all(
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
-/// import dream_test/reporters
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit_context.{describe, group, it, with_tags}
 /// import gleam/io
@@ -374,7 +383,8 @@ pub fn after_all(
 ///
 /// pub fn main() {
 ///   runner.new([suite()])
-///   |> runner.reporter(reporters.bdd(io.print, True))
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.exit_on_failure()
 ///   |> runner.run()
 /// }

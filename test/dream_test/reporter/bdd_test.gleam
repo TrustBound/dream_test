@@ -1,5 +1,6 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
+import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, group, it}
 import gleam/list
@@ -140,6 +141,26 @@ pub fn tests() {
       let write = fn(_s: String) { Nil }
       bdd.report(sample_results(), write)
       Ok(types.AssertionOk)
+    }),
+
+    it("bdd.color renders ANSI escapes", fn() {
+      let reporter = bdd.new() |> bdd.color()
+      let report = case reporter {
+        reporter_types.Bdd(config) -> bdd.render(config, sample_results())
+        _ -> ""
+      }
+
+      case string.contains(report, "\u{1b}[") {
+        True -> Ok(types.AssertionOk)
+        False ->
+          Ok(
+            types.AssertionFailed(types.AssertionFailure(
+              operator: "bdd.color",
+              message: "expected colored report to include ANSI escape sequences",
+              payload: None,
+            )),
+          )
+      }
     }),
   ])
 }

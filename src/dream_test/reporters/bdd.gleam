@@ -2,15 +2,19 @@
 ////
 //// This module formats `TestResult` values in a hierarchical, spec-like layout
 //// that mirrors your `describe` / `it` structure. It’s primarily used by
-//// `dream_test/reporters` (the reporter constructors), but it’s also useful
-//// directly when you want the formatted output as a `String` or when you’re
-//// streaming results as they complete.
+//// the end-of-run BDD results reporter (`runner.results_reporters([bdd.new()])`),
+//// but it’s also useful directly when you want formatted output as a `String`
+//// (e.g. snapshot tests) or when you’re formatting results incrementally in a
+//// custom runner.
 
 import dream_test/reporters/gherkin as gherkin_reporter
+import dream_test/reporters/types as reporter_types
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
-  Passed, Pending, SetupFailed, Skipped, SnapshotFailure, TimedOut,
+  type AssertionFailure, type Status, type TestResult, BooleanFailure,
+  CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
+  Failed, OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
+  SnapshotFailure, StringMatchFailure, TimedOut,
 }
 import gleam/int
 import gleam/list
@@ -43,6 +47,169 @@ pub type FormatIncrementalPartsResult {
     test_line: String,
     new_path: List(String),
   )
+}
+
+// ============================================================================
+// Results reporter builder (end-of-run)
+// ============================================================================
+
+/// Create a BDD results reporter.
+///
+/// This reporter prints at the end of the run, using the traversal-ordered results
+/// provided by the runner.
+pub fn new() -> reporter_types.ResultsReporter {
+  reporter_types.Bdd(reporter_types.BddReporterConfig(
+    color: False,
+    mode: reporter_types.BddFull,
+  ))
+}
+
+/// Enable ANSI color output for the BDD report.
+pub fn color(
+  reporter reporter: reporter_types.ResultsReporter,
+) -> reporter_types.ResultsReporter {
+  case reporter {
+    reporter_types.Bdd(reporter_types.BddReporterConfig(color: _c, mode: mode)) ->
+      reporter_types.Bdd(reporter_types.BddReporterConfig(
+        color: True,
+        mode: mode,
+      ))
+    other -> other
+  }
+}
+
+/// Print only the summary line at the end of the run.
+pub fn summary_only(
+  reporter reporter: reporter_types.ResultsReporter,
+) -> reporter_types.ResultsReporter {
+  case reporter {
+    reporter_types.Bdd(reporter_types.BddReporterConfig(color: color, mode: _)) ->
+      reporter_types.Bdd(reporter_types.BddReporterConfig(
+        color: color,
+        mode: reporter_types.BddSummaryOnly,
+      ))
+    other -> other
+  }
+}
+
+/// Print only repeated failures and the summary line at the end of the run.
+pub fn failures_only(
+  reporter reporter: reporter_types.ResultsReporter,
+) -> reporter_types.ResultsReporter {
+  case reporter {
+    reporter_types.Bdd(reporter_types.BddReporterConfig(color: color, mode: _)) ->
+      reporter_types.Bdd(reporter_types.BddReporterConfig(
+        color: color,
+        mode: reporter_types.BddFailuresOnly,
+      ))
+    other -> other
+  }
+}
+
+/// Render the end-of-run BDD output for the given results.
+pub fn render(
+  config config: reporter_types.BddReporterConfig,
+  results results: List(TestResult),
+) -> String {
+  let reporter_types.BddReporterConfig(color: color, mode: mode) = config
+  render_bdd_sections(color, mode, results)
+}
+
+fn render_bdd_sections(
+  color: Bool,
+  mode: reporter_types.BddOutputMode,
+  results: List(TestResult),
+) -> String {
+  let summary = format_summary(color, results)
+
+  case mode {
+    reporter_types.BddSummaryOnly -> summary
+    reporter_types.BddFailuresOnly -> {
+      let failures = filter_failures(results, [])
+      let failures_text = format_all_results(color, failures, [], "")
+      string.concat([failures_text, "\n", summary])
+    }
+    reporter_types.BddFull -> {
+      let results_text = format_all_results(color, results, [], "")
+      let failures = filter_failures(results, [])
+      let failures_text = case failures {
+        [] -> ""
+        _ ->
+          "\n"
+          <> format_failures_header(color)
+          <> "\n"
+          <> format_all_results(color, failures, [], "")
+      }
+      string.concat([results_text, failures_text, "\n", summary])
+    }
+  }
+}
+
+fn filter_failures(
+  results: List(TestResult),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case results {
+    [] -> list.reverse(acc_rev)
+    [result, ..rest] -> {
+      case is_failure_status(result.status) {
+        True -> filter_failures(rest, [result, ..acc_rev])
+        False -> filter_failures(rest, acc_rev)
+      }
+    }
+  }
+}
+
+fn is_failure_status(status: Status) -> Bool {
+  case status {
+    Failed -> True
+    SetupFailed -> True
+    TimedOut -> True
+    _ -> False
+  }
+}
+
+fn ansi_wrap(code: String, text: String) -> String {
+  string.concat(["\u{1b}[", code, "m", text, "\u{1b}[0m"])
+}
+
+fn ansi_dim(text: String) -> String {
+  ansi_wrap("2", text)
+}
+
+fn ansi_red(text: String) -> String {
+  ansi_wrap("31", text)
+}
+
+fn ansi_green(text: String) -> String {
+  ansi_wrap("32", text)
+}
+
+fn ansi_yellow(text: String) -> String {
+  ansi_wrap("33", text)
+}
+
+fn ansi_cyan(text: String) -> String {
+  ansi_wrap("36", text)
+}
+
+fn ansi_magenta(text: String) -> String {
+  ansi_wrap("35", text)
+}
+
+fn ansi_bold(text: String) -> String {
+  ansi_wrap("1", text)
+}
+
+fn maybe(color: Bool, apply: fn(String) -> String, text: String) -> String {
+  case color {
+    True -> apply(text)
+    False -> text
+  }
+}
+
+fn format_failures_header(color: Bool) -> String {
+  maybe(color, fn(t) { ansi_bold(ansi_red(t)) }, "Failures:")
 }
 
 /// Format test results as a BDD-style report string.
@@ -81,11 +248,11 @@ pub fn format(results results: List(TestResult)) -> String {
   let #(gherkin_results, unit_results) = partition_by_kind(results)
 
   // Format each group with appropriate reporter
-  let unit_text = format_unit_results(unit_results)
+  let unit_text = format_unit_results(False, unit_results)
   let gherkin_text = format_gherkin_results(gherkin_results)
 
   // Combine with single summary
-  let summary_text = format_summary(results)
+  let summary_text = format_summary(False, results)
   string.concat([unit_text, gherkin_text, "\n", summary_text])
 }
 
@@ -95,14 +262,14 @@ fn partition_by_kind(
   list.partition(results, gherkin_reporter.is_gherkin_result)
 }
 
-fn format_unit_results(results: List(TestResult)) -> String {
+fn format_unit_results(color: Bool, results: List(TestResult)) -> String {
   case results {
     [] -> ""
     _ -> {
       // Sort results by full_name to group tests from the same describe block together.
       // This ensures consistent output regardless of parallel execution order.
       let sorted = list.sort(results, compare_by_full_name)
-      format_all_results(sorted, [], "")
+      format_all_results(color, sorted, [], "")
     }
   }
 }
@@ -227,7 +394,7 @@ pub fn format_incremental(
   result result: TestResult,
   previous_path previous_path: List(String),
 ) -> FormatIncrementalResult {
-  let text = format_one_result_with_test_indent(result, previous_path, 0)
+  let text = format_one_result_with_test_indent(False, result, previous_path, 0)
   let new_path = extract_describe_segments(result.full_name)
   FormatIncrementalResult(text: text, new_path: new_path)
 }
@@ -264,7 +431,12 @@ pub fn format_incremental_with_test_indent(
   extra_test_indent extra_test_indent: Int,
 ) -> FormatIncrementalResult {
   let text =
-    format_one_result_with_test_indent(result, previous_path, extra_test_indent)
+    format_one_result_with_test_indent(
+      False,
+      result,
+      previous_path,
+      extra_test_indent,
+    )
   let new_path = extract_describe_segments(result.full_name)
   FormatIncrementalResult(text: text, new_path: new_path)
 }
@@ -309,6 +481,7 @@ pub fn format_incremental_parts_with_test_indent(
 ) -> FormatIncrementalPartsResult {
   let #(headers, test_line) =
     format_one_result_parts_with_test_indent(
+      False,
       result,
       previous_path,
       extra_test_indent,
@@ -346,7 +519,7 @@ pub fn format_incremental_parts_with_test_indent(
 ///
 /// A single summary line as a `String` (including a trailing newline).
 pub fn format_summary_only(results results: List(TestResult)) -> String {
-  format_summary(results)
+  format_summary(False, results)
 }
 
 /// ## Example
@@ -360,6 +533,7 @@ pub fn format_summary_only(results results: List(TestResult)) -> String {
 /// |> or_fail_with("expected summary snapshot match")
 /// ```
 fn format_all_results(
+  color: Bool,
   results: List(TestResult),
   previous_path: List(String),
   accumulated: String,
@@ -367,21 +541,23 @@ fn format_all_results(
   case results {
     [] -> accumulated
     [result, ..rest] -> {
-      let formatted = format_one_result(result, previous_path)
+      let formatted = format_one_result(color, result, previous_path)
       let updated = string.concat([accumulated, formatted])
       let new_path = extract_describe_segments(result.full_name)
-      format_all_results(rest, new_path, updated)
+      format_all_results(color, rest, new_path, updated)
     }
   }
 }
 
 fn format_one_result_with_test_indent(
+  color: Bool,
   result: TestResult,
   previous_path: List(String),
   extra_test_indent: Int,
 ) -> String {
   let #(headers, test_line) =
     format_one_result_parts_with_test_indent(
+      color,
       result,
       previous_path,
       extra_test_indent,
@@ -389,11 +565,16 @@ fn format_one_result_with_test_indent(
   string.concat([headers, test_line])
 }
 
-fn format_one_result(result: TestResult, previous_path: List(String)) -> String {
-  format_one_result_with_test_indent(result, previous_path, 0)
+fn format_one_result(
+  color: Bool,
+  result: TestResult,
+  previous_path: List(String),
+) -> String {
+  format_one_result_with_test_indent(color, result, previous_path, 0)
 }
 
 fn format_one_result_parts_with_test_indent(
+  color: Bool,
   result: TestResult,
   previous_path: List(String),
   extra_test_indent: Int,
@@ -401,9 +582,52 @@ fn format_one_result_parts_with_test_indent(
   let current_path = extract_describe_segments(result.full_name)
   let common_depth = count_common_prefix(previous_path, current_path, 0)
   let new_segments = list.drop(current_path, common_depth)
-  let headers = format_header_segments(new_segments, common_depth, "")
-  let test_line = format_test_line_with_indent(result, extra_test_indent)
+  let is_gherkin = gherkin_reporter.is_gherkin_result(result)
+  let headers =
+    format_header_segments_for_kind(
+      color,
+      new_segments,
+      common_depth,
+      is_gherkin,
+      "",
+    )
+  let test_line =
+    format_test_line_with_indent_for_kind(
+      color,
+      result,
+      extra_test_indent,
+      is_gherkin,
+    )
   #(headers, test_line)
+}
+
+fn format_header_segments_for_kind(
+  color: Bool,
+  segments: List(String),
+  depth: Int,
+  is_gherkin: Bool,
+  accumulated: String,
+) -> String {
+  case segments {
+    [] -> accumulated
+    [segment, ..rest] -> {
+      let indent = build_indent(depth)
+      let label = case is_gherkin && depth == 0 {
+        True -> "Feature: " <> segment
+        False -> segment
+      }
+      let styled = maybe(color, fn(t) { ansi_bold(ansi_cyan(t)) }, label)
+      let header = string.concat([indent, styled, "\n"])
+      let updated = string.concat([accumulated, header])
+      format_header_segments_for_kind(
+        color,
+        rest,
+        depth + 1,
+        is_gherkin,
+        updated,
+      )
+    }
+  }
 }
 
 fn count_common_prefix(
@@ -445,30 +669,31 @@ fn extract_describe_segments(full_name: List(String)) -> List(String) {
   }
 }
 
-fn format_header_segments(
-  segments: List(String),
-  depth: Int,
-  accumulated: String,
+fn format_test_line_with_indent_for_kind(
+  color: Bool,
+  result: TestResult,
+  extra_indent: Int,
+  is_gherkin: Bool,
 ) -> String {
-  case segments {
-    [] -> accumulated
-    [segment, ..rest] -> {
-      let indent = build_indent(depth)
-      let header = string.concat([indent, segment, "\n"])
-      let updated = string.concat([accumulated, header])
-      format_header_segments(rest, depth + 1, updated)
-    }
-  }
-}
-
-fn format_test_line_with_indent(result: TestResult, extra_indent: Int) -> String {
   let depth = calculate_test_depth(result.full_name)
   let indent = build_indent(depth + extra_indent)
-  let marker = status_marker(result.status)
-  let name = extract_test_name(result.full_name)
+  let marker = status_marker(color, result.status)
+  let name = case is_gherkin {
+    True -> "Scenario: " <> extract_test_name(result.full_name)
+    False -> extract_test_name(result.full_name)
+  }
   let duration = format_duration(result.duration_ms)
-  let test_line = string.concat([indent, marker, " ", name, duration, "\n"])
-  let failure_text = format_failure_details(result, depth + extra_indent)
+  let colored_name = case result.status {
+    Passed -> name
+    Failed -> maybe(color, ansi_red, name)
+    SetupFailed -> maybe(color, ansi_red, name)
+    TimedOut -> maybe(color, ansi_red, name)
+    Skipped -> maybe(color, ansi_yellow, name)
+    Pending -> maybe(color, ansi_yellow, name)
+  }
+  let test_line =
+    string.concat([indent, marker, " ", colored_name, duration, "\n"])
+  let failure_text = format_failure_details(color, result, depth + extra_indent)
   string.concat([test_line, failure_text])
 }
 
@@ -506,26 +731,32 @@ fn extract_test_name(full_name: List(String)) -> String {
   }
 }
 
-fn status_marker(status: Status) -> String {
+fn status_marker(color: Bool, status: Status) -> String {
   case status {
-    Passed -> "✓"
-    Failed -> "✗"
-    Skipped -> "-"
-    Pending -> "~"
-    TimedOut -> "!"
-    SetupFailed -> "⚠"
+    Passed -> maybe(color, ansi_green, "✓")
+    Failed -> maybe(color, ansi_red, "✗")
+    Skipped -> maybe(color, ansi_yellow, "-")
+    Pending -> maybe(color, ansi_yellow, "~")
+    TimedOut -> maybe(color, ansi_red, "!")
+    SetupFailed -> maybe(color, ansi_red, "⚠")
   }
 }
 
-fn format_failure_details(result: TestResult, indent_level: Int) -> String {
+fn format_failure_details(
+  color: Bool,
+  result: TestResult,
+  indent_level: Int,
+) -> String {
   case result.status {
-    Failed -> format_all_failures(result.failures, indent_level, "")
-    SetupFailed -> format_all_failures(result.failures, indent_level, "")
+    Failed -> format_all_failures(color, result.failures, indent_level, "")
+    SetupFailed -> format_all_failures(color, result.failures, indent_level, "")
+    TimedOut -> format_all_failures(color, result.failures, indent_level, "")
     _ -> ""
   }
 }
 
 fn format_all_failures(
+  color: Bool,
   failures: List(AssertionFailure),
   indent_level: Int,
   accumulated: String,
@@ -533,59 +764,159 @@ fn format_all_failures(
   case failures {
     [] -> accumulated
     [failure, ..rest] -> {
-      let formatted = format_one_failure(failure, indent_level)
+      let formatted = format_one_failure(color, failure, indent_level)
       let updated = string.concat([accumulated, formatted])
-      format_all_failures(rest, indent_level, updated)
+      format_all_failures(color, rest, indent_level, updated)
     }
   }
 }
 
-fn format_one_failure(failure: AssertionFailure, indent_level: Int) -> String {
+fn format_one_failure(
+  color: Bool,
+  failure: AssertionFailure,
+  indent_level: Int,
+) -> String {
   let base_indent = build_indent(indent_level)
 
-  let header = string.concat([base_indent, "  ", failure.operator, "\n"])
-  let message_text = format_failure_message(failure.message, base_indent)
-  let payload_text = format_failure_payload(failure.payload, base_indent)
+  let operator_text =
+    maybe(color, fn(t) { ansi_bold(ansi_magenta(t)) }, failure.operator)
+  let header = string.concat([base_indent, "  ", operator_text, "\n"])
+  let message_text = format_failure_message(color, failure.message, base_indent)
+  let payload_text = format_failure_payload(color, failure.payload, base_indent)
 
   string.concat([header, message_text, payload_text])
 }
 
-fn format_failure_message(message: String, base_indent: String) -> String {
+fn format_failure_message(
+  color: Bool,
+  message: String,
+  base_indent: String,
+) -> String {
   case message {
     "" -> ""
-    _ -> string.concat([base_indent, "    Message: ", message, "\n"])
+    _ -> {
+      let label = maybe(color, ansi_dim, "    Message: ")
+      let msg = maybe(color, ansi_red, message)
+      string.concat([base_indent, label, msg, "\n"])
+    }
   }
 }
 
 fn format_failure_payload(
+  color: Bool,
   payload: option.Option(types.FailurePayload),
   base_indent: String,
 ) -> String {
   case payload {
+    Some(BooleanFailure(actual, expected)) -> {
+      let expected_text = case expected {
+        True -> "True"
+        False -> "False"
+      }
+      let actual_text = case actual {
+        True -> "True"
+        False -> "False"
+      }
+      format_expected_actual(color, base_indent, expected_text, actual_text)
+    }
     Some(EqualityFailure(actual, expected)) ->
-      string.concat([
-        base_indent,
-        "    Expected: ",
-        expected,
-        "\n",
-        base_indent,
-        "    Actual:   ",
-        actual,
-        "\n",
-      ])
+      format_expected_actual(color, base_indent, expected, actual)
+    Some(OptionFailure(actual, expected_some)) -> {
+      let expected_text = case expected_some {
+        True -> "Some(_)"
+        False -> "None"
+      }
+      format_expected_actual(color, base_indent, expected_text, actual)
+    }
+    Some(ResultFailure(actual, expected_ok)) -> {
+      let expected_text = case expected_ok {
+        True -> "Ok(_)"
+        False -> "Error(_)"
+      }
+      format_expected_actual(color, base_indent, expected_text, actual)
+    }
+    Some(CollectionFailure(actual, expected, operation)) -> {
+      let op_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Operation: ")
+        <> maybe(color, ansi_cyan, operation)
+        <> "\n"
+      op_line <> format_expected_actual(color, base_indent, expected, actual)
+    }
+    Some(ComparisonFailure(actual, expected, operator)) -> {
+      let op_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Operator: ")
+        <> maybe(color, ansi_cyan, operator)
+        <> "\n"
+      op_line <> format_expected_actual(color, base_indent, expected, actual)
+    }
+    Some(StringMatchFailure(actual, pattern, operation)) -> {
+      let op_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Operation: ")
+        <> maybe(color, ansi_cyan, operation)
+        <> "\n"
+      let pat_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Pattern:   ")
+        <> maybe(color, ansi_green, pattern)
+        <> "\n"
+      let actual_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Actual:    ")
+        <> maybe(color, ansi_red, actual)
+        <> "\n"
+      op_line <> pat_line <> actual_line
+    }
     Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) ->
       format_snapshot_failure(
+        color,
         actual,
         expected,
         snapshot_path,
         is_missing,
         base_indent,
       )
+    Some(CustomMatcherFailure(actual, description)) -> {
+      let desc_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Description: ")
+        <> maybe(color, ansi_cyan, description)
+        <> "\n"
+      let actual_line =
+        base_indent
+        <> maybe(color, ansi_dim, "    Actual:      ")
+        <> maybe(color, ansi_red, actual)
+        <> "\n"
+      desc_line <> actual_line
+    }
     _ -> ""
   }
 }
 
+fn format_expected_actual(
+  color: Bool,
+  base_indent: String,
+  expected: String,
+  actual: String,
+) -> String {
+  let expected_label = maybe(color, ansi_dim, "    Expected: ")
+  let actual_label = maybe(color, ansi_dim, "    Actual:   ")
+  string.concat([
+    base_indent,
+    expected_label,
+    maybe(color, ansi_green, expected),
+    "\n",
+    base_indent,
+    actual_label,
+    maybe(color, ansi_red, actual),
+    "\n",
+  ])
+}
+
 fn format_snapshot_failure(
+  color: Bool,
   actual: String,
   expected: String,
   snapshot_path: String,
@@ -596,29 +927,22 @@ fn format_snapshot_failure(
     True ->
       string.concat([
         base_indent,
-        "    Snapshot missing: ",
-        snapshot_path,
+        maybe(color, ansi_dim, "    Snapshot missing: "),
+        maybe(color, ansi_yellow, snapshot_path),
         "\n",
       ])
     False ->
       string.concat([
         base_indent,
-        "    Snapshot: ",
-        snapshot_path,
+        maybe(color, ansi_dim, "    Snapshot: "),
+        maybe(color, ansi_cyan, snapshot_path),
         "\n",
-        base_indent,
-        "    Expected: ",
-        expected,
-        "\n",
-        base_indent,
-        "    Actual:   ",
-        actual,
-        "\n",
+        format_expected_actual(color, base_indent, expected, actual),
       ])
   }
 }
 
-fn format_summary(results: List(TestResult)) -> String {
+fn format_summary(color: Bool, results: List(TestResult)) -> String {
   let total = list.length(results)
   let failed = count_by_status(results, Failed)
   let skipped = count_by_status(results, Skipped)
@@ -629,16 +953,16 @@ fn format_summary(results: List(TestResult)) -> String {
   let total_duration = sum_durations(results, 0)
 
   string.concat([
-    "Summary: ",
-    int.to_string(total),
+    maybe(color, fn(t) { ansi_bold(ansi_cyan(t)) }, "Summary: "),
+    maybe(color, ansi_cyan, int.to_string(total)),
     " run, ",
-    int.to_string(failed),
+    maybe(color, ansi_red, int.to_string(failed)),
     " failed, ",
-    int.to_string(passed),
+    maybe(color, ansi_green, int.to_string(passed)),
     " passed",
-    build_summary_suffix(skipped, pending, timed_out, setup_failed),
+    build_summary_suffix(color, skipped, pending, timed_out, setup_failed),
     " in ",
-    timing.format_duration_ms(total_duration),
+    maybe(color, ansi_cyan, timing.format_duration_ms(total_duration)),
     "\n",
   ])
 }
@@ -676,6 +1000,7 @@ fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
 }
 
 fn build_summary_suffix(
+  color: Bool,
   skipped: Int,
   pending: Int,
   timed_out: Int,
@@ -683,10 +1008,15 @@ fn build_summary_suffix(
 ) -> String {
   let parts =
     []
-    |> add_summary_part_if_nonzero(skipped, " skipped")
-    |> add_summary_part_if_nonzero(pending, " pending")
-    |> add_summary_part_if_nonzero(timed_out, " timed out")
-    |> add_summary_part_if_nonzero(setup_failed, " setup failed")
+    |> add_summary_part_if_nonzero(color, skipped, " skipped", ansi_yellow)
+    |> add_summary_part_if_nonzero(color, pending, " pending", ansi_yellow)
+    |> add_summary_part_if_nonzero(color, timed_out, " timed out", ansi_red)
+    |> add_summary_part_if_nonzero(
+      color,
+      setup_failed,
+      " setup failed",
+      ansi_red,
+    )
 
   format_summary_parts(parts)
 }
@@ -700,11 +1030,16 @@ fn format_summary_parts(parts: List(String)) -> String {
 
 fn add_summary_part_if_nonzero(
   parts: List(String),
+  color: Bool,
   count: Int,
   label: String,
+  paint: fn(String) -> String,
 ) -> List(String) {
   case count {
     0 -> parts
-    _ -> [string.concat([int.to_string(count), label]), ..parts]
+    _ -> [
+      string.concat([paint(int.to_string(count)), maybe(color, ansi_dim, label)]),
+      ..parts
+    ]
   }
 }

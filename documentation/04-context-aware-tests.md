@@ -55,10 +55,10 @@ This is the “make dependencies explicit” version of hooks: instead of setup 
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit_context.{before_each, describe, it}
-import gleam/io
 
 pub type Ctx {
   Ctx(counter: Int)
@@ -90,7 +90,8 @@ pub fn suite() {
 
 pub fn main() {
   runner.new([suite()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
@@ -107,10 +108,10 @@ pub fn main() {
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit_context.{before_each, describe, group, it}
-import gleam/io
 
 pub type Ctx {
   Ctx(counter: Int)
@@ -148,7 +149,8 @@ pub fn suite() {
 
 pub fn main() {
   runner.new([suite()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

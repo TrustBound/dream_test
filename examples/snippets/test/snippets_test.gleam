@@ -1,7 +1,7 @@
 import dream_test/discover
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
-import gleam/io
 
 fn suites() {
   let discover.LoadResult(suites: suites, errors: _errors) =
@@ -13,7 +13,8 @@ fn suites() {
 
 pub fn main() {
   runner.new(suites())
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new() |> bdd.color()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

@@ -1,6 +1,7 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/types as reporter_types
 import dream_test/unit.{describe, it}
+import gleam/list
 import gleam/option.{Some}
 import gleam/result
 
@@ -20,6 +21,15 @@ fn hook_error_message(
       ..,
     ) -> Ok(message)
     _ -> Error("expected HookFinished with HookError")
+  }
+}
+
+fn run_finished_results_count(
+  event: reporter_types.ReporterEvent,
+) -> Result(Int, String) {
+  case event {
+    reporter_types.RunFinished(results: results, ..) -> Ok(list.length(results))
+    _ -> Error("expected RunFinished")
   }
 }
 
@@ -50,6 +60,18 @@ pub fn tests() {
       |> should
       |> be_equal("boom")
       |> or_fail_with("expected hook error message 'boom'")
+    }),
+    it("RunFinished includes the traversal-ordered results list", fn() {
+      use count <- result.try(
+        run_finished_results_count(
+          reporter_types.RunFinished(completed: 1, total: 1, results: []),
+        ),
+      )
+
+      count
+      |> should
+      |> be_equal(0)
+      |> or_fail_with("expected results count to be 0")
     }),
   ])
 }

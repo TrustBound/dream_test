@@ -63,12 +63,17 @@ Rapid application development needs testing tools that scale and support the gro
 
 ### Reporting
 
-| Feature                  | What you get                        |
-| ------------------------ | ----------------------------------- |
-| 📝 **BDD reporter**      | Human-readable, hierarchical output |
-| ⚫ **Progress reporter** | Compact dots for quick feedback     |
-| 📋 **JSON reporter**     | Machine-readable for CI pipelines   |
-| 🌿 **Gherkin reporter**  | Dedicated output for feature tests  |
+| Feature                      | What you get                                         |
+| ---------------------------- | ---------------------------------------------------- |
+| 📝 **BDD results reporter**  | Human-readable, hierarchical output (printed at end) |
+| 📊 **Progress reporter**     | Live single-line progress bar during the run         |
+| 📋 **JSON results reporter** | Machine-readable JSON (printed at end)               |
+| 🌿 **Gherkin formatting**    | Dedicated output for feature tests                   |
+
+Dream Test splits reporting into:
+
+- **Progress** (during the run): `runner.progress_reporter(progress.new())`
+- **Results** (after the run): `runner.results_reporters([bdd.new(), json.new(), ...])`
 
 ## Full Usage Guide
 
@@ -88,10 +93,10 @@ Rapid application development needs testing tools that scale and support the gro
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 import gleam/string
 
 pub fn tests() {
@@ -108,7 +113,8 @@ pub fn tests() {
 
 pub fn main() {
   runner.new([tests()])
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

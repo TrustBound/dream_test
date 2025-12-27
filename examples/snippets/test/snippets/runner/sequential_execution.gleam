@@ -1,8 +1,8 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/io
 
 pub fn tests() {
   describe("Sequential tests", [
@@ -27,7 +27,8 @@ pub fn main() {
   runner.new([tests()])
   |> runner.max_concurrency(1)
   |> runner.default_timeout_ms(30_000)
-  |> runner.reporter(reporters.bdd(io.print, True))
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }

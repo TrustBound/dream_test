@@ -41,8 +41,9 @@ pub fn tests() {
     it(
       "handle_event does not crash for RunStarted/TestFinished/RunFinished",
       fn() {
-        let write = fn(_s: String) { Nil }
-        progress.handle_event(reporter_types.RunStarted(total: 2), write)
+        let reporter = progress.new()
+        let _ =
+          progress.handle_event(reporter, reporter_types.RunStarted(total: 2))
         let result =
           types.TestResult(
             name: "t",
@@ -53,14 +54,16 @@ pub fn tests() {
             failures: [],
             kind: types.Unit,
           )
-        progress.handle_event(
-          reporter_types.TestFinished(completed: 1, total: 2, result: result),
-          write,
-        )
-        progress.handle_event(
-          reporter_types.RunFinished(completed: 2, total: 2),
-          write,
-        )
+        let _ =
+          progress.handle_event(
+            reporter,
+            reporter_types.TestFinished(completed: 1, total: 2, result: result),
+          )
+        let _ =
+          progress.handle_event(
+            reporter,
+            reporter_types.RunFinished(completed: 2, total: 2, results: []),
+          )
         Ok(types.AssertionOk)
       },
     ),

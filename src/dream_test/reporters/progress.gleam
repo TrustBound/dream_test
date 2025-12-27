@@ -15,15 +15,15 @@
 //// - if that is missing/invalid, it defaults to 80 columns
 ////
 //// It is designed to be driven by `dream_test/reporters/types.ReporterEvent`,
-//// but most users should not call it directly. Prefer attaching a reporter via
-//// `dream_test/reporters` and letting the runner drive events.
+//// but most users should not call it directly. Prefer attaching it via
+//// `runner.progress_reporter(progress.new())` and letting the runner drive events.
 ////
 //// ## Example
 ////
 //// ```gleam
 //// pub fn main() {
 ////   runner.new([tests()])
-////   |> runner.reporter(reporters.progress(io.print))
+////   |> runner.progress_reporter(progress.new())
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
@@ -33,7 +33,21 @@ import dream_test/reporters/types as reporter_types
 import dream_test/types.{type TestResult}
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/string
+
+/// A progress-bar reporter that renders a single-line UI during a run.
+///
+/// Construct one with `progress.new()` and attach it to the runner via
+/// `runner.progress_reporter(...)`.
+pub opaque type ProgressReporter {
+  ProgressReporter
+}
+
+/// Create a new progress reporter.
+pub fn new() -> ProgressReporter {
+  ProgressReporter
+}
 
 /// Handle a single reporter event by writing an in-place progress bar line.
 ///
@@ -52,8 +66,8 @@ import gleam/string
 ///
 /// ## When should I use this?
 ///
-/// Usually you shouldn’t call it directly—prefer `reporters.progress(...)` via
-/// `dream_test/reporters` and attach that reporter to `runner`.
+/// Usually you shouldn’t call it directly—prefer attaching it via
+/// `runner.progress_reporter(progress.new())` and letting the runner drive events.
 ///
 /// You may call it directly only if you are building your own reporter/driver
 /// and you are already receiving `ReporterEvent`s.
@@ -77,17 +91,18 @@ import gleam/string
 /// |> or_fail_with("expected handle_event output snapshot match")
 /// ```
 pub fn handle_event(
+  reporter reporter: ProgressReporter,
   event event: reporter_types.ReporterEvent,
-  write write: fn(String) -> Nil,
-) -> Nil {
+) -> Option(String) {
+  let _ = reporter
   let cols = terminal_columns()
   let line = render(cols, event)
 
   case event {
-    reporter_types.HookStarted(..) -> Nil
-    reporter_types.HookFinished(..) -> Nil
-    reporter_types.RunFinished(..) -> write("\r" <> line <> "\n")
-    _ -> write("\r" <> line)
+    reporter_types.HookStarted(..) -> None
+    reporter_types.HookFinished(..) -> None
+    reporter_types.RunFinished(..) -> Some("\r" <> line <> "\n")
+    _ -> Some("\r" <> line)
   }
 }
 
@@ -134,8 +149,11 @@ pub fn render(
       result: result,
     ) -> render_line(cols, completed, total, format_result_name(result))
 
-    reporter_types.RunFinished(completed: completed, total: total) ->
-      render_line(cols, completed, total, "done")
+    reporter_types.RunFinished(
+      completed: completed,
+      total: total,
+      results: _results,
+    ) -> render_line(cols, completed, total, "done")
 
     // Hook events do not affect the progress bar.
     _ -> render_line(cols, 0, 1, "")
