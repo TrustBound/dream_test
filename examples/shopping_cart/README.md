@@ -22,11 +22,15 @@ shopping_cart/
 │   │   ├── checkout.gleam          # Checkout steps
 │   │   └── assertions.gleam        # Verification steps (Then)
 │   └── features/
-│       └── shopping_cart.gleam     # Inline feature definition
+│       ├── shopping_cart.gleam     # Inline DSL feature definition
+│       └── shopping_cart_file.gleam # Loads `features/*.feature` into a TestSuite
 └── README.md
 ```
 
 ## Two Approaches
+
+This example project runs **both** the `.feature` file(s) in `features/` and the
+inline DSL suite.
 
 ### 1. Gherkin Feature Files
 
@@ -76,18 +80,18 @@ pub fn register(registry: StepRegistry) -> StepRegistry {
 
 ### Cucumber Expression Placeholders
 
-| Placeholder | Matches | Example |
-|-------------|---------|---------|
-| `{int}` | Integers | `5`, `42` |
-| `{float}` | Decimals | `3.14`, `0.5` |
-| `{string}` | Quoted text | `"hello"` |
-| `{word}` | Single word | `apple` |
+| Placeholder | Matches     | Example       |
+| ----------- | ----------- | ------------- |
+| `{int}`     | Integers    | `5`, `42`     |
+| `{float}`   | Decimals    | `3.14`, `0.5` |
+| `{string}`  | Quoted text | `"hello"`     |
+| `{word}`    | Single word | `apple`       |
 
 ## Running
 
 ```bash
 cd examples/shopping_cart
-gleam test
+make test
 ```
 
 ## Output

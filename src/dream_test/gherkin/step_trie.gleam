@@ -1,67 +1,32 @@
-//// Step Trie - Fast step definition lookup using Cucumber Expressions.
+//// Fast step-definition lookup using Cucumber-Expression-style placeholders.
 ////
-//// Provides O(word count) step matching instead of O(step definitions) linear search.
-//// This is the core data structure for efficient Gherkin step matching.
+//// This is the data structure behind `dream_test/gherkin/steps`. It matches step
+//// text in time proportional to the **number of tokens in the step text**, not
+//// the number of registered step definitions.
 ////
-//// ## Performance Characteristics
+//// ## Placeholder syntax
 ////
-//// - **Insert**: O(words in pattern) - typically 5-10 words
-//// - **Lookup**: O(words in step text) - independent of total step definitions
-//// - **Memory**: O(total words across all patterns)
+//// - `{int}`: integers like `42`, `-5`
+//// - `{float}`: decimals like `3.14`, `-0.5`
+//// - `{string}`: quoted strings like `"hello world"`
+//// - `{word}` / `{}`: a single token
 ////
-//// ## Placeholder Syntax
-////
-//// Patterns use Cucumber Expression placeholders:
-////
-//// | Placeholder | Matches | Captures |
-//// |-------------|---------|----------|
-//// | `{int}` | Integer like `42`, `-5` | `CapturedInt(Int)` |
-//// | `{float}` | Decimal like `3.14`, `0.5` | `CapturedFloat(Float)` |
-//// | `{string}` | Quoted text like `"hello"` | `CapturedString(String)` |
-//// | `{word}` | Single word like `apple` | `CapturedWord(String)` |
-//// | `{}` | Any single token | `CapturedWord(String)` |
-////
-//// ## Prefix and Suffix Support
-////
-//// Placeholders can have literal prefixes and suffixes:
-////
-//// - `${float}` matches `$3.99` and captures `3.99`
-//// - `{int}%` matches `50%` and captures `50`
-//// - `${float}USD` matches `$19.99USD` and captures `19.99`
-////
-//// This works by splitting patterns and text at placeholder/numeric boundaries,
-//// so `${float}` becomes `["$", "{float}"]` in the trie, and `$3.99` becomes
-//// `["$", "3.99"]` during matching.
-////
-//// ## Matching Priority
-////
-//// When multiple patterns could match, the trie uses this priority order:
-////
-//// 1. **Literal words** - exact string match (highest priority)
-//// 2. **{string}** - quoted string capture
-//// 3. **{int}** - integer capture
-//// 4. **{float}** - decimal capture  
-//// 5. **{word}** - single word capture
-//// 6. **{}** - any word capture (lowest priority)
-////
-//// This ensures the most specific step definition wins.
+//// Prefix/suffix text can be attached to placeholders. For example,
+//// `${float}USD` matches `$19.99USD` and captures `19.99` as a float.
 ////
 //// ## Example
 ////
 //// ```gleam
-//// let trie = new()
-//// |> insert("Given", "I have {int} items", count_handler)
-//// |> insert("Given", "I have an empty cart", empty_handler)
-//// |> insert("Then", "the total is ${float}", total_handler)
-////
-//// // Matches empty_handler (literal "an" beats {int})
-//// lookup(trie, "Given", "I have an empty cart")
-////
-//// // Matches count_handler, captures [CapturedInt(42)]
-//// lookup(trie, "Given", "I have 42 items")
-////
-//// // Matches total_handler, captures [CapturedFloat(19.99)]
-//// lookup(trie, "Then", "the total is $19.99")
+////       step_trie.lookup(trie, "Then", "the total is $19.99USD")
+////       |> should
+////       |> be_equal(
+////         Some(
+////           step_trie.StepMatch(handler: "total_usd", captures: [
+////             step_trie.CapturedFloat(19.99),
+////           ]),
+////         ),
+////       )
+////       |> or_fail_with("expected float capture for $19.99USD")
 //// ```
 
 import gleam/dict.{type Dict}
@@ -209,8 +174,13 @@ pub type StepMatch(handler) {
 /// ## Example
 ///
 /// ```gleam
-/// let trie = new()
-/// |> insert("Given", "I have {int} items", handler)
+///       let trie =
+///         step_trie.new()
+///         |> step_trie.insert(
+///           keyword: "Given",
+///           pattern: "I have an empty cart",
+///           handler: "empty",
+///         )
 /// ```
 ///
 pub fn new() -> StepTrie(handler) {
@@ -232,16 +202,18 @@ pub fn new() -> StepTrie(handler) {
 /// ## Example
 ///
 /// ```gleam
-/// let trie = new()
-/// |> insert("Given", "I have {int} items", have_items)
-/// |> insert("When", "I add {int} more", add_items)
+///         |> step_trie.insert(
+///           keyword: "Given",
+///           pattern: "I have {int} items",
+///           handler: "count",
+///         )
 /// ```
 ///
 pub fn insert(
-  trie: StepTrie(handler),
-  keyword: String,
-  pattern: String,
-  handler: handler,
+  trie trie: StepTrie(handler),
+  keyword keyword: String,
+  pattern pattern: String,
+  handler handler: handler,
 ) -> StepTrie(handler) {
   let segments = parse_step_pattern(pattern)
   let updated_root = insert_into_node(trie.root, keyword, segments, handler)
@@ -385,22 +357,25 @@ fn get_or_create_literal_child(
 /// This enables patterns like `"the price is ${float}"` to match text like
 /// `"the price is $19.99"` and capture `19.99` as the float value.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```gleam
-/// parse_step_pattern("I have {int} items")
-/// // [LiteralWord("I"), LiteralWord("have"), IntParam, LiteralWord("items")]
-///
-/// parse_step_pattern("the total is ${float}")
-/// // [LiteralWord("the"), LiteralWord("total"), LiteralWord("is"),
-/// //  LiteralWord("$"), FloatParam]
-///
-/// parse_step_pattern("I apply a {int}% discount")
-/// // [LiteralWord("I"), LiteralWord("apply"), LiteralWord("a"),
-/// //  IntParam, LiteralWord("%"), LiteralWord("discount")]
+///       step_trie.parse_step_pattern("the total is ${float}USD")
+///       |> should
+///       |> be_equal([
+///         step_trie.LiteralWord("the"),
+///         step_trie.LiteralWord("total"),
+///         step_trie.LiteralWord("is"),
+///         step_trie.LiteralWord("$"),
+///         step_trie.FloatParam,
+///         step_trie.LiteralWord("USD"),
+///       ])
+///       |> or_fail_with(
+///         "expected ${float}USD to split into literal + FloatParam segments",
+///       )
 /// ```
 ///
-pub fn parse_step_pattern(pattern: String) -> List(StepSegment) {
+pub fn parse_step_pattern(pattern pattern: String) -> List(StepSegment) {
   pattern
   |> string.split(" ")
   |> list.filter(is_non_empty)
@@ -438,25 +413,52 @@ fn split_on_first_placeholder(
 ) -> List(String) {
   case placeholders {
     [] -> [word]
-    [placeholder, ..rest] -> {
-      case string.split_once(word, placeholder) {
-        Ok(#(before, after)) -> {
-          let parts = []
-          let parts = case before {
-            "" -> parts
-            _ -> list.append(parts, [before])
-          }
-          let parts = list.append(parts, [placeholder])
-          let parts = case after {
-            "" -> parts
-            _ -> list.append(parts, split_word_around_placeholder(after))
-          }
-          parts
-        }
-        Error(_) -> split_on_first_placeholder(word, rest)
+    [placeholder, ..rest] ->
+      case try_split_on_placeholder(word, placeholder) {
+        Some(parts) -> parts
+        None -> split_on_first_placeholder(word, rest)
       }
-    }
   }
+}
+
+fn try_split_on_placeholder(
+  word: String,
+  placeholder: String,
+) -> Option(List(String)) {
+  case string.split_once(word, placeholder) {
+    Ok(#(before, after)) ->
+      Some(append_placeholder_parts(before, placeholder, after))
+    Error(_) -> None
+  }
+}
+
+fn append_placeholder_parts(
+  before: String,
+  placeholder: String,
+  after: String,
+) -> List(String) {
+  []
+  |> append_if_non_empty(before)
+  |> list.append([placeholder])
+  |> append_list(split_after(after))
+}
+
+fn append_if_non_empty(parts: List(String), value: String) -> List(String) {
+  case value {
+    "" -> parts
+    _ -> list.append(parts, [value])
+  }
+}
+
+fn split_after(after: String) -> List(String) {
+  case after {
+    "" -> []
+    _ -> split_word_around_placeholder(after)
+  }
+}
+
+fn append_list(parts: List(String), extra: List(String)) -> List(String) {
+  list.append(parts, extra)
 }
 
 /// Split a token on boundaries between numeric and non-numeric characters.
@@ -473,14 +475,16 @@ fn split_numeric_boundaries(token: String) -> List(String) {
 
 fn do_split_numeric(token: String) -> List(String) {
   case regexp.from_string("(-?[0-9]+\\.?[0-9]*)") {
-    Ok(re) -> {
-      case regexp.split(re, token) {
-        // No match, return as-is
-        [only] -> [only]
-        parts -> parts |> list.filter(is_non_empty)
-      }
-    }
+    Ok(re) -> split_numeric_with_regex(token, re)
     Error(_) -> [token]
+  }
+}
+
+fn split_numeric_with_regex(token: String, re: regexp.Regexp) -> List(String) {
+  case regexp.split(re, token) {
+    // No match, return as-is
+    [only] -> [only]
+    parts -> parts |> list.filter(is_non_empty)
   }
 }
 
@@ -509,19 +513,22 @@ fn do_split_numeric(token: String) -> List(String) {
 /// ## Example
 ///
 /// ```gleam
-/// let result = lookup(trie, "Given", "I have 42 items")
-/// case result {
-///   Some(StepMatch(handler, captures)) -> {
-///     // captures = [CapturedInt(42)]
-///   }
-///   None -> // No matching step definition
-/// }
+///       step_trie.lookup(trie, "Then", "the total is $19.99USD")
+///       |> should
+///       |> be_equal(
+///         Some(
+///           step_trie.StepMatch(handler: "total_usd", captures: [
+///             step_trie.CapturedFloat(19.99),
+///           ]),
+///         ),
+///       )
+///       |> or_fail_with("expected float capture for $19.99USD")
 /// ```
 ///
 pub fn lookup(
-  trie: StepTrie(handler),
-  keyword: String,
-  text: String,
+  trie trie: StepTrie(handler),
+  keyword keyword: String,
+  text text: String,
 ) -> Option(StepMatch(handler)) {
   let words = tokenize_step_text(text)
   lookup_in_node(trie.root, keyword, words, [])
@@ -544,31 +551,27 @@ pub fn lookup(
 /// pattern like `${float}` is parsed, it becomes `["$", "{float}"]`. For
 /// matching to work, the text `$19.99` must also become `["$", "19.99"]`.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```gleam
-/// // Basic tokenization
-/// tokenize_step_text("I have 5 items")
-/// // ["I", "have", "5", "items"]
-///
-/// // Quoted strings preserved
-/// tokenize_step_text("I add \"Red Widget\" to cart")
-/// // ["I", "add", "\"Red Widget\"", "to", "cart"]
-///
-/// // Currency prefix split from number
-/// tokenize_step_text("the total is $19.99")
-/// // ["the", "total", "is", "$", "19.99"]
-///
-/// // Percentage suffix split from number
-/// tokenize_step_text("I apply a 15% discount")
-/// // ["I", "apply", "a", "15", "%", "discount"]
-///
-/// // Multiple numeric boundaries
-/// tokenize_step_text("price is $99.99USD")
-/// // ["price", "is", "$", "99.99", "USD"]
+///       step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
+///       |> should
+///       |> be_equal([
+///         "I",
+///         "add",
+///         "\"Red Widget\"",
+///         "and",
+///         "pay",
+///         "$",
+///         "19.99",
+///         "USD",
+///       ])
+///       |> or_fail_with(
+///         "expected tokenization to preserve quotes and split $19.99USD",
+///       )
 /// ```
 ///
-pub fn tokenize_step_text(text: String) -> List(String) {
+pub fn tokenize_step_text(text text: String) -> List(String) {
   text
   |> tokenize_preserving_quotes([], "", False)
   |> list.flat_map(split_numeric_boundaries)

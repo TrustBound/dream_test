@@ -7,6 +7,13 @@ erl_crash.dump
 !/test/fixtures/file/temp/.gitkeep
 /test/fixtures/snapshots/temp/*
 !/test/fixtures/snapshots/temp/.gitkeep
+/test/fixtures/snapshots/clearable_tmp_*
+
+# Local/editor scratch & generated temp output
+.cursor/
+/test/tmp/
+/examples/**/test/tmp/
+PLAN.md
 
 # Analysis reports (generated files)
 COMPATIBILITY_REPORT.md

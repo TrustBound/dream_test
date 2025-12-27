@@ -1,24 +1,15 @@
 //// Equality matchers for dream_test.
 ////
-//// These matchers compare values using Gleam's structural equality.
-//// They're re-exported through `dream_test/assertions/should`.
+//// These matchers compare values using Gleam's structural equality and are
+//// re-exported through `dream_test/matchers`.
 ////
-//// ## Usage
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, equal, not_equal, or_fail_with}
-////
-//// // Check equality
-//// result
-//// |> should()
-//// |> equal(42)
-//// |> or_fail_with("Should be 42")
-////
-//// // Check inequality
-//// result
-//// |> should()
-//// |> not_equal(0)
-//// |> or_fail_with("Should not be zero")
+//// 2 + 3
+//// |> should
+//// |> be_equal(5)
+//// |> or_fail_with("2 + 3 should equal 5")
 //// ```
 
 import dream_test/types.{
@@ -35,13 +26,27 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// add(2, 3)
-/// |> should()
-/// |> equal(5)
+/// 2 + 3
+/// |> should
+/// |> be_equal(5)
 /// |> or_fail_with("2 + 3 should equal 5")
 /// ```
 ///
-pub fn equal(value_or_result: MatchResult(a), expected: a) -> MatchResult(a) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `expected`: the value you expect the actual value to equal
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On success, preserves the original value for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
+pub fn be_equal(
+  value_or_result value_or_result: MatchResult(a),
+  expected expected: a,
+) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_equal(actual, expected)
@@ -59,7 +64,7 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
         )
 
       MatchFailed(AssertionFailure(
-        operator: "equal",
+        operator: "be_equal",
         message: "",
         payload: Some(payload),
       ))
@@ -74,15 +79,26 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// divide(10, 3)
-/// |> should()
+/// 10 + 3
+/// |> should
 /// |> not_equal(3)
-/// |> or_fail_with("10/3 should not equal 3 exactly")
+/// |> or_fail_with("10 + 3 should not equal 3")
 /// ```
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(a)` produced by `should` (or a previous matcher)
+/// - `unexpected`: the value you expect the actual value to *not* equal
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On success, preserves the original value for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
 pub fn not_equal(
-  value_or_result: MatchResult(a),
-  unexpected: a,
+  value_or_result value_or_result: MatchResult(a),
+  unexpected unexpected: a,
 ) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)

@@ -14,11 +14,11 @@ Write behavior-driven tests using familiar Given/When/Then syntax:
 
 ```gleam
 import dream_test/gherkin/feature.{feature, scenario, given, when, then}
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items in my cart", step_have_items)
     |> step("I add {int} more items", step_add_items)
     |> step("I should have {int} items total", step_should_have)
@@ -196,7 +196,7 @@ pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
 }
 
 // Use it like any built-in matcher
-4 |> should() |> be_even() |> or_fail_with("Should be even")
+4 |> should |> be_even() |> or_fail_with("Should be even")
 ```
 
 ### 📊 JSON Reporter
@@ -204,8 +204,8 @@ pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
 Output test results as JSON for CI/CD integration, test aggregation, or tooling:
 
 ```gleam
-import dream_test/reporter/json
-import dream_test/reporter/bdd.{report}
+import dream_test/reporters/json
+import dream_test/reporters/bdd.{report}
 
 pub fn main() {
   to_test_cases("my_test", tests())

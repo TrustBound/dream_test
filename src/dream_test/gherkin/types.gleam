@@ -1,46 +1,18 @@
 //// Gherkin types for dream_test.
 ////
-//// This module defines the data structures representing parsed Gherkin
-//// `.feature` files. These types are used by the parser and converted
-//// to dream_test's `TestCase` and `TestSuite` types for execution.
+//// These are the data structures produced by the Gherkin parser and consumed
+//// by the feature/discovery APIs. Most users won’t construct them directly,
+//// but they’re useful when you’re integrating your own parser or tooling.
 ////
-//// ## Type Overview
+//// ## Example
 ////
-//// | Type              | Purpose                                          |
-//// |-------------------|--------------------------------------------------|
-//// | `Feature`         | A parsed `.feature` file                         |
-//// | `Scenario`        | A single scenario or scenario outline            |
-//// | `Step`            | A Given/When/Then step with text                 |
-//// | `StepKeyword`     | The keyword type (Given, When, Then, And, But)   |
-//// | `StepArgument`    | Optional DocString or DataTable                  |
-//// | `Background`      | Steps to run before each scenario                |
-//// | `ExamplesTable`   | Data table for Scenario Outline expansion        |
+//// Use this when building BDD suites (e.g. in a snippet `tests()` function).
 ////
-//// ## Gherkin Syntax Reference
-////
-//// ```gherkin
-//// @tag1 @tag2
-//// Feature: Shopping Cart
-////   As a customer
-////   I want to manage my cart
-////
-////   Background:
-////     Given I am logged in
-////
-////   Scenario: Adding items
-////     Given I have an empty cart
-////     When I add 3 items of "Widget"
-////     Then my cart should have 3 items
-////
-////   Scenario Outline: Multiple products
-////     Given I have an empty cart
-////     When I add <quantity> items of "<product>"
-////     Then my cart should have <quantity> items
-////
-////     Examples:
-////       | quantity | product |
-////       | 1        | Widget  |
-////       | 5        | Gadget  |
+//// ```gleam
+//// keyword_to_string(Given)
+//// |> should
+//// |> be_equal("Given")
+//// |> or_fail_with("expected Given")
 //// ```
 
 import gleam/option.{type Option}
@@ -76,23 +48,13 @@ pub type StepKeyword {
 ///
 /// Multi-line text enclosed in triple quotes:
 ///
-/// ```gherkin
-/// Given a document with content:
-///   """json
-///   {"name": "example"}
-///   """
-/// ```
+/// In Dream Test these values are represented as `DocString(...)`.
 ///
 /// ## DataTable
 ///
 /// Tabular data with pipe-delimited rows:
 ///
-/// ```gherkin
-/// Given the following users:
-///   | name  | email           |
-///   | Alice | alice@test.com  |
-///   | Bob   | bob@test.com    |
-/// ```
+/// In Dream Test these values are represented as `DataTable(...)`.
 ///
 pub type StepArgument {
   /// Multi-line text content.
@@ -115,10 +77,11 @@ pub type StepArgument {
 ///
 /// ## Example
 ///
-/// ```gherkin
-/// Given I have 5 items in my cart
-/// When I remove 2 items
-/// Then I should have 3 items
+/// ```gleam
+/// Step(keyword: Given, text: "I have 1 item", argument: None)
+/// |> should
+/// |> be_equal(Step(keyword: Given, text: "I have 1 item", argument: None))
+/// |> or_fail_with("expected Step to be constructible")
 /// ```
 ///
 pub type Step {
@@ -141,15 +104,16 @@ pub type Step {
 /// A Background defines common setup steps that are executed before
 /// every scenario in the feature. It's useful for shared preconditions.
 ///
+/// Background steps run before each scenario, as if they were prepended.
+///
 /// ## Example
 ///
-/// ```gherkin
-/// Background:
-///   Given I am logged in as "admin"
-///   And I am on the dashboard
+/// ```gleam
+/// empty_background()
+/// |> should
+/// |> be_equal(Background(steps: []))
+/// |> or_fail_with("expected empty background")
 /// ```
-///
-/// These steps run before each scenario, as if they were prepended.
 ///
 pub type Background {
   Background(steps: List(Step))
@@ -166,23 +130,12 @@ pub type Background {
 ///
 /// ## Example
 ///
-/// ```gherkin
-/// Examples:
-///   | quantity | product |
-///   | 1        | Widget  |
-///   | 5        | Gadget  |
+/// ```gleam
+/// ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]])
+/// |> should
+/// |> be_equal(ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]]))
+/// |> or_fail_with("expected ExamplesTable to be constructible")
 /// ```
-///
-/// With a scenario outline:
-///
-/// ```gherkin
-/// When I add <quantity> items of "<product>"
-/// ```
-///
-/// This expands to two scenarios:
-/// - "When I add 1 items of \"Widget\""
-/// - "When I add 5 items of \"Gadget\""
-///
 pub type ExamplesTable {
   ExamplesTable(
     /// Column headers (e.g., ["quantity", "product"])
@@ -200,30 +153,18 @@ pub type ExamplesTable {
 ///
 /// There are two variants:
 ///
-/// ## Scenario
+/// A `Scenario` has concrete step text; a `ScenarioOutline` is parameterized
+/// with an examples table and uses `<placeholder>` values in step text.
 ///
-/// A single test case with fixed steps:
+/// ## Example
 ///
-/// ```gherkin
-/// Scenario: Adding items to cart
-///   Given I have an empty cart
-///   When I add 3 items
-///   Then my cart should have 3 items
-/// ```
+/// ```gleam
+/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
 ///
-/// ## ScenarioOutline
-///
-/// A parameterized test with examples table:
-///
-/// ```gherkin
-/// Scenario Outline: Adding products
-///   When I add <qty> items of "<name>"
-///   Then my cart should have <qty> items
-///
-///   Examples:
-///     | qty | name   |
-///     | 1   | Widget |
-///     | 5   | Gadget |
+/// Scenario(name: "Example scenario", tags: [], steps: [step])
+/// |> should
+/// |> be_equal(Scenario(name: "Example scenario", tags: [], steps: [step]))
+/// |> or_fail_with("expected Scenario to be constructible")
 /// ```
 ///
 pub type Scenario {
@@ -263,25 +204,28 @@ pub type Scenario {
 ///
 /// ## Example
 ///
-/// ```gherkin
-/// @shopping
-/// Feature: Shopping Cart
-///   As a customer
-///   I want to manage items in my cart
-///   So that I can purchase what I need
+/// ```gleam
+/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+/// let scenario = Scenario(name: "Example scenario", tags: [], steps: [step])
 ///
-///   Background:
-///     Given I am logged in
-///
-///   Scenario: Empty cart
-///     Given I have an empty cart
-///     Then my cart count should be 0
-///
-///   @slow
-///   Scenario: Adding items
-///     Given I have an empty cart
-///     When I add 3 items of "Widget"
-///     Then my cart should have 3 items
+/// Feature(
+///   name: "Example feature",
+///   description: None,
+///   tags: [],
+///   background: None,
+///   scenarios: [scenario],
+/// )
+/// |> should
+/// |> be_equal(
+///   Feature(
+///     name: "Example feature",
+///     description: None,
+///     tags: [],
+///     background: None,
+///     scenarios: [scenario],
+///   ),
+/// )
+/// |> or_fail_with("expected Feature to be constructible")
 /// ```
 ///
 pub type Feature {
@@ -308,11 +252,13 @@ pub type Feature {
 /// ## Example
 ///
 /// ```gleam
-/// keyword_to_string(Given)  // -> "Given"
-/// keyword_to_string(And)    // -> "And"
+/// keyword_to_string(Given)
+/// |> should
+/// |> be_equal("Given")
+/// |> or_fail_with("expected Given")
 /// ```
 ///
-pub fn keyword_to_string(keyword: StepKeyword) -> String {
+pub fn keyword_to_string(keyword keyword: StepKeyword) -> String {
   case keyword {
     Given -> "Given"
     When -> "When"
@@ -329,11 +275,13 @@ pub fn keyword_to_string(keyword: StepKeyword) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// keyword_from_string("Given")  // -> Some(Given)
-/// keyword_from_string("Hello")  // -> None
+/// keyword_from_string("Then")
+/// |> should
+/// |> be_equal(Some(Then))
+/// |> or_fail_with("expected Some(Then)")
 /// ```
 ///
-pub fn keyword_from_string(text: String) -> Option(StepKeyword) {
+pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
   case text {
     "Given" -> option.Some(Given)
     "When" -> option.Some(When)
@@ -352,14 +300,15 @@ pub fn keyword_from_string(text: String) -> Option(StepKeyword) {
 /// ## Example
 ///
 /// ```gleam
-/// resolve_keyword(And, Given)  // -> Given
-/// resolve_keyword(But, Then)   // -> Then
-/// resolve_keyword(When, Given) // -> When (non-And/But unchanged)
+/// resolve_keyword(And, Given)
+/// |> should
+/// |> be_equal(Given)
+/// |> or_fail_with("expected And after Given to resolve to Given")
 /// ```
 ///
 pub fn resolve_keyword(
-  keyword: StepKeyword,
-  previous: StepKeyword,
+  keyword keyword: StepKeyword,
+  previous previous: StepKeyword,
 ) -> StepKeyword {
   case keyword {
     And -> previous
@@ -372,6 +321,15 @@ pub fn resolve_keyword(
 ///
 /// Useful as a default value or for testing.
 ///
+/// ## Example
+///
+/// ```gleam
+/// empty_examples()
+/// |> should
+/// |> be_equal(ExamplesTable(headers: [], rows: []))
+/// |> or_fail_with("expected empty examples table")
+/// ```
+///
 pub fn empty_examples() -> ExamplesTable {
   ExamplesTable(headers: [], rows: [])
 }
@@ -379,6 +337,15 @@ pub fn empty_examples() -> ExamplesTable {
 /// Create an empty background.
 ///
 /// Useful as a default value or for testing.
+///
+/// ## Example
+///
+/// ```gleam
+/// empty_background()
+/// |> should
+/// |> be_equal(Background(steps: []))
+/// |> or_fail_with("expected empty background")
+/// ```
 ///
 pub fn empty_background() -> Background {
   Background(steps: [])

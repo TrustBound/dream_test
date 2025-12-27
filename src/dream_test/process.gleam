@@ -1,47 +1,29 @@
 //// Process helpers for tests that need actors or async operations.
 ////
-//// When tests run in isolated BEAM processes, any processes spawned by the
-//// test are automatically terminated when the test ends. This module provides
-//// helpers for common patterns.
+//// When Dream Test runs a test, it runs in an isolated BEAM process. Any
+//// processes you spawn inside a test can be *linked* to that test process, so
+//// they automatically die when the test ends (pass, fail, timeout, crash).
 ////
-//// ## Auto-Cleanup
+//// This module gives you a few “batteries included” patterns:
 ////
-//// Processes started with these helpers are linked to the test process.
-//// When the test completes (pass, fail, or timeout), all linked processes
-//// are automatically cleaned up. No manual teardown needed.
+//// - A simple counter actor (`start_counter`) you can use to test stateful code.
+//// - A generic actor starter (`start_actor`) + a pipe-friendly call helper (`call_actor`).
+//// - “wait until ready” polling (`await_ready` / `await_some`) for async systems.
+//// - A safe-ish random port helper (`unique_port`) for test servers.
 ////
-//// ## Quick Start
+//// ## Example
+//// Use this inside an `it` block.
 ////
 //// ```gleam
-//// import dream_test/process.{start_counter, get_count, increment}
-//// import dream_test/unit.{describe, it}
-//// import dream_test/assertions/should.{should, equal, or_fail_with}
+//// let counter = process.start_counter()
+//// process.increment(counter)
+//// process.increment(counter)
 ////
-//// pub fn tests() {
-////   describe("Counter", [
-////     it("increments correctly", fn() {
-////       let counter = start_counter()
-////       increment(counter)
-////       increment(counter)
-////
-////       get_count(counter)
-////       |> should()
-////       |> equal(2)
-////       |> or_fail_with("Counter should be 2")
-////     }),
-////   ])
-//// }
+//// process.get_count(counter)
+//// |> should
+//// |> be_equal(2)
+//// |> or_fail_with("expected counter to be 2")
 //// ```
-////
-//// ## Available Helpers
-////
-//// | Helper              | Purpose                                      |
-//// |---------------------|----------------------------------------------|
-//// | `start_counter`     | Simple counter actor for testing state       |
-//// | `start_actor`       | Generic actor with custom state and handler  |
-//// | `unique_port`       | Generate random port for test servers        |
-//// | `await_ready`       | Poll until a condition is true               |
-//// | `await_some`        | Poll until a function returns Ok             |
 
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -49,12 +31,22 @@ import gleam/otp/actor
 
 /// Messages for the built-in counter actor.
 ///
-/// Use these with the counter functions or send them directly:
+/// Most of the time you’ll use the helpers (`increment`, `set_count`, etc), but
+/// you can also send the messages directly when it’s convenient.
+///
+/// ## Example
+/// Use this inside an `it` block.
 ///
 /// ```gleam
-/// let counter = start_counter()
-/// process.send(counter, Increment)
-/// process.send(counter, SetCount(100))
+/// let counter = process.start_counter()
+///
+/// erlang_process.send(counter, process.Increment)
+/// erlang_process.send(counter, process.SetCount(10))
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(10)
+/// |> or_fail_with("expected counter to be 10 after SetCount")
 /// ```
 ///
 pub type CounterMessage {
@@ -66,16 +58,26 @@ pub type CounterMessage {
 
 /// Start a counter actor initialized to 0.
 ///
-/// The counter is linked to the test process and will be automatically
-/// cleaned up when the test ends.
+/// The counter is linked to the test process and will be automatically cleaned
+/// up when the test ends.
+///
+/// ## Returns
+///
+/// A `Subject(CounterMessage)` you can pass to the other counter helpers (or
+/// send messages to directly).
 ///
 /// ## Example
+/// Use this inside an `it` block.
 ///
 /// ```gleam
-/// let counter = start_counter()
-/// increment(counter)
-/// increment(counter)
-/// get_count(counter)  // -> 2
+/// let counter = process.start_counter()
+/// process.increment(counter)
+/// process.increment(counter)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(2)
+/// |> or_fail_with("expected counter to be 2")
 /// ```
 ///
 pub fn start_counter() -> Subject(CounterMessage) {
@@ -84,15 +86,28 @@ pub fn start_counter() -> Subject(CounterMessage) {
 
 /// Start a counter actor with a specific initial value.
 ///
+/// ## Parameters
+///
+/// - `initial`: The initial count value.
+///
+/// ## Returns
+///
+/// A `Subject(CounterMessage)` for the started counter.
+///
 /// ## Example
+/// Use this inside an `it` block.
 ///
 /// ```gleam
-/// let counter = start_counter_with(100)
-/// decrement(counter)
-/// get_count(counter)  // -> 99
+/// let counter = process.start_counter_with(10)
+/// process.decrement(counter)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(9)
+/// |> or_fail_with("expected counter to be 9 after decrement")
 /// ```
 ///
-pub fn start_counter_with(initial: Int) -> Subject(CounterMessage) {
+pub fn start_counter_with(initial initial: Int) -> Subject(CounterMessage) {
   let assert Ok(started) =
     actor.new(initial)
     |> actor.on_message(handle_counter_message)
@@ -120,15 +135,29 @@ fn handle_counter_message(
 ///
 /// This is a synchronous call that blocks until the counter responds.
 ///
+/// ## Parameters
+///
+/// - `counter`: The counter actor to query.
+///
+/// ## Returns
+///
+/// The current counter value.
+///
 /// ## Example
 ///
+/// Use this inside an `it` block.
+///
 /// ```gleam
-/// let counter = start_counter()
-/// increment(counter)
-/// let value = get_count(counter)  // -> 1
+/// let counter = process.start_counter()
+/// process.increment(counter)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(1)
+/// |> or_fail_with("expected counter to be 1")
 /// ```
 ///
-pub fn get_count(counter: Subject(CounterMessage)) -> Int {
+pub fn get_count(counter counter: Subject(CounterMessage)) -> Int {
   actor.call(counter, waiting: 1000, sending: GetCount)
 }
 
@@ -136,16 +165,30 @@ pub fn get_count(counter: Subject(CounterMessage)) -> Int {
 ///
 /// This is an asynchronous send—it returns immediately.
 ///
+/// ## Parameters
+///
+/// - `counter`: The counter actor to increment.
+///
+/// ## Returns
+///
+/// `Nil`. (The message is sent asynchronously.)
+///
 /// ## Example
 ///
+/// Use this inside an `it` block.
+///
 /// ```gleam
-/// let counter = start_counter()
-/// increment(counter)
-/// increment(counter)
-/// get_count(counter)  // -> 2
+/// let counter = process.start_counter()
+/// process.increment(counter)
+/// process.increment(counter)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(2)
+/// |> or_fail_with("expected counter to be 2")
 /// ```
 ///
-pub fn increment(counter: Subject(CounterMessage)) -> Nil {
+pub fn increment(counter counter: Subject(CounterMessage)) -> Nil {
   process.send(counter, Increment)
 }
 
@@ -153,15 +196,29 @@ pub fn increment(counter: Subject(CounterMessage)) -> Nil {
 ///
 /// This is an asynchronous send—it returns immediately.
 ///
+/// ## Parameters
+///
+/// - `counter`: The counter actor to decrement.
+///
+/// ## Returns
+///
+/// `Nil`. (The message is sent asynchronously.)
+///
 /// ## Example
 ///
+/// Use this inside an `it` block.
+///
 /// ```gleam
-/// let counter = start_counter_with(10)
-/// decrement(counter)
-/// get_count(counter)  // -> 9
+/// let counter = process.start_counter_with(10)
+/// process.decrement(counter)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(9)
+/// |> or_fail_with("expected counter to be 9 after decrement")
 /// ```
 ///
-pub fn decrement(counter: Subject(CounterMessage)) -> Nil {
+pub fn decrement(counter counter: Subject(CounterMessage)) -> Nil {
   process.send(counter, Decrement)
 }
 
@@ -169,15 +226,33 @@ pub fn decrement(counter: Subject(CounterMessage)) -> Nil {
 ///
 /// This is an asynchronous send—it returns immediately.
 ///
+/// ## Parameters
+///
+/// - `counter`: The counter actor to set.
+/// - `value`: The new value to set.
+///
+/// ## Returns
+///
+/// `Nil`. (The message is sent asynchronously.)
+///
 /// ## Example
 ///
+/// Use this inside an `it` block.
+///
 /// ```gleam
-/// let counter = start_counter()
-/// set_count(counter, 42)
-/// get_count(counter)  // -> 42
+/// let counter = process.start_counter()
+/// process.set_count(counter, 42)
+///
+/// process.get_count(counter)
+/// |> should
+/// |> be_equal(42)
+/// |> or_fail_with("expected counter to be 42 after set_count")
 /// ```
 ///
-pub fn set_count(counter: Subject(CounterMessage), value: Int) -> Nil {
+pub fn set_count(
+  counter counter: Subject(CounterMessage),
+  value value: Int,
+) -> Nil {
   process.send(counter, SetCount(value))
 }
 
@@ -187,6 +262,17 @@ pub fn set_count(counter: Subject(CounterMessage), value: Int) -> Nil {
 ///
 /// - `Port(n)` - Use a specific port number
 /// - `RandomPort` - Pick a random available port (recommended)
+///
+/// ## Example
+///
+/// Use this anywhere you need a port selection value.
+///
+/// ```gleam
+/// process.Port(1234)
+/// |> should
+/// |> be_equal(process.Port(1234))
+/// |> or_fail_with("expected PortSelection to be constructible")
+/// ```
 ///
 pub type PortSelection {
   /// Use a specific port number.
@@ -206,10 +292,13 @@ pub type PortSelection {
 ///
 /// ## Example
 ///
+/// Use this in test setup, before starting a server.
+///
 /// ```gleam
-/// let port = unique_port()
-/// start_server(port)
-/// // port is something like 34521
+/// process.unique_port()
+/// |> should
+/// |> be_between(10_000, 60_000)
+/// |> or_fail_with("expected unique_port to be within 10k..60k")
 /// ```
 ///
 pub fn unique_port() -> Int {
@@ -228,33 +317,27 @@ pub fn unique_port() -> Int {
 /// - `initial_state` - The actor's starting state
 /// - `handler` - Function `fn(state, message) -> actor.Next(state, message)`
 ///
+/// ## Returns
+///
+/// A `Subject(msg)` you can send messages to (or call with `call_actor`).
+///
 /// ## Example
 ///
 /// ```gleam
-/// pub type TodoMessage {
-///   Add(String)
-///   GetAll(Subject(List(String)))
-/// }
+/// let todos = process.start_actor([], handle_todo_message)
 ///
-/// let todos = start_actor([], fn(items, msg) {
-///   case msg {
-///     Add(item) -> actor.continue([item, ..items])
-///     GetAll(reply) -> {
-///       process.send(reply, items)
-///       actor.continue(items)
-///     }
-///   }
-/// })
+/// erlang_process.send(todos, Add("Write tests"))
+/// erlang_process.send(todos, Add("Run tests"))
 ///
-/// process.send(todos, Add("Write tests"))
-/// process.send(todos, Add("Run tests"))
-/// let items = call_actor(todos, GetAll, 1000)
-/// // items == ["Run tests", "Write tests"]
+/// process.call_actor(todos, GetAll, 1000)
+/// |> should
+/// |> be_equal(["Write tests", "Run tests"])
+/// |> or_fail_with("expected items to be preserved in insertion order")
 /// ```
 ///
 pub fn start_actor(
-  initial_state: state,
-  handler: fn(state, msg) -> actor.Next(state, msg),
+  initial_state initial_state: state,
+  handler handler: fn(state, msg) -> actor.Next(state, msg),
 ) -> Subject(msg) {
   let assert Ok(started) =
     actor.new(initial_state)
@@ -275,20 +358,23 @@ pub fn start_actor(
 /// - `make_message` - Function that creates the message given a reply subject
 /// - `timeout_ms` - How long to wait for a response
 ///
+/// ## Returns
+///
+/// The reply value from the actor.
+///
 /// ## Example
 ///
 /// ```gleam
-/// pub type Msg {
-///   GetValue(Subject(Int))
-/// }
-///
-/// let value = call_actor(my_actor, GetValue, 1000)
+/// process.call_actor(todos, GetAll, 1000)
+/// |> should
+/// |> be_equal(["Write tests", "Run tests"])
+/// |> or_fail_with("expected items to be preserved in insertion order")
 /// ```
 ///
 pub fn call_actor(
-  subject: Subject(msg),
-  make_message: fn(Subject(reply)) -> msg,
-  timeout_ms: Int,
+  subject subject: Subject(msg),
+  make_message make_message: fn(Subject(reply)) -> msg,
+  timeout_ms timeout_ms: Int,
 ) -> reply {
   actor.call(subject, waiting: timeout_ms, sending: make_message)
 }
@@ -309,8 +395,10 @@ pub fn call_actor(
 /// ## Example
 ///
 /// ```gleam
-/// // Check every 100ms for up to 10 seconds
-/// PollConfig(timeout_ms: 10_000, interval_ms: 100)
+/// process.default_poll_config()
+/// |> should
+/// |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
+/// |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
 /// ```
 ///
 pub type PollConfig {
@@ -329,6 +417,19 @@ pub type PollConfig {
 ///
 /// Good for operations that might take a few seconds.
 ///
+/// ## Returns
+///
+/// `PollConfig(timeout_ms: 5000, interval_ms: 50)`.
+///
+/// ## Example
+///
+/// ```gleam
+/// process.default_poll_config()
+/// |> should
+/// |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
+/// |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
+/// ```
+///
 pub fn default_poll_config() -> PollConfig {
   PollConfig(timeout_ms: 5000, interval_ms: 50)
 }
@@ -340,6 +441,19 @@ pub fn default_poll_config() -> PollConfig {
 ///
 /// Good for fast local operations like servers starting.
 ///
+/// ## Returns
+///
+/// `PollConfig(timeout_ms: 1000, interval_ms: 10)`.
+///
+/// ## Example
+///
+/// ```gleam
+/// process.quick_poll_config()
+/// |> should
+/// |> be_equal(process.PollConfig(timeout_ms: 1000, interval_ms: 10))
+/// |> or_fail_with("expected quick_poll_config to be 1000ms/10ms")
+/// ```
+///
 pub fn quick_poll_config() -> PollConfig {
   PollConfig(timeout_ms: 1000, interval_ms: 10)
 }
@@ -347,6 +461,11 @@ pub fn quick_poll_config() -> PollConfig {
 /// Result of a polling operation.
 ///
 /// Either the condition was met (`Ready`) or we gave up (`TimedOut`).
+///
+/// ## Constructors
+///
+/// - `Ready(value)`: The condition was met.
+/// - `TimedOut`: The timeout elapsed.
 ///
 pub type PollResult(a) {
   /// The condition was met and returned this value.
@@ -366,23 +485,28 @@ pub type PollResult(a) {
 /// - Waiting for a file to appear
 /// - Waiting for a service to become healthy
 ///
+/// ## Parameters
+///
+/// - `config`: Poll timeout + interval.
+/// - `check`: A zero-arg function returning `Bool`.
+///
+/// ## Returns
+///
+/// `Ready(True)` when the check returns `True`, otherwise `TimedOut`.
+///
 /// ## Example
 ///
 /// ```gleam
-/// // Wait for server to be ready
-/// case await_ready(quick_poll_config(), fn() { is_port_open(port) }) {
-///   Ready(True) -> {
-///     // Server is up, proceed with test
-///     make_request(port)
-///     |> should()
-///     |> be_ok()
-///     |> or_fail_with("Request should succeed")
-///   }
-///   TimedOut -> fail_with("Server didn't start in time")
-/// }
+/// process.await_ready(process.quick_poll_config(), always_true)
+/// |> should
+/// |> be_equal(process.Ready(True))
+/// |> or_fail_with("expected await_ready to return Ready(True)")
 /// ```
 ///
-pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) {
+pub fn await_ready(
+  config config: PollConfig,
+  check check: fn() -> Bool,
+) -> PollResult(Bool) {
   poll_until_true(config.timeout_ms, config.interval_ms, check)
 }
 
@@ -397,24 +521,27 @@ pub fn await_ready(config: PollConfig, check: fn() -> Bool) -> PollResult(Bool) 
 /// - Waiting for an async job to complete
 /// - Waiting for a resource to become available
 ///
+/// ## Parameters
+///
+/// - `config`: Poll timeout + interval.
+/// - `check`: A zero-arg function returning `Result(value, error)`.
+///
+/// ## Returns
+///
+/// `Ready(value)` when the check returns `Ok(value)`, otherwise `TimedOut`.
+///
 /// ## Example
 ///
 /// ```gleam
-/// // Wait for user to appear in database
-/// case await_some(default_poll_config(), fn() { find_user(user_id) }) {
-///   Ready(user) -> {
-///     user.name
-///     |> should()
-///     |> equal("Alice")
-///     |> or_fail_with("User should be Alice")
-///   }
-///   TimedOut -> fail_with("User never appeared in database")
-/// }
+/// process.await_some(process.default_poll_config(), always_ok_42)
+/// |> should
+/// |> be_equal(process.Ready(42))
+/// |> or_fail_with("expected await_some to return Ready(42)")
 /// ```
 ///
 pub fn await_some(
-  config: PollConfig,
-  check: fn() -> Result(a, e),
+  config config: PollConfig,
+  check check: fn() -> Result(a, e),
 ) -> PollResult(a) {
   poll_until_ok(config.timeout_ms, config.interval_ms, check)
 }

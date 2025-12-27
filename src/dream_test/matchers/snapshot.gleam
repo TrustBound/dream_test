@@ -1,96 +1,28 @@
 //// Snapshot matchers for dream_test.
 ////
-//// Snapshot testing compares a value against a stored "golden" file.
-//// On first run, the snapshot is created automatically. On subsequent runs,
-//// the value is compared against the stored snapshot—any difference is a failure.
+//// Snapshot testing compares output against a stored “golden” file.
 ////
-//// ## Why Snapshot Testing?
+//// - On first run (missing snapshot), the snapshot is created and the test passes.
+//// - On later runs, the output is compared against the file; differences fail.
 ////
-//// Snapshot tests excel at detecting **unintended changes** in complex outputs:
+//// Snapshot tests are useful when the output is large or awkward to specify by
+//// hand (rendered HTML, JSON, error messages, logs, etc.).
 ////
-//// - Rendered HTML/JSON/XML
-//// - Error messages and logs
-//// - Serialized data structures
-//// - Any output where "expected" is hard to specify manually
-////
-//// ## Basic Usage
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
-////
-//// it("renders user profile", fn() {
-////   render_profile(user)
-////   |> should()
-////   |> match_snapshot("./test/snapshots/user_profile.snap")
-////   |> or_fail_with("Profile should match snapshot")
-//// })
+//// let path = "./test/tmp/match_snapshot_example.snap"
+//// "hello"
+//// |> should
+//// |> match_snapshot(path)
+//// |> or_fail_with("expected snapshot match")
 //// ```
-////
-//// ## How It Works
-////
-//// | Scenario              | Behavior                                  |
-//// |-----------------------|-------------------------------------------|
-//// | Snapshot missing      | Creates it, test **passes**               |
-//// | Snapshot matches      | Test **passes**                           |
-//// | Snapshot differs      | Test **fails** with diff                  |
-////
-//// ## Updating Snapshots
-////
-//// When you intentionally change output, update snapshots by deleting them:
-////
-//// ```bash
-//// # Update one snapshot
-//// rm ./test/snapshots/user_profile.snap
-//// gleam test
-////
-//// # Update all snapshots in a directory
-//// rm ./test/snapshots/*.snap
-//// gleam test
-//// ```
-////
-//// Or use the helper functions:
-////
-//// ```gleam
-//// // In a setup script or before tests
-//// let _ = snapshot.clear_snapshot("./test/snapshots/user_profile.snap")
-//// let _ = snapshot.clear_snapshots_in_directory("./test/snapshots")
-//// ```
-////
-//// ## Snapshot File Organization
-////
-//// Recommended structure:
-////
-//// ```text
-//// test/
-//// ├── snapshots/
-//// │   ├── api/
-//// │   │   ├── users_list.snap
-//// │   │   └── user_detail.snap
-//// │   └── components/
-//// │       ├── header.snap
-//// │       └── footer.snap
-//// └── my_test.gleam
-//// ```
-////
-//// Use descriptive paths that mirror your test structure.
-////
-//// ## Testing Non-Strings
-////
-//// For complex data structures, use `match_snapshot_inspect`:
-////
-//// ```gleam
-//// build_complex_result()
-//// |> should()
-//// |> match_snapshot_inspect("./test/snapshots/complex.snap")
-//// |> or_fail_with("Result should match snapshot")
-//// ```
-////
-//// This uses Gleam's `string.inspect` to serialize the value.
 
 import dream_test/file
 import dream_test/types.{
   type MatchResult, AssertionFailure, MatchFailed, MatchOk, SnapshotFailure,
 }
+import gleam/list
 import gleam/option.{Some}
 import gleam/string
 
@@ -114,55 +46,25 @@ import gleam/string
 /// - `value_or_result` - The `MatchResult(String)` from the assertion chain
 /// - `snapshot_path` - Path to the snapshot file (will be created if missing)
 ///
-/// ## Examples
-///
-/// ### Basic Usage
+/// ## Example
 ///
 /// ```gleam
-/// it("serializes user to JSON", fn() {
-///   user_to_json(sample_user)
-///   |> should()
-///   |> match_snapshot("./test/snapshots/user.json")
-///   |> or_fail_with("User JSON should match snapshot")
-/// })
+/// let path = "./test/tmp/match_snapshot_example.snap"
+/// "hello"
+/// |> should
+/// |> match_snapshot(path)
+/// |> or_fail_with("expected snapshot match")
 /// ```
 ///
-/// ### With Transformation
+/// ## Returns
 ///
-/// ```gleam
-/// it("renders HTML correctly", fn() {
-///   render_page(data)
-///   |> string.trim()  // Normalize whitespace
-///   |> should()
-///   |> match_snapshot("./test/snapshots/page.html")
-///   |> or_fail_with("Page HTML should match snapshot")
-/// })
-/// ```
-///
-/// ### Error Handling
-///
-/// ```gleam
-/// it("handles parse errors gracefully", fn() {
-///   case parse(invalid_input) {
-///     Ok(_) -> fail("Should have failed")
-///     Error(msg) ->
-///       msg
-///       |> should()
-///       |> match_snapshot("./test/snapshots/parse_error.snap")
-///       |> or_fail_with("Error message should match snapshot")
-///   }
-/// })
-/// ```
-///
-/// ## Updating the Snapshot
-///
-/// ```bash
-/// rm ./test/snapshots/user.json && gleam test
-/// ```
+/// A `MatchResult(String)`:
+/// - On success, preserves the original string for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 ///
 pub fn match_snapshot(
-  value_or_result: MatchResult(String),
-  snapshot_path: String,
+  value_or_result value_or_result: MatchResult(String),
+  snapshot_path snapshot_path: String,
 ) -> MatchResult(String) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -187,52 +89,25 @@ pub fn match_snapshot(
 /// - `value_or_result` - The `MatchResult(value)` from the assertion chain
 /// - `snapshot_path` - Path to the snapshot file
 ///
-/// ## Examples
-///
-/// ### Testing a Record
+/// ## Example
 ///
 /// ```gleam
-/// it("parses config correctly", fn() {
-///   parse_config(raw_toml)
-///   |> should()
-///   |> match_snapshot_inspect("./test/snapshots/config.snap")
-///   |> or_fail_with("Parsed config should match snapshot")
-/// })
+/// let path = "./test/tmp/match_snapshot_inspect_example.snap"
+/// Some(1)
+/// |> should
+/// |> match_snapshot_inspect(path)
+/// |> or_fail_with("expected inspect snapshot match")
 /// ```
 ///
-/// ### Testing a List
+/// ## Returns
 ///
-/// ```gleam
-/// it("filters users correctly", fn() {
-///   users
-///   |> list.filter(is_active)
-///   |> should()
-///   |> match_snapshot_inspect("./test/snapshots/active_users.snap")
-///   |> or_fail_with("Active users should match snapshot")
-/// })
-/// ```
-///
-/// ## Snapshot Format
-///
-/// The snapshot will contain the Gleam debug representation:
-///
-/// ```text
-/// User(name: "Alice", age: 30, active: True)
-/// ```
-///
-/// ```text
-/// [User(name: "Alice", age: 30), User(name: "Bob", age: 25)]
-/// ```
-///
-/// ## Note on Stability
-///
-/// The `string.inspect` output may change between Gleam versions.
-/// If you need stable serialization, convert to JSON or another format
-/// and use `match_snapshot` instead.
+/// A `MatchResult(value)`:
+/// - On success, preserves the original value for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
 ///
 pub fn match_snapshot_inspect(
-  value_or_result: MatchResult(value),
-  snapshot_path: String,
+  value_or_result value_or_result: MatchResult(value),
+  snapshot_path snapshot_path: String,
 ) -> MatchResult(value) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -258,35 +133,20 @@ pub fn match_snapshot_inspect(
 /// - `Ok(Nil)` - Snapshot was deleted (or didn't exist)
 /// - `Error(String)` - Human-readable error message
 ///
-/// ## Examples
-///
-/// ### Clear Before Test
+/// ## Example
 ///
 /// ```gleam
-/// // In a test setup
-/// let _ = snapshot.clear_snapshot("./test/snapshots/user.snap")
-/// // Next test will create a fresh snapshot
-/// ```
+/// let path = "./test/tmp/clear_snapshot_example.snap"
 ///
-/// ### Conditional Update
+/// // Setup: create a snapshot file (no assertions during setup)
+/// use _ <- result.try(
+///   file.write(path, "hello") |> result.map_error(file.error_to_string),
+/// )
 ///
-/// ```gleam
-/// case env.get("UPDATE_SNAPSHOTS") {
-///   Ok("true") -> {
-///     let _ = snapshot.clear_snapshot("./test/snapshots/output.snap")
-///   }
-///   _ -> Nil
-/// }
-/// ```
-///
-/// ## Idempotent Behavior
-///
-/// This function succeeds even if the file doesn't exist:
-///
-/// ```gleam
-/// // Both calls succeed
-/// let _ = snapshot.clear_snapshot("./test/snapshots/new.snap")
-/// let _ = snapshot.clear_snapshot("./test/snapshots/new.snap")
+/// clear_snapshot(path)
+/// |> should
+/// |> be_equal(Ok(Nil))
+/// |> or_fail_with("expected clear_snapshot to succeed")
 /// ```
 ///
 pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
@@ -310,30 +170,26 @@ pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
 /// - `Ok(Int)` - Number of snapshot files deleted
 /// - `Error(String)` - Human-readable error message
 ///
-/// ## Examples
-///
-/// ### Clear All Snapshots
+/// ## Example
 ///
 /// ```gleam
-/// case snapshot.clear_snapshots_in_directory("./test/snapshots") {
-///   Ok(0) -> io.println("No snapshots to clear")
-///   Ok(n) -> io.println("Cleared " <> int.to_string(n) <> " snapshots")
-///   Error(msg) -> io.println("Error: " <> msg)
-/// }
+/// let directory = "./test/tmp/clear_snapshots_in_directory_example"
+/// let a = directory <> "/a.snap"
+/// let b = directory <> "/b.snap"
+///
+/// // Setup: create two snapshot files (no assertions during setup)
+/// use _ <- result.try(
+///   file.write(a, "a") |> result.map_error(file.error_to_string),
+/// )
+/// use _ <- result.try(
+///   file.write(b, "b") |> result.map_error(file.error_to_string),
+/// )
+///
+/// clear_snapshots_in_directory(directory)
+/// |> should
+/// |> be_equal(Ok(2))
+/// |> or_fail_with("expected two deleted snapshots")
 /// ```
-///
-/// ### Clear Subdirectory
-///
-/// ```gleam
-/// // Clear only API snapshots
-/// let _ = snapshot.clear_snapshots_in_directory("./test/snapshots/api")
-/// ```
-///
-/// ## Notes
-///
-/// - Only deletes files with `.snap` extension
-/// - Does **not** recurse into subdirectories
-/// - Non-snapshot files are left untouched
 ///
 pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {
   case file.delete_files_matching(directory, ".snap") {
@@ -348,9 +204,31 @@ pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {
 
 fn check_snapshot(actual: String, snapshot_path: String) -> MatchResult(String) {
   case file.read(snapshot_path) {
-    Ok(expected) -> compare_snapshot(actual, expected, snapshot_path)
+    Ok(expected) ->
+      compare_snapshot(
+        actual,
+        normalize_snapshot_expected(expected),
+        snapshot_path,
+      )
     Error(file.NotFound(_)) -> create_snapshot(actual, snapshot_path)
     Error(error) -> make_read_error_failure(snapshot_path, error)
+  }
+}
+
+fn normalize_snapshot_expected(expected: String) -> String {
+  expected
+  |> string.to_graphemes
+  |> list.reverse
+  |> drop_trailing_newlines
+  |> list.reverse
+  |> string.join("")
+}
+
+fn drop_trailing_newlines(graphemes_reversed: List(String)) -> List(String) {
+  case graphemes_reversed {
+    ["\n", ..rest] -> drop_trailing_newlines(rest)
+    ["\r", ..rest] -> drop_trailing_newlines(rest)
+    other -> other
   }
 }
 
@@ -359,7 +237,10 @@ fn compare_snapshot(
   expected: String,
   snapshot_path: String,
 ) -> MatchResult(String) {
-  case actual == expected {
+  // Normalize both sides so trailing newlines in either the snapshot file
+  // or the produced output don't create noisy, meaningless mismatches.
+  let normalized_actual = normalize_snapshot_expected(actual)
+  case normalized_actual == expected {
     True -> MatchOk(actual)
     False -> make_mismatch_failure(actual, expected, snapshot_path)
   }
@@ -434,7 +315,12 @@ fn check_snapshot_inspect(
   let serialized = string.inspect(value)
   case file.read(snapshot_path) {
     Ok(expected) ->
-      compare_snapshot_inspect(value, serialized, expected, snapshot_path)
+      compare_snapshot_inspect(
+        value,
+        serialized,
+        normalize_snapshot_expected(expected),
+        snapshot_path,
+      )
     Error(file.NotFound(_)) ->
       create_snapshot_inspect(value, serialized, snapshot_path)
     Error(error) -> make_read_error_failure_inspect(snapshot_path, error)

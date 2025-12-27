@@ -159,18 +159,18 @@ pub fn add_failure(context, failure) {
 
 | ❌ Avoid            | ✅ Use instead          |
 | ------------------- | ----------------------- |
-| `dream_test/assert` | `dream_test/assertions` |
+| `dream_test/assert` | `dream_test/matchers`   |
 | `dream_test/type`   | `dream_test/types`      |
 
 **Module path conventions**:
 
 ```
 dream_test/context         # Per-test state
-dream_test/assertions/should  # Assertion API
+dream_test/matchers        # Matcher API
 dream_test/types           # Shared data types
 dream_test/runner          # Test execution
 dream_test/unit            # describe/it DSL
-dream_test/reporter/bdd    # Output formatting
+dream_test/reporters/bdd    # Output formatting
 ```
 
 ---
@@ -185,7 +185,7 @@ dream_test/reporter/bdd    # Output formatting
 
 ```gleam
 value
-|> should.equal(expected)
+|> should.be_equal(expected)
 |> or_fail_with("message")
 ```
 
@@ -193,8 +193,8 @@ value
 
 ```gleam
 value
-|> should()
-|> equal(expected)
+|> should
+|> be_equal(expected)
 |> or_fail_with("message")
 ```
 
@@ -204,17 +204,17 @@ value
 
 **Rule**: Use unqualified imports for DSL functions and piped helpers. Use qualified references when the namespace adds clarity.
 
-**Why**: `should()`, `equal()`, `or_fail_with()` read better unqualified in pipes. Module prefixes add noise for frequently-used functions.
+**Why**: `should`, `equal()`, `or_fail_with()` read better unqualified in pipes. Module prefixes add noise for frequently-used functions.
 
 ### Importing values
 
 ```gleam
 // ✅ Good: Unqualified for pipe-friendly DSL
 import dream_test/unit.{describe, it}
-import dream_test/assertions/should.{should, equal, or_fail_with}
+import dream_test/matchers.{should, be_equal, or_fail_with}
 
 // ❌ Bad: Redundant alias
-import dream_test/assertions/should as should
+import dream_test/matchers as should
 ```
 
 ### Importing types

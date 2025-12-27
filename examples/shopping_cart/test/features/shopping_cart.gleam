@@ -4,16 +4,16 @@ import dream_test/gherkin/feature.{
   and, background, feature_with_background, given, scenario, then, when,
   with_tags,
 }
-import dream_test/gherkin/steps.{new_registry}
+import dream_test/gherkin/steps
 import dream_test/types.{type TestSuite}
 import steps/assertions
 import steps/cart
 import steps/checkout
 import steps/discount
 
-pub fn tests() -> TestSuite {
+pub fn tests() -> TestSuite(Nil) {
   let registry =
-    new_registry()
+    steps.new()
     |> cart.register()
     |> discount.register()
     |> checkout.register()
@@ -21,7 +21,7 @@ pub fn tests() -> TestSuite {
 
   let bg = background([given("I have an empty cart")])
 
-  feature_with_background("Shopping Cart", registry, bg, [
+  feature_with_background("Shopping Cart (inline)", registry, bg, [
     scenario("Adding a single item to the cart", [
       when("I add 2 apples to the cart"),
       then("the cart should contain 2 items"),
@@ -58,6 +58,14 @@ pub fn tests() -> TestSuite {
       and("the total should be $5.40"),
     ])
       |> with_tags(["discount"]),
+    scenario("Applying a fixed amount discount", [
+      given("I add 2 oranges to the cart"),
+      when("I apply a $1.00 discount"),
+      then("the subtotal should be $4.00"),
+      and("the discount should be $1.00"),
+      and("the total should be $3.00"),
+    ])
+      |> with_tags(["discount"]),
     scenario("Successful checkout", [
       given("I add 1 apple to the cart"),
       and("I add 2 bananas to the cart"),
@@ -70,7 +78,7 @@ pub fn tests() -> TestSuite {
       when("I checkout"),
       then("the checkout should fail with \"cart is empty\""),
     ])
-      |> with_tags(["checkout", "error"]),
+      |> with_tags(["error"]),
     scenario("Cannot add zero items", [
       when("I try to add 0 apples to the cart"),
       then("the operation should fail with \"invalid quantity\""),

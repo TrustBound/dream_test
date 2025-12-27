@@ -4,7 +4,8 @@ import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, get_int,
 }
 import dream_test/gherkin/world.{get_or, put}
-import dream_test/types.{type AssertionResult, AssertionOk}
+import dream_test/matchers.{succeed}
+import dream_test/types.{type AssertionResult}
 import gleam/int
 import gleam/result
 import shopping_cart/cart
@@ -25,7 +26,9 @@ pub fn register(registry: StepRegistry) -> StepRegistry {
 // Step Implementations
 // ============================================================================
 
-fn step_apply_percent_discount(context: StepContext) -> AssertionResult {
+fn step_apply_percent_discount(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let percent = get_int(context.captures, 0) |> result.unwrap(0)
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let discount = cart_types.PercentOff(int.to_float(percent))
@@ -33,16 +36,18 @@ fn step_apply_percent_discount(context: StepContext) -> AssertionResult {
   case pricing.apply_discount(the_cart, discount) {
     Ok(updated) -> {
       put(context.world, "cart", updated)
-      AssertionOk
+      Ok(succeed())
     }
     Error(_) -> {
       put(context.world, "last_error", "discount failed")
-      AssertionOk
+      Ok(succeed())
     }
   }
 }
 
-fn step_apply_fixed_discount(context: StepContext) -> AssertionResult {
+fn step_apply_fixed_discount(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let amount = get_float(context.captures, 0) |> result.unwrap(0.0)
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let discount = cart_types.FixedAmount(amount)
@@ -50,11 +55,11 @@ fn step_apply_fixed_discount(context: StepContext) -> AssertionResult {
   case pricing.apply_discount(the_cart, discount) {
     Ok(updated) -> {
       put(context.world, "cart", updated)
-      AssertionOk
+      Ok(succeed())
     }
     Error(_) -> {
       put(context.world, "last_error", "discount failed")
-      AssertionOk
+      Ok(succeed())
     }
   }
 }

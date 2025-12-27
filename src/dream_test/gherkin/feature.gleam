@@ -1,63 +1,61 @@
-//// Feature execution and TestSuite conversion for Gherkin tests.
+//// Convert Gherkin features into runnable `TestSuite`s.
 ////
-//// This module converts parsed Gherkin features to dream_test TestSuites
-//// and provides an inline DSL for defining features directly in Gleam.
+//// This module does two related jobs:
+//// - **Execute parsed `.feature` files**: turn a parsed `gherkin/types.Feature`
+////   into a `TestSuite` using a step registry (your Given/When/Then handlers).
+//// - **Provide an inline DSL**: build features directly in Gleam when you don’t
+////   want to keep `.feature` files on disk.
 ////
-//// ## Two Approaches
-////
-//// 1. **File-based**: Parse `.feature` files with standard Gherkin syntax
-//// 2. **Inline DSL**: Define features directly in Gleam code
-////
-//// Both approaches share the same step definitions and execution engine.
-////
-//// ## File-Based Usage
-////
-//// Parse a `.feature` file and convert to TestSuite:
+//// ## Example (file-based)
 ////
 //// ```gleam
-//// import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
-//// import dream_test/gherkin/parser
-//// import dream_test/gherkin/steps.{new_registry, given, when_, then_}
-//// import dream_test/runner
+//// pub fn tests() {
+////   // Define step handlers
+////   let steps =
+////     steps.new()
+////     |> step("the server is running", step_server_running)
+////     |> step("the cart is empty", step_empty_cart)
+////     |> step("I add {int} items", step_add_items)
+////     |> step("the cart should have {int} items", step_verify_count)
 ////
-//// pub fn main() {
-////   let steps = new_registry()
-////   |> given("I have {int} items", have_items)
-////   |> when_("I add {int} items", add_items)
-////   |> then_("the total is ${float}", check_total)
+////   // Parse the .feature file
+////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
 ////
-////   let assert Ok(parsed) = parser.parse_file("features/cart.feature")
-////   let config = FeatureConfig(feature: parsed, step_registry: steps)
-////   
-////   to_test_suite("cart_test", config)
-////   |> runner.run_suite()
+////   // Convert to TestSuite and run
+////   let config = FeatureConfig(feature: feature, step_registry: steps)
+////   to_test_suite(config)
 //// }
 //// ```
 ////
-//// ## Inline DSL Usage
-////
-//// Define features directly in Gleam without `.feature` files:
+//// ## Example (inline DSL)
 ////
 //// ```gleam
-//// import dream_test/gherkin/feature.{
-////   feature, scenario, given, when, then, and, with_tags,
-//// }
+//// pub fn tests() {
+////   let steps =
+////     steps.new()
+////     |> step("the server is running", step_server_running)
+////     |> step("the cart is empty", step_empty_cart)
+////     |> step("I add {int} items", step_add_items)
+////     |> step("the cart should have {int} items", step_verify_count)
 ////
-//// pub fn tests() -> TestSuite {
-////   let steps = cart_steps()
-////   
-////   feature("Shopping Cart", steps, [
+////   let bg = background([given("the server is running")])
+////
+////   feature_with_background("Shopping Cart", steps, bg, [
 ////     scenario("Adding items", [
-////       given("I have an empty cart"),
-////       when("I add 2 apples to the cart"),
-////       then("the cart should contain 2 items"),
-////       and("the total should be $3.00"),
+////       given("the cart is empty"),
+////       when("I add 3 items"),
+////       then("the cart should have 3 items"),
 ////     ])
-////     |> with_tags(["happy-path"]),
+////       |> with_tags(["smoke"]),
+////     scenario("Adding more items", [
+////       given("the cart is empty"),
+////       when("I add 2 items"),
+////       and("I add 3 items"),
+////       then("the cart should have 5 items"),
+////     ]),
 ////   ])
 //// }
 //// ```
-////
 
 import dream_test/gherkin/step_trie.{type StepMatch}
 import dream_test/gherkin/steps.{
@@ -66,9 +64,8 @@ import dream_test/gherkin/steps.{
 import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
-  type AssertionResult, type TestCase, type TestSuite, type TestSuiteItem,
-  AssertionFailed, AssertionFailure, AssertionOk, GherkinScenario,
-  SingleTestConfig, SuiteGroup, SuiteTest, TestCase, TestSuite,
+  type AssertionResult, type Node, type TestSuite, AssertionFailed,
+  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
 }
 import gleam/dict.{type Dict}
 import gleam/int
@@ -131,78 +128,72 @@ pub type InlineStep {
 ///
 /// ## Parameters
 ///
-/// - `module_name`: Name for the suite (usually the test module name)
 /// - `config`: FeatureConfig with feature and step registry
 ///
 /// ## Returns
 ///
-/// A TestSuite that can be run with `runner.run_suite()`
+/// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
 ///
-pub fn to_test_suite(module_name: String, config: FeatureConfig) -> TestSuite {
+/// ## Example
+///
+/// ```gleam
+/// let config = FeatureConfig(feature: feature, step_registry: steps)
+/// to_test_suite(config)
+/// ```
+pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
   let feature = config.feature
-  let items = build_suite_items(feature, config)
+  let children = build_suite_items(feature, config)
 
-  TestSuite(
-    name: feature.name,
-    full_name: [module_name, feature.name],
-    before_all_hooks: [],
-    after_all_hooks: [],
-    items: items,
+  Root(
+    seed: Nil,
+    tree: Group(name: feature.name, tags: feature.tags, children: children),
   )
-}
-
-/// Convert a Feature to a flat list of TestCases.
-///
-/// Unlike `to_test_suite`, this flattens the feature to a simple list.
-/// Use this when you don't need before_all/after_all hooks.
-///
-/// ## Parameters
-///
-/// - `module_name`: Name prefix for test paths
-/// - `config`: FeatureConfig with feature and step registry
-///
-/// ## Returns
-///
-/// A list of TestCases that can be run with `runner.run_all()`
-///
-pub fn to_test_cases(
-  module_name: String,
-  config: FeatureConfig,
-) -> List(TestCase) {
-  let suite = to_test_suite(module_name, config)
-  flatten_suite(suite)
-}
-
-fn flatten_suite(suite: TestSuite) -> List(TestCase) {
-  list.flat_map(suite.items, flatten_item)
-}
-
-fn flatten_item(item: TestSuiteItem) -> List(TestCase) {
-  case item {
-    SuiteTest(test_case) -> [test_case]
-    SuiteGroup(nested_suite) -> flatten_suite(nested_suite)
-  }
 }
 
 fn build_suite_items(
   feature: gherkin_types.Feature,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
-  list.flat_map(feature.scenarios, fn(scenario) {
-    scenario_to_suite_items(feature, scenario, config)
-  })
+) -> List(Node(Nil)) {
+  build_suite_items_loop(feature, feature.scenarios, config, [])
+}
+
+fn build_suite_items_loop(
+  feature: gherkin_types.Feature,
+  scenarios: List(gherkin_types.Scenario),
+  config: FeatureConfig,
+  acc_rev: List(Node(Nil)),
+) -> List(Node(Nil)) {
+  case scenarios {
+    [] -> list.reverse(acc_rev)
+    [scenario, ..rest] -> {
+      let items = scenario_to_suite_items(feature, scenario, config)
+      build_suite_items_loop(
+        feature,
+        rest,
+        config,
+        reverse_append(items, acc_rev),
+      )
+    }
+  }
+}
+
+fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
+  case items {
+    [] -> acc
+    [item, ..rest] -> reverse_append(rest, [item, ..acc])
+  }
 }
 
 fn scenario_to_suite_items(
   feature: gherkin_types.Feature,
   scenario: gherkin_types.Scenario,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
+) -> List(Node(Nil)) {
   case scenario {
     gherkin_types.Scenario(name, tags, steps) -> {
-      let test_case =
-        build_scenario_test_case(feature, name, tags, steps, config, None)
-      [SuiteTest(test_case)]
+      let test_node =
+        build_scenario_test_node(feature, name, tags, steps, config, None)
+      [test_node]
     }
     gherkin_types.ScenarioOutline(name, tags, steps, examples) -> {
       expand_scenario_outline(feature, name, tags, steps, examples, config)
@@ -210,14 +201,14 @@ fn scenario_to_suite_items(
   }
 }
 
-fn build_scenario_test_case(
+fn build_scenario_test_node(
   feature: gherkin_types.Feature,
   scenario_name: String,
   scenario_tags: List(String),
   steps: List(gherkin_types.Step),
   config: FeatureConfig,
   example_suffix: Option(String),
-) -> TestCase {
+) -> Node(Nil) {
   let full_name = build_full_name(feature.name, scenario_name, example_suffix)
   let scenario_id = string.join(full_name, "::")
   let all_tags = list.append(feature.tags, scenario_tags)
@@ -228,23 +219,15 @@ fn build_scenario_test_case(
       list.append(background_steps, steps)
     None -> steps
   }
-
-  let run_fn =
-    build_scenario_runner(scenario_id, all_steps, config.step_registry)
-
-  let single_config =
-    SingleTestConfig(
-      name: scenario_name,
-      full_name: full_name,
-      tags: all_tags,
-      kind: GherkinScenario(scenario_id),
-      run: run_fn,
-      timeout_ms: None,
-      before_each_hooks: [],
-      after_each_hooks: [],
-    )
-
-  TestCase(single_config)
+  Test(
+    name: scenario_name,
+    tags: all_tags,
+    kind: GherkinScenario(scenario_id),
+    run: fn(_nil: Nil) {
+      Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
+    },
+    timeout_ms: None,
+  )
 }
 
 fn build_full_name(
@@ -265,43 +248,103 @@ fn expand_scenario_outline(
   steps: List(gherkin_types.Step),
   examples: gherkin_types.ExamplesTable,
   config: FeatureConfig,
-) -> List(TestSuiteItem) {
+) -> List(Node(Nil)) {
   let headers = examples.headers
 
-  list.index_map(examples.rows, fn(row, index) {
-    let substitutions = build_substitution_map(headers, row)
-    let expanded_steps = substitute_steps(steps, substitutions)
-    let suffix = "(Example " <> int.to_string(index + 1) <> ")"
+  expand_scenario_outline_rows_loop(
+    feature,
+    name,
+    tags,
+    steps,
+    config,
+    headers,
+    examples.rows,
+    0,
+    [],
+  )
+}
 
-    let test_case =
-      build_scenario_test_case(
+fn expand_scenario_outline_rows_loop(
+  feature: gherkin_types.Feature,
+  name: String,
+  tags: List(String),
+  steps: List(gherkin_types.Step),
+  config: FeatureConfig,
+  headers: List(String),
+  rows: List(List(String)),
+  index: Int,
+  acc_rev: List(Node(Nil)),
+) -> List(Node(Nil)) {
+  case rows {
+    [] -> list.reverse(acc_rev)
+    [row, ..rest] -> {
+      let substitutions = build_substitution_map(headers, row)
+      let expanded_steps = substitute_steps(steps, substitutions)
+      let suffix = "(Example " <> int.to_string(index + 1) <> ")"
+
+      let node =
+        build_scenario_test_node(
+          feature,
+          name,
+          tags,
+          expanded_steps,
+          config,
+          Some(suffix),
+        )
+
+      expand_scenario_outline_rows_loop(
         feature,
         name,
         tags,
-        expanded_steps,
+        steps,
         config,
-        Some(suffix),
+        headers,
+        rest,
+        index + 1,
+        [node, ..acc_rev],
       )
-    SuiteTest(test_case)
-  })
+    }
+  }
 }
 
 fn build_substitution_map(
   headers: List(String),
   values: List(String),
 ) -> Dict(String, String) {
-  list.zip(headers, values)
-  |> list.fold(dict.new(), fn(acc, pair) {
-    let #(header, value) = pair
-    dict.insert(acc, header, value)
-  })
+  build_substitution_map_loop(list.zip(headers, values), dict.new())
+}
+
+fn build_substitution_map_loop(
+  pairs: List(#(String, String)),
+  acc: Dict(String, String),
+) -> Dict(String, String) {
+  case pairs {
+    [] -> acc
+    [#(header, value), ..rest] ->
+      build_substitution_map_loop(rest, dict.insert(acc, header, value))
+  }
 }
 
 fn substitute_steps(
   steps: List(gherkin_types.Step),
   substitutions: Dict(String, String),
 ) -> List(gherkin_types.Step) {
-  list.map(steps, fn(step) { substitute_step(step, substitutions) })
+  substitute_steps_loop(steps, substitutions, [])
+}
+
+fn substitute_steps_loop(
+  steps: List(gherkin_types.Step),
+  substitutions: Dict(String, String),
+  acc_rev: List(gherkin_types.Step),
+) -> List(gherkin_types.Step) {
+  case steps {
+    [] -> list.reverse(acc_rev)
+    [step, ..rest] ->
+      substitute_steps_loop(rest, substitutions, [
+        substitute_step(step, substitutions),
+        ..acc_rev
+      ])
+  }
 }
 
 fn substitute_step(
@@ -320,23 +363,26 @@ fn substitute_placeholders(
   text: String,
   substitutions: Dict(String, String),
 ) -> String {
-  dict.fold(substitutions, text, fn(acc, header, value) {
-    let placeholder = "<" <> header <> ">"
-    string.replace(acc, placeholder, value)
-  })
+  substitute_placeholders_loop(dict.to_list(substitutions), text)
+}
+
+fn substitute_placeholders_loop(
+  pairs: List(#(String, String)),
+  acc: String,
+) -> String {
+  case pairs {
+    [] -> acc
+    [#(header, value), ..rest] -> {
+      let placeholder = "<" <> header <> ">"
+      let next = string.replace(acc, placeholder, value)
+      substitute_placeholders_loop(rest, next)
+    }
+  }
 }
 
 // ============================================================================
 // Scenario Execution
 // ============================================================================
-
-fn build_scenario_runner(
-  scenario_id: String,
-  steps: List(gherkin_types.Step),
-  registry: StepRegistry,
-) -> fn() -> AssertionResult {
-  fn() { execute_scenario(scenario_id, steps, registry) }
-}
 
 fn execute_scenario(
   scenario_id: String,
@@ -390,7 +436,15 @@ fn execute_step(
   case steps.find_step(registry, effective_keyword, step.text) {
     Ok(match) -> {
       let context = build_step_context(match, step, the_world)
-      match.handler(context)
+      case match.handler(context) {
+        Ok(result) -> result
+        Error(message) ->
+          AssertionFailed(AssertionFailure(
+            operator: "step",
+            message: message,
+            payload: None,
+          ))
+      }
     }
     Error(msg) -> {
       AssertionFailed(AssertionFailure(
@@ -451,17 +505,31 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 ///
 /// ## Returns
 ///
-/// A TestSuite that can be run with `runner.run_suite()`
+/// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
 ///
 /// ## Example
 ///
 /// ```gleam
+/// let steps =
+///   steps.new()
+///   |> step("I have {int} items in my cart", step_have_items)
+///   |> step("I add {int} more items", step_add_items)
+///   |> step("I should have {int} items total", step_should_have)
+///
 /// feature("Shopping Cart", steps, [
+///   scenario("Adding items to cart", [
+///     given("I have 3 items in my cart"),
+///     when("I add 2 more items"),
+///     then("I should have 5 items total"),
+///     but("I should have 5 items total"),
+///   ]),
+/// ])
+/// ```
 pub fn feature(
-  name: String,
-  registry: StepRegistry,
-  scenarios: List(InlineScenario),
-) -> TestSuite {
+  name name: String,
+  registry registry: StepRegistry,
+  scenarios scenarios: List(InlineScenario),
+) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -473,7 +541,7 @@ pub fn feature(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(name <> "_test", config)
+  to_test_suite(config)
 }
 
 /// Define an inline scenario.
@@ -486,14 +554,18 @@ pub fn feature(
 /// ## Example
 ///
 /// ```gleam
-/// scenario("Adding items", [
-///   given("I have an empty cart"),
-///   when_step("I add 5 items"),
-///   then_step("I should have 5 items"),
-/// ])
+/// scenario("Adding items to cart", [
+///       given("I have 3 items in my cart"),
+///       when("I add 2 more items"),
+///       then("I should have 5 items total"),
+///       but("I should have 5 items total"),
+///     ]),
 /// ```
 ///
-pub fn scenario(name: String, inline_steps: List(InlineStep)) -> InlineScenario {
+pub fn scenario(
+  name name: String,
+  inline_steps inline_steps: List(InlineStep),
+) -> InlineScenario {
   InlineScenario(name: name, steps: inline_steps, tags: [])
 }
 
@@ -503,10 +575,11 @@ pub fn scenario(name: String, inline_steps: List(InlineStep)) -> InlineScenario 
 ///
 /// ```gleam
 /// scenario("Adding items", [
-///   when("I add 2 apples to the cart"),
-///   then("the cart should contain 2 items"),
-/// ])
-/// |> with_tags(["happy-path", "smoke"])
+///       given("the cart is empty"),
+///       when("I add 3 items"),
+///       then("the cart should have 3 items"),
+///     ])
+///       |> with_tags(["smoke"]),
 /// ```
 ///
 /// ## Note
@@ -515,8 +588,8 @@ pub fn scenario(name: String, inline_steps: List(InlineStep)) -> InlineScenario 
 /// `dream_test/unit.with_tags` instead.
 ///
 pub fn with_tags(
-  inline_scenario: InlineScenario,
-  tags: List(String),
+  inline_scenario inline_scenario: InlineScenario,
+  tags tags: List(String),
 ) -> InlineScenario {
   InlineScenario(..inline_scenario, tags: tags)
 }
@@ -526,10 +599,10 @@ pub fn with_tags(
 /// ## Example
 ///
 /// ```gleam
-/// given("I have {int} items in my cart")
+///       given("the cart is empty"),
 /// ```
 ///
-pub fn given(text: String) -> InlineStep {
+pub fn given(text text: String) -> InlineStep {
   InlineStep(keyword: "Given", text: text)
 }
 
@@ -538,10 +611,10 @@ pub fn given(text: String) -> InlineStep {
 /// ## Example
 ///
 /// ```gleam
-/// when("I add {int} items")
+///       when("I add 3 items"),
 /// ```
 ///
-pub fn when(text: String) -> InlineStep {
+pub fn when(text text: String) -> InlineStep {
   InlineStep(keyword: "When", text: text)
 }
 
@@ -550,10 +623,10 @@ pub fn when(text: String) -> InlineStep {
 /// ## Example
 ///
 /// ```gleam
-/// then("I should have {int} items")
+///       then("the cart should have 3 items"),
 /// ```
 ///
-pub fn then(text: String) -> InlineStep {
+pub fn then(text text: String) -> InlineStep {
   InlineStep(keyword: "Then", text: text)
 }
 
@@ -562,10 +635,10 @@ pub fn then(text: String) -> InlineStep {
 /// ## Example
 ///
 /// ```gleam
-/// and("I have a coupon")
+///       and("I add 3 items"),
 /// ```
 ///
-pub fn and(text: String) -> InlineStep {
+pub fn and(text text: String) -> InlineStep {
   InlineStep(keyword: "And", text: text)
 }
 
@@ -574,10 +647,10 @@ pub fn and(text: String) -> InlineStep {
 /// ## Example
 ///
 /// ```gleam
-/// but("I should not see errors")
+///       but("I should have 5 items total"),
 /// ```
 ///
-pub fn but(text: String) -> InlineStep {
+pub fn but(text text: String) -> InlineStep {
   InlineStep(keyword: "But", text: text)
 }
 
@@ -617,15 +690,12 @@ fn parse_keyword(keyword_str: String) -> gherkin_types.StepKeyword {
 /// ## Example
 ///
 /// ```gleam
-/// let bg = background([
-///   given("I am logged in"),
-///   given("I have an empty cart"),
-/// ])
-///
-/// feature_with_background("Shopping", steps, bg, [...scenarios...])
+/// let bg = background([given("the server is running")])
 /// ```
 ///
-pub fn background(inline_steps: List(InlineStep)) -> List(gherkin_types.Step) {
+pub fn background(
+  inline_steps inline_steps: List(InlineStep),
+) -> List(gherkin_types.Step) {
   list.map(inline_steps, inline_to_parsed_step)
 }
 
@@ -638,12 +708,32 @@ pub fn background(inline_steps: List(InlineStep)) -> List(gherkin_types.Step) {
 /// - `background_steps`: Steps to run before each scenario
 /// - `scenarios`: List of inline scenarios
 ///
+/// ## Example
+///
+/// ```gleam
+/// let bg = background([given("the server is running")])
+///
+/// feature_with_background("Shopping Cart", steps, bg, [
+///   scenario("Adding items", [
+///     given("the cart is empty"),
+///     when("I add 3 items"),
+///     then("the cart should have 3 items"),
+///   ])
+///     |> with_tags(["smoke"]),
+///   scenario("Adding more items", [
+///     given("the cart is empty"),
+///     when("I add 2 items"),
+///     and("I add 3 items"),
+///     then("the cart should have 5 items"),
+///   ]),
+/// ])
+/// ```
 pub fn feature_with_background(
-  name: String,
-  registry: StepRegistry,
-  background_steps: List(gherkin_types.Step),
-  scenarios: List(InlineScenario),
-) -> TestSuite {
+  name name: String,
+  registry registry: StepRegistry,
+  background_steps background_steps: List(gherkin_types.Step),
+  scenarios scenarios: List(InlineScenario),
+) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -655,5 +745,5 @@ pub fn feature_with_background(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(name <> "_test", config)
+  to_test_suite(config)
 }

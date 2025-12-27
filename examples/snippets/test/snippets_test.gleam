@@ -1,70 +1,20 @@
-//// Main test runner for all README snippets
-////
-//// Each snippet lives in its own file for easy linking from README.md
+import dream_test/discover
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner
 
-import chaining
-import custom_matchers
-import dream_test/reporter/bdd.{report}
-import dream_test/runner.{exit_on_failure, run_all, run_suite}
-import dream_test/unit.{describe, to_test_cases}
-import execution_modes
-import explicit_failures
-import gherkin_discover
-import gherkin_feature
-import gherkin_file
-import gherkin_hero
-import gherkin_placeholders
-import gherkin_step_handler
-import gleam/io
-import gleam/list
-import hero
-import hook_failure
-import hook_inheritance
-import json_reporter
-import lifecycle_hooks
-import quick_start
-import runner_config
-import sequential_execution
-import skipping_tests
+fn suites() {
+  let discover.LoadResult(suites: suites, errors: _errors) =
+    discover.tests("snippets/**.gleam")
+    |> discover.load()
 
-pub fn tests() {
-  describe("README Snippets", [
-    quick_start.tests(),
-    hero.tests(),
-    chaining.tests(),
-    custom_matchers.tests(),
-    lifecycle_hooks.tests(),
-    explicit_failures.tests(),
-    hook_inheritance.tests(),
-    hook_failure.tests(),
-    runner_config.tests(),
-    json_reporter.tests(),
-    sequential_execution.tests(),
-    execution_modes.tests(),
-    skipping_tests.tests(),
-  ])
+  suites
 }
 
 pub fn main() {
-  // Run unit test snippets
-  let unit_results =
-    to_test_cases("snippets_test", tests())
-    |> run_all()
-
-  // Run Gherkin snippets (these return TestSuite, not UnitTest)
-  let gherkin_results =
-    [
-      gherkin_hero.tests(),
-      gherkin_feature.tests(),
-      gherkin_step_handler.tests(),
-      gherkin_placeholders.tests(),
-      gherkin_file.tests(),
-      gherkin_discover.tests(),
-    ]
-    |> list.flat_map(run_suite)
-
-  let all_results = list.append(unit_results, gherkin_results)
-
-  report(all_results, io.print)
-  exit_on_failure(all_results)
+  runner.new(suites())
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new() |> bdd.color()])
+  |> runner.exit_on_failure()
+  |> runner.run()
 }

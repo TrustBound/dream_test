@@ -1,22 +1,17 @@
 //// Boolean matchers for dream_test.
 ////
-//// These matchers check boolean values.
-//// They're re-exported through `dream_test/assertions/should`.
+//// These matchers check boolean values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// ## Usage
+//// Use them in a matcher chain when you want to assert a boolean condition.
+////
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, be_true, be_false, or_fail_with}
-////
-//// is_valid(input)
-//// |> should()
+//// True
+//// |> should
 //// |> be_true()
-//// |> or_fail_with("Input should be valid")
-////
-//// is_empty(list)
-//// |> should()
-//// |> be_false()
-//// |> or_fail_with("List should not be empty")
+//// |> or_fail_with("expected True")
 //// ```
 
 import dream_test/types.{
@@ -26,16 +21,29 @@ import gleam/option.{Some}
 
 /// Assert that a value is `True`.
 ///
+/// Use this when your value is expected to be `True` and you want a useful
+/// failure payload when it isn't.
+///
 /// ## Example
 ///
 /// ```gleam
-/// is_valid(input)
-/// |> should()
+/// True
+/// |> should
 /// |> be_true()
-/// |> or_fail_with("Input should be valid")
+/// |> or_fail_with("expected True")
 /// ```
 ///
-pub fn be_true(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Bool)` preserving the boolean for further chaining.
+///
+pub fn be_true(
+  value_or_result value_or_result: MatchResult(Bool),
+) -> MatchResult(Bool) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_true(actual)
@@ -59,16 +67,29 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 
 /// Assert that a value is `False`.
 ///
+/// Use this when your value is expected to be `False` and you want a useful
+/// failure payload when it isn't.
+///
 /// ## Example
 ///
 /// ```gleam
-/// is_empty(list)
-/// |> should()
+/// False
+/// |> should
 /// |> be_false()
-/// |> or_fail_with("List should not be empty")
+/// |> or_fail_with("expected False")
 /// ```
 ///
-pub fn be_false(value_or_result: MatchResult(Bool)) -> MatchResult(Bool) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Bool)` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Bool)` preserving the boolean for further chaining.
+///
+pub fn be_false(
+  value_or_result value_or_result: MatchResult(Bool),
+) -> MatchResult(Bool) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_false(actual)

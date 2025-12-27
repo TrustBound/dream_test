@@ -1,22 +1,19 @@
 //// Option matchers for dream_test.
 ////
-//// These matchers work with `Option(a)` values and support chaining.
-//// They're re-exported through `dream_test/assertions/should`.
+//// These matchers work with `Option(a)` values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// ## Chaining
+//// `be_some()` unwraps `Some(value)` so you can keep matching on the inner
+//// value. `be_none()` asserts the option is empty.
 ////
-//// The `be_some` matcher extracts the inner value, allowing you to chain
-//// additional matchers:
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{should, be_some, equal, or_fail_with}
-////
-//// // Check that it's Some, then check the inner value
-//// find_user(id)
-//// |> should()
+//// Some(42)
+//// |> should
 //// |> be_some()
-//// |> equal(expected_user)
-//// |> or_fail_with("Should find the expected user")
+//// |> be_equal(42)
+//// |> or_fail_with("expected Some(42)")
 //// ```
 
 import dream_test/types.{
@@ -28,27 +25,31 @@ import gleam/string
 /// Assert that an `Option` is `Some` and extract its value.
 ///
 /// If the assertion passes, the inner value is passed to subsequent matchers.
+/// This enables chaining like `be_some() |> be_equal(42)`.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// find_user(id)
-/// |> should()
-/// |> be_some()
-/// |> or_fail_with("User should exist")
-/// ```
-///
-/// ## Chaining
-///
-/// ```gleam
 /// Some(42)
-/// |> should()
+/// |> should
 /// |> be_some()
-/// |> equal(42)
-/// |> or_fail_with("Should be Some(42)")
+/// |> be_equal(42)
+/// |> or_fail_with("expected Some(42)")
 /// ```
 ///
-pub fn be_some(value_or_result: MatchResult(Option(a))) -> MatchResult(a) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(a)`:
+/// - On `Some(value)`, the chain continues with the unwrapped `value`.
+/// - On `None`, the chain becomes failed and later matchers are skipped.
+///
+pub fn be_some(
+  value_or_result value_or_result: MatchResult(Option(a)),
+) -> MatchResult(a) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_some(actual)
@@ -75,13 +76,23 @@ fn check_is_some(actual: Option(a)) -> MatchResult(a) {
 /// ## Example
 ///
 /// ```gleam
-/// find_deleted_user(id)
-/// |> should()
+/// None
+/// |> should
 /// |> be_none()
-/// |> or_fail_with("Deleted user should not exist")
+/// |> or_fail_with("expected None")
 /// ```
 ///
-pub fn be_none(value_or_result: MatchResult(Option(a))) -> MatchResult(Nil) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Option(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(Nil)` that continues the chain with `Nil` on success.
+///
+pub fn be_none(
+  value_or_result value_or_result: MatchResult(Option(a)),
+) -> MatchResult(Nil) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual) -> check_is_none(actual)

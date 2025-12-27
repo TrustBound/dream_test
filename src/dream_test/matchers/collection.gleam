@@ -1,26 +1,18 @@
 //// Collection matchers for dream_test.
 ////
-//// These matchers work with lists.
-//// They're re-exported through `dream_test/assertions/should`.
+//// These matchers work with `List(a)` values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// ## Usage
+//// Use them to assert collection properties like length, emptiness, and
+//// membership.
+////
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
-////   should, contain, not_contain, have_length, be_empty, or_fail_with,
-//// }
-////
-//// // Check if list contains an item
-//// users
-//// |> should()
-//// |> contain(alice)
-//// |> or_fail_with("Users should include Alice")
-////
-//// // Check list length
-//// get_results()
-//// |> should()
+//// [1, 2, 3]
+//// |> should
 //// |> have_length(3)
-//// |> or_fail_with("Should have 3 results")
+//// |> or_fail_with("expected list length 3")
 //// ```
 
 import dream_test/types.{
@@ -33,18 +25,32 @@ import gleam/string
 
 /// Assert that a list contains a specific item.
 ///
+/// Use this when you want to assert membership while preserving the original
+/// list for further checks.
+///
 /// ## Example
 ///
 /// ```gleam
 /// [1, 2, 3]
-/// |> should()
+/// |> should
 /// |> contain(2)
-/// |> or_fail_with("List should contain 2")
+/// |> or_fail_with("expected list to contain 2")
 /// ```
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `expected_item`: the item that must be present in the list
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))`:
+/// - On success, preserves the list for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
 pub fn contain(
-  value_or_result: MatchResult(List(a)),
-  expected_item: a,
+  value_or_result value_or_result: MatchResult(List(a)),
+  expected_item expected_item: a,
 ) -> MatchResult(List(a)) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -77,18 +83,32 @@ fn check_contains(
 
 /// Assert that a list does not contain a specific item.
 ///
+/// Use this when you want to assert absence while preserving the original list
+/// for further checks.
+///
 /// ## Example
 ///
 /// ```gleam
 /// ["a", "b", "c"]
-/// |> should()
+/// |> should
 /// |> not_contain("d")
-/// |> or_fail_with("List should not contain 'd'")
+/// |> or_fail_with("expected list to not contain \"d\"")
 /// ```
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `unexpected_item`: the item that must *not* be present in the list
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))`:
+/// - On success, preserves the list for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
 pub fn not_contain(
-  value_or_result: MatchResult(List(a)),
-  unexpected_item: a,
+  value_or_result value_or_result: MatchResult(List(a)),
+  unexpected_item unexpected_item: a,
 ) -> MatchResult(List(a)) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -121,18 +141,32 @@ fn check_not_contains(
 
 /// Assert that a list has a specific length.
 ///
+/// Use this when you need to assert exact list length while preserving the list
+/// for further checks.
+///
 /// ## Example
 ///
 /// ```gleam
-/// get_users()
-/// |> should()
+/// [1, 2, 3]
+/// |> should
 /// |> have_length(3)
-/// |> or_fail_with("Should have 3 users")
+/// |> or_fail_with("expected list length 3")
 /// ```
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+/// - `expected_length`: the exact length the list must have
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))`:
+/// - On success, preserves the list for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
 pub fn have_length(
-  value_or_result: MatchResult(List(a)),
-  expected_length: Int,
+  value_or_result value_or_result: MatchResult(List(a)),
+  expected_length expected_length: Int,
 ) -> MatchResult(List(a)) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -167,16 +201,31 @@ fn check_length(
 
 /// Assert that a list is empty.
 ///
+/// Use this when you want to assert there are no values while preserving the
+/// list for further checks.
+///
 /// ## Example
 ///
 /// ```gleam
-/// get_errors()
-/// |> should()
+/// []
+/// |> should
 /// |> be_empty()
-/// |> or_fail_with("Should have no errors")
+/// |> or_fail_with("expected empty list")
 /// ```
 ///
-pub fn be_empty(value_or_result: MatchResult(List(a))) -> MatchResult(List(a)) {
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(List(a))` produced by `should` (or a previous matcher)
+///
+/// ## Returns
+///
+/// A `MatchResult(List(a))`:
+/// - On success, preserves the list for further chaining.
+/// - On failure, the chain becomes failed and later matchers are skipped.
+///
+pub fn be_empty(
+  value_or_result value_or_result: MatchResult(List(a)),
+) -> MatchResult(List(a)) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
     MatchOk(actual_list) -> check_is_empty(actual_list)

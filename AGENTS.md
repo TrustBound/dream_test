@@ -26,13 +26,13 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 
 - In Gleam, importing specific names from a module using `{...}` **also** brings the module name into scope.
   - `import dream_test/unit.{describe, it}` imports `unit` and the unqualified values `describe` and `it`.
-  - `import dream_test/assertions/should.{or_fail_with}` imports `should` and the unqualified value `or_fail_with`, so `should.equal` and `or_fail_with(...)` are both valid.
+  - `import dream_test/matchers.{or_fail_with}` imports `matchers` and the unqualified value `or_fail_with`, so `matchers.be_equal` and `or_fail_with(...)` are both valid.
 - Only use `as` when you genuinely need to distinguish between two different modules with the **same** final name.
-  - Do **not** write `import dream_test/assertions/should as should`; it adds no information and is banned in this project.
+  - Do **not** write `import dream_test/matchers as should`; it adds no information and is banned in this project.
 - To avoid duplicate imports and confusion, follow the project standards:
   - Use unqualified imports for:
     - `describe`, `it` from `dream_test/unit`.
-    - Piped helpers like `or_fail_with` from `dream_test/assertions/should`.
+    - Piped helpers like `or_fail_with` from `dream_test/matchers`.
     - Core types via `{type ...}` imports when the module name adds no clarity.
 
 ## 3. Type Imports
@@ -47,7 +47,7 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 
 - `assert` is a **reserved word** in Gleam.
   - Do **not** use it as a directory or module name (e.g. `dream_test/assert`).
-  - Use `assertions` instead (e.g. `dream_test/assertions/context` or `dream_test/bootstrap/assertions`).
+  - Use `matchers` instead (e.g. `dream_test/matchers`).
 
 ## 5. Pattern Matching & Blocks
 
@@ -77,8 +77,8 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 - Do **not** return functions from assertion helpers for general chaining.
   - This project prefers simple, multi-argument functions that are pipe-friendly.
 - Correct pattern for assertions:
-  - `value |> should() |> equal(expected) |> or_fail_with("message")`
-  - Not: `value |> should.equal(expected)` (old pattern without chaining).
+  - `value |> should |> be_equal(expected) |> or_fail_with("message")`
+  - Not: `value |> should.be_equal(expected)` (old pattern without chaining).
 
 ## 8. No Closures, No Anonymous Functions
 

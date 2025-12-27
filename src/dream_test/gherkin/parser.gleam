@@ -1,37 +1,12 @@
-//// Gherkin parser for `.feature` files.
+//// Parse Gherkin `.feature` files into `gherkin/types.Feature`.
 ////
-//// Parses Gherkin syntax into structured Feature types that can be
-//// converted to dream_test TestSuites.
+//// Use this when you have Gherkin text (from a file on disk, a fixture, or a
+//// string literal) and you want a structured representation you can convert
+//// into runnable tests via `dream_test/gherkin/feature`.
 ////
-//// ## Supported Syntax
-////
-//// - Feature, Scenario, Scenario Outline
-//// - Background
-//// - Given/When/Then/And/But steps
-//// - Tags (@tag syntax)
-//// - DataTables (pipe-delimited)
-//// - DocStrings (triple quotes)
-//// - Examples tables for Scenario Outlines
-//// - Comments (# lines)
-////
-//// ## Example Usage
-////
-//// ```gleam
-//// import dream_test/gherkin/parser
-////
-//// // Parse from file
-//// case parser.parse_file("test/features/shopping.feature") {
-////   Ok(feature) -> run_feature(feature)
-////   Error(msg) -> panic as msg
-//// }
-////
-//// // Parse from string
-//// let content = "Feature: My Feature\n  Scenario: Test\n    Given something"
-//// case parser.parse_string(content) {
-////   Ok(feature) -> run_feature(feature)
-////   Error(msg) -> panic as msg
-//// }
-//// ```
+//// The parser supports common Gherkin syntax:
+//// Feature / Scenario / Scenario Outline, Background, tags (`@tag`), steps,
+//// DocStrings (`"""`), DataTables (`| ... |`), Examples tables, and comments.
 
 import dream_test/file
 import dream_test/gherkin/types.{
@@ -60,7 +35,13 @@ import gleam/string
 /// - `Ok(Feature)`: Successfully parsed feature
 /// - `Error(String)`: Parse error with description
 ///
-pub fn parse_file(path: String) -> Result(Feature, String) {
+/// ## Example
+///
+/// ```gleam
+///   let assert Ok(feature) = parser.parse_file("test/cart.feature")
+/// ```
+///
+pub fn parse_file(path path: String) -> Result(Feature, String) {
   case file.read(path) {
     Ok(content) -> parse_string(content)
     Error(error) ->
@@ -81,7 +62,25 @@ pub fn parse_file(path: String) -> Result(Feature, String) {
 /// - `Ok(Feature)`: Successfully parsed feature
 /// - `Error(String)`: Parse error with description
 ///
-pub fn parse_string(content: String) -> Result(Feature, String) {
+/// ## Example
+///
+/// ```gleam
+///       let content =
+///         "@smoke\n"
+///         <> "Feature: Demo\n"
+///         <> "\n"
+///         <> "  Scenario: One\n"
+///         <> "    Given a thing\n"
+///
+///       use feature <- result.try(parser.parse_string(content))
+///
+///       feature.name
+///       |> should
+///       |> be_equal("Demo")
+///       |> or_fail_with("expected feature name Demo")
+/// ```
+///
+pub fn parse_string(content content: String) -> Result(Feature, String) {
   let lines = string.split(content, "\n")
   let state = initial_state()
   parse_lines(lines, state)

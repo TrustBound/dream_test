@@ -1,8 +1,14 @@
 //// Core types for dream_test.
 ////
 //// This module defines the data structures used throughout the framework.
-//// Most users won't need to interact with these types directly—they're used
-//// internally by the DSL, runner, and reporters.
+//// Most users won’t need to construct these values directly—`dream_test/unit`,
+//// `dream_test/runner`, and the reporter modules create them for you.
+////
+//// You *will* want to read this module if you are:
+////
+//// - writing custom matchers (you’ll work with `MatchResult(a)` and `AssertionFailure`)
+//// - building a custom reporter (you’ll consume `TestResult`)
+//// - filtering results in CI (you’ll inspect `TestResult.tags`, `TestResult.status`, etc.)
 ////
 //// ## Type Overview
 ////
@@ -20,25 +26,47 @@
 //// If you're writing custom matchers, you'll work with `MatchResult(a)`:
 ////
 //// ```gleam
-//// import dream_test/types.{type MatchResult, MatchOk, MatchFailed, AssertionFailure}
-////
-//// pub fn be_positive(result: MatchResult(Int)) -> MatchResult(Int) {
+//// pub fn be_even(result) {
 ////   case result {
-////     MatchFailed(f) -> MatchFailed(f)
-////     MatchOk(n) -> check_positive(n)
+////     // If already failed, propagate the failure
+////     MatchFailed(failure) -> MatchFailed(failure)
+////     // Otherwise, check our condition
+////     MatchOk(value) -> check_even(value)
 ////   }
 //// }
 ////
-//// fn check_positive(n: Int) -> MatchResult(Int) {
-////   case n > 0 {
-////     True -> MatchOk(n)
-////     False -> MatchFailed(AssertionFailure(...))
+//// fn check_even(value) {
+////   case value % 2 == 0 {
+////     True -> MatchOk(value)
+////     False ->
+////       MatchFailed(AssertionFailure(
+////         operator: "be_even",
+////         message: "",
+////         payload: Some(CustomMatcherFailure(
+////           actual: int.to_string(value),
+////           description: "expected an even number",
+////         )),
+////       ))
 ////   }
 //// }
 //// ```
+//// =============================================================================
+//// Unified tree model (Root/Node)
+//// =============================================================================
+////
+//// Dream Test compiles all unit/context/gherkin tests into a single tree model
+//// that the executor runs.
+////
+//// - `Root(context)` holds the initial seed value and a single root `Node`.
+//// - `Node(context)` represents groups, tests, and lifecycle hooks.
+////
 
 import gleam/option.{type Option}
 
+/// Error type for test execution.
+///
+/// Lifecycle hooks and test bodies can short-circuit by returning
+/// `Error("message")` where the message is human-readable.
 /// The outcome of a test.
 ///
 /// After a test runs, it has one of these statuses:
@@ -54,26 +82,29 @@ import gleam/option.{type Option}
 ///
 /// ## SetupFailed Explained
 ///
-/// When a `before_each` or `before_all` hook returns `AssertionFailed`,
-/// the test (or all tests in the group) are marked as `SetupFailed`.
-/// This indicates the test didn't fail on its own—it never had a chance
-/// to run because its setup failed.
+/// `SetupFailed` means the test body did not run because a lifecycle hook
+/// failed first.
+///
+/// In Dream Test, hooks and test bodies can short-circuit with `Error("message")`.
+/// When `before_all` fails, *all* tests in that suite become `SetupFailed`.
+/// When `before_each` fails, only that test becomes `SetupFailed`.
 ///
 /// ```gleam
-/// describe("Database", [
+/// describe("Handles failures", [
 ///   before_all(fn() {
 ///     case connect_to_database() {
-///       Ok(_) -> AssertionOk
-///       Error(_) -> AssertionFailed(...)  // All tests become SetupFailed
+///       Ok(_) -> Ok(Nil)
+///       Error(e) -> Error("Database connection failed: " <> e)
 ///     }
 ///   }),
-///   it("test1", fn() { ... }),  // Never runs → SetupFailed
-///   it("test2", fn() { ... }),  // Never runs → SetupFailed
+///   // If before_all fails, these tests are marked SetupFailed (not run)
+///   it("test1", fn() { Ok(succeed()) }),
+///   it("test2", fn() { Ok(succeed()) }),
 /// ])
 /// ```
 ///
-/// The `failures` field in `TestResult` will contain the hook's failure
-/// details, so you can see what went wrong.
+/// The failing hook message is recorded on the `TestResult.failures` list so
+/// reporters can display it.
 ///
 pub type Status {
   Passed
@@ -134,7 +165,11 @@ pub type FailurePayload {
 
 /// Complete information about a failed assertion.
 ///
-/// Contains the operator name, user message, and optional structured payload.
+/// Contains:
+///
+/// - the matcher/operator name (e.g. `"equal"` or `"be_ok"`)
+/// - a user-friendly message (provided by `or_fail_with("...")`)
+/// - optional structured payload for rich reporting
 ///
 /// ## Fields
 ///
@@ -152,8 +187,11 @@ pub type AssertionFailure {
 
 /// The final result of an assertion chain.
 ///
-/// This is what `or_fail_with` returns. Test runners use this to determine
-/// whether a test passed or failed.
+/// This is the value a test ultimately produces to indicate pass/fail/skip.
+///
+/// In typical usage, you don’t construct `AssertionResult` directly:
+/// - assertion chains produce it
+/// - `skip(...)` produces `AssertionSkipped`
 ///
 /// ## Variants
 ///
@@ -166,12 +204,10 @@ pub type AssertionFailure {
 /// Most users won't construct this directly. It's returned by `or_fail_with`:
 ///
 /// ```gleam
-/// let result: AssertionResult =
-///   42
-///   |> should()
-///   |> equal(42)
-///   |> or_fail_with("Should be 42")
-/// // result == AssertionOk
+/// 2 + 3
+/// |> should
+/// |> be_equal(5)
+/// |> or_fail_with("2 + 3 should equal 5")
 /// ```
 ///
 pub type AssertionResult {
@@ -188,28 +224,15 @@ pub type AssertionResult {
 /// ## How Chaining Works
 ///
 /// ```gleam
-/// Some(42)           // Start with a value
-/// |> should()        // -> MatchOk(Some(42))
-/// |> be_some()       // -> MatchOk(42)  (unwrapped!)
-/// |> equal(42)       // -> MatchOk(42)
-/// |> or_fail_with()  // -> AssertionOk
+/// Some(42)
+/// |> should
+/// |> be_some()
+/// |> be_equal(42)
+/// |> or_fail_with("expected Some(42)")
 /// ```
 ///
 /// If any matcher fails, the `MatchFailed` propagates through the rest of
 /// the chain without executing further checks.
-///
-/// ## For Custom Matchers
-///
-/// When writing a custom matcher, follow this pattern:
-///
-/// ```gleam
-/// pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
-///   case result {
-///     MatchFailed(failure) -> MatchFailed(failure)  // Propagate failure
-///     MatchOk(value) -> check_is_even(value)        // Check the value
-///   }
-/// }
-/// ```
 ///
 pub type MatchResult(a) {
   MatchOk(a)
@@ -221,15 +244,25 @@ pub type MatchResult(a) {
 /// This discards the value and returns just the pass/fail status.
 /// Used internally by `or_fail_with`.
 ///
+/// ## Parameters
+///
+/// - `result`: the `MatchResult(a)` you want to collapse into pass/fail
+///
+/// ## Returns
+///
+/// - `MatchOk(_)` becomes `AssertionOk`
+/// - `MatchFailed(failure)` becomes `AssertionFailed(failure)`
+///
 /// ## Example
 ///
 /// ```gleam
-/// let match_result = MatchOk(42)
-/// let assertion_result = to_assertion_result(match_result)
-/// // assertion_result == AssertionOk
+/// types.to_assertion_result(types.MatchOk(1))
+/// |> should
+/// |> be_equal(types.AssertionOk)
+/// |> or_fail_with("expected MatchOk -> AssertionOk")
 /// ```
 ///
-pub fn to_assertion_result(result: MatchResult(a)) -> AssertionResult {
+pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
   case result {
     MatchOk(_) -> AssertionOk
     MatchFailed(failure) -> AssertionFailed(failure)
@@ -273,19 +306,10 @@ pub type CoverageSummary {
 ///
 /// ## Example
 ///
-/// After running tests, you get a list of these:
+/// After running suites, you get a list of these:
 ///
 /// ```gleam
-/// let results = run_all(test_cases)
-/// // results: List(TestResult)
-///
-/// list.each(results, fn(result) {
-///   case result.status {
-///     Passed -> io.println("✓ " <> result.name)
-///     Failed -> io.println("✗ " <> result.name)
-///     _ -> Nil
-///   }
-/// })
+/// let results = runner.new([example_suite()]) |> runner.run()
 /// ```
 ///
 pub type TestResult {
@@ -300,157 +324,93 @@ pub type TestResult {
   )
 }
 
-/// Configuration for a single test.
+/// A complete test suite in the unified execution model.
 ///
-/// This is the internal representation of a test before it's run.
-/// Most users won't create this directly—use `describe`/`it` instead.
+/// A `Root(context)` stores the initial `seed` context value and the top-level
+/// `tree` (`Node(context)`) containing groups, tests, and hooks.
+pub type Root(context) {
+  Root(seed: context, tree: Node(context))
+}
+
+/// A node in the unified test tree: groups, tests, and hooks.
 ///
-/// ## Fields
-///
-/// - `name` - The test's name
-/// - `full_name` - Complete path including parent groups
-/// - `tags` - Tags for filtering with `RunnerConfig.test_filter`
-/// - `kind` - Type of test (Unit, Integration, Gherkin)
-/// - `run` - The test function to execute
-/// - `timeout_ms` - Optional per-test timeout override
-/// - `before_each_hooks` - Hooks to run before the test (outer-to-inner order)
-/// - `after_each_hooks` - Hooks to run after the test (inner-to-outer order)
-///
-pub type SingleTestConfig {
-  SingleTestConfig(
+/// Most users build these values via `dream_test/unit` or `dream_test/unit_context`.
+pub type Node(context) {
+  /// A named group containing child nodes.
+  Group(name: String, tags: List(String), children: List(Node(context)))
+
+  /// A runnable test leaf.
+  Test(
     name: String,
-    full_name: List(String),
     tags: List(String),
     kind: TestKind,
-    run: fn() -> AssertionResult,
-    /// Optional per-test timeout override in milliseconds.
-    /// If None, uses the runner's default timeout.
+    run: fn(context) -> Result(AssertionResult, String),
     timeout_ms: Option(Int),
-    /// Hooks to run before the test, in outer-to-inner order.
-    before_each_hooks: List(fn() -> AssertionResult),
-    /// Hooks to run after the test, in inner-to-outer order.
-    after_each_hooks: List(fn() -> AssertionResult),
   )
+
+  /// Group-scoped hooks.
+  BeforeAll(run: fn(context) -> Result(context, String))
+  BeforeEach(run: fn(context) -> Result(context, String))
+  AfterEach(run: fn(context) -> Result(Nil, String))
+  AfterAll(run: fn(context) -> Result(Nil, String))
 }
 
-/// A runnable test case.
-///
-/// Wraps a `SingleTestConfig`. This is what the runner actually executes.
-///
-pub type TestCase {
-  TestCase(SingleTestConfig)
-}
+/// Compatibility alias: suites are roots in the unified model.
+pub type TestSuite(context) =
+  Root(context)
 
-/// A structured test suite preserving group hierarchy.
-///
-/// Unlike a flat `List(TestCase)`, a `TestSuite` maintains the tree structure
-/// of your `describe` blocks. This enables `before_all`/`after_all` hooks,
-/// which need to know where groups begin and end.
-///
-/// ## When You Need This
-///
-/// Most tests don't need `TestSuite`. Use it when you have:
-///
-/// - Expensive setup you want to share across tests (database servers, etc.)
-/// - Resources that should be created once and cleaned up once
-/// - Integration tests with external services
-///
-/// ## How It's Structured
-///
-/// ```text
-/// TestSuite("Database tests")
-/// ├── before_all_hooks: [start_db]
-/// ├── items:
-/// │   ├── SuiteTest("creates users")
-/// │   ├── SuiteTest("queries users")
-/// │   └── SuiteGroup(TestSuite("error cases"))
-/// │       ├── before_all_hooks: []
-/// │       ├── items:
-/// │       │   ├── SuiteTest("handles not found")
-/// │       │   └── SuiteTest("handles timeout")
-/// │       └── after_all_hooks: []
-/// └── after_all_hooks: [stop_db]
-/// ```
-///
-/// ## Creating a TestSuite
-///
-/// Don't construct this directly. Use `to_test_suite` from the unit module:
-///
-/// ```gleam
-/// import dream_test/unit.{describe, it, before_all, to_test_suite}
-///
-/// describe("My tests", [
-///   before_all(fn() { setup(); AssertionOk }),
-///   it("test one", fn() { ... }),
-/// ])
-/// |> to_test_suite("my_module_test")
-/// ```
-///
-/// ## Executing a TestSuite
-///
-/// Use `run_suite` or `run_suite_with_config`:
-///
-/// ```gleam
-/// suite
-/// |> run_suite()
-/// |> report(io.print)
-/// ```
-///
-/// ## Fields
-///
-/// - `name` - The group's name (from `describe`)
-/// - `full_name` - Complete path including parent groups (for reporting)
-/// - `before_all_hooks` - Run once before any test in this group
-/// - `after_all_hooks` - Run once after all tests in this group complete
-/// - `items` - The tests and nested groups contained in this suite
-///
-pub type TestSuite {
-  TestSuite(
-    name: String,
-    full_name: List(String),
-    before_all_hooks: List(fn() -> AssertionResult),
-    after_all_hooks: List(fn() -> AssertionResult),
-    items: List(TestSuiteItem),
-  )
-}
+/// Compatibility alias: suite items are nodes in the unified model.
+pub type TestSuiteItem(context) =
+  Node(context)
 
-/// An item within a test suite: either a single test or a nested group.
+/// Construct a root suite with a single top-level group.
 ///
-/// This type enables the recursive structure of `TestSuite`. You won't
-/// typically construct these directly—they're created by `to_test_suite`.
+/// This is primarily a low-level helper; most users should start from
+/// `dream_test/unit.describe` or `dream_test/unit_context.describe`.
 ///
-/// ## Variants
+/// ## Parameters
 ///
-/// - `SuiteTest(TestCase)` - A single test to execute
-/// - `SuiteGroup(TestSuite)` - A nested group with its own hooks
+/// - `name`: name of the top-level group
+/// - `seed`: the initial context value stored in the `Root`
+/// - `children`: children under the top-level group
 ///
-/// ## Execution Order
+/// ## Returns
 ///
-/// When a suite is executed, items are processed in order:
-///
-/// 1. All `SuiteTest` items run in parallel (up to `max_concurrency`)
-/// 2. `SuiteGroup` items are processed after tests complete
-/// 3. Each nested group runs its own `before_all`/`after_all` hooks
-///
-pub type TestSuiteItem {
-  /// A single test case to run.
-  SuiteTest(TestCase)
-  /// A nested group with its own hooks.
-  SuiteGroup(TestSuite)
+/// A `Root(context)` containing a `Group(name: name, ...)` at the top.
+pub fn root(
+  name name: String,
+  seed seed: context,
+  children children: List(Node(context)),
+) -> Root(context) {
+  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
 }
 
 /// Derive a Status from a list of failures.
 ///
 /// Returns `Passed` if there are no failures, `Failed` otherwise.
 ///
+/// This helper is used when a test body (or hook) accumulates a list of
+/// `AssertionFailure`s and needs to compute a summary status.
+///
+/// ## Parameters
+///
+/// - `failures`: assertion failures accumulated while running a test
+///
+/// ## Returns
+///
+/// - `Passed` when `failures` is empty
+/// - `Failed` otherwise
+///
 /// ## Example
 ///
 /// ```gleam
-/// status_from_failures([])  // -> Passed
-/// status_from_failures([some_failure])  // -> Failed
+/// types.status_from_failures([])
+/// |> should
+/// |> be_equal(types.Passed)
+/// |> or_fail_with("expected Passed for empty failures")
 /// ```
 ///
-pub fn status_from_failures(failures: List(AssertionFailure)) -> Status {
+pub fn status_from_failures(failures failures: List(AssertionFailure)) -> Status {
   case failures {
     [] -> Passed
     _ -> Failed

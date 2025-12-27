@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-12-17
+
+### Added
+
+- **Suite-first runner builder** (`dream_test/runner`)
+
+  - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
+  - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `progress_reporter`, `results_reporters`, `output`, `silent`, `exit_on_failure`, `filter_tests`)
+  - Suite list can be built incrementally with `add_suites(...)`, and specific suites can run with an execution config override via `add_suites_with_config(...)`
+
+- **Runtime test discovery** (`dream_test/discover`)
+
+  - Builder for discovering compiled test modules under `./test/` via module path globs (e.g. `"unit/**_test.gleam"`)
+  - Loads modules that export `tests/0` and calls them to obtain `TestSuite(Nil)` values
+
+- **Reporting split** (`dream_test/reporters/types`, `dream_test/reporters/bdd`, `dream_test/reporters/json`, `dream_test/reporters/progress`)
+
+  - Runner emits structured `ReporterEvent`s (`RunStarted`, `TestFinished`, `RunFinished`, plus hook events)
+  - Live progress via `runner.progress_reporter(progress.new())`
+  - End-of-run reporting via `runner.results_reporters([bdd.new(), json.new(), ...])`
+
+- **Live progress bar reporter** (`dream_test/reporters/progress`)
+
+  - In-place single-line progress bar that adapts to terminal width
+
+- **Selective sandbox crash reports** (`dream_test/sandbox`)
+
+  - New `SandboxConfig.show_crash_reports` flag (default `False`) to suppress noisy BEAM crash reports while still reporting failures
+  - Convenience helper `sandbox.with_crash_reports` for local debugging
+
+### Changed
+
+- **Unit DSL is suite-first** (`dream_test/unit`, `dream_test/types`)
+
+  - Suite items are now typed (`SuiteItem(ctx)`) and suites carry context (`TestSuite(ctx)`)
+  - Test bodies now return `Result(AssertionResult, String)` for explicit failure reporting
+  - Lifecycle hooks now return `Result(ctx, String)` for explicit failure reporting
+
+- **Parallel runner API** (`dream_test/parallel`)
+
+  - Added event-driven entrypoints for driving reporters during parallel execution
+
+### Documentation
+
+- Updated docs to the new v2 suite-first pipeline and event-driven reporter model.
+
+### Breaking Changes
+
+- `dream_test/runner`: replaced `run_all*` / `run_suite*` free functions with the `RunBuilder` pipeline (`runner.new(...) |> ... |> runner.run()`).
+- `dream_test/unit`: test bodies now return `Result(AssertionResult, String)` instead of `AssertionResult`. Hooks now return `Result(ctx, String)` instead of `ctx`.
+- `dream_test/unit`: replaced the old `UnitTest` tree + `to_test_suite` conversion with typed suite builders (`describe`, `group`, `describe_with_hooks`, `SuiteHooks`).
+- `dream_test/types`: suites and test cases are now context-typed (`TestSuite(ctx)`, `SuiteTestCase(ctx)`), so user code matching these types must be updated.
+- **Reporters refactored and split**: live output via `runner.progress_reporter(progress.new())`, end-of-run output via `runner.results_reporters([bdd.new(), json.new(), ...])`. The old `dream_test/reporter` module is replaced by `dream_test/reporters/*`.
+- `dream_test/gherkin/world.get`: error type changed from `Result(a, Nil)` to `Result(a, String)` for more informative failures.
+
 ## [1.2.0] - 2025-12-04
 
 ### Added
@@ -89,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Per-test and total duration in BDD and Gherkin reporters
   - Monotonic time measurement for accurate elapsed time
 
-- **JSON Reporter** (`dream_test/reporter/json`)
+- **JSON Reporter** (`dream_test/reporters/json`)
 
   - Machine-readable JSON output for CI/CD integration
   - `format` and `format_pretty` for string output
@@ -178,7 +233,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Assertions Module** (`dream_test/assertions/should`)
 
-  - Fluent assertion API with `should()` builder
+  - Fluent assertion API with `should` builder
   - `or_fail_with` for custom failure messages
   - Chainable assertion pattern
 
@@ -199,7 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Test timeout handling
   - Comprehensive test result reporting
 
-- **BDD Reporter** (`dream_test/reporter/bdd`)
+- **BDD Reporter** (`dream_test/reporters/bdd`)
 
   - Colorized terminal output
   - Hierarchical test result display
@@ -228,7 +283,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/TrustBound/dream_test/compare/1.2.0...2.0.0
 [1.2.0]: https://github.com/TrustBound/dream_test/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/TrustBound/dream_test/compare/1.0.3...1.1.0
 [1.0.3]: https://github.com/TrustBound/dream_test/compare/1.0.2...1.0.3

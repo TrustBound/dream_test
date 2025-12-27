@@ -1,61 +1,25 @@
 //// File operations for dream_test.
 ////
-//// This module provides file I/O operations for internal use by dream_test,
-//// particularly for snapshot testing and Gherkin file parsing. It wraps
-//// Erlang's file operations with proper error handling.
+//// Dream Test uses this module internally for snapshot testing and Gherkin file
+//// parsing. It wraps Erlang file operations with a small, structured error type
+//// (`FileError`) so callers can decide how to handle failures.
 ////
-//// ## Error Handling
+//// ## Example
 ////
-//// Unlike many file libraries that return opaque errors, this module provides
-//// structured `FileError` types that tell you exactly what went wrong:
-////
-//// ```gleam
-//// case file.read("config.json") {
-////   Ok(content) -> parse(content)
-////   Error(NotFound(_)) -> use_defaults()
-////   Error(PermissionDenied(path)) -> panic as "Cannot read " <> path
-////   Error(error) -> panic as file.error_to_string(error)
-//// }
-//// ```
-////
-//// ## Usage Examples
-////
-//// ### Reading Files
+//// Use this in test code (for example inside a snippet `tests()` function).
 ////
 //// ```gleam
-//// import dream_test/file
+//// let path = tmp_path()
 ////
-//// case file.read("./test/fixtures/expected.json") {
-////   Ok(content) -> content
-////   Error(error) -> {
-////     io.println("Error: " <> file.error_to_string(error))
-////     ""
-////   }
-//// }
-//// ```
+//// // Setup: create the file (no assertions during setup)
+//// use _ <- result.try(
+////   write(path, "hello") |> result.map_error(error_to_string),
+//// )
 ////
-//// ### Writing Files
-////
-//// ```gleam
-//// // Creates parent directories automatically
-//// case file.write("./test/snapshots/output.snap", result) {
-////   Ok(Nil) -> io.println("Saved!")
-////   Error(NoSpace(_)) -> io.println("Disk full!")
-////   Error(error) -> io.println(file.error_to_string(error))
-//// }
-//// ```
-////
-//// ### Deleting Files
-////
-//// ```gleam
-//// // Safe to call even if file doesn't exist
-//// let _ = file.delete("./test/snapshots/old.snap")
-////
-//// // Delete all snapshots
-//// case file.delete_files_matching("./test/snapshots", ".snap") {
-////   Ok(count) -> io.println("Deleted " <> int.to_string(count) <> " files")
-////   Error(error) -> io.println(file.error_to_string(error))
-//// }
+//// read(path)
+//// |> should
+//// |> be_equal(Ok("hello"))
+//// |> or_fail_with("expected to read back written content")
 //// ```
 
 // =============================================================================
@@ -80,19 +44,10 @@
 /// ## Example
 ///
 /// ```gleam
-/// case file.read("secret.txt") {
-///   Ok(content) -> use(content)
-///   Error(PermissionDenied(path)) -> {
-///     io.println("Access denied: " <> path)
-///     io.println("Try: chmod +r " <> path)
-///   }
-///   Error(NotFound(path)) -> {
-///     io.println("File not found: " <> path)
-///   }
-///   Error(error) -> {
-///     io.println(file.error_to_string(error))
-///   }
-/// }
+/// error_to_string(NotFound("/x"))
+/// |> should
+/// |> be_equal("File not found: /x")
+/// |> or_fail_with("expected NotFound formatting")
 /// ```
 ///
 pub type FileError {
@@ -132,20 +87,24 @@ pub type FileError {
 /// Formats the error with both the error type and the affected path,
 /// suitable for logging or displaying to users.
 ///
+/// ## Parameters
+///
+/// - `error`: the `FileError` value to format
+///
+/// ## Returns
+///
+/// A human-readable message string. This function is pure (no I/O).
+///
 /// ## Examples
 ///
 /// ```gleam
-/// error_to_string(NotFound("/app/config.json"))
-/// // -> "File not found: /app/config.json"
-///
-/// error_to_string(PermissionDenied("/etc/shadow"))
-/// // -> "Permission denied: /etc/shadow"
-///
-/// error_to_string(FileSystemError("/dev/null", "ebusy"))
-/// // -> "File error (ebusy): /dev/null"
+/// error_to_string(NotFound("/x"))
+/// |> should
+/// |> be_equal("File not found: /x")
+/// |> or_fail_with("expected NotFound formatting")
 /// ```
 ///
-pub fn error_to_string(error: FileError) -> String {
+pub fn error_to_string(error error: FileError) -> String {
   case error {
     NotFound(path) -> "File not found: " <> path
     PermissionDenied(path) -> "Permission denied: " <> path
@@ -179,26 +138,21 @@ pub fn error_to_string(error: FileError) -> String {
 /// ## Examples
 ///
 /// ```gleam
-/// // Read a configuration file
-/// case file.read("gleam.toml") {
-///   Ok(toml) -> parse_config(toml)
-///   Error(NotFound(_)) -> default_config()
-///   Error(error) -> panic as file.error_to_string(error)
-/// }
-/// ```
+/// let path = tmp_path()
 ///
-/// ```gleam
-/// // Read with full error handling
-/// case file.read(path) {
-///   Ok(content) -> Ok(content)
-///   Error(NotFound(_)) -> Error("Config file missing")
-///   Error(PermissionDenied(_)) -> Error("Cannot read config (permission denied)")
-///   Error(error) -> Error(file.error_to_string(error))
-/// }
+/// // Setup: create the file (no assertions during setup)
+/// use _ <- result.try(
+///   write(path, "hello") |> result.map_error(error_to_string),
+/// )
+///
+/// read(path)
+/// |> should
+/// |> be_equal(Ok("hello"))
+/// |> or_fail_with("expected to read back written content")
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "read_file")
-pub fn read(path: String) -> Result(String, FileError)
+pub fn read(path path: String) -> Result(String, FileError)
 
 /// Write a string to a file, creating parent directories if needed.
 ///
@@ -221,21 +175,19 @@ pub fn read(path: String) -> Result(String, FileError)
 /// ## Examples
 ///
 /// ```gleam
-/// // Write a snapshot file
-/// case file.write("./test/snapshots/user.snap", json_output) {
-///   Ok(Nil) -> io.println("Snapshot saved")
-///   Error(error) -> io.println("Failed: " <> file.error_to_string(error))
-/// }
-/// ```
+/// let path = tmp_path()
 ///
-/// ```gleam
-/// // Creates nested directories automatically
-/// file.write("./deep/nested/path/file.txt", "content")
-/// // Creates ./deep/nested/path/ if it doesn't exist
+/// // Setup: create the file (no assertions during setup)
+/// use _ <- result.try(
+///   write(path, "hello") |> result.map_error(error_to_string),
+/// )
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "write_file")
-pub fn write(path: String, content: String) -> Result(Nil, FileError)
+pub fn write(
+  path path: String,
+  content content: String,
+) -> Result(Nil, FileError)
 
 /// Delete a file.
 ///
@@ -256,21 +208,22 @@ pub fn write(path: String, content: String) -> Result(Nil, FileError)
 /// ## Examples
 ///
 /// ```gleam
-/// // Safe cleanup - doesn't fail if already deleted
-/// let _ = file.delete("./test/temp/output.txt")
-/// ```
+/// let path = tmp_path()
 ///
-/// ```gleam
-/// // Delete with error handling
-/// case file.delete(snapshot_path) {
-///   Ok(Nil) -> io.println("Snapshot cleared")
-///   Error(PermissionDenied(_)) -> io.println("Cannot delete (permission denied)")
-///   Error(error) -> io.println(file.error_to_string(error))
-/// }
+/// // Setup: create the file, then delete it (no assertions during setup)
+/// use _ <- result.try(
+///   write(path, "hello") |> result.map_error(error_to_string),
+/// )
+/// use _ <- result.try(delete(path) |> result.map_error(error_to_string))
+///
+/// read(path)
+/// |> should
+/// |> be_equal(Error(NotFound(path)))
+/// |> or_fail_with("expected deleted file to be NotFound")
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "delete_file")
-pub fn delete(path: String) -> Result(Nil, FileError)
+pub fn delete(path path: String) -> Result(Nil, FileError)
 
 /// Delete all files in a directory that have a specific extension.
 ///
@@ -286,22 +239,27 @@ pub fn delete(path: String) -> Result(Nil, FileError)
 /// ## Returns
 ///
 /// - `Ok(Int)` - Number of files deleted
-/// - `Error(FileSystemError)` - Directory access failed
+/// - `Error(FileError)` - Directory access failed (the specific variant depends on the underlying file system error)
 ///
 /// ## Examples
 ///
 /// ```gleam
-/// // Clear all snapshot files
-/// case file.delete_files_matching("./test/snapshots", ".snap") {
-///   Ok(0) -> io.println("No snapshots to delete")
-///   Ok(n) -> io.println("Deleted " <> int.to_string(n) <> " snapshots")
-///   Error(error) -> io.println(file.error_to_string(error))
-/// }
-/// ```
+/// let directory = "./test/tmp/file_helpers_" <> int.to_string(unique_port())
+/// let a = directory <> "/a.snap"
+/// let b = directory <> "/b.snap"
+/// let keep = directory <> "/keep.txt"
 ///
-/// ```gleam
-/// // Clean up temporary files before test run
-/// let _ = file.delete_files_matching("./test/temp", ".tmp")
+/// // Setup: create 2 matching files and 1 non-matching file
+/// use _ <- result.try(write(a, "a") |> result.map_error(error_to_string))
+/// use _ <- result.try(write(b, "b") |> result.map_error(error_to_string))
+/// use _ <- result.try(
+///   write(keep, "keep") |> result.map_error(error_to_string),
+/// )
+///
+/// delete_files_matching(directory, ".snap")
+/// |> should
+/// |> be_equal(Ok(2))
+/// |> or_fail_with("expected two deleted snapshots")
 /// ```
 ///
 /// ## Notes
@@ -312,6 +270,6 @@ pub fn delete(path: String) -> Result(Nil, FileError)
 ///
 @external(erlang, "dream_test_file_ffi", "delete_files_matching")
 pub fn delete_files_matching(
-  directory: String,
-  extension: String,
+  directory directory: String,
+  extension extension: String,
 ) -> Result(Int, FileError)

@@ -182,7 +182,7 @@ Add tests in the appropriate `test/dream_test/` subdirectory matching the source
 
 ```gleam
 import dream_test/unit.{describe, it}
-import dream_test/assertions/should.{should, equal, fail_with, or_fail_with}
+import dream_test/matchers.{should, , fail_with, or_fail_with}
 import dream_test/types.{AssertionOk, MatchFailed, MatchOk}
 
 pub fn tests() {
@@ -263,11 +263,11 @@ Every public function needs:
 ///
 /// ```gleam
 /// 42
-/// |> should()
-/// |> equal(42)
+/// |> should
+/// |> be_equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```
-pub fn equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
+pub fn be_equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
   // ...
 }
 ````
@@ -276,7 +276,7 @@ pub fn equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
 
 See these files for documentation quality standards:
 
-- `src/dream_test/assertions/should.gleam` — module docs with tables, chaining examples
+- `src/dream_test/matchers.gleam` — module docs with tables, chaining examples
 - `src/dream_test/unit.gleam` — DSL usage patterns
 - `src/dream_test/runner.gleam` — configuration examples
 

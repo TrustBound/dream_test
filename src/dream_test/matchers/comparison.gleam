@@ -1,34 +1,18 @@
 //// Comparison matchers for dream_test.
 ////
-//// These matchers compare numeric values.
-//// They're re-exported through `dream_test/assertions/should`.
+//// These matchers compare numeric values and are re-exported through
+//// `dream_test/matchers`.
 ////
-//// ## Integer Matchers
+//// Use them to assert ordering relationships (greater-than, less-than, in a
+//// range, etc.) while preserving the numeric value for further chaining.
+////
+//// ## Example
 ////
 //// ```gleam
-//// import dream_test/assertions/should.{
-////   should, be_greater_than, be_less_than, be_at_least,
-////   be_at_most, be_between, be_in_range, or_fail_with,
-//// }
-////
-//// count
-//// |> should()
+//// 10
+//// |> should
 //// |> be_greater_than(0)
-//// |> or_fail_with("Count should be positive")
-////
-//// score
-//// |> should()
-//// |> be_in_range(0, 100)
-//// |> or_fail_with("Score should be 0-100")
-//// ```
-////
-//// ## Float Matchers
-////
-//// ```gleam
-//// average
-//// |> should()
-//// |> be_greater_than_float(0.0)
-//// |> or_fail_with("Average should be positive")
+//// |> or_fail_with("expected 10 to be greater than 0")
 //// ```
 
 import dream_test/types.{
@@ -40,18 +24,27 @@ import gleam/option.{Some}
 
 /// Assert that an integer is greater than a threshold.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual integer must be greater than
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// count_items()
-/// |> should()
+/// 10
+/// |> should
 /// |> be_greater_than(0)
-/// |> or_fail_with("Should have at least one item")
+/// |> or_fail_with("expected 10 to be greater than 0")
 /// ```
 ///
 pub fn be_greater_than(
-  value_or_result: MatchResult(Int),
-  threshold: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  threshold threshold: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -81,18 +74,27 @@ fn check_greater_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 
 /// Assert that an integer is less than a threshold.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual integer must be less than
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// response_time_ms
-/// |> should()
+/// 10
+/// |> should
 /// |> be_less_than(100)
-/// |> or_fail_with("Response should be under 100ms")
+/// |> or_fail_with("expected 10 to be less than 100")
 /// ```
 ///
 pub fn be_less_than(
-  value_or_result: MatchResult(Int),
-  threshold: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  threshold threshold: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -122,18 +124,27 @@ fn check_less_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 
 /// Assert that an integer is at least a minimum value (>=).
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `minimum`: the minimum allowed value (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// user.age
-/// |> should()
-/// |> be_at_least(18)
-/// |> or_fail_with("User must be at least 18")
+/// 10
+/// |> should
+/// |> be_at_least(10)
+/// |> or_fail_with("expected 10 to be at least 10")
 /// ```
 ///
 pub fn be_at_least(
-  value_or_result: MatchResult(Int),
-  minimum: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  minimum minimum: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -163,18 +174,27 @@ fn check_at_least(actual: Int, minimum: Int) -> MatchResult(Int) {
 
 /// Assert that an integer is at most a maximum value (<=).
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `maximum`: the maximum allowed value (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// password.length
-/// |> should()
-/// |> be_at_most(128)
-/// |> or_fail_with("Password must be at most 128 characters")
+/// 10
+/// |> should
+/// |> be_at_most(10)
+/// |> or_fail_with("expected 10 to be at most 10")
 /// ```
 ///
 pub fn be_at_most(
-  value_or_result: MatchResult(Int),
-  maximum: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  maximum maximum: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -206,19 +226,29 @@ fn check_at_most(actual: Int, maximum: Int) -> MatchResult(Int) {
 ///
 /// The value must be strictly greater than `min` and strictly less than `max`.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `min`: lower bound (exclusive)
+/// - `max`: upper bound (exclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// port
-/// |> should()
-/// |> be_between(1024, 65535)
-/// |> or_fail_with("Port must be between 1024 and 65535")
+/// 5
+/// |> should
+/// |> be_between(1, 10)
+/// |> or_fail_with("expected 5 to be between 1 and 10")
 /// ```
 ///
 pub fn be_between(
-  value_or_result: MatchResult(Int),
-  min: Int,
-  max: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  min min: Int,
+  max max: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -250,19 +280,29 @@ fn check_between(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 ///
 /// The value must be >= `min` and <= `max`.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Int)` produced by `should` (or a previous matcher)
+/// - `min`: lower bound (inclusive)
+/// - `max`: upper bound (inclusive)
+///
+/// ## Returns
+///
+/// A `MatchResult(Int)` preserving the integer for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// score
-/// |> should()
+/// 10
+/// |> should
 /// |> be_in_range(0, 100)
-/// |> or_fail_with("Score must be 0-100")
+/// |> or_fail_with("expected 10 to be in range 0..100")
 /// ```
 ///
 pub fn be_in_range(
-  value_or_result: MatchResult(Int),
-  min: Int,
-  max: Int,
+  value_or_result value_or_result: MatchResult(Int),
+  min min: Int,
+  max max: Int,
 ) -> MatchResult(Int) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -292,18 +332,27 @@ fn check_in_range(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 
 /// Assert that a float is greater than a threshold.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual float must be greater than
+///
+/// ## Returns
+///
+/// A `MatchResult(Float)` preserving the float for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// average
-/// |> should()
+/// 0.5
+/// |> should
 /// |> be_greater_than_float(0.0)
-/// |> or_fail_with("Average should be positive")
+/// |> or_fail_with("expected 0.5 to be greater than 0.0")
 /// ```
 ///
 pub fn be_greater_than_float(
-  value_or_result: MatchResult(Float),
-  threshold: Float,
+  value_or_result value_or_result: MatchResult(Float),
+  threshold threshold: Float,
 ) -> MatchResult(Float) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)
@@ -336,18 +385,27 @@ fn check_greater_than_float(
 
 /// Assert that a float is less than a threshold.
 ///
+/// ## Parameters
+///
+/// - `value_or_result`: the `MatchResult(Float)` produced by `should` (or a previous matcher)
+/// - `threshold`: the value the actual float must be less than
+///
+/// ## Returns
+///
+/// A `MatchResult(Float)` preserving the float for further chaining.
+///
 /// ## Example
 ///
 /// ```gleam
-/// error_rate
-/// |> should()
-/// |> be_less_than_float(0.01)
-/// |> or_fail_with("Error rate should be under 1%")
+/// 0.5
+/// |> should
+/// |> be_less_than_float(1.0)
+/// |> or_fail_with("expected 0.5 to be less than 1.0")
 /// ```
 ///
 pub fn be_less_than_float(
-  value_or_result: MatchResult(Float),
-  threshold: Float,
+  value_or_result value_or_result: MatchResult(Float),
+  threshold threshold: Float,
 ) -> MatchResult(Float) {
   case value_or_result {
     MatchFailed(failure) -> MatchFailed(failure)

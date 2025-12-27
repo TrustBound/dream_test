@@ -17,7 +17,7 @@ import dream_test/assertions/should.{should, match_snapshot, or_fail_with}
 
 it("renders user profile", fn() {
   render_profile(user)
-  |> should()
+  |> should
   |> match_snapshot("./test/snapshots/user_profile.snap")
   |> or_fail_with("Profile should match snapshot")
 })
@@ -38,7 +38,7 @@ Test any value using `string.inspect` serialization—perfect for records, lists
 
 ```gleam
 build_config()
-|> should()
+|> should
 |> match_snapshot_inspect("./test/snapshots/config.snap")
 |> or_fail_with("Config should match snapshot")
 ```
@@ -49,7 +49,7 @@ No magic environment variables or flags. To update a snapshot:
 
 ```sh
 rm ./test/snapshots/user_profile.snap
-gleam test
+make test
 ```
 
 The new snapshot is created automatically on the next run.
@@ -123,6 +123,7 @@ See the new [examples/snippets/test/snapshot_testing.gleam](https://github.com/T
 ---
 
 **Full Changelog:** [CHANGELOG.md](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)
+
 
 
 
