@@ -293,7 +293,7 @@ Dream Test runs tests in parallel by default (configurable). Hooks don’t chang
 If your hooks touch shared external state (ports, filesystem paths, database schemas), you have two options:
 
 - Make the resource usage isolated (unique temp dirs, unique ports, per-test DB schemas), or
-- Run sequentially by setting the runner’s concurrency to 1 (see the runner chapter).
+- Run sequentially by setting the runner’s concurrency to 1, or run only the shared-resource suite(s) sequentially using `runner.add_suites_with_config` (see the runner chapter).
 
 ### What's Next?
 

@@ -60,6 +60,7 @@ Rapid application development needs testing tools that scale and support the gro
 | ⏱️ **Timeouts**           | Per-test timeout control                 |
 | 🔍 **Test discovery**     | Find tests from file paths               |
 | 🚨 **Exit-on-failure**    | Fail fast for CI                         |
+| 🧩 **Suite-specific execution config** | Run some suites sequential/with custom timeouts in the same runner (`runner.add_suites_with_config(...)`) |
 
 ### Reporting
 

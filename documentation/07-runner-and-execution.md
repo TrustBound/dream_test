@@ -108,6 +108,35 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/sequential_execution.gleam)</sub>
 
+### Mixed execution policies (per-suite concurrency/timeout)
+
+If only *some* suites share external state (for example: database suites) you don’t need two separate runners.
+Instead, run everything in one runner and apply an execution config override to the suites that need it.
+
+```gleam
+import dream_test/parallel
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner
+
+pub fn main() {
+  let db_config =
+    parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+
+  runner.new([])
+  |> runner.add_suites([unit_tests()])
+  |> runner.add_suites_with_config(db_config, [db_tests()])
+  |> runner.max_concurrency(8)
+  |> runner.default_timeout_ms(10_000)
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/suite_specific_config.gleam)</sub>
+
 ### Choosing a concurrency number (practical guidance)
 
 - Start with the default.

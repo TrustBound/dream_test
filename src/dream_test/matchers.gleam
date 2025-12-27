@@ -860,3 +860,4 @@ pub fn fail_with(message message: String) -> AssertionResult {
 pub fn succeed() -> AssertionResult {
   AssertionOk
 }
+

@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   - New `runner.new([suite]) |> ... |> runner.run()` pipeline for configuring and running suites
   - Configuration is applied via builder functions (`max_concurrency`, `default_timeout_ms`, `progress_reporter`, `results_reporters`, `output`, `silent`, `exit_on_failure`, `filter_tests`)
+  - Suite list can be built incrementally with `add_suites(...)`, and specific suites can run with an execution config override via `add_suites_with_config(...)`
+
+- **Runtime test discovery** (`dream_test/discover`)
+
+  - Builder for discovering compiled test modules under `./test/` via module path globs (e.g. `"unit/**_test.gleam"`)
+  - Loads modules that export `tests/0` and calls them to obtain `TestSuite(Nil)` values
 
 - **Reporting split** (`dream_test/reporters/types`, `dream_test/reporters/bdd`, `dream_test/reporters/json`, `dream_test/reporters/progress`)
 
@@ -36,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unit DSL is suite-first** (`dream_test/unit`, `dream_test/types`)
 
   - Suite items are now typed (`SuiteItem(ctx)`) and suites carry context (`TestSuite(ctx)`)
-  - Lifecycle hooks now return `Result(..., String)` for explicit failure reporting
+  - Test bodies now return `Result(AssertionResult, String)` for explicit failure reporting
+  - Lifecycle hooks now return `Result(ctx, String)` for explicit failure reporting
 
 - **Parallel runner API** (`dream_test/parallel`)
 
@@ -49,8 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking Changes
 
 - `dream_test/runner`: replaced `run_all*` / `run_suite*` free functions with the `RunBuilder` pipeline (`runner.new(...) |> ... |> runner.run()`).
+- `dream_test/unit`: test bodies now return `Result(AssertionResult, String)` instead of `AssertionResult`. Hooks now return `Result(ctx, String)` instead of `ctx`.
 - `dream_test/unit`: replaced the old `UnitTest` tree + `to_test_suite` conversion with typed suite builders (`describe`, `group`, `describe_with_hooks`, `SuiteHooks`).
 - `dream_test/types`: suites and test cases are now context-typed (`TestSuite(ctx)`, `SuiteTestCase(ctx)`), so user code matching these types must be updated.
+- **Reporters refactored and split**: live output via `runner.progress_reporter(progress.new())`, end-of-run output via `runner.results_reporters([bdd.new(), json.new(), ...])`. The old `dream_test/reporter` module is replaced by `dream_test/reporters/*`.
 - `dream_test/gherkin/world.get`: error type changed from `Result(a, Nil)` to `Result(a, String)` for more informative failures.
 
 ## [1.2.0] - 2025-12-04

@@ -18,6 +18,7 @@
 ////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/parallel
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
@@ -35,7 +36,12 @@
 //// }
 ////
 //// pub fn main() {
-////   runner.new([tests()])
+////   let db_config =
+////     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+////
+////   runner.new([])
+////   |> runner.add_suites([tests()])
+////   |> runner.add_suites_with_config(db_config, [db_tests()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.exit_on_failure()
@@ -148,13 +154,20 @@ pub type TestInfo {
 /// ```
 pub opaque type RunBuilder(ctx) {
   RunBuilder(
-    suites: List(TestSuite(ctx)),
+    suite_runs: List(SuiteRun(ctx)),
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
     should_exit_on_failure: Bool,
     progress_reporter: Option(progress.ProgressReporter),
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
+  )
+}
+
+type SuiteRun(ctx) {
+  SuiteRun(
+    suite: TestSuite(ctx),
+    config_override: Option(parallel.ParallelConfig),
   )
 }
 
@@ -211,15 +224,73 @@ pub type Output {
 /// A `RunBuilder(ctx)` you can pipe through configuration helpers and finally
 /// `runner.run()`.
 pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
+  let config = parallel.default_config()
   RunBuilder(
-    suites: suites,
-    config: parallel.default_config(),
+    suite_runs: suites_to_suite_runs_default(suites, []),
+    config: config,
     test_filter: None,
     should_exit_on_failure: False,
     progress_reporter: None,
     results_reporters: [],
     output: None,
   )
+}
+
+/// Append suites to the run, using the builder’s current execution config.
+///
+/// This is useful when you want to build up your suite list incrementally
+/// (especially when some suites need a different execution config).
+///
+/// Suites added with `add_suites` will run using the runner’s current execution
+/// config (configured via `max_concurrency` / `default_timeout_ms`).
+///
+/// ## Example
+///
+/// ```gleam
+/// runner.new([])
+/// |> runner.add_suites([unit_suite()])
+/// |> runner.add_suites([integration_suite()])
+/// |> runner.run()
+/// ```
+pub fn add_suites(
+  builder builder: RunBuilder(ctx),
+  suites suites: List(TestSuite(ctx)),
+) -> RunBuilder(ctx) {
+  let appended = append_suite_runs_default(builder.suite_runs, suites)
+  RunBuilder(..builder, suite_runs: appended)
+}
+
+/// Append suites to the run, using an explicit execution config override.
+///
+/// This lets you run suites with different concurrency/timeout policies in a
+/// single runner invocation (for example: DB suites sequential, unit suites
+/// parallel).
+///
+/// The override applies only to the suites added by this call. Reporting, output,
+/// filtering, and exit behavior remain global runner settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/parallel
+///
+/// let db_config =
+///   parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+///
+/// runner.new([])
+/// |> runner.add_suites([unit_suite()])
+/// |> runner.add_suites_with_config(db_config, [db_suite()])
+/// |> runner.max_concurrency(50)
+/// |> runner.default_timeout_ms(5_000)
+/// |> runner.run()
+/// ```
+pub fn add_suites_with_config(
+  builder builder: RunBuilder(ctx),
+  config config: parallel.ParallelConfig,
+  suites suites: List(TestSuite(ctx)),
+) -> RunBuilder(ctx) {
+  let appended = append_suite_runs_with_override(builder.suite_runs, config, suites)
+  RunBuilder(..builder, suite_runs: appended)
 }
 
 /// Set the maximum number of concurrently running tests.
@@ -549,8 +620,8 @@ pub fn filter_tests(
 ///
 /// A list of `TestResult` values, in deterministic order.
 pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
-  let selected_suites = apply_test_filter(builder.suites, builder.test_filter)
-  let total = count_total_tests(selected_suites)
+  let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
+  let total = count_total_tests(selected_runs)
 
   let output = case builder.output {
     Some(output) -> output
@@ -572,7 +643,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
 
   let #(results, completed2) =
     run_suites_with_progress(
-      selected_suites,
+      selected_runs,
       builder.config,
       builder.progress_reporter,
       output,
@@ -623,27 +694,31 @@ fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
 }
 
 fn apply_test_filter(
-  suites: List(TestSuite(ctx)),
+  suite_runs: List(SuiteRun(ctx)),
   predicate: Option(fn(TestInfo) -> Bool),
-) -> List(TestSuite(ctx)) {
+) -> List(SuiteRun(ctx)) {
   case predicate {
-    None -> suites
-    Some(p) -> filter_suites(suites, p, [])
+    None -> suite_runs
+    Some(p) -> filter_suite_runs(suite_runs, p, [])
   }
 }
 
-fn filter_suites(
-  suites: List(TestSuite(ctx)),
+fn filter_suite_runs(
+  suite_runs: List(SuiteRun(ctx)),
   predicate: fn(TestInfo) -> Bool,
-  acc_rev: List(TestSuite(ctx)),
-) -> List(TestSuite(ctx)) {
-  case suites {
+  acc_rev: List(SuiteRun(ctx)),
+) -> List(SuiteRun(ctx)) {
+  case suite_runs {
     [] -> list.reverse(acc_rev)
-    [suite, ..rest] -> {
+    [SuiteRun(suite: suite, config_override: override), ..rest] -> {
       let #(maybe, _has_tests) = filter_root(suite, predicate)
       case maybe {
-        None -> filter_suites(rest, predicate, acc_rev)
-        Some(filtered) -> filter_suites(rest, predicate, [filtered, ..acc_rev])
+        None -> filter_suite_runs(rest, predicate, acc_rev)
+        Some(filtered) ->
+          filter_suite_runs(rest, predicate, [
+            SuiteRun(suite: filtered, config_override: override),
+            ..acc_rev
+          ])
       }
     }
   }
@@ -753,21 +828,22 @@ fn filter_children(
 }
 
 fn run_suites_with_progress(
-  suites: List(TestSuite(ctx)),
-  config: parallel.ParallelConfig,
+  suite_runs: List(SuiteRun(ctx)),
+  default_config: parallel.ParallelConfig,
   progress_reporter: Option(progress.ProgressReporter),
   output: Output,
   total: Int,
   completed: Int,
   acc: List(TestResult),
 ) -> #(List(TestResult), Int) {
-  case suites {
+  case suite_runs {
     [] -> #(acc, completed)
-    [suite, ..rest] -> {
+    [SuiteRun(suite: suite, config_override: override), ..rest] -> {
+      let suite_config = suite_run_config(default_config, override)
       let parallel_result =
         parallel.run_root_parallel_with_reporter(
           parallel.RunRootParallelWithReporterConfig(
-            config: config,
+            config: suite_config,
             suite: suite,
             progress_reporter: progress_reporter,
             write: output_out(output),
@@ -783,7 +859,7 @@ fn run_suites_with_progress(
 
       run_suites_with_progress(
         rest,
-        config,
+        default_config,
         next_progress_reporter,
         output,
         total,
@@ -791,6 +867,16 @@ fn run_suites_with_progress(
         list.append(acc, results),
       )
     }
+  }
+}
+
+fn suite_run_config(
+  default_config: parallel.ParallelConfig,
+  override: Option(parallel.ParallelConfig),
+) -> parallel.ParallelConfig {
+  case override {
+    None -> default_config
+    Some(config) -> config
   }
 }
 
@@ -842,14 +928,17 @@ fn output_out(output: Output) -> fn(String) -> Nil {
   out
 }
 
-fn count_total_tests(suites: List(TestSuite(ctx))) -> Int {
-  count_total_tests_from_list(suites, 0)
+fn count_total_tests(suite_runs: List(SuiteRun(ctx))) -> Int {
+  count_total_tests_from_list(suite_runs, 0)
 }
 
-fn count_total_tests_from_list(suites: List(TestSuite(ctx)), acc: Int) -> Int {
-  case suites {
+fn count_total_tests_from_list(
+  suite_runs: List(SuiteRun(ctx)),
+  acc: Int,
+) -> Int {
+  case suite_runs {
     [] -> acc
-    [suite, ..rest] ->
+    [SuiteRun(suite: suite, config_override: _), ..rest] ->
       count_total_tests_from_list(rest, acc + count_tests_in_suite(suite.tree))
   }
 }
@@ -868,6 +957,54 @@ fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
     [child, ..rest] ->
       count_tests_in_children(rest, acc + count_tests_in_suite(child))
   }
+}
+
+// ============================================================================
+// Suite run list helpers (no anonymous fns)
+// ============================================================================
+
+fn suites_to_suite_runs_default(
+  suites: List(TestSuite(ctx)),
+  acc_rev: List(SuiteRun(ctx)),
+) -> List(SuiteRun(ctx)) {
+  case suites {
+    [] -> list.reverse(acc_rev)
+    [suite, ..rest] ->
+      suites_to_suite_runs_default(rest, [
+        SuiteRun(suite: suite, config_override: None),
+        ..acc_rev
+      ])
+  }
+}
+
+fn suites_to_suite_runs_with_override(
+  config: parallel.ParallelConfig,
+  suites: List(TestSuite(ctx)),
+  acc_rev: List(SuiteRun(ctx)),
+) -> List(SuiteRun(ctx)) {
+  case suites {
+    [] -> list.reverse(acc_rev)
+    [suite, ..rest] ->
+      suites_to_suite_runs_with_override(config, rest, [
+        SuiteRun(suite: suite, config_override: Some(config)),
+        ..acc_rev
+      ])
+  }
+}
+
+fn append_suite_runs_default(
+  existing: List(SuiteRun(ctx)),
+  suites: List(TestSuite(ctx)),
+) -> List(SuiteRun(ctx)) {
+  list.append(existing, suites_to_suite_runs_default(suites, []))
+}
+
+fn append_suite_runs_with_override(
+  existing: List(SuiteRun(ctx)),
+  config: parallel.ParallelConfig,
+  suites: List(TestSuite(ctx)),
+) -> List(SuiteRun(ctx)) {
+  list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
 }
 
 /// Return `True` if the list contains any failing statuses.

@@ -103,7 +103,7 @@ pub type LoadResult {
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, reporter, run}
+/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 /// import gleam/io
 ///
 /// pub fn main() {
@@ -142,7 +142,7 @@ pub fn new() -> TestDiscovery {
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, reporter, run}
+/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 /// import gleam/io
 ///
 /// pub fn main() {
@@ -189,7 +189,7 @@ pub fn from_path(
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, reporter, run}
+/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 /// import gleam/io
 ///
 /// pub fn main() {
@@ -295,7 +295,7 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, reporter, run}
+/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 /// import gleam/io
 ///
 /// pub fn main() {
@@ -342,7 +342,7 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, reporter, run}
+/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
 /// import gleam/io
 ///
 /// pub fn main() {
