@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -36,7 +36,7 @@ fn step_verify_count(context: StepContext) {
 pub fn tests() {
   // Define step handlers
   let steps =
-    new_registry()
+    steps.new()
     |> step("the server is running", step_server_running)
     |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)

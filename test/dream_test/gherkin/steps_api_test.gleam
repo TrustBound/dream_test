@@ -10,7 +10,7 @@ pub fn tests() {
     it("find_step captures two values for {int} and {word}", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("I have {int} items of {word}", steps_test_handler)
 
       // Act
@@ -31,7 +31,7 @@ pub fn tests() {
     it("get_int extracts captured {int}", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("I have {int} items of {word}", steps_test_handler)
 
       // Act
@@ -52,7 +52,7 @@ pub fn tests() {
     it("get_word extracts captured {word}", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("I have {int} items of {word}", steps_test_handler)
 
       // Act
@@ -73,7 +73,7 @@ pub fn tests() {
     it("get_string extracts {string} without quotes", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("I say {string}", steps_test_handler)
 
       // Act
@@ -91,7 +91,7 @@ pub fn tests() {
     }),
 
     it("find_step returns Error for undefined steps", fn() {
-      let registry = steps.new_registry()
+      let registry = steps.new()
       case steps.find_step(registry, gtypes.Given, "I do not exist") {
         Ok(_) -> Ok(fail_with("expected undefined step error"))
         Error(_msg) -> Ok(test_types.AssertionOk)

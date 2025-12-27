@@ -14,11 +14,11 @@ Write behavior-driven tests using familiar Given/When/Then syntax:
 
 ```gleam
 import dream_test/gherkin/feature.{feature, scenario, given, when, then}
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items in my cart", step_have_items)
     |> step("I add {int} more items", step_add_items)
     |> step("I should have {int} items total", step_should_have)

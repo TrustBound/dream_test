@@ -135,7 +135,7 @@ Feature: Shopping Cart
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import gleam/result
@@ -160,7 +160,7 @@ fn step_verify_count(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items in my cart", step_have_items)
     |> step("I add {int} more items", step_add_items)
     |> step("I should have {int} items total", step_verify_count)
@@ -176,14 +176,14 @@ pub fn tests() {
 
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import gleam/result
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items", fn(ctx: StepContext) {
       put(ctx.world, "cart", get_int(ctx.captures, 0) |> result.unwrap(0))
       Ok(succeed())

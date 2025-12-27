@@ -4,7 +4,7 @@
 //// `features/` so you can see the full file-based workflow.
 
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{new_registry}
+import dream_test/gherkin/steps
 import dream_test/types.{type TestSuite}
 import steps/assertions
 import steps/cart
@@ -13,7 +13,7 @@ import steps/discount
 
 pub fn tests() -> TestSuite(Nil) {
   let registry =
-    new_registry()
+    steps.new()
     |> cart.register()
     |> discount.register()
     |> checkout.register()

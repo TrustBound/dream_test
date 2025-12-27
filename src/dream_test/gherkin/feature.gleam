@@ -12,7 +12,7 @@
 //// pub fn tests() {
 ////   // Define step handlers
 ////   let steps =
-////     new_registry()
+////     steps.new()
 ////     |> step("the server is running", step_server_running)
 ////     |> step("the cart is empty", step_empty_cart)
 ////     |> step("I add {int} items", step_add_items)
@@ -32,7 +32,7 @@
 //// ```gleam
 //// pub fn tests() {
 ////   let steps =
-////     new_registry()
+////     steps.new()
 ////     |> step("the server is running", step_server_running)
 ////     |> step("the cart is empty", step_empty_cart)
 ////     |> step("I add {int} items", step_add_items)
@@ -511,7 +511,7 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 ///
 /// ```gleam
 /// let steps =
-///   new_registry()
+///   steps.new()
 ///   |> step("I have {int} items in my cart", step_have_items)
 ///   |> step("I add {int} more items", step_add_items)
 ///   |> step("I should have {int} items total", step_should_have)

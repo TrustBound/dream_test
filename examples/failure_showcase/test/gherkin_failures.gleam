@@ -1,7 +1,7 @@
 //// Gherkin failures for the failure showcase example.
 
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 
@@ -32,7 +32,7 @@ fn step_counter_should_be_one(context: StepContext) {
 
 pub fn tests() {
   let registry =
-    new_registry()
+    steps.new()
     |> step("a counter at 0", step_counter_at_zero)
     |> step("I increment the counter", step_increment_counter)
     |> step("the counter should be 2", step_counter_should_be_two)

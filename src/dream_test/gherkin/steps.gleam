@@ -10,7 +10,7 @@
 ////
 //// ```gleam
 ////   let steps =
-////     new_registry()
+////     new()
 ////     |> step("I have {int} items in my cart", step_have_items)
 ////     |> step("I add {int} more items", step_add_items)
 ////     |> step("I should have {int} items total", step_should_have)
@@ -107,7 +107,7 @@ pub opaque type StepRegistry {
 ///
 /// ```gleam
 /// let steps =
-///   new_registry()
+///   new()
 ///   |> step("I have {int} items", step_int)
 ///   |> step("the price is ${float}", step_float)
 ///   |> step("the message is {string}", step_string)
@@ -115,7 +115,7 @@ pub opaque type StepRegistry {
 ///   |> step("everything works", step_pass)
 /// ```
 ///
-pub fn new_registry() -> StepRegistry {
+pub fn new() -> StepRegistry {
   StepRegistry(trie: step_trie.new())
 }
 
@@ -136,7 +136,7 @@ pub fn new_registry() -> StepRegistry {
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new_registry() |> given("I have {int} items", step_pass)
+///       let registry = new() |> given("I have {int} items", step_pass)
 /// ```
 ///
 pub fn given(
@@ -167,7 +167,7 @@ pub fn given(
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new_registry() |> when_("I add {int} items", step_pass)
+///       let registry = new() |> when_("I add {int} items", step_pass)
 /// ```
 ///
 pub fn when_(
@@ -198,7 +198,7 @@ pub fn when_(
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new_registry() |> then_("I should have {int} items", step_pass)
+///       let registry = new() |> then_("I should have {int} items", step_pass)
 /// ```
 ///
 pub fn then_(
@@ -228,7 +228,7 @@ pub fn then_(
 ///
 /// ```gleam
 /// let steps =
-///     new_registry()
+///     new()
 ///     |> step("I have {int} items in my cart", step_have_items)
 ///     |> step("I add {int} more items", step_add_items)
 ///     |> step("I should have {int} items total", step_should_have)
@@ -287,7 +287,7 @@ pub fn step(
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new_registry() |> given("I have {int} items", step_pass)
+///       let registry = new() |> given("I have {int} items", step_pass)
 ///
 ///       use matched <- result.try(find_step(registry, Given, "I have 3 items"))
 ///

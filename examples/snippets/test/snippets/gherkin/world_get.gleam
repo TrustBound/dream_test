@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
-import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, step}
 import dream_test/gherkin/world.{get, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -29,7 +29,7 @@ pub fn register(registry) {
 }
 
 pub fn tests() {
-  let steps = new_registry() |> register()
+  let steps = steps.new() |> register()
 
   feature("World: get", steps, [
     scenario("Reading a stored value", [

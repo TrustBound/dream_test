@@ -1,6 +1,5 @@
 import dream_test/gherkin/steps.{
-  type StepContext, capture_count, find_step, get_int, given, new_registry,
-  then_, when_,
+  type StepContext, capture_count, find_step, get_int, given, then_, when_,
 }
 import dream_test/gherkin/types.{Given, Then, When}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -14,7 +13,7 @@ fn step_pass(_context: StepContext) {
 pub fn tests() {
   describe("Gherkin steps registry", [
     it("can find a step and count captures", fn() {
-      let registry = new_registry() |> given("I have {int} items", step_pass)
+      let registry = steps.new() |> given("I have {int} items", step_pass)
 
       use matched <- result.try(find_step(registry, Given, "I have 3 items"))
 
@@ -24,7 +23,7 @@ pub fn tests() {
       |> or_fail_with("expected exactly one capture")
     }),
     it("can extract an int capture", fn() {
-      let registry = new_registry() |> given("I have {int} items", step_pass)
+      let registry = steps.new() |> given("I have {int} items", step_pass)
 
       use matched <- result.try(find_step(registry, Given, "I have 3 items"))
       use count <- result.try(get_int(matched.captures, 0))
@@ -35,14 +34,14 @@ pub fn tests() {
       |> or_fail_with("expected captured int to be 3")
     }),
     it("registers a When step", fn() {
-      let registry = new_registry() |> when_("I add {int} items", step_pass)
+      let registry = steps.new() |> when_("I add {int} items", step_pass)
 
       use _matched <- result.try(find_step(registry, When, "I add 2 items"))
       Ok(succeed())
     }),
     it("registers a Then step", fn() {
       let registry =
-        new_registry() |> then_("I should have {int} items", step_pass)
+        steps.new() |> then_("I should have {int} items", step_pass)
 
       use _matched <- result.try(find_step(
         registry,

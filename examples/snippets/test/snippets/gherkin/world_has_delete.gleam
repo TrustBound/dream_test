@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, step}
 import dream_test/gherkin/world.{delete, has, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -31,7 +31,7 @@ pub fn register(registry) {
 }
 
 pub fn tests() {
-  let steps = new_registry() |> register()
+  let steps = steps.new() |> register()
 
   feature("World: has + delete", steps, [
     scenario("Deleting a key", [

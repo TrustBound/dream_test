@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -30,7 +30,7 @@ fn step_should_have(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items in my cart", step_have_items)
     |> step("I add {int} more items", step_add_items)
     |> step("I should have {int} items total", step_should_have)

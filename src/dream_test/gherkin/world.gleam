@@ -12,7 +12,7 @@
 ////
 //// ```gleam
 //// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-//// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
+//// import dream_test/gherkin/steps.{type StepContext, get_float, step}
 //// import dream_test/gherkin/world.{get_or, put}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import dream_test/reporters/bdd
@@ -52,7 +52,7 @@
 //// }
 ////
 //// pub fn tests() {
-////   let steps = new_registry() |> register()
+////   let steps = steps.new() |> register()
 ////
 ////   feature("Bank Account", steps, [
 ////     scenario("Withdrawal", [
@@ -165,7 +165,7 @@ pub fn cleanup(world world: World) -> Nil {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
+/// import dream_test/gherkin/steps.{type StepContext, get_float, step}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -205,7 +205,7 @@ pub fn cleanup(world world: World) -> Nil {
 /// }
 ///
 /// pub fn tests() {
-///   let steps = new_registry() |> register()
+///   let steps = steps.new() |> register()
 ///
 ///   feature("Bank Account", steps, [
 ///     scenario("Withdrawal", [
@@ -248,7 +248,7 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then}
-/// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+/// import dream_test/gherkin/steps.{type StepContext, step}
 /// import dream_test/gherkin/world.{get, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -279,7 +279,7 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 /// }
 ///
 /// pub fn tests() {
-///   let steps = new_registry() |> register()
+///   let steps = steps.new() |> register()
 ///
 ///   feature("World: get", steps, [
 ///     scenario("Reading a stored value", [
@@ -320,7 +320,7 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, get_float, new_registry, step}
+/// import dream_test/gherkin/steps.{type StepContext, get_float, step}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -360,7 +360,7 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 /// }
 ///
 /// pub fn tests() {
-///   let steps = new_registry() |> register()
+///   let steps = steps.new() |> register()
 ///
 ///   feature("Bank Account", steps, [
 ///     scenario("Withdrawal", [
@@ -400,7 +400,7 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+/// import dream_test/gherkin/steps.{type StepContext, step}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -433,7 +433,7 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 /// }
 ///
 /// pub fn tests() {
-///   let steps = new_registry() |> register()
+///   let steps = steps.new() |> register()
 ///
 ///   feature("World: has + delete", steps, [
 ///     scenario("Deleting a key", [
@@ -473,7 +473,7 @@ pub fn has(world world: World, key key: String) -> Bool {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, new_registry, step}
+/// import dream_test/gherkin/steps.{type StepContext, step}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -506,7 +506,7 @@ pub fn has(world world: World, key key: String) -> Bool {
 /// }
 ///
 /// pub fn tests() {
-///   let steps = new_registry() |> register()
+///   let steps = steps.new() |> register()
 ///
 ///   feature("World: has + delete", steps, [
 ///     scenario("Deleting a key", [

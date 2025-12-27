@@ -10,7 +10,7 @@
 ////
 //// ```gleam
 //// import dream_test/gherkin/discover
-//// import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+//// import dream_test/gherkin/steps.{type StepContext, get_int, step}
 //// import dream_test/gherkin/world.{get_or, put}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import gleam/result
@@ -43,7 +43,7 @@
 //// pub fn tests() {
 ////   // Define step handlers
 ////   let steps =
-////     new_registry()
+////     steps.new()
 ////     |> step("the server is running", step_server_running)
 ////     |> step("the cart is empty", step_empty_cart)
 ////     |> step("I add {int} items", step_add_items)
@@ -139,7 +139,7 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 /// ```gleam
 /// // Define step handlers
 /// let steps =
-///   new_registry()
+///   steps.new()
 ///   |> step("the server is running", step_server_running)
 ///   |> step("the cart is empty", step_empty_cart)
 ///   |> step("I add {int} items", step_add_items)

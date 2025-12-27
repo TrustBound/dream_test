@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
-import dream_test/gherkin/steps.{new_registry, step}
+import dream_test/gherkin/steps.{step}
 import dream_test/matchers.{succeed}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
@@ -10,7 +10,7 @@ fn step_ok(_context) {
 }
 
 pub fn tests() {
-  let steps = new_registry() |> step("everything is fine", step_ok)
+  let steps = steps.new() |> step("everything is fine", step_ok)
 
   feature("Gherkin Reporting", steps, [
     scenario("A passing scenario", [

@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, get_float, get_int, get_string, get_word, new_registry, step,
+  type StepContext, get_float, get_int, get_string, get_word, step,
 }
 import dream_test/gherkin/world.{put}
 import dream_test/matchers.{succeed}
@@ -43,7 +43,7 @@ fn step_pass(_context) {
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items", step_int)
     |> step("the price is ${float}", step_float)
     |> step("the message is {string}", step_string)

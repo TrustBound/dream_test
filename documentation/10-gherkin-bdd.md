@@ -65,7 +65,7 @@ That’s why the examples annotate `context: StepContext` (it’s the minimal ty
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -95,7 +95,7 @@ fn step_should_have(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items in my cart", step_have_items)
     |> step("I add {int} more items", step_add_items)
     |> step("I should have {int} items total", step_should_have)
@@ -135,7 +135,7 @@ Typed helpers like `get_int` parse the capture into the right type.
 import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, get_float, get_int, get_string, get_word, new_registry, step,
+  type StepContext, get_float, get_int, get_string, get_word, step,
 }
 import dream_test/gherkin/world.{put}
 import dream_test/reporters/bdd
@@ -177,7 +177,7 @@ fn step_pass(_context) {
 
 pub fn tests() {
   let steps =
-    new_registry()
+    steps.new()
     |> step("I have {int} items", step_int)
     |> step("the price is ${float}", step_float)
     |> step("the message is {string}", step_string)
@@ -241,7 +241,7 @@ Feature: Shopping Cart
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -276,7 +276,7 @@ fn step_verify_count(context: StepContext) {
 pub fn tests() {
   // Define step handlers
   let steps =
-    new_registry()
+    steps.new()
     |> step("the server is running", step_server_running)
     |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)
@@ -308,7 +308,7 @@ Use discovery when you want real `.feature` files (e.g. written by QA or copied 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{type StepContext, get_int, new_registry, step}
+import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -343,7 +343,7 @@ fn step_verify_count(context: StepContext) {
 pub fn tests() {
   // Define step handlers
   let steps =
-    new_registry()
+    steps.new()
     |> step("the server is running", step_server_running)
     |> step("the cart is empty", step_empty_cart)
     |> step("I add {int} items", step_add_items)

@@ -10,7 +10,7 @@ pub fn tests() {
     it("inline feature() builds a runnable suite", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("a thing", gherkin_step_ok)
         |> steps.then_("it works", gherkin_step_ok)
 
@@ -45,7 +45,7 @@ pub fn tests() {
     it("with_tags adds scenario tags to the resulting test result", fn() {
       // Arrange
       let registry =
-        steps.new_registry()
+        steps.new()
         |> steps.given("a thing", gherkin_step_ok)
 
       let suite =

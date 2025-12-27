@@ -94,7 +94,7 @@ pub fn tests() {
 
         let suite =
           discover.features("./test/tmp/features/discover_bad_suite.feature")
-          |> discover.with_registry(steps.new_registry())
+          |> discover.with_registry(steps.new())
           |> discover.to_suite("Features")
 
         // Act
