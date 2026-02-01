@@ -38,6 +38,8 @@ pub fn main() {
         write: write,
         total: total,
         completed: completed,
+        runner_before_each_test: [],
+        runner_after_each_test: [],
       ),
     )
   let parallel.RunRootParallelWithReporterResult(

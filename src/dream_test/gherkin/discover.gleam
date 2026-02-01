@@ -66,6 +66,7 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 
 // ============================================================================
 // Types
@@ -323,7 +324,15 @@ fn error_to_node(error: String) -> Node(Nil) {
     kind: Unit,
     run: parse_error_test_run,
     timeout_ms: None,
+    source: source_from_parse_error(error),
   )
+}
+
+fn source_from_parse_error(error: String) -> Option(String) {
+  case string.split_once(error, ": ") {
+    Ok(#(path, _message)) -> Some(path)
+    Error(_) -> None
+  }
 }
 
 fn parse_error_test_run(_nil: Nil) -> Result(AssertionResult, String) {

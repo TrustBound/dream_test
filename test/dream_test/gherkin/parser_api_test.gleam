@@ -4,7 +4,7 @@ import dream_test/gherkin/types as gtypes
 import dream_test/matchers.{fail_with}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
-import gleam/option.{None}
+import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("dream_test/gherkin/parser", [
@@ -24,6 +24,7 @@ pub fn tests() {
       case result {
         Ok(gtypes.Feature(
           name: "Demo",
+          source: None,
           description: None,
           tags: ["smoke"],
           background: None,
@@ -58,14 +59,15 @@ pub fn tests() {
       let _ = file.write(path, content)
 
       case parser.parse_file(path) {
-        Ok(gtypes.Feature(
-          name: "From File",
-          description: _,
-          tags: _,
-          background: _,
-          scenarios: [_],
-        )) -> Ok(test_types.AssertionOk)
-        Ok(_) -> Ok(fail_with("unexpected parse result"))
+        Ok(feature) ->
+          case feature.source {
+            Some(source) ->
+              case source == path && feature.name == "From File" {
+                True -> Ok(test_types.AssertionOk)
+                False -> Ok(fail_with("unexpected parse result"))
+              }
+            None -> Ok(fail_with("expected source to be set"))
+          }
         Error(msg) -> Ok(fail_with(msg))
       }
     }),

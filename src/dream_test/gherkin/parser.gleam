@@ -43,10 +43,33 @@ import gleam/string
 ///
 pub fn parse_file(path path: String) -> Result(Feature, String) {
   case file.read(path) {
-    Ok(content) -> parse_string(content)
+    Ok(content) ->
+      case parse_string(content) {
+        Ok(feature) -> Ok(feature_with_source(feature, path))
+        Error(message) -> Error(message)
+      }
     Error(error) ->
       Error("Failed to read feature file: " <> file.error_to_string(error))
   }
+}
+
+fn feature_with_source(feature: Feature, source: String) -> Feature {
+  let Feature(
+    name: name,
+    source: _source,
+    description: description,
+    tags: tags,
+    background: background,
+    scenarios: scenarios,
+  ) = feature
+  Feature(
+    name: name,
+    source: Some(source),
+    description: description,
+    tags: tags,
+    background: background,
+    scenarios: scenarios,
+  )
 }
 
 /// Parse Gherkin content from a string.
@@ -554,6 +577,7 @@ fn finalize_feature(state: ParserState) -> Result(Feature, String) {
     Some(name) ->
       Ok(Feature(
         name: name,
+        source: None,
         description: final_state.feature_description,
         tags: final_state.feature_tags,
         background: final_state.background,

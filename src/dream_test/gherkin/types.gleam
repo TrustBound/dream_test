@@ -232,6 +232,8 @@ pub type Feature {
   Feature(
     /// The feature name (from the Feature: line)
     name: String,
+    /// Optional source identifier (typically the .feature file path)
+    source: Option(String),
     /// Optional description text below the feature name
     description: Option(String),
     /// Tags applied to the feature (inherited by all scenarios)

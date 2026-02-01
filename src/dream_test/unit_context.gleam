@@ -243,7 +243,14 @@ pub fn it(
   name name: String,
   run run: fn(context) -> Result(AssertionResult, String),
 ) -> ContextNode(context) {
-  Test(name: name, tags: [], kind: Unit, run: run, timeout_ms: None)
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: run,
+    timeout_ms: None,
+    source: None,
+  )
 }
 
 /// Define a skipped context-aware test.
@@ -310,6 +317,7 @@ pub fn skip(
     kind: Unit,
     run: skipped_test_run,
     timeout_ms: None,
+    source: None,
   )
 }
 
@@ -396,8 +404,15 @@ pub fn with_tags(
   case node {
     Group(name, _, children) ->
       Group(name: name, tags: tags, children: children)
-    Test(name, _, kind, run, timeout_ms) ->
-      Test(name: name, tags: tags, kind: kind, run: run, timeout_ms: timeout_ms)
+    Test(name, _, kind, run, timeout_ms, source) ->
+      Test(
+        name: name,
+        tags: tags,
+        kind: kind,
+        run: run,
+        timeout_ms: timeout_ms,
+        source: source,
+      )
     other -> other
   }
 }

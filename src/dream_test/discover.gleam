@@ -39,7 +39,7 @@ import dream_test/types.{
   AssertionFailure, Group, Root, Test, Unit,
 }
 import gleam/list
-import gleam/option.{None}
+import gleam/option.{None, Some}
 import gleam/string
 
 // ============================================================================
@@ -432,7 +432,11 @@ fn load_suites_from_modules_next(
 ) -> LoadResult {
   case call_tests(module_name) {
     Ok(suite) ->
-      load_suites_from_modules(rest, [suite, ..suites_rev], errors_rev)
+      load_suites_from_modules(
+        rest,
+        [suite_with_source(suite, module_name), ..suites_rev],
+        errors_rev,
+      )
     Error(message) ->
       load_suites_from_modules(rest, suites_rev, [
         format_load_error(module_name, message),
@@ -547,6 +551,47 @@ fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
   tree
 }
 
+fn suite_with_source(suite: TestSuite(Nil), source: String) -> TestSuite(Nil) {
+  let Root(seed, tree) = suite
+  Root(seed: seed, tree: node_with_source(tree, source))
+}
+
+fn node_with_source(node: Node(Nil), source: String) -> Node(Nil) {
+  case node {
+    Group(name, tags, children) ->
+      Group(
+        name: name,
+        tags: tags,
+        children: children_with_source(children, source, []),
+      )
+    Test(name, tags, kind, run, timeout_ms, _source) ->
+      Test(
+        name: name,
+        tags: tags,
+        kind: kind,
+        run: run,
+        timeout_ms: timeout_ms,
+        source: Some(source),
+      )
+    other -> other
+  }
+}
+
+fn children_with_source(
+  children: List(Node(Nil)),
+  source: String,
+  acc_rev: List(Node(Nil)),
+) -> List(Node(Nil)) {
+  case children {
+    [] -> list.reverse(acc_rev)
+    [child, ..rest] ->
+      children_with_source(rest, source, [
+        node_with_source(child, source),
+        ..acc_rev
+      ])
+  }
+}
+
 fn error_to_node(error: String) -> Node(Nil) {
   Test(
     name: "Discovery Error: " <> error,
@@ -554,6 +599,7 @@ fn error_to_node(error: String) -> Node(Nil) {
     kind: Unit,
     run: discovery_error_run,
     timeout_ms: None,
+    source: None,
   )
 }
 

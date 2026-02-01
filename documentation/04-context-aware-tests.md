@@ -33,6 +33,8 @@ This is the right tool when:
 
 If you don’t need an explicit context, prefer `dream_test/unit` — it’s simpler.
 
+For setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](07-runner-and-execution.md).
+
 ### The idea: context flows through the suite
 
 - You give `describe` an initial `seed` value.

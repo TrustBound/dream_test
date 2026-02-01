@@ -82,6 +82,7 @@ pub fn tests() {
 
       Feature(
         name: "Example feature",
+        source: None,
         description: None,
         tags: [],
         background: None,
@@ -91,6 +92,7 @@ pub fn tests() {
       |> be_equal(
         Feature(
           name: "Example feature",
+          source: None,
           description: None,
           tags: [],
           background: None,

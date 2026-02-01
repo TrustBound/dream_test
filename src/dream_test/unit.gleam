@@ -255,6 +255,7 @@ pub fn it(
     kind: Unit,
     run: fn(_nil: Nil) { run() },
     timeout_ms: None,
+    source: None,
   )
 }
 
@@ -327,13 +328,21 @@ pub fn skip(
 ) -> UnitNode {
   let node = it(name, run)
   case node {
-    Test(name: name, tags: tags, kind: kind, run: _run, timeout_ms: timeout_ms) ->
+    Test(
+      name: name,
+      tags: tags,
+      kind: kind,
+      run: _run,
+      timeout_ms: timeout_ms,
+      source: source,
+    ) ->
       Test(
         name: name,
         tags: tags,
         kind: kind,
         run: skipped_test_run,
         timeout_ms: timeout_ms,
+        source: source,
       )
     other -> other
   }
@@ -737,8 +746,15 @@ pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
   case node {
     Group(name, _, children) ->
       Group(name: name, tags: tags, children: children)
-    Test(name, _, kind, run, timeout_ms) ->
-      Test(name: name, tags: tags, kind: kind, run: run, timeout_ms: timeout_ms)
+    Test(name, _, kind, run, timeout_ms, source) ->
+      Test(
+        name: name,
+        tags: tags,
+        kind: kind,
+        run: run,
+        timeout_ms: timeout_ms,
+        source: source,
+      )
     other -> other
   }
 }

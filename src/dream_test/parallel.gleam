@@ -41,9 +41,9 @@ import dream_test/sandbox
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Node, type Status,
-  type TestKind, type TestResult, type TestSuite, AfterAll, AfterEach,
-  AssertionFailed, AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll,
-  BeforeEach, Failed, Group, Passed, Root, SetupFailed, Skipped, Test,
+  type TestInfo, type TestKind, type TestResult, type TestSuite, AfterAll,
+  AfterEach, AssertionFailed, AssertionFailure, AssertionOk, AssertionSkipped,
+  BeforeAll, BeforeEach, Failed, Group, Passed, Root, SetupFailed, Skipped, Test,
   TestResult, TimedOut, Unit,
 }
 import gleam/erlang/process.{
@@ -109,6 +109,10 @@ pub type RunRootParallelWithReporterConfig(context) {
     write: fn(String) -> Nil,
     total: Int,
     completed: Int,
+    runner_before_each_test: List(
+      fn(TestInfo, context) -> Result(context, String),
+    ),
+    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   )
 }
 
@@ -132,6 +136,10 @@ type ExecuteNodeConfig(context) {
     context: context,
     inherited_before_each: List(fn(context) -> Result(context, String)),
     inherited_after_each: List(fn(context) -> Result(Nil, String)),
+    runner_before_each_test: List(
+      fn(TestInfo, context) -> Result(context, String),
+    ),
+    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
     node: Node(context),
     progress_reporter: Option(progress.ProgressReporter),
     write: fn(String) -> Nil,
@@ -164,6 +172,10 @@ type RunParallelLoopConfig(context) {
     scope: List(String),
     inherited_tags: List(String),
     context: context,
+    runner_before_each_test: List(
+      fn(TestInfo, context) -> Result(context, String),
+    ),
+    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
     before_each_hooks: List(fn(context) -> Result(context, String)),
     after_each_hooks: List(fn(context) -> Result(Nil, String)),
     failures_rev: List(AssertionFailure),
@@ -187,6 +199,10 @@ type StartWorkersUpToLimitConfig(context) {
     scope: List(String),
     inherited_tags: List(String),
     context: context,
+    runner_before_each_test: List(
+      fn(TestInfo, context) -> Result(context, String),
+    ),
+    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
     before_each_hooks: List(fn(context) -> Result(context, String)),
     after_each_hooks: List(fn(context) -> Result(Nil, String)),
     failures_rev: List(AssertionFailure),
@@ -310,6 +326,8 @@ pub fn run_root_parallel(
       context: seed,
       inherited_before_each: [],
       inherited_after_each: [],
+      runner_before_each_test: [],
+      runner_after_each_test: [],
       node: tree,
       progress_reporter: None,
       write: discard_write,
@@ -400,6 +418,8 @@ pub fn run_root_parallel_with_reporter(
     write: write,
     total: total,
     completed: completed,
+    runner_before_each_test: runner_before_each_test,
+    runner_after_each_test: runner_after_each_test,
   ) = config
 
   let Root(seed, tree) = suite
@@ -411,6 +431,8 @@ pub fn run_root_parallel_with_reporter(
       context: seed,
       inherited_before_each: [],
       inherited_after_each: [],
+      runner_before_each_test: runner_before_each_test,
+      runner_after_each_test: runner_after_each_test,
       node: tree,
       progress_reporter: progress_reporter,
       write: write,
@@ -441,6 +463,8 @@ fn execute_node(
     context: context,
     inherited_before_each: inherited_before_each,
     inherited_after_each: inherited_after_each,
+    runner_before_each_test: runner_before_each_test,
+    runner_after_each_test: runner_after_each_test,
     node: node,
     progress_reporter: progress_reporter,
     write: write,
@@ -522,6 +546,8 @@ fn execute_node(
               group_scope,
               combined_tags,
               ctx2,
+              runner_before_each_test,
+              runner_after_each_test,
               combined_before_each,
               combined_after_each,
               tests,
@@ -538,6 +564,8 @@ fn execute_node(
               group_scope,
               combined_tags,
               ctx2,
+              runner_before_each_test,
+              runner_after_each_test,
               combined_before_each,
               combined_after_each,
               groups,
@@ -588,7 +616,7 @@ fn fail_test_nodes(
 ) -> List(TestResult) {
   case nodes {
     [] -> acc_rev
-    [Test(name, tags, kind, _run, _timeout_ms), ..rest] -> {
+    [Test(name, tags, kind, _run, _timeout_ms, _source), ..rest] -> {
       let full_name = list.append(scope, [name])
       let all_tags = list.append(inherited_tags, tags)
       let failures = list.reverse(failures_rev)
@@ -768,6 +796,10 @@ fn run_tests_in_group(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
@@ -786,6 +818,8 @@ fn run_tests_in_group(
         scope,
         inherited_tags,
         context,
+        runner_before_each_test,
+        runner_after_each_test,
         before_each_hooks,
         after_each_hooks,
         tests,
@@ -802,6 +836,8 @@ fn run_tests_in_group(
         scope,
         inherited_tags,
         context,
+        runner_before_each_test,
+        runner_after_each_test,
         before_each_hooks,
         after_each_hooks,
         tests,
@@ -819,6 +855,10 @@ fn run_tests_parallel(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
@@ -839,6 +879,8 @@ fn run_tests_parallel(
     scope: scope,
     inherited_tags: inherited_tags,
     context: context,
+    runner_before_each_test: runner_before_each_test,
+    runner_after_each_test: runner_after_each_test,
     before_each_hooks: before_each_hooks,
     after_each_hooks: after_each_hooks,
     failures_rev: failures_rev,
@@ -877,6 +919,8 @@ fn run_parallel_loop(
     scope: scope,
     inherited_tags: inherited_tags,
     context: context,
+    runner_before_each_test: runner_before_each_test,
+    runner_after_each_test: runner_after_each_test,
     before_each_hooks: before_each_hooks,
     after_each_hooks: after_each_hooks,
     failures_rev: failures_rev,
@@ -899,6 +943,8 @@ fn run_parallel_loop(
       scope: scope,
       inherited_tags: inherited_tags,
       context: context,
+      runner_before_each_test: runner_before_each_test,
+      runner_after_each_test: runner_after_each_test,
       before_each_hooks: before_each_hooks,
       after_each_hooks: after_each_hooks,
       failures_rev: failures_rev,
@@ -984,6 +1030,8 @@ fn start_workers_up_to_limit(
     scope: scope,
     inherited_tags: inherited_tags,
     context: context,
+    runner_before_each_test: runner_before_each_test,
+    runner_after_each_test: runner_after_each_test,
     before_each_hooks: before_each_hooks,
     after_each_hooks: after_each_hooks,
     failures_rev: failures_rev,
@@ -1006,6 +1054,8 @@ fn start_workers_up_to_limit(
               scope,
               inherited_tags,
               context,
+              runner_before_each_test,
+              runner_after_each_test,
               before_each_hooks,
               after_each_hooks,
               failures_rev,
@@ -1039,7 +1089,7 @@ fn running_test_metadata(
   node: Node(context),
 ) -> #(String, List(String), List(String), TestKind) {
   case node {
-    Test(name, tags, kind, _run, _timeout_ms) -> #(
+    Test(name, tags, kind, _run, _timeout_ms, _source) -> #(
       name,
       list.append(scope, [name]),
       list.append(inherited_tags, tags),
@@ -1055,6 +1105,10 @@ fn spawn_test_worker(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   failures_rev: List(AssertionFailure),
@@ -1072,6 +1126,8 @@ fn spawn_test_worker(
             scope,
             inherited_tags,
             context,
+            runner_before_each_test,
+            runner_after_each_test,
             before_each_hooks,
             after_each_hooks,
             failures_rev,
@@ -1093,7 +1149,7 @@ fn test_timeout_ms(config: ParallelConfig, node: Node(context)) -> Int {
   let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
     config
   case node {
-    Test(_, _, _, _, Some(ms)) -> ms
+    Test(_, _, _, _, Some(ms), _) -> ms
     _ -> default_timeout_ms
   }
 }
@@ -1444,6 +1500,10 @@ fn execute_one_test_node(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   failures_rev: List(AssertionFailure),
@@ -1451,33 +1511,68 @@ fn execute_one_test_node(
 ) -> TestResult {
   // Fallback to sequential single-test logic by reusing existing code path.
   case node {
-    Test(name, tags, kind, run, timeout_ms) -> {
+    Test(name, tags, kind, run, timeout_ms, source) -> {
       let full_name = list.append(scope, [name])
       let all_tags = list.append(inherited_tags, tags)
+      let info =
+        types.TestInfo(
+          name: name,
+          full_name: full_name,
+          tags: all_tags,
+          kind: kind,
+          source: source,
+        )
       let start = timing.now_ms()
 
-      let #(ctx_after_setup, setup_status, setup_failures) =
-        run_before_each_list(config, scope, context, before_each_hooks, [])
-
-      let assertion = case setup_status {
-        SetupFailed -> AssertionFailed(head_failure_or_unknown(setup_failures))
-        _ ->
-          run_in_sandbox(config, timeout_ms, fn() {
-            case run(ctx_after_setup) {
-              Ok(a) -> a
-              Error(message) -> AssertionFailed(hook_failure("error", message))
-            }
-          })
-      }
-
-      let #(status, failures) =
-        assertion_to_status_and_failures(
-          assertion,
-          failures_rev,
-          setup_failures,
+      let #(ctx_after_runner_setup, runner_setup_status, runner_setup_failures) =
+        run_runner_before_each_list(
+          config,
+          scope,
+          info,
+          context,
+          runner_before_each_test,
+          [],
         )
 
-      let #(final_status, final_failures) =
+      let #(ctx_after_setup, setup_status, setup_failures) = case
+        runner_setup_status
+      {
+        SetupFailed -> #(
+          ctx_after_runner_setup,
+          SetupFailed,
+          runner_setup_failures,
+        )
+        _ ->
+          run_before_each_list(
+            config,
+            scope,
+            ctx_after_runner_setup,
+            before_each_hooks,
+            runner_setup_failures,
+          )
+      }
+
+      let #(status, failures) = case setup_status {
+        SetupFailed ->
+          setup_failed_status_and_failures(failures_rev, setup_failures)
+        _ -> {
+          let assertion =
+            run_in_sandbox(config, timeout_ms, fn() {
+              case run(ctx_after_setup) {
+                Ok(a) -> a
+                Error(message) ->
+                  AssertionFailed(hook_failure("error", message))
+              }
+            })
+          assertion_to_status_and_failures(
+            assertion,
+            failures_rev,
+            setup_failures,
+          )
+        }
+      }
+
+      let #(status_after_suite, failures_after_suite) =
         run_after_each_list(
           config,
           scope,
@@ -1485,6 +1580,17 @@ fn execute_one_test_node(
           after_each_hooks,
           status,
           failures,
+        )
+
+      let #(final_status, final_failures) =
+        run_runner_after_each_list(
+          config,
+          scope,
+          info,
+          ctx_after_setup,
+          runner_after_each_test,
+          status_after_suite,
+          failures_after_suite,
         )
 
       let duration = timing.now_ms() - start
@@ -1517,6 +1623,10 @@ fn run_tests_sequentially(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
@@ -1529,33 +1639,68 @@ fn run_tests_sequentially(
 ) -> #(List(TestResult), Int) {
   case tests {
     [] -> #(acc_rev, completed)
-    [Test(name, tags, kind, run, timeout_ms), ..rest] -> {
+    [Test(name, tags, kind, run, timeout_ms, source), ..rest] -> {
       let full_name = list.append(scope, [name])
       let all_tags = list.append(inherited_tags, tags)
+      let info =
+        types.TestInfo(
+          name: name,
+          full_name: full_name,
+          tags: all_tags,
+          kind: kind,
+          source: source,
+        )
       let start = timing.now_ms()
 
-      let #(ctx_after_setup, setup_status, setup_failures) =
-        run_before_each_list(config, scope, context, before_each_hooks, [])
-
-      let assertion = case setup_status {
-        SetupFailed -> AssertionFailed(head_failure_or_unknown(setup_failures))
-        _ ->
-          run_in_sandbox(config, timeout_ms, fn() {
-            case run(ctx_after_setup) {
-              Ok(a) -> a
-              Error(message) -> AssertionFailed(hook_failure("error", message))
-            }
-          })
-      }
-
-      let #(status, failures) =
-        assertion_to_status_and_failures(
-          assertion,
-          failures_rev,
-          setup_failures,
+      let #(ctx_after_runner_setup, runner_setup_status, runner_setup_failures) =
+        run_runner_before_each_list(
+          config,
+          scope,
+          info,
+          context,
+          runner_before_each_test,
+          [],
         )
 
-      let #(final_status, final_failures) =
+      let #(ctx_after_setup, setup_status, setup_failures) = case
+        runner_setup_status
+      {
+        SetupFailed -> #(
+          ctx_after_runner_setup,
+          SetupFailed,
+          runner_setup_failures,
+        )
+        _ ->
+          run_before_each_list(
+            config,
+            scope,
+            ctx_after_runner_setup,
+            before_each_hooks,
+            runner_setup_failures,
+          )
+      }
+
+      let #(status, failures) = case setup_status {
+        SetupFailed ->
+          setup_failed_status_and_failures(failures_rev, setup_failures)
+        _ -> {
+          let assertion =
+            run_in_sandbox(config, timeout_ms, fn() {
+              case run(ctx_after_setup) {
+                Ok(a) -> a
+                Error(message) ->
+                  AssertionFailed(hook_failure("error", message))
+              }
+            })
+          assertion_to_status_and_failures(
+            assertion,
+            failures_rev,
+            setup_failures,
+          )
+        }
+      }
+
+      let #(status_after_suite, failures_after_suite) =
         run_after_each_list(
           config,
           scope,
@@ -1563,6 +1708,17 @@ fn run_tests_sequentially(
           after_each_hooks,
           status,
           failures,
+        )
+
+      let #(final_status, final_failures) =
+        run_runner_after_each_list(
+          config,
+          scope,
+          info,
+          ctx_after_setup,
+          runner_after_each_test,
+          status_after_suite,
+          failures_after_suite,
         )
 
       let duration = timing.now_ms() - start
@@ -1592,6 +1748,8 @@ fn run_tests_sequentially(
         scope,
         inherited_tags,
         context,
+        runner_before_each_test,
+        runner_after_each_test,
         before_each_hooks,
         after_each_hooks,
         rest,
@@ -1610,6 +1768,8 @@ fn run_tests_sequentially(
         scope,
         inherited_tags,
         context,
+        runner_before_each_test,
+        runner_after_each_test,
         before_each_hooks,
         after_each_hooks,
         rest,
@@ -1628,6 +1788,10 @@ fn run_child_groups_sequentially(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
+  runner_before_each_test: List(
+    fn(TestInfo, context) -> Result(context, String),
+  ),
+  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   groups: List(Node(context)),
@@ -1648,6 +1812,8 @@ fn run_child_groups_sequentially(
           context: context,
           inherited_before_each: before_each_hooks,
           inherited_after_each: after_each_hooks,
+          runner_before_each_test: runner_before_each_test,
+          runner_after_each_test: runner_after_each_test,
           node: group_node,
           progress_reporter: progress_reporter,
           write: write,
@@ -1660,6 +1826,8 @@ fn run_child_groups_sequentially(
         scope,
         inherited_tags,
         context,
+        runner_before_each_test,
+        runner_after_each_test,
         before_each_hooks,
         after_each_hooks,
         rest,
@@ -1803,17 +1971,122 @@ fn run_after_each_list(
   }
 }
 
-fn hook_failure(operator: String, message: String) -> AssertionFailure {
-  AssertionFailure(operator: operator, message: message, payload: None)
+fn run_runner_before_each_list(
+  config: ParallelConfig,
+  scope: List(String),
+  info: TestInfo,
+  context: context,
+  hooks: List(fn(TestInfo, context) -> Result(context, String)),
+  failures_rev: List(AssertionFailure),
+) -> #(context, Status, List(AssertionFailure)) {
+  case hooks {
+    [] -> #(context, Passed, failures_rev)
+    [hook, ..rest] ->
+      case run_runner_hook_transform(config, scope, info, context, hook) {
+        Ok(next) ->
+          run_runner_before_each_list(
+            config,
+            scope,
+            info,
+            next,
+            rest,
+            failures_rev,
+          )
+        Error(message) -> #(context, SetupFailed, [
+          hook_failure("before_each_test", message),
+          ..failures_rev
+        ])
+      }
+  }
 }
 
-fn head_failure_or_unknown(
+fn run_runner_after_each_list(
+  config: ParallelConfig,
+  scope: List(String),
+  info: TestInfo,
+  context: context,
+  hooks: List(fn(TestInfo, context) -> Result(Nil, String)),
+  status: Status,
   failures_rev: List(AssertionFailure),
-) -> AssertionFailure {
-  case failures_rev {
-    [f, ..] -> f
-    [] -> hook_failure("before_each", "setup failed")
+) -> #(Status, List(AssertionFailure)) {
+  case hooks {
+    [] -> #(status, failures_rev)
+    [hook, ..rest] ->
+      case run_runner_hook_teardown(config, scope, info, context, hook) {
+        Ok(_) ->
+          run_runner_after_each_list(
+            config,
+            scope,
+            info,
+            context,
+            rest,
+            status,
+            failures_rev,
+          )
+        Error(message) ->
+          run_runner_after_each_list(
+            config,
+            scope,
+            info,
+            context,
+            rest,
+            Failed,
+            [hook_failure("after_each_test", message), ..failures_rev],
+          )
+      }
   }
+}
+
+fn run_runner_hook_transform(
+  config: ParallelConfig,
+  scope: List(String),
+  info: TestInfo,
+  context: context,
+  hook: fn(TestInfo, context) -> Result(context, String),
+) -> Result(context, String) {
+  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
+    config
+  let sandbox_config =
+    sandbox.SandboxConfig(
+      timeout_ms: default_timeout_ms,
+      show_crash_reports: False,
+    )
+
+  case sandbox.run_isolated(sandbox_config, fn() { hook(info, context) }) {
+    sandbox.SandboxCompleted(result) -> result
+    sandbox.SandboxTimedOut ->
+      Error("hook timed out in " <> string.join(scope, " > "))
+    sandbox.SandboxCrashed(reason) ->
+      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
+  }
+}
+
+fn run_runner_hook_teardown(
+  config: ParallelConfig,
+  scope: List(String),
+  info: TestInfo,
+  context: context,
+  hook: fn(TestInfo, context) -> Result(Nil, String),
+) -> Result(Nil, String) {
+  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
+    config
+  let sandbox_config =
+    sandbox.SandboxConfig(
+      timeout_ms: default_timeout_ms,
+      show_crash_reports: False,
+    )
+
+  case sandbox.run_isolated(sandbox_config, fn() { hook(info, context) }) {
+    sandbox.SandboxCompleted(result) -> result
+    sandbox.SandboxTimedOut ->
+      Error("hook timed out in " <> string.join(scope, " > "))
+    sandbox.SandboxCrashed(reason) ->
+      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
+  }
+}
+
+fn hook_failure(operator: String, message: String) -> AssertionFailure {
+  AssertionFailure(operator: operator, message: message, payload: None)
 }
 
 fn assertion_to_status_and_failures(
@@ -1835,6 +2108,13 @@ fn assertion_to_status_and_failures(
       list.append(setup_failures_rev, inherited_failures_rev),
     )
   }
+}
+
+fn setup_failed_status_and_failures(
+  inherited_failures_rev: List(AssertionFailure),
+  setup_failures_rev: List(AssertionFailure),
+) -> #(Status, List(AssertionFailure)) {
+  #(SetupFailed, list.append(setup_failures_rev, inherited_failures_rev))
 }
 
 fn run_in_sandbox(

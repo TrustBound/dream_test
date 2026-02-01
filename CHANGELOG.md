@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-01-31
+
+### Added
+
+- **Runner-level hooks** (`dream_test/runner`, `dream_test/parallel`)
+
+  - New `before_each_test`, `after_each_test`, `before_each_suite`, `after_each_suite`,
+    `before_all_suites`, and `after_all_suites` hooks
+  - Hooks receive structured metadata via `types.TestInfo` and `types.SuiteInfo`
+  - Per-test hooks run in the executor with sandboxing and correct ordering around suite hooks
+
+- **Test/suite metadata** (`dream_test/types`)
+
+  - New `TestInfo` and `SuiteInfo` types, including best-effort `source`
+  - Source tracking for unit discovery (module name) and Gherkin discovery (feature path)
+
+### Changed
+
+- **Setup failure status** (`dream_test/parallel`)
+
+  - Runner `before_each_test` failures now yield `SetupFailed` and skip test bodies
+
+### Documentation
+
+- Added runner hook section to the runner guide with a tested snippet
+- Updated README and documentation index to highlight runner hooks
+- Refreshed compatibility reports (`COMPATIBILITY.md`, `COMPATIBILITY_REPORT.md`, `CONSTRAINT_ANALYSIS.md`)
+
 ## [2.0.0] - 2025-12-27
 
 ### Added
@@ -283,7 +311,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.0...HEAD
+[2.1.0]: https://github.com/TrustBound/dream_test/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/TrustBound/dream_test/compare/1.2.0...2.0.0
 [1.2.0]: https://github.com/TrustBound/dream_test/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/TrustBound/dream_test/compare/1.0.3...1.1.0

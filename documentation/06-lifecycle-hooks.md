@@ -4,6 +4,8 @@ Hooks are a power tool: they remove repetition, but they can also hide the story
 
 The goal of Dream Test’s hook design is to keep hooks **predictable and debuggable**, especially under parallel execution.
 
+For runner-level hooks (per-test/per-suite/per-run), see [Runner & execution](07-runner-and-execution.md).
+
 ### Mental model
 
 Hooks are part of the nested test structure that the runner executes around tests:

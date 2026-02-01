@@ -22,6 +22,8 @@
 gleam add --dev dream_test
 ```
 
+Current version: `2.1.0`
+
 ## Why Dream Test?
 
 Rapid application development needs testing tools that scale and support the growing needs of the application without slowing down progress. Dream test was designed to help engineers write expressive unit and integration tests for their applications using the tools and techniques they know from other ecosystems; adapted properly to gleam and the beam.
@@ -60,6 +62,7 @@ Rapid application development needs testing tools that scale and support the gro
 | ⏱️ **Timeouts**                        | Per-test timeout control                                                                                  |
 | 🔍 **Test discovery**                  | Find tests from file paths                                                                                |
 | 🚨 **Exit-on-failure**                 | Fail fast for CI                                                                                          |
+| 🪝 **Runner hooks**                    | Runner-level hooks for per-test/per-suite/per-run setup and teardown                                       |
 | 🧩 **Suite-specific execution config** | Run some suites sequential/with custom timeouts in the same runner (`runner.add_suites_with_config(...)`) |
 
 ### Reporting
@@ -84,7 +87,7 @@ Dream Test splits reporting into:
 4. [Context-Aware Tests](documentation/04-context-aware-tests.md)
 5. [Assertions & Matchers](documentation/05-assertions-and-matchers.md)
 6. [Lifecycle Hooks](documentation/06-lifecycle-hooks.md)
-7. [Runner & Execution](documentation/07-runner-and-execution.md)
+7. [Runner & Execution](documentation/07-runner-and-execution.md) — includes runner hooks
 8. [Reporters](documentation/08-reporters.md)
 9. [Snapshot Testing](documentation/09-snapshot-testing.md)
 10. [Gherkin BDD](documentation/10-gherkin-bdd.md)

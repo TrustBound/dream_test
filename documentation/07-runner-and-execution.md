@@ -137,6 +137,86 @@ pub fn main() {
 
 <sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/suite_specific_config.gleam)</sub>
 
+### Runner hooks (test/suite/run)
+
+Runner hooks let you apply setup/teardown **across suites** without modifying
+each suite’s contents. Hooks are metadata-aware and receive structured info
+about what is running.
+
+**`types.TestInfo` fields**:
+
+- `name`: leaf test name (`it("...")`)
+- `full_name`: group path + test name (e.g. `["outer", "inner", "leaf"]`)
+- `tags`: effective tags (includes inherited group tags)
+- `kind`: `types.TestKind` (Unit, GherkinScenario(id), etc.)
+- `source`: best-effort origin string (see below)
+
+**`types.SuiteInfo` fields**:
+
+- `name`: top-level suite/group name
+- `tests`: deterministic list of `TestInfo` values that will execute
+- `source`: best-effort origin string (see below)
+
+**Hook signatures**:
+
+- `before_each_test` / `after_each_test` receive `types.TestInfo`.
+- `before_each_suite` / `after_each_suite` receive `types.SuiteInfo`.
+- `before_all_suites` / `after_all_suites` receive the full list of `SuiteInfo` after filtering.
+
+`source` is best-effort:
+
+- Unit discovery suites use the **module name**.
+- Gherkin discovery suites use the **.feature path**.
+- Manually constructed suites use `None`.
+
+```gleam
+import dream_test/matchers.{succeed}
+import dream_test/runner
+import dream_test/types.{type SuiteInfo, type TestInfo}
+import dream_test/unit.{describe, it}
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/string
+
+pub fn tests() {
+  describe("Example", [
+    it("a", fn() { Ok(succeed()) }),
+    it("b", fn() { Ok(succeed()) }),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.before_all_suites(before_all_suites_hook)
+  |> runner.before_each_suite(before_each_suite_hook)
+  |> runner.before_each_test(before_each_test_hook)
+  |> runner.after_each_test(after_each_test_hook)
+  |> runner.run()
+}
+
+fn before_all_suites_hook(suites: List(SuiteInfo)) -> Result(Nil, String) {
+  io.println("suites: " <> int.to_string(list.length(suites)))
+  Ok(Nil)
+}
+
+fn before_each_suite_hook(suite: SuiteInfo) -> Result(Nil, String) {
+  io.println("suite: " <> suite.name)
+  Ok(Nil)
+}
+
+fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
+  io.println("test: " <> string.join(info.full_name, " > "))
+  Ok(ctx)
+}
+
+fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
+  Ok(Nil)
+}
+```
+
+<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/runner_hooks.gleam)</sub>
+
 ### Choosing a concurrency number (practical guidance)
 
 - Start with the default.

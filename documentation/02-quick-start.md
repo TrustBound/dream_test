@@ -12,6 +12,8 @@ That explicitness is the source of most of Dream Test’s reliability: when a te
 
 If you’re looking for a mental model of “how does the runner find my tests?”: in Dream Test, **`main()` chooses what runs** by passing suites to the runner. You can list suites explicitly, or generate the list via discovery.
 
+If you need setup/teardown that spans multiple suites, see the runner-level hooks section in [Runner & execution model](07-runner-and-execution.md).
+
 ### Choose your first runner style
 
 There are two good starting points:

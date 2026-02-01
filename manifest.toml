@@ -6,12 +6,12 @@ packages = [
   { name = "gleam_json", version = "3.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_json", source = "hex", outer_checksum = "44FDAA8847BE8FC48CA7A1C089706BD54BADCC4C45B237A992EDDF9F2CDB2836" },
   { name = "gleam_otp", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_stdlib"], otp_app = "gleam_otp", source = "hex", outer_checksum = "BA6A294E295E428EC1562DC1C11EA7530DCB981E8359134BEABC8493B7B2258E" },
   { name = "gleam_regexp", version = "1.1.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_regexp", source = "hex", outer_checksum = "9C215C6CA84A5B35BB934A9B61A9A306EC743153BE2B0425A0D032E477B062A9" },
-  { name = "gleam_stdlib", version = "0.67.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "6368313DB35963DC02F677A513BB0D95D58A34ED0A9436C8116820BF94BE3511" },
+  { name = "gleam_stdlib", version = "0.68.1", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "F7FAEBD8EF260664E86A46C8DBA23508D1D11BB3BCC6EE1B89B3BC3E5C83FF1E" },
 ]
 
 [requirements]
 gleam_erlang = { version = ">= 1.0.0 and < 2.0.0" }
-gleam_json = { version = ">= 3.0.1 and < 4.0.0" }
+gleam_json = { version = ">= 3.0.2 and < 4.0.0" }
 gleam_otp = { version = ">= 1.1.0 and < 2.0.0" }
 gleam_regexp = { version = ">= 1.0.0 and < 2.0.0" }
-gleam_stdlib = { version = ">= 0.60.0 and < 2.0.0" }
+gleam_stdlib = { version = ">= 0.60.0 and < 1.0.0" }

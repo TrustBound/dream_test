@@ -324,6 +324,44 @@ pub type TestResult {
   )
 }
 
+/// Lightweight test identity information.
+///
+/// This is used by the runner for filtering and hook metadata.
+///
+/// ## Fields
+///
+/// - `name`: the leaf test name (the `it("...")` label)
+/// - `full_name`: group path + test name (deterministic, good for identifiers)
+/// - `tags`: effective tags (includes inherited group tags)
+/// - `kind`: `TestKind` (Unit, Integration, or GherkinScenario(id))
+/// - `source`: best-effort origin string (module name or `.feature` path)
+///
+/// ### Source behavior
+///
+/// - Unit discovery uses the **module name**
+/// - Gherkin discovery uses the **.feature file path**
+/// - Manually constructed suites use `None`
+pub type TestInfo {
+  TestInfo(
+    name: String,
+    full_name: List(String),
+    tags: List(String),
+    kind: TestKind,
+    source: Option(String),
+  )
+}
+
+/// Suite metadata for runner-level hooks.
+///
+/// ## Fields
+///
+/// - `name`: top-level suite/group name
+/// - `tests`: deterministic list of `TestInfo` values that will execute
+/// - `source`: best-effort origin string (see `TestInfo.source`)
+pub type SuiteInfo {
+  SuiteInfo(name: String, tests: List(TestInfo), source: Option(String))
+}
+
 /// A complete test suite in the unified execution model.
 ///
 /// A `Root(context)` stores the initial `seed` context value and the top-level
@@ -346,6 +384,8 @@ pub type Node(context) {
     kind: TestKind,
     run: fn(context) -> Result(AssertionResult, String),
     timeout_ms: Option(Int),
+    /// Best-effort origin string for this test (module name or .feature path).
+    source: Option(String),
   )
 
   /// Group-scoped hooks.

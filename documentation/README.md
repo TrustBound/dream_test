@@ -34,7 +34,7 @@ That’s why you’ll see the same patterns repeated:
 4. [Context-aware unit tests](04-context-aware-tests.md) — when “setup returns a value” and you need to pass it into tests.
 5. [Assertions & matchers](05-assertions-and-matchers.md) — how and why the `should` pipeline works.
 6. [Lifecycle hooks](06-lifecycle-hooks.md) — power tools, and how to keep them from hiding meaning.
-7. [Runner & execution model](07-runner-and-execution.md) — concurrency, timeouts, CI, and reliability.
+7. [Runner & execution model](07-runner-and-execution.md) — concurrency, timeouts, CI, reliability, and runner hooks.
 8. [Reporters](08-reporters.md) — humans vs machines, streaming vs post-run.
 9. [Snapshot testing](09-snapshot-testing.md) — when snapshots make tests clearer (and when they make them worse).
 10. [Gherkin / BDD](10-gherkin-bdd.md) — scenario testing with a world state and placeholder captures.

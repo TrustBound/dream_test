@@ -227,6 +227,7 @@ fn build_scenario_test_node(
       Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
     },
     timeout_ms: None,
+    source: feature.source,
   )
 }
 
@@ -534,6 +535,7 @@ pub fn feature(
   let parsed_feature =
     gherkin_types.Feature(
       name: name,
+      source: None,
       description: None,
       tags: [],
       background: None,
@@ -738,6 +740,7 @@ pub fn feature_with_background(
   let parsed_feature =
     gherkin_types.Feature(
       name: name,
+      source: None,
       description: None,
       tags: [],
       background: Some(gherkin_types.Background(steps: background_steps)),

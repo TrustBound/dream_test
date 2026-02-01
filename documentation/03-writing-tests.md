@@ -11,6 +11,8 @@ Dream Test’s unit DSL is built for that style, but there’s a deeper design g
 - **Your test module stays ordinary Gleam** (no hidden discovery side-effects).
 - **Failures should read well** (because tests are communication, not just verification).
 
+If you need setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](07-runner-and-execution.md).
+
 ### `describe` + `it` (the core loop)
 
 ```gleam
