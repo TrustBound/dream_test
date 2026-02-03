@@ -198,15 +198,14 @@ fn close_doc_string(state: ParserState) -> Result(ParserState, String) {
   let doc_string =
     DocString(content: content, content_type: state.doc_string_type)
 
-  // Attach to the last step
-  case list.reverse(state.current_steps) {
+  // Attach to the most recent step (head of list, since steps are prepended)
+  case state.current_steps {
     [Step(keyword, text, _), ..rest] -> {
       let updated_step = Step(keyword, text, Some(doc_string))
-      let new_steps = list.reverse([updated_step, ..rest])
       Ok(
         ParserState(
           ..state,
-          current_steps: new_steps,
+          current_steps: [updated_step, ..rest],
           in_doc_string: False,
           doc_string_content: [],
           doc_string_type: None,
@@ -519,8 +518,8 @@ fn add_data_table_row(
   cells: List(String),
   state: ParserState,
 ) -> Result(ParserState, String) {
-  // Add to the last step's DataTable
-  case list.reverse(state.current_steps) {
+  // Add to the most recent step's DataTable (head of list, since steps are prepended)
+  case state.current_steps {
     [Step(keyword, text, arg), ..rest] -> {
       let updated_arg = case arg {
         Some(DataTable(rows)) -> DataTable(rows: list.append(rows, [cells]))
@@ -528,8 +527,7 @@ fn add_data_table_row(
         None -> DataTable(rows: [cells])
       }
       let updated_step = Step(keyword, text, Some(updated_arg))
-      let new_steps = list.reverse([updated_step, ..rest])
-      Ok(ParserState(..state, current_steps: new_steps))
+      Ok(ParserState(..state, current_steps: [updated_step, ..rest]))
     }
     [] -> Error("DataTable without preceding step")
   }
