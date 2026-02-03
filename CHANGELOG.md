@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-02-02
+
+### Fixed
+
+- **Gherkin step attachments** (`dream_test/gherkin/parser`)
+
+  - Data tables and doc strings now attach to the correct step in parsed scenarios
+  - Thanks to [Álvaro Vilanova Vidal](https://github.com/alvivi) for finding and fixing this issue
+
 ## [2.1.0] - 2026-01-31
 
 ### Added
@@ -311,7 +320,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.0...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.1...HEAD
+[2.1.1]: https://github.com/TrustBound/dream_test/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/TrustBound/dream_test/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/TrustBound/dream_test/compare/1.2.0...2.0.0
 [1.2.0]: https://github.com/TrustBound/dream_test/compare/1.1.0...1.2.0
