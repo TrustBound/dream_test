@@ -23,6 +23,20 @@ fn normalize_timestamp_ms(json: String) -> String {
   before <> "\"timestamp_ms\":0," <> rest
 }
 
+// The reported gleam_version tracks the installed gleam_stdlib, so it must be
+// normalized or the snapshot breaks on every dependency update.
+fn normalize_gleam_version(json: String) -> String {
+  let #(before, after) =
+    string.split_once(json, "\"gleam_version\": \"")
+    |> result.unwrap(#("MISSING_GLEAM_VERSION", ""))
+
+  let #(_version, rest) =
+    string.split_once(after, "\"")
+    |> result.unwrap(#("MISSING_GLEAM_VERSION_VALUE", after))
+
+  before <> "\"gleam_version\": \"0.0.0\"" <> rest
+}
+
 fn normalize_duration_ms(json: String) -> String {
   normalize_duration_ms_loop(json, "")
 }
@@ -45,7 +59,10 @@ pub fn tests() {
     it("format_pretty returns JSON containing tests", fn() {
       let results = runner.new([example_suite()]) |> runner.run()
       let text = json.format_pretty(results)
-      let normalized = normalize_timestamp_ms(text) |> normalize_duration_ms
+      let normalized =
+        normalize_timestamp_ms(text)
+        |> normalize_duration_ms
+        |> normalize_gleam_version
 
       normalized
       |> should
