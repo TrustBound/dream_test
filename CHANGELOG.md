@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency constraints** (`gleam.toml`)
+
+  - Widened `gleam_stdlib` to `>= 0.60.0 and < 2.0.0` so dream_test can be installed
+    alongside packages that require `gleam_stdlib` 1.x
+  - Verified the full test suite and all examples against `gleam_stdlib` 1.0.3
+  - Thanks to [@aschrijver](https://github.com/aschrijver) for reporting ([#19](https://github.com/TrustBound/dream_test/issues/19))
+
+### Fixed
+
+- **JSON reporter snippet snapshot** (`examples/snippets`)
+
+  - The tested snippet now normalizes `gleam_version` in the JSON report so the
+    snapshot no longer breaks when `gleam_stdlib` is upgraded
+
 ## [2.1.1] - 2026-02-02
 
 ### Fixed
