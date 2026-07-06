@@ -9,6 +9,9 @@ erl_crash.dump
 !/test/fixtures/snapshots/temp/.gitkeep
 /test/fixtures/snapshots/clearable_tmp_*
 
+# macOS Finder metadata
+.DS_Store
+
 # Local/editor scratch & generated temp output
 .cursor/
 /test/tmp/

@@ -5,7 +5,7 @@
   "system": {
     "os": "unix",
     "otp_version": "28",
-    "gleam_version": "0.67.1"
+    "gleam_version": "0.0.0"
   },
   "summary": {
     "total": 1,
