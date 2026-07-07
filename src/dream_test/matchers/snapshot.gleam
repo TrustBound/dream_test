@@ -202,7 +202,10 @@ pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {
 // Internal Implementation
 // =============================================================================
 
-fn check_snapshot(actual: String, snapshot_path: String) -> MatchResult(String) {
+fn check_snapshot(
+  actual: String,
+  snapshot_path: String,
+) -> MatchResult(String) {
   case file.read(snapshot_path) {
     Ok(expected) ->
       compare_snapshot(
@@ -283,7 +286,10 @@ fn make_read_error_failure(
   ))
 }
 
-fn create_snapshot(actual: String, snapshot_path: String) -> MatchResult(String) {
+fn create_snapshot(
+  actual: String,
+  snapshot_path: String,
+) -> MatchResult(String) {
   case file.write(snapshot_path, actual) {
     Ok(Nil) -> MatchOk(actual)
     Error(error) -> make_write_failure(snapshot_path, error)

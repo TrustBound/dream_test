@@ -5,7 +5,9 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/result
 
-fn run_started_total(event: reporter_types.ReporterEvent) -> Result(Int, String) {
+fn run_started_total(
+  event: reporter_types.ReporterEvent,
+) -> Result(Int, String) {
   case event {
     reporter_types.RunStarted(total: total) -> Ok(total)
     _ -> Error("expected RunStarted")

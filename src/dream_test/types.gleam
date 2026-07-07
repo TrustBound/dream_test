@@ -450,7 +450,9 @@ pub fn root(
 /// |> or_fail_with("expected Passed for empty failures")
 /// ```
 ///
-pub fn status_from_failures(failures failures: List(AssertionFailure)) -> Status {
+pub fn status_from_failures(
+  failures failures: List(AssertionFailure),
+) -> Status {
   case failures {
     [] -> Passed
     _ -> Failed
