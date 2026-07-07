@@ -22,7 +22,7 @@
 gleam add --dev dream_test
 ```
 
-Current version: `2.1.2`
+Current version: `2.1.3`
 
 ## Why Dream Test?
 

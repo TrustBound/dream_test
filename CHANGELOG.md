@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-07-06
+
+### Fixed
+
+- **Hex publishing** (`.github/workflows/publish.yml`, `.github/workflows/publish-docs.yml`)
+
+  - The 2.1.2 release was never published: Gleam 1.14's Hex client sends duplicate
+    `content-type` headers on publish requests, which Hex.pm began rejecting with
+    `400 Bad Request` after a server-side Plug upgrade on 2026-06-27
+  - The publish workflows now use Gleam 1.17.0, whose Hex client sends a single
+    `content-type` header
+  - 2.1.3 is the first version on Hex to include the 2.1.2 changes
+
+- **JSON reporter snippet snapshot** (`examples/snippets`)
+
+  - The tested snippet now also normalizes `otp_version` in the JSON report so the
+    snapshot no longer breaks when Erlang/OTP is upgraded
+
+### Changed
+
+- **Toolchain** (`.github/workflows/ci.yml`, `CONTRIBUTING.md`)
+
+  - CI now runs Gleam 1.17.0, and sources are reformatted with the 1.17 formatter
+    (whitespace-only changes)
+  - Contributor prerequisites now require Gleam 1.17.0+ and Erlang/OTP 28+, since
+    older formatters produce output that fails CI's format check
+
 ## [2.1.2] - 2026-07-06
+
+_Not published to Hex: the publish workflow failed (see 2.1.3). These changes
+first shipped in 2.1.3._
 
 ### Changed
 
@@ -338,8 +368,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.2...HEAD
-[2.1.2]: https://github.com/TrustBound/dream_test/compare/2.1.1...2.1.2
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.3...HEAD
+[2.1.3]: https://github.com/TrustBound/dream_test/compare/2.1.1...2.1.3
+[2.1.2]: https://github.com/TrustBound/dream_test/compare/2.1.1...7c1daa617e276eef2f7ad4bf470f0ac8dfb634a3
 [2.1.1]: https://github.com/TrustBound/dream_test/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/TrustBound/dream_test/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/TrustBound/dream_test/compare/1.2.0...2.0.0
