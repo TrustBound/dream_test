@@ -1510,7 +1510,10 @@ fn count_total_tests(suite_runs: List(SuiteRun(ctx))) -> Int {
   count_total_tests_from_list(suite_runs, 0)
 }
 
-fn count_total_tests_from_list(suite_runs: List(SuiteRun(ctx)), acc: Int) -> Int {
+fn count_total_tests_from_list(
+  suite_runs: List(SuiteRun(ctx)),
+  acc: Int,
+) -> Int {
   case suite_runs {
     [] -> acc
     [SuiteRun(suite: suite, config_override: _), ..rest] ->

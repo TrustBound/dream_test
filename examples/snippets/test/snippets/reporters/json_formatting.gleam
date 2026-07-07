@@ -37,6 +37,20 @@ fn normalize_gleam_version(json: String) -> String {
   before <> "\"gleam_version\": \"0.0.0\"" <> rest
 }
 
+// The reported otp_version tracks the local Erlang install, so it must be
+// normalized or the snapshot breaks whenever OTP is upgraded.
+fn normalize_otp_version(json: String) -> String {
+  let #(before, after) =
+    string.split_once(json, "\"otp_version\": \"")
+    |> result.unwrap(#("MISSING_OTP_VERSION", ""))
+
+  let #(_version, rest) =
+    string.split_once(after, "\"")
+    |> result.unwrap(#("MISSING_OTP_VERSION_VALUE", after))
+
+  before <> "\"otp_version\": \"0\"" <> rest
+}
+
 fn normalize_duration_ms(json: String) -> String {
   normalize_duration_ms_loop(json, "")
 }
@@ -63,6 +77,7 @@ pub fn tests() {
         normalize_timestamp_ms(text)
         |> normalize_duration_ms
         |> normalize_gleam_version
+        |> normalize_otp_version
 
       normalized
       |> should

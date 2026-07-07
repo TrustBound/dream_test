@@ -56,7 +56,9 @@ fn step_verify_item_count(
   |> or_fail_with("Cart should contain " <> int.to_string(expected) <> " items")
 }
 
-fn step_verify_subtotal(context: StepContext) -> Result(AssertionResult, String) {
+fn step_verify_subtotal(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = pricing.subtotal(the_cart)
@@ -67,7 +69,9 @@ fn step_verify_subtotal(context: StepContext) -> Result(AssertionResult, String)
   |> or_fail_with("Subtotal should be $" <> float.to_string(expected))
 }
 
-fn step_verify_discount(context: StepContext) -> Result(AssertionResult, String) {
+fn step_verify_discount(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
   let actual = pricing.discount_amount(the_cart)
