@@ -453,7 +453,9 @@ fn format_discover_error(pattern: String, message: String) -> String {
   pattern <> ": " <> message
 }
 
-fn discover_all_modules(patterns: List(String)) -> #(List(String), List(String)) {
+fn discover_all_modules(
+  patterns: List(String),
+) -> #(List(String), List(String)) {
   discover_all_modules_loop(patterns, [], [], [])
 }
 

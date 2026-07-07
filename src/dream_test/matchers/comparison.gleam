@@ -413,7 +413,10 @@ pub fn be_less_than_float(
   }
 }
 
-fn check_less_than_float(actual: Float, threshold: Float) -> MatchResult(Float) {
+fn check_less_than_float(
+  actual: Float,
+  threshold: Float,
+) -> MatchResult(Float) {
   case actual <. threshold {
     True -> MatchOk(actual)
     False -> {

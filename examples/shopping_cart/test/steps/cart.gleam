@@ -49,7 +49,9 @@ fn step_add_product(context: StepContext) -> Result(AssertionResult, String) {
   Ok(succeed())
 }
 
-fn step_try_add_product(context: StepContext) -> Result(AssertionResult, String) {
+fn step_try_add_product(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let quantity = get_int(context.captures, 0) |> result.unwrap(0)
   let product =
     get_string(context.captures, 1) |> result.unwrap("") |> lookup_product()
@@ -76,7 +78,9 @@ fn add_item_error_to_string(e) -> String {
   }
 }
 
-fn step_update_quantity(context: StepContext) -> Result(AssertionResult, String) {
+fn step_update_quantity(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let product_name = get_string(context.captures, 0) |> result.unwrap("")
   let quantity = get_int(context.captures, 1) |> result.unwrap(0)
   let product_id = normalize_product_id(product_name)
@@ -94,7 +98,9 @@ fn step_update_quantity(context: StepContext) -> Result(AssertionResult, String)
   }
 }
 
-fn step_remove_product(context: StepContext) -> Result(AssertionResult, String) {
+fn step_remove_product(
+  context: StepContext,
+) -> Result(AssertionResult, String) {
   let product_name = get_string(context.captures, 0) |> result.unwrap("")
   let product_id = normalize_product_id(product_name)
   let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())

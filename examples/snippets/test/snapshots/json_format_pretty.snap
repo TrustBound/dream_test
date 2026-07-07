@@ -4,7 +4,7 @@
   "duration_ms": 0,
   "system": {
     "os": "unix",
-    "otp_version": "28",
+    "otp_version": "0",
     "gleam_version": "0.0.0"
   },
   "summary": {

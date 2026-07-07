@@ -42,8 +42,8 @@ All contributions are valued, no matter how small.
 
 ### Prerequisites
 
-- [Gleam](https://gleam.run/) v1.0.0+
-- Erlang/OTP 26+
+- [Gleam](https://gleam.run/) v1.17.0+ — required, not just recommended. CI runs `gleam format --check` with the 1.17 formatter, and earlier formatters produce different output, so code formatted with an older Gleam will fail CI (and code formatted with 1.17 will fail the pre-commit hook on an older local Gleam).
+- Erlang/OTP 28+ (the version CI tests against)
 - Git
 - Make (optional but recommended)
 

@@ -35,7 +35,10 @@ fn do_subtotal(items: List(CartItem), acc: Float) -> Float {
 // ============================================================================
 
 /// Apply a discount to the cart
-pub fn apply_discount(cart: Cart, discount: Discount) -> Result(Cart, CartError) {
+pub fn apply_discount(
+  cart: Cart,
+  discount: Discount,
+) -> Result(Cart, CartError) {
   case discount {
     BuyXGetYFree(_, _, product_id) -> {
       case dict.has_key(cart.items, product_id) {
