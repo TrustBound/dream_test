@@ -1,6 +1,6 @@
 import dream_test/file.{
-  FileSystemError, IsDirectory, NoSpace, NotFound, PermissionDenied, delete,
-  delete_files_matching, error_to_string, read, write,
+  type FileError, FileSystemError, IsDirectory, NoSpace, NotFound,
+  PermissionDenied, delete, delete_files_matching, error_to_string, read, write,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process.{unique_port}
@@ -161,6 +161,14 @@ pub fn tests() {
       |> or_fail_with("only a.tmp should be deleted, not the sub.tmp directory")
     }),
 
+    it("write gives NoSpace for a file on a full disk", fn() {
+      let #(path, result) = with_file_on_full_disk(write_hello)
+      result
+      |> should
+      |> be_equal(Error(NoSpace(path)))
+      |> or_fail_with("expected NoSpace for the file on the full disk")
+    }),
+
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should
@@ -197,3 +205,13 @@ pub fn tests() {
     }),
   ])
 }
+
+fn write_hello(path: String) -> Result(Nil, FileError) {
+  write(path, "hello")
+}
+
+/// Call `run` with the path of a new file on a real device that has no
+/// free space, and give the path and the result. Fails the test on a
+/// system that has no such device.
+@external(erlang, "dream_test_file_test_ffi", "with_file_on_full_disk")
+fn with_file_on_full_disk(run: fn(String) -> a) -> #(String, a)
