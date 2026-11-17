@@ -18,16 +18,14 @@ import dream_test/coverage/report.{
 }
 import dream_test/coverage_project_support.{
   add_source, compile_source, make_unreadable, project, project_config,
-  with_fixture_lock,
+  unique_name, with_fixture_lock,
 }
 import dream_test/file.{
   FileSystemError, IsDirectory, NotFound, PermissionDenied, read, write,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/process.{unique_port}
 import dream_test/unit.{describe, group, it}
 import gleam/dynamic.{type Dynamic}
-import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -213,7 +211,7 @@ fn is_ok(value: Result(a, b)) -> Bool {
 fn change_mode(path: String, mode: Int) -> Dynamic
 
 fn output_path(name: String) -> String {
-  "test/tmp/coverage_api_test/" <> int.to_string(unique_port()) <> "_" <> name
+  "test/tmp/coverage_api_test/" <> unique_name() <> "_" <> name
 }
 
 fn measure_classify(
@@ -373,8 +371,7 @@ pub fn tests() {
         },
       ),
       it("returns NoSourceFiles for a directory without source files", fn() {
-        let directory =
-          "test/tmp/coverage_api_test/empty_" <> int.to_string(unique_port())
+        let directory = "test/tmp/coverage_api_test/empty_" <> unique_name()
         let _ = write(directory <> "/notes.txt", "not source")
         coverage.new()
         |> coverage.source_directory(directory)
@@ -472,9 +469,7 @@ pub fn tests() {
       }),
       it("write the LCOV file", fn() {
         let path =
-          "test/tmp/coverage_api_test/lcov_"
-          <> int.to_string(unique_port())
-          <> ".info"
+          "test/tmp/coverage_api_test/lcov_" <> unique_name() <> ".info"
         let _ = measure_classify(fixture_config() |> coverage.lcov_path(path))
         read(path)
         |> should

@@ -7,9 +7,7 @@
 import dream_test/coverage.{type CoverageConfig, type CoverageError}
 import dream_test/coverage/report.{type CoverageReport}
 import dream_test/file
-import dream_test/process.{unique_port}
 import gleam/dynamic.{type Dynamic}
-import gleam/int
 import gleam/string
 
 /// Create an empty project and return its source directory.
@@ -76,6 +74,12 @@ pub fn load_original(module: String) -> Nil
 @external(erlang, "dream_test_coverage_project_ffi", "with_fixture_lock")
 pub fn with_fixture_lock(work: fn() -> a) -> a
 
+/// A name that no other call gives, in this run or an earlier run that left
+/// files in `build` or `test/tmp`. `process.unique_port` is random and can
+/// repeat, so it must not name files or modules.
+@external(erlang, "dream_test_coverage_test_ffi", "unique_name")
+pub fn unique_name() -> String
+
 /// Start coverage with `config`, run `work`, then finish.
 pub fn measure(
   config: CoverageConfig,
@@ -126,10 +130,11 @@ pub type MarkedProject {
   MarkedProject(root: String, source_directory: String, module: String)
 }
 
-/// Create a project named `<prefix>_<n>`, with a new `n` each time. Its
-/// module has the same name.
+/// Create a project named `<prefix>_<unique name>`. Its module has the same
+/// name. The name must not repeat in a run: two projects with one module
+/// name share the loaded module and its coverage claim.
 pub fn new_marked_project(prefix: String) -> MarkedProject {
-  let name = prefix <> "_" <> int.to_string(unique_port())
+  let name = prefix <> "_" <> unique_name()
   MarkedProject(
     root: "build/coverage/projects/" <> name,
     source_directory: project(name),

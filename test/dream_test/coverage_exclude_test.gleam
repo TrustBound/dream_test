@@ -8,13 +8,11 @@ import dream_test/coverage.{
 import dream_test/coverage/report.{type CoverageReport}
 import dream_test/coverage_project_support.{
   add_damaged_beam, add_source, compile_source, measure, project, project_config,
-  with_fixture_lock,
+  unique_name, with_fixture_lock,
 }
 import dream_test/file.{read, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/process.{unique_port}
 import dream_test/unit.{describe, group, it}
-import gleam/int
 import gleam/list
 
 fn fixture_config() -> CoverageConfig {
@@ -33,7 +31,7 @@ fn ffi_pattern() -> String {
 
 /// A new, empty directory for one test's files.
 fn test_directory() -> String {
-  "build/coverage/exclude_tests/" <> int.to_string(unique_port())
+  "build/coverage/exclude_tests/" <> unique_name()
 }
 
 /// Measure `classify(1)` with `config`, and list the paths of the report's
