@@ -6,6 +6,10 @@
     run_main_in_new_vm_with_environment/3,
     set_environment_variable/2,
     unset_environment_variable/1,
+    start_server_in_new_vm/2,
+    send_server_request/2,
+    wait_for_server_exit/1,
+    read_line/0,
     reset_child_output/0,
     child_project/1,
     add_source/2,
@@ -291,6 +295,54 @@ set_environment_variable(Name, Value) ->
 unset_environment_variable(Name) ->
     true = os:unsetenv(unicode:characters_to_list(Name)),
     nil.
+
+%% ---------------------------------------------------------------------------
+%% A server in its own `erl` process
+%% ---------------------------------------------------------------------------
+
+%% Start `Module:Function()` in a new `erl` process that halts with status 0
+%% when the function returns. Requests go to its standard input, one per
+%% line, and replies come back from its standard output, one per line.
+%% Returns the port, which only the calling process can use.
+start_server_in_new_vm(Module, Function) ->
+    Erl = os:find_executable("erl"),
+    Eval = io_lib:format("'~ts':'~ts'(), erlang:halt(0).", [Module, Function]),
+    open_port(
+        {spawn_executable, Erl},
+        [exit_status, binary, stderr_to_stdout, use_stdio, {line, 65536},
+         {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
+    ).
+
+%% Send one request line and return the reply line. Returns
+%% `{error, Output}` when the server exits or does not reply in 60 seconds.
+send_server_request(Port, Request) ->
+    true = port_command(Port, [Request, "\n"]),
+    receive
+        {Port, {data, {eol, Reply}}} -> {ok, Reply};
+        {Port, {exit_status, Status}} -> {error, format({exited, Status})}
+    after 60000 ->
+        port_close(Port),
+        {error, <<"timed out after 60 seconds">>}
+    end.
+
+%% Wait for the server to halt and return its exit status, or -1 after 60
+%% seconds.
+wait_for_server_exit(Port) ->
+    receive
+        {Port, {exit_status, Status}} -> Status
+    after 60000 ->
+        port_close(Port),
+        -1
+    end.
+
+%% In the server: read one line from standard input, without the newline.
+%% The end of the input is `{error, nil}`.
+read_line() ->
+    case io:get_line("") of
+        eof -> {error, nil};
+        {error, _Reason} -> {error, nil};
+        Line -> {ok, string:trim(unicode:characters_to_binary(Line), trailing, "\n")}
+    end.
 
 collect_output(Port, Output) ->
     receive

@@ -182,6 +182,63 @@
 //// A file that cannot be written fails coverage with a `Coverage failed`
 //// message that names the format and the path.
 ////
+//// ## Coverage from other BEAM instances
+////
+//// Code that runs in another BEAM instance is not measured by the test
+//// run, for example an application server that integration tests start as
+//// a separate OS process. That server can measure itself with `start` and
+//// `finish`, write an LCOV file when it stops, and the test run adds the
+//// file to its own report with `merge_lcov`.
+////
+//// In the server, start coverage before it serves requests, and call
+//// `finish` in its stop path, before the BEAM halts. `finish` writes the
+//// LCOV file:
+////
+//// ```gleam
+//// pub fn main() {
+////   let config =
+////     coverage.new()
+////     |> coverage.lcov_path("build/coverage/servers/app.info")
+////   let assert Ok(session) = coverage.start(config)
+////   serve_until_stop_requested()
+////   let assert Ok(_) = coverage.finish(session)
+//// }
+//// ```
+////
+//// In the test run, delete the old file before the server starts, stop the
+//// server before the tests end, and merge the file:
+////
+//// ```gleam
+//// describe("app", [
+////   before_all(fn() {
+////     file.delete("build/coverage/servers/app.info")
+////     |> result.map_error(file.error_to_string)
+////   }),
+////   before_all(start_server),
+////   after_all(stop_server_and_wait_for_exit),
+////   it("serves the home page", get_home_page),
+//// ])
+////
+//// runner.new([app_tests()])
+//// |> runner.coverage(
+////   coverage.new()
+////   |> coverage.merge_lcov("build/coverage/servers/*.info"),
+//// )
+//// |> runner.run()
+//// ```
+////
+//// - Start the server from the project root, the same directory the tests
+////   run in, so the paths in its LCOV file are the paths in the project.
+//// - A BEAM that is killed (for example with `SIGKILL`, or with `SIGTERM`
+////   and no handler) does not run `finish`, so the file is not written.
+////   Stop the server through its own stop path, for example a stop request
+////   or the end of its standard input.
+//// - Delete the old file before the server starts. Then a server that did
+////   not write its file fails the test run with `NoLcovFilesMatched`, and
+////   the counts of an earlier run are never merged.
+//// - Give each server its own file name, and stop each server before the
+////   test run finishes, because `merge_lcov` reads the files then.
+////
 //// ## Line accuracy
 ////
 //// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
@@ -771,7 +828,9 @@ pub fn minimum_percent(
 /// file (with `coverage.finish`, or any tool that writes LCOV). When this run
 /// finishes, every file that matches `pattern` is read and its line counts
 /// are added, per file and line, to this run's counts. The table, the LCOV
-/// output and `coverage.minimum_percent` then use the combined totals.
+/// output and `coverage.minimum_percent` then use the combined totals. The
+/// module docs show how a server writes its file, in "Coverage from other
+/// BEAM instances".
 ///
 /// Call it more than once to merge more than one pattern. Each pattern must
 /// match at least one file, so a run that silently produced no coverage is

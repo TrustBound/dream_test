@@ -123,6 +123,20 @@ pub fn tests() {
       ))
       |> or_fail_with("expected the table and exit status 0")
     }),
+    it("merges the LCOV file of a server that ran in its own BEAM", fn() {
+      run_main("server_coverage_merged")
+      |> should
+      |> be_equal(#(
+        0,
+        "\nCoverage\n"
+          <> "File                                             Lines  Cover   Missing\n"
+          <> "test/coverage_fixtures/coverage_fixture_ffi.erl  0/1    0.0%    6\n"
+          <> "test/coverage_fixtures/nested/deep.gleam         1/1    100.0%\n"
+          <> "test/coverage_fixtures/sample.gleam              2/4    50.0%   9, 14\n"
+          <> "Total                                            3/6    50.0%\n",
+      ))
+      |> or_fail_with("expected the server's lines in the table and exit 0")
+    }),
     it("fails below the minimum and exits 1 with exit_on_failure", fn() {
       run_main("below_minimum_with_exit_on_failure")
       |> should
