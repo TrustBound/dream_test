@@ -11,10 +11,22 @@
 //// ```gleam
 ////   let steps =
 ////     new()
-////     |> step("I have {int} items in my cart", step_have_items)
-////     |> step("I add {int} more items", step_add_items)
-////     |> step("I should have {int} items total", step_should_have)
+////     |> given("I have {int} items in my cart", step_have_items)
+////     |> when_("I add {int} more items", step_add_items)
+////     |> then_("I should have {int} items total", step_should_have)
 //// ```
+////
+//// ## Phases
+////
+//// Every step definition belongs to exactly one phase: `given` (Arrange),
+//// `when_` (Act) or `then_` (Assert). A step matches only the definitions of
+//// its phase. `And`, `But` and `*` steps take the phase of the step before
+//// them.
+////
+//// Each pattern can have one definition for each phase. A second definition
+//// of the same pattern in the same phase is an error: `find_step` and
+//// `validate` return it, and every scenario that uses the registry fails with
+//// it.
 ////
 //// ## Placeholder types
 ////
@@ -33,11 +45,14 @@ import dream_test/gherkin/step_trie.{
   type CapturedValue, type StepMatch, type StepTrie, CapturedFloat, CapturedInt,
   CapturedString, CapturedWord,
 }
-import dream_test/gherkin/types.{type StepKeyword, And, But, Given, Then, When}
+import dream_test/gherkin/types.{
+  type StepPhase, GivenPhase, ThenPhase, WhenPhase,
+}
 import dream_test/gherkin/world.{type World}
 import dream_test/types as dream_types
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 
 // ============================================================================
 // Types
@@ -92,7 +107,11 @@ pub type StepHandler =
 /// not with how many step definitions you’ve registered.
 ///
 pub opaque type StepRegistry {
-  StepRegistry(trie: StepTrie(StepHandler))
+  StepRegistry(
+    trie: StepTrie(StepHandler),
+    /// Duplicate step definition errors, newest first.
+    errors_newest_first: List(String),
+  )
 }
 
 // ============================================================================
@@ -108,15 +127,15 @@ pub opaque type StepRegistry {
 /// ```gleam
 /// let steps =
 ///   new()
-///   |> step("I have {int} items", step_int)
-///   |> step("the price is ${float}", step_float)
-///   |> step("the message is {string}", step_string)
-///   |> step("the user is {word}", step_word)
-///   |> step("everything works", step_pass)
+///   |> given("I have {int} items", step_int)
+///   |> given("the price is ${float}", step_float)
+///   |> given("the message is {string}", step_string)
+///   |> given("the user is {word}", step_word)
+///   |> then_("everything works", step_pass)
 /// ```
 ///
 pub fn new() -> StepRegistry {
-  StepRegistry(trie: step_trie.new())
+  StepRegistry(trie: step_trie.new(), errors_newest_first: [])
 }
 
 /// Register a Given step definition.
@@ -144,8 +163,7 @@ pub fn given(
   pattern pattern: String,
   handler handler: StepHandler,
 ) -> StepRegistry {
-  let updated = step_trie.insert(registry.trie, "Given", pattern, handler)
-  StepRegistry(trie: updated)
+  register(registry, GivenPhase, pattern, handler)
 }
 
 /// Register a When step definition.
@@ -175,8 +193,7 @@ pub fn when_(
   pattern pattern: String,
   handler handler: StepHandler,
 ) -> StepRegistry {
-  let updated = step_trie.insert(registry.trie, "When", pattern, handler)
-  StepRegistry(trie: updated)
+  register(registry, WhenPhase, pattern, handler)
 }
 
 /// Register a Then step definition.
@@ -206,41 +223,61 @@ pub fn then_(
   pattern pattern: String,
   handler handler: StepHandler,
 ) -> StepRegistry {
-  let updated = step_trie.insert(registry.trie, "Then", pattern, handler)
-  StepRegistry(trie: updated)
+  register(registry, ThenPhase, pattern, handler)
 }
 
-/// Register a step that matches any keyword.
+/// Add a step definition, or record a duplicate step definition error.
+fn register(
+  registry: StepRegistry,
+  phase: StepPhase,
+  pattern: String,
+  handler: StepHandler,
+) -> StepRegistry {
+  case step_trie.insert(registry.trie, phase, pattern, handler) {
+    Ok(updated) -> StepRegistry(..registry, trie: updated)
+    Error(message) ->
+      StepRegistry(..registry, errors_newest_first: [
+        message,
+        ..registry.errors_newest_first
+      ])
+  }
+}
+
+/// Check a registry for duplicate step definitions.
 ///
-/// Use this for steps that work regardless of Given/When/Then context.
+/// Registering the same pattern twice in one phase (for example two `given`
+/// calls with `"I have {int} items"`) is an error. The builder functions keep
+/// the first definition and record the error. `validate` returns the
+/// recorded errors, one per line. Every scenario that runs with a registry
+/// that has errors fails with this message, so a duplicate cannot be missed.
 ///
-/// ## Parameters
-///
-/// - `registry`: The registry to add to
-/// - `pattern`: Step pattern with placeholders
-/// - `handler`: Handler function to execute
+/// The same pattern in different phases (for example `given` and `then_`) is
+/// not a duplicate.
 ///
 /// ## Returns
 ///
-/// A new registry containing the added step.
+/// - `Ok(Nil)`: The registry has no duplicate step definitions
+/// - `Error(String)`: One line for each duplicate step definition
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let steps =
-///     new()
-///     |> step("I have {int} items in my cart", step_have_items)
-///     |> step("I add {int} more items", step_add_items)
-///     |> step("I should have {int} items total", step_should_have)
+///       new()
+///       |> given("I have {int} items", step_pass)
+///       |> given("I have {int} items", step_pass)
+///       |> validate
+///       |> should
+///       |> be_equal(Error(
+///         "Duplicate step definition: Given \"I have {int} items\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+///       ))
+///       |> or_fail_with("expected a duplicate step definition error")
 /// ```
 ///
-pub fn step(
-  registry registry: StepRegistry,
-  pattern pattern: String,
-  handler handler: StepHandler,
-) -> StepRegistry {
-  let updated = step_trie.insert(registry.trie, "*", pattern, handler)
-  StepRegistry(trie: updated)
+pub fn validate(registry registry: StepRegistry) -> Result(Nil, String) {
+  case registry.errors_newest_first {
+    [] -> Ok(Nil)
+    errors -> Error(string.join(list.reverse(errors), "\n"))
+  }
 }
 
 // ============================================================================
@@ -249,8 +286,10 @@ pub fn step(
 
 /// Find a matching step definition.
 ///
-/// Searches the registry for a handler matching the given keyword and text.
-/// Returns the handler and captured values on success, or an error message.
+/// Searches the registry for a handler of the given phase that matches the
+/// text. Returns the handler and captured values on success, or an error
+/// message. A registry with duplicate step definitions gives the error of
+/// `validate`.
 ///
 /// ## Performance
 ///
@@ -276,7 +315,9 @@ pub fn step(
 /// ## Parameters
 ///
 /// - `registry`: The registry to search
-/// - `keyword`: Step keyword (Given, When, Then, And, But)
+/// - `phase`: The phase of the step (`GivenPhase`, `WhenPhase` or
+///   `ThenPhase`). Resolve `And`, `But` and `*` steps with
+///   `types.resolve_phase` first.
 /// - `text`: Step text to match
 ///
 /// ## Returns
@@ -289,7 +330,7 @@ pub fn step(
 /// ```gleam
 ///       let registry = new() |> given("I have {int} items", step_pass)
 ///
-///       use matched <- result.try(find_step(registry, Given, "I have 3 items"))
+///       use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
 ///
 ///       capture_count(matched.captures)
 ///       |> should
@@ -299,23 +340,24 @@ pub fn step(
 ///
 pub fn find_step(
   registry registry: StepRegistry,
-  keyword keyword: StepKeyword,
+  phase phase: StepPhase,
   text text: String,
 ) -> Result(StepMatch(StepHandler), String) {
-  let keyword_str = keyword_to_string(keyword)
-  case step_trie.lookup(registry.trie, keyword_str, text) {
-    Some(match) -> Ok(match)
-    None -> Error("Undefined step: " <> keyword_str <> " " <> text)
+  case validate(registry) {
+    Ok(Nil) -> lookup_step(registry, phase, text)
+    Error(message) -> Error(message)
   }
 }
 
-fn keyword_to_string(keyword: StepKeyword) -> String {
-  case keyword {
-    Given -> "Given"
-    When -> "When"
-    Then -> "Then"
-    And -> "And"
-    But -> "But"
+fn lookup_step(
+  registry: StepRegistry,
+  phase: StepPhase,
+  text: String,
+) -> Result(StepMatch(StepHandler), String) {
+  case step_trie.lookup(registry.trie, phase, text) {
+    Some(match) -> Ok(match)
+    None ->
+      Error("Undefined step: " <> types.phase_to_string(phase) <> " " <> text)
   }
 }
 

@@ -17,7 +17,7 @@
 //// ## Example
 ////
 //// ```gleam
-////       step_trie.lookup(trie, "Then", "the total is $19.99USD")
+////       step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
 ////       |> should
 ////       |> be_equal(
 ////         Some(
@@ -29,6 +29,7 @@
 ////       |> or_fail_with("expected float capture for $19.99USD")
 //// ```
 
+import dream_test/gherkin/types.{type StepPhase}
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
@@ -101,13 +102,13 @@ pub type CapturedValue {
 
 /// A node in the step trie.
 ///
-/// Each node can store handlers for different keywords and has children
+/// Each node can store handlers for different phases and has children
 /// for different segment types. Children are organized by priority.
 ///
 pub opaque type StepTrieNode(handler) {
   StepTrieNode(
-    /// Handlers at this node, keyed by keyword (Given, When, Then, *)
-    handlers: Dict(String, handler),
+    /// Handlers at this node, keyed by phase (one handler for each phase)
+    handlers: Dict(StepPhase, handler),
     /// Child nodes for literal words (exact matches, highest priority)
     literal_children: Dict(String, StepTrieNode(handler)),
     /// Child node for {string} parameter
@@ -176,7 +177,7 @@ pub type StepMatch(handler) {
 ///       let trie =
 ///         step_trie.new()
 ///         |> step_trie.insert(
-///           keyword: "Given",
+///           phase: GivenPhase,
 ///           pattern: "I have an empty cart",
 ///           handler: "empty",
 ///         )
@@ -188,130 +189,186 @@ pub fn new() -> StepTrie(handler) {
 
 /// Insert a step pattern into the trie.
 ///
-/// Adds a handler at the path specified by the pattern. If a handler already
-/// exists for the same keyword and pattern, it is replaced.
+/// Adds a handler for one phase at the path specified by the pattern. Each
+/// pattern can have one handler for each phase. The same pattern in a
+/// different phase is a different step definition.
 ///
 /// ## Parameters
 ///
 /// - `trie`: The trie to insert into
-/// - `keyword`: Step keyword as string ("Given", "When", "Then", or "*" for any)
+/// - `phase`: The phase of the step definition (`GivenPhase`, `WhenPhase` or
+///   `ThenPhase`)
 /// - `pattern`: Step pattern with placeholders (e.g., "I have {int} items")
 /// - `handler`: The handler to store
+///
+/// ## Returns
+///
+/// - `Ok(StepTrie)`: The trie with the new step definition
+/// - `Error(String)`: The trie already has a handler for this phase and a
+///   pattern with the same segments. The message names the phase and the
+///   pattern.
 ///
 /// ## Example
 ///
 /// ```gleam
-///         |> step_trie.insert(
-///           keyword: "Given",
-///           pattern: "I have {int} items",
-///           handler: "count",
-///         )
+///       step_trie.new()
+///       |> step_trie.insert(
+///         phase: GivenPhase,
+///         pattern: "I have {int} items",
+///         handler: "count",
+///       )
 /// ```
 ///
 pub fn insert(
   trie trie: StepTrie(handler),
-  keyword keyword: String,
+  phase phase: StepPhase,
   pattern pattern: String,
   handler handler: handler,
-) -> StepTrie(handler) {
+) -> Result(StepTrie(handler), String) {
   let segments = parse_step_pattern(pattern)
-  let updated_root = insert_into_node(trie.root, keyword, segments, handler)
-  StepTrie(root: updated_root)
+  case insert_into_node(trie.root, phase, segments, handler) {
+    Ok(updated_root) -> Ok(StepTrie(root: updated_root))
+    Error(Nil) -> Error(duplicate_definition_message(phase, pattern))
+  }
+}
+
+fn duplicate_definition_message(phase: StepPhase, pattern: String) -> String {
+  "Duplicate step definition: "
+  <> types.phase_to_string(phase)
+  <> " \""
+  <> pattern
+  <> "\" is already defined. Each pattern can have one definition for each of Given, When and Then."
 }
 
 fn insert_into_node(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   segments: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   case segments {
-    [] -> insert_handler_at_node(node, keyword, handler)
+    [] -> insert_handler_at_node(node, phase, handler)
     [LiteralWord(word), ..rest] ->
-      insert_literal_segment(node, word, keyword, rest, handler)
-    [IntParam, ..rest] -> insert_int_segment(node, keyword, rest, handler)
-    [FloatParam, ..rest] -> insert_float_segment(node, keyword, rest, handler)
-    [StringParam, ..rest] -> insert_string_segment(node, keyword, rest, handler)
-    [WordParam, ..rest] -> insert_word_segment(node, keyword, rest, handler)
-    [AnyParam, ..rest] -> insert_any_segment(node, keyword, rest, handler)
+      insert_literal_segment(node, word, phase, rest, handler)
+    [IntParam, ..rest] -> insert_int_segment(node, phase, rest, handler)
+    [FloatParam, ..rest] -> insert_float_segment(node, phase, rest, handler)
+    [StringParam, ..rest] -> insert_string_segment(node, phase, rest, handler)
+    [WordParam, ..rest] -> insert_word_segment(node, phase, rest, handler)
+    [AnyParam, ..rest] -> insert_any_segment(node, phase, rest, handler)
   }
 }
 
+/// A node holds one handler for each phase. A second handler for the same
+/// phase is a duplicate step definition.
 fn insert_handler_at_node(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   handler: handler,
-) -> StepTrieNode(handler) {
-  let updated_handlers = dict.insert(node.handlers, keyword, handler)
-  StepTrieNode(..node, handlers: updated_handlers)
+) -> Result(StepTrieNode(handler), Nil) {
+  case dict.has_key(node.handlers, phase) {
+    True -> Error(Nil)
+    False ->
+      Ok(
+        StepTrieNode(
+          ..node,
+          handlers: dict.insert(node.handlers, phase, handler),
+        ),
+      )
+  }
 }
 
 fn insert_literal_segment(
   node: StepTrieNode(handler),
   word: String,
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = get_or_create_literal_child(node, word)
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  let updated_children = dict.insert(node.literal_children, word, updated_child)
-  StepTrieNode(..node, literal_children: updated_children)
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(
+        StepTrieNode(
+          ..node,
+          literal_children: dict.insert(
+            node.literal_children,
+            word,
+            updated_child,
+          ),
+        ),
+      )
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn insert_int_segment(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = option.unwrap(node.int_child, empty_node())
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  StepTrieNode(..node, int_child: Some(updated_child))
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(StepTrieNode(..node, int_child: Some(updated_child)))
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn insert_float_segment(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = option.unwrap(node.float_child, empty_node())
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  StepTrieNode(..node, float_child: Some(updated_child))
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(StepTrieNode(..node, float_child: Some(updated_child)))
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn insert_string_segment(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = option.unwrap(node.string_child, empty_node())
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  StepTrieNode(..node, string_child: Some(updated_child))
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(StepTrieNode(..node, string_child: Some(updated_child)))
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn insert_word_segment(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = option.unwrap(node.word_child, empty_node())
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  StepTrieNode(..node, word_child: Some(updated_child))
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(StepTrieNode(..node, word_child: Some(updated_child)))
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn insert_any_segment(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   rest: List(StepSegment),
   handler: handler,
-) -> StepTrieNode(handler) {
+) -> Result(StepTrieNode(handler), Nil) {
   let child = option.unwrap(node.any_child, empty_node())
-  let updated_child = insert_into_node(child, keyword, rest, handler)
-  StepTrieNode(..node, any_child: Some(updated_child))
+  case insert_into_node(child, phase, rest, handler) {
+    Ok(updated_child) ->
+      Ok(StepTrieNode(..node, any_child: Some(updated_child)))
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn get_or_create_literal_child(
@@ -551,7 +608,8 @@ fn is_digit(grapheme: String) -> Bool {
 
 /// Look up a step in the trie.
 ///
-/// Searches for a handler matching the given keyword and step text.
+/// Searches for a handler of the given phase that matches the step text.
+/// Only handlers of that phase match.
 /// Returns the matched handler and captured values, or None if no match.
 ///
 /// Lookup is O(word count) - independent of total step definitions.
@@ -559,7 +617,7 @@ fn is_digit(grapheme: String) -> Bool {
 /// ## Parameters
 ///
 /// - `trie`: The trie to search
-/// - `keyword`: Step keyword as string ("Given", "When", "Then")
+/// - `phase`: The phase of the step (`GivenPhase`, `WhenPhase` or `ThenPhase`)
 /// - `text`: Step text to match (e.g., "I have 42 items")
 ///
 /// ## Returns
@@ -570,7 +628,7 @@ fn is_digit(grapheme: String) -> Bool {
 /// ## Example
 ///
 /// ```gleam
-///       step_trie.lookup(trie, "Then", "the total is $19.99USD")
+///       step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
 ///       |> should
 ///       |> be_equal(
 ///         Some(
@@ -584,11 +642,11 @@ fn is_digit(grapheme: String) -> Bool {
 ///
 pub fn lookup(
   trie trie: StepTrie(handler),
-  keyword keyword: String,
+  phase phase: StepPhase,
   text text: String,
 ) -> Option(StepMatch(handler)) {
   let words = tokenize_step_text(text)
-  lookup_in_node(trie.root, keyword, words, [])
+  lookup_in_node(trie.root, phase, words, [])
 }
 
 /// Tokenize step text for matching.
@@ -680,29 +738,24 @@ fn add_token_if_non_empty(tokens: List(String), token: String) -> List(String) {
 
 fn lookup_in_node(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   words: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
   case words {
-    [] -> lookup_handler_at_node(node, keyword, captures)
-    [word, ..rest] -> lookup_word(node, keyword, word, rest, captures)
+    [] -> lookup_handler_at_node(node, phase, captures)
+    [word, ..rest] -> lookup_word(node, phase, word, rest, captures)
   }
 }
 
 fn lookup_handler_at_node(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
-  // Try exact keyword first, then wildcard "*"
-  let handler_result = case dict.get(node.handlers, keyword) {
-    Ok(handler) -> Some(handler)
-    Error(_) -> dict.get(node.handlers, "*") |> option.from_result
-  }
-  case handler_result {
-    Some(handler) -> Some(StepMatch(handler, list.reverse(captures)))
-    None -> None
+  case dict.get(node.handlers, phase) {
+    Ok(handler) -> Some(StepMatch(handler, list.reverse(captures)))
+    Error(Nil) -> None
   }
 }
 
@@ -718,35 +771,35 @@ fn lookup_handler_at_node(
 ///
 fn lookup_word(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
   // 1. Try literal match first (highest priority)
   case dict.get(node.literal_children, word) {
-    Ok(child) -> lookup_in_node(child, keyword, rest, captures)
-    Error(_) -> try_param_matches(node, keyword, word, rest, captures)
+    Ok(child) -> lookup_in_node(child, phase, rest, captures)
+    Error(_) -> try_param_matches(node, phase, word, rest, captures)
   }
 }
 
 fn try_param_matches(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
   // 2. Try {string} (quoted)
-  case try_string_match(node, keyword, word, rest, captures) {
+  case try_string_match(node, phase, word, rest, captures) {
     Some(result) -> Some(result)
-    None -> try_numeric_matches(node, keyword, word, rest, captures)
+    None -> try_numeric_matches(node, phase, word, rest, captures)
   }
 }
 
 fn try_string_match(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
@@ -755,7 +808,7 @@ fn try_string_match(
     Some(child), True -> {
       let unquoted = unquote_string(word)
       let updated_captures = [CapturedString(unquoted), ..captures]
-      lookup_in_node(child, keyword, rest, updated_captures)
+      lookup_in_node(child, phase, rest, updated_captures)
     }
     _, _ -> None
   }
@@ -763,21 +816,21 @@ fn try_string_match(
 
 fn try_numeric_matches(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
   // 3. Try {int}
-  case try_int_match(node, keyword, word, rest, captures) {
+  case try_int_match(node, phase, word, rest, captures) {
     Some(result) -> Some(result)
-    None -> try_float_then_word(node, keyword, word, rest, captures)
+    None -> try_float_then_word(node, phase, word, rest, captures)
   }
 }
 
 fn try_int_match(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
@@ -785,7 +838,7 @@ fn try_int_match(
   case node.int_child, int.parse(word) {
     Some(child), Ok(value) -> {
       let updated_captures = [CapturedInt(value), ..captures]
-      lookup_in_node(child, keyword, rest, updated_captures)
+      lookup_in_node(child, phase, rest, updated_captures)
     }
     _, _ -> None
   }
@@ -793,21 +846,21 @@ fn try_int_match(
 
 fn try_float_then_word(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
   // 4. Try {float}
-  case try_float_match(node, keyword, word, rest, captures) {
+  case try_float_match(node, phase, word, rest, captures) {
     Some(result) -> Some(result)
-    None -> try_word_matches(node, keyword, word, rest, captures)
+    None -> try_word_matches(node, phase, word, rest, captures)
   }
 }
 
 fn try_float_match(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
@@ -815,7 +868,7 @@ fn try_float_match(
   case node.float_child, float.parse(word) {
     Some(child), Ok(value) -> {
       let updated_captures = [CapturedFloat(value), ..captures]
-      lookup_in_node(child, keyword, rest, updated_captures)
+      lookup_in_node(child, phase, rest, updated_captures)
     }
     _, _ -> None
   }
@@ -823,7 +876,7 @@ fn try_float_match(
 
 fn try_word_matches(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
@@ -832,15 +885,15 @@ fn try_word_matches(
   case node.word_child {
     Some(child) -> {
       let updated_captures = [CapturedWord(word), ..captures]
-      lookup_in_node(child, keyword, rest, updated_captures)
+      lookup_in_node(child, phase, rest, updated_captures)
     }
-    None -> try_any_match(node, keyword, word, rest, captures)
+    None -> try_any_match(node, phase, word, rest, captures)
   }
 }
 
 fn try_any_match(
   node: StepTrieNode(handler),
-  keyword: String,
+  phase: StepPhase,
   word: String,
   rest: List(String),
   captures: List(CapturedValue),
@@ -849,7 +902,7 @@ fn try_any_match(
   case node.any_child {
     Some(child) -> {
       let updated_captures = [CapturedWord(word), ..captures]
-      lookup_in_node(child, keyword, rest, updated_captures)
+      lookup_in_node(child, phase, rest, updated_captures)
     }
     None -> None
   }

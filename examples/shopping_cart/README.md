@@ -77,16 +77,17 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
-### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L19-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L19-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
-  |> steps.step("I have an empty cart", step_empty_cart)
-  |> steps.step("I add {int} {word} to the cart", step_add_product)
-  |> steps.step("I try to add {int} {word} to the cart", step_try_add_product)
-  |> steps.step("I update the {word} quantity to {int}", step_update_quantity)
-  |> steps.step("I remove {word} from the cart", step_remove_product)
+  |> steps.given("I have an empty cart", step_empty_cart)
+  |> steps.given("I add {int} {word} to the cart", step_add_product)
+  |> steps.when_("I add {int} {word} to the cart", step_add_product)
+  |> steps.when_("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when_("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.when_("I remove {word} from the cart", step_remove_product)
 }
 ```
 

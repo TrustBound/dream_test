@@ -18,11 +18,12 @@ import shopping_cart/types as cart_types
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
-  |> steps.step("I have an empty cart", step_empty_cart)
-  |> steps.step("I add {int} {word} to the cart", step_add_product)
-  |> steps.step("I try to add {int} {word} to the cart", step_try_add_product)
-  |> steps.step("I update the {word} quantity to {int}", step_update_quantity)
-  |> steps.step("I remove {word} from the cart", step_remove_product)
+  |> steps.given("I have an empty cart", step_empty_cart)
+  |> steps.given("I add {int} {word} to the cart", step_add_product)
+  |> steps.when_("I add {int} {word} to the cart", step_add_product)
+  |> steps.when_("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when_("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.when_("I remove {word} from the cart", step_remove_product)
 }
 
 // ============================================================================

@@ -13,10 +13,10 @@
 ////   // Define step handlers
 ////   let steps =
 ////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when_("I add {int} items", step_add_items)
+////     |> then_("the cart should have {int} items", step_verify_count)
 ////
 ////   // Parse the .feature file
 ////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -33,10 +33,10 @@
 //// pub fn tests() {
 ////   let steps =
 ////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when_("I add {int} items", step_add_items)
+////     |> then_("the cart should have {int} items", step_verify_count)
 ////
 ////   let bg = background([given("the server is running")])
 ////
@@ -107,7 +107,8 @@ pub type InlineScenario {
 
 /// An inline step for the DSL.
 ///
-/// The `given`, `when`, `then`, `and`, and `but` helpers build these for you.
+/// The `given`, `when`, `then`, `and`, `but` and `asterisk` helpers build
+/// these for you.
 /// Build one by hand when you choose the keyword at run time.
 ///
 /// ## Example
@@ -118,7 +119,7 @@ pub type InlineScenario {
 ///
 pub type InlineStep {
   InlineStep(
-    /// The step keyword (Given, When, Then, And, But)
+    /// The step keyword (Given, When, Then, And, But, *)
     keyword: gherkin_types.StepKeyword,
     /// Step text after the keyword
     text: String,
@@ -132,7 +133,8 @@ pub type InlineStep {
 /// Convert a Feature to a TestSuite.
 ///
 /// Creates a TestSuite with one test per scenario. Background steps are
-/// prepended to each scenario. ScenarioOutlines are expanded based on
+/// prepended to each scenario, so a scenario that starts with `And`, `But` or
+/// `*` takes the phase of the last Background step. ScenarioOutlines are expanded based on
 /// their examples table.
 ///
 /// ## Parameters
@@ -396,71 +398,131 @@ fn execute_scenario(
   steps: List(gherkin_types.Step),
   registry: StepRegistry,
 ) -> AssertionResult {
-  // Create world for this scenario
+  case steps.validate(registry) {
+    Ok(Nil) -> resolve_and_execute(scenario_id, steps, registry)
+    Error(message) -> step_failure(message)
+  }
+}
+
+/// Find the phase of every step before any step runs, so a step with no
+/// phase fails the scenario before the Background has side effects.
+fn resolve_and_execute(
+  scenario_id: String,
+  steps: List(gherkin_types.Step),
+  registry: StepRegistry,
+) -> AssertionResult {
+  case resolve_phases(steps, None, []) {
+    Ok(phased_steps) -> execute_in_world(scenario_id, phased_steps, registry)
+    Error(message) -> step_failure(message)
+  }
+}
+
+fn execute_in_world(
+  scenario_id: String,
+  phased_steps: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
+  registry: StepRegistry,
+) -> AssertionResult {
   let the_world = world.new_world(scenario_id)
-
-  // Execute all steps
-  let result = execute_steps(steps, registry, the_world, gherkin_types.Given)
-
-  // Clean up world
+  let result = execute_steps(phased_steps, registry, the_world)
   world.cleanup(the_world)
-
   result
 }
 
-fn execute_steps(
+/// Pair each step with its phase. The Background steps come first in
+/// `steps`, so the first scenario step takes the phase of the last
+/// Background step.
+fn resolve_phases(
   steps: List(gherkin_types.Step),
+  previous: Option(gherkin_types.StepPhase),
+  phased_newest_first: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
+) -> Result(List(#(gherkin_types.Step, gherkin_types.StepPhase)), String) {
+  case steps {
+    [] -> Ok(list.reverse(phased_newest_first))
+    [step, ..rest] ->
+      resolve_step_phase(step, rest, previous, phased_newest_first)
+  }
+}
+
+fn resolve_step_phase(
+  step: gherkin_types.Step,
+  rest: List(gherkin_types.Step),
+  previous: Option(gherkin_types.StepPhase),
+  phased_newest_first: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
+) -> Result(List(#(gherkin_types.Step, gherkin_types.StepPhase)), String) {
+  case gherkin_types.resolve_phase(step.keyword, previous) {
+    Ok(phase) ->
+      resolve_phases(rest, Some(phase), [#(step, phase), ..phased_newest_first])
+    Error(Nil) -> Error(no_previous_step_message(step))
+  }
+}
+
+fn no_previous_step_message(step: gherkin_types.Step) -> String {
+  "\""
+  <> gherkin_types.keyword_to_string(step.keyword)
+  <> " "
+  <> step.text
+  <> "\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then."
+}
+
+fn execute_steps(
+  phased_steps: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
   registry: StepRegistry,
   the_world: World,
-  previous_keyword: gherkin_types.StepKeyword,
 ) -> AssertionResult {
-  case steps {
+  case phased_steps {
     [] -> AssertionOk
-    [step, ..rest] -> {
-      case execute_step(step, registry, the_world, previous_keyword) {
-        AssertionOk -> {
-          let effective_keyword =
-            gherkin_types.resolve_keyword(step.keyword, previous_keyword)
-          execute_steps(rest, registry, the_world, effective_keyword)
-        }
-        failure -> failure
-      }
-    }
+    [#(step, phase), ..rest] ->
+      continue_after(
+        execute_step(step, phase, registry, the_world),
+        rest,
+        registry,
+        the_world,
+      )
+  }
+}
+
+fn continue_after(
+  result: AssertionResult,
+  rest: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
+  registry: StepRegistry,
+  the_world: World,
+) -> AssertionResult {
+  case result {
+    AssertionOk -> execute_steps(rest, registry, the_world)
+    failure -> failure
   }
 }
 
 fn execute_step(
   step: gherkin_types.Step,
+  phase: gherkin_types.StepPhase,
   registry: StepRegistry,
   the_world: World,
-  previous_keyword: gherkin_types.StepKeyword,
 ) -> AssertionResult {
-  // Resolve And/But to effective keyword
-  let effective_keyword =
-    gherkin_types.resolve_keyword(step.keyword, previous_keyword)
-
-  // Find matching step definition
-  case steps.find_step(registry, effective_keyword, step.text) {
-    Ok(match) -> {
-      let context = build_step_context(match, step, the_world)
-      case match.handler(context) {
-        Ok(result) -> result
-        Error(message) ->
-          AssertionFailed(AssertionFailure(
-            operator: "step",
-            message: message,
-            payload: None,
-          ))
-      }
-    }
-    Error(msg) -> {
-      AssertionFailed(AssertionFailure(
-        operator: "step",
-        message: msg,
-        payload: None,
-      ))
-    }
+  case steps.find_step(registry, phase, step.text) {
+    Ok(match) -> run_handler(match, step, the_world)
+    Error(message) -> step_failure(message)
   }
+}
+
+fn run_handler(
+  match: StepMatch(StepHandler),
+  step: gherkin_types.Step,
+  the_world: World,
+) -> AssertionResult {
+  let context = build_step_context(match, step, the_world)
+  case match.handler(context) {
+    Ok(result) -> result
+    Error(message) -> step_failure(message)
+  }
+}
+
+fn step_failure(message: String) -> AssertionResult {
+  AssertionFailed(AssertionFailure(
+    operator: "step",
+    message: message,
+    payload: None,
+  ))
 }
 
 fn build_step_context(
@@ -519,9 +581,9 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 /// ```gleam
 /// let steps =
 ///   steps.new()
-///   |> step("I have {int} items in my cart", step_have_items)
-///   |> step("I add {int} more items", step_add_items)
-///   |> step("I should have {int} items total", step_should_have)
+///   |> given("I have {int} items in my cart", step_have_items)
+///   |> when_("I add {int} more items", step_add_items)
+///   |> then_("I should have {int} items total", step_should_have)
 ///
 /// feature("Shopping Cart", steps, [
 ///   scenario("Adding items to cart", [
@@ -660,6 +722,21 @@ pub fn and(text text: String) -> InlineStep {
 ///
 pub fn but(text text: String) -> InlineStep {
   InlineStep(keyword: gherkin_types.But, text: text)
+}
+
+/// Create a `*` step for inline DSL.
+///
+/// A `*` step takes the phase of the step before it, like `and` and `but`.
+/// Use it for a list of steps where Given, When or Then reads badly.
+///
+/// ## Example
+///
+/// ```gleam
+///       asterisk("I pack a passport"),
+/// ```
+///
+pub fn asterisk(text text: String) -> InlineStep {
+  InlineStep(keyword: gherkin_types.Asterisk, text: text)
 }
 
 fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {

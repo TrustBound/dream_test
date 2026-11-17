@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
-import dream_test/gherkin/steps.{type StepContext, step}
+import dream_test/gherkin/steps.{type StepContext}
 import dream_test/gherkin/world.{get, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -24,8 +24,8 @@ fn step_count_is_42(context: StepContext) {
 
 pub fn register(registry) {
   registry
-  |> step("count is stored", step_store)
-  |> step("count should be 42", step_count_is_42)
+  |> steps.given("count is stored", step_store)
+  |> steps.then_("count should be 42", step_count_is_42)
 }
 
 pub fn tests() {

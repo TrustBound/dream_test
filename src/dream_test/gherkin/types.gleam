@@ -27,10 +27,12 @@ import gleam/option.{type Option}
 /// - `Given` - Describes initial context/preconditions
 /// - `When` - Describes an action
 /// - `Then` - Describes an expected outcome
-/// - `And` / `But` - Continues the previous step type
+/// - `And` / `But` - Continues the previous step
+/// - `Asterisk` - The `*` keyword, which also continues the previous step
 ///
-/// When matching step definitions, `And` and `But` inherit the keyword
-/// type from the previous step (e.g., `And` after `Given` is treated as `Given`).
+/// When matching step definitions, `And`, `But` and `*` take the phase of the
+/// step before them (e.g., `And` after `Given` is matched as a Given step).
+/// See `StepPhase` and `resolve_phase`.
 ///
 pub type StepKeyword {
   Given
@@ -38,6 +40,33 @@ pub type StepKeyword {
   Then
   And
   But
+  /// The `*` keyword. It takes the phase of the step before it.
+  Asterisk
+}
+
+/// The phase of a step: the part of a scenario that the step belongs to.
+///
+/// Given, When and Then map to Arrange, Act and Assert. Every step definition
+/// belongs to exactly one phase, and a step matches only the definitions of
+/// its phase. `And`, `But` and `*` steps have no phase of their own: they take
+/// the phase of the step before them (see `resolve_phase`).
+///
+/// ## Example
+///
+/// ```gleam
+/// resolve_phase(keyword: And, previous: Some(GivenPhase))
+/// |> should
+/// |> be_equal(Ok(GivenPhase))
+/// |> or_fail_with("expected And after Given to be a Given step")
+/// ```
+///
+pub type StepPhase {
+  /// Arrange: the context before the action (`Given` steps).
+  GivenPhase
+  /// Act: the action (`When` steps).
+  WhenPhase
+  /// Assert: the expected outcome (`Then` steps).
+  ThenPhase
 }
 
 /// Optional argument attached to a step.
@@ -267,6 +296,7 @@ pub fn keyword_to_string(keyword keyword: StepKeyword) -> String {
     Then -> "Then"
     And -> "And"
     But -> "But"
+    Asterisk -> "*"
   }
 }
 
@@ -290,13 +320,14 @@ pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
     "Then" -> option.Some(Then)
     "And" -> option.Some(And)
     "But" -> option.Some(But)
+    "*" -> option.Some(Asterisk)
     _ -> option.None
   }
 }
 
-/// Resolve And/But to the effective keyword based on previous step.
+/// Resolve And/But/* to the effective keyword based on previous step.
 ///
-/// In Gherkin, `And` and `But` inherit meaning from the previous step.
+/// In Gherkin, `And`, `But` and `*` inherit meaning from the previous step.
 /// This function resolves them to their effective keyword type.
 ///
 /// ## Example
@@ -315,7 +346,58 @@ pub fn resolve_keyword(
   case keyword {
     And -> previous
     But -> previous
+    Asterisk -> previous
     other -> other
+  }
+}
+
+/// Find the phase of a step from its keyword and the phase of the step
+/// before it.
+///
+/// `Given`, `When` and `Then` give their own phase. `And`, `But` and `*` give
+/// the phase of the step before them, so they need a previous phase. With no
+/// previous phase (`None`), they give `Error(Nil)`: a scenario cannot start
+/// with `And`, `But` or `*` unless a Background step comes before it.
+///
+/// ## Example
+///
+/// ```gleam
+/// resolve_phase(keyword: And, previous: Some(GivenPhase))
+/// |> should
+/// |> be_equal(Ok(GivenPhase))
+/// |> or_fail_with("expected And after Given to be a Given step")
+/// ```
+///
+pub fn resolve_phase(
+  keyword keyword: StepKeyword,
+  previous previous: Option(StepPhase),
+) -> Result(StepPhase, Nil) {
+  case keyword {
+    Given -> Ok(GivenPhase)
+    When -> Ok(WhenPhase)
+    Then -> Ok(ThenPhase)
+    And -> option.to_result(previous, Nil)
+    But -> option.to_result(previous, Nil)
+    Asterisk -> option.to_result(previous, Nil)
+  }
+}
+
+/// Convert a StepPhase to the name of its keyword.
+///
+/// ## Example
+///
+/// ```gleam
+/// phase_to_string(WhenPhase)
+/// |> should
+/// |> be_equal("When")
+/// |> or_fail_with("expected When")
+/// ```
+///
+pub fn phase_to_string(phase phase: StepPhase) -> String {
+  case phase {
+    GivenPhase -> "Given"
+    WhenPhase -> "When"
+    ThenPhase -> "Then"
   }
 }
 

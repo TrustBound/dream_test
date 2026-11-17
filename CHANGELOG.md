@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same count code.
 - `ansi.apply_if` applies a style only when colour is on. Use it in a
   reporter with a colour option.
+- The Gherkin `*` step keyword. In a `.feature` file, `* I pack a passport`
+  is a step. In the inline DSL, `feature.asterisk("I pack a passport")`
+  makes one. A `*` step takes the phase of the step before it, like `And`
+  and `But`. `gherkin/types.StepKeyword` has the new `Asterisk` variant.
+- `gherkin/types.StepPhase` (`GivenPhase`, `WhenPhase`, `ThenPhase`): the
+  phase of a step, which maps to Arrange, Act and Assert.
+  `gherkin/types.resolve_phase` gives the phase of a step from its keyword
+  and the phase before it. `gherkin/types.phase_to_string` gives the name
+  of a phase.
+- `gherkin/steps.validate` returns the duplicate step definitions of a
+  registry, one line for each.
 
 ### Changed
 
@@ -89,6 +100,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not change. Code that writes the type of the `with_registry` result
   must change `FeatureDiscovery` to `RunnableDiscovery`, and code that called
   `to_suite` without `with_registry` must add the call.
+
+- BREAKING: `gherkin/steps.step` is removed. Each step definition now
+  belongs to exactly one phase. Before, `step` matched a step of any
+  keyword. Now register it with `given`, `when_` or `then_`, for example
+  `|> steps.step("I add {int} items", add)` becomes
+  `|> steps.when_("I add {int} items", add)`. To use one pattern in two
+  phases, register it in each phase.
+- BREAKING: `gherkin/types.StepKeyword` has a new variant, `Asterisk`, for
+  the `*` keyword. A `case` on `StepKeyword` must add a branch for it.
+- BREAKING: `gherkin/steps.find_step` now takes `phase: StepPhase` in place
+  of `keyword: StepKeyword`, for example
+  `find_step(registry, Given, "I have 3 items")` becomes
+  `find_step(registry, GivenPhase, "I have 3 items")`. Resolve an `And`,
+  `But` or `*` step with `types.resolve_phase` first.
+- BREAKING: `gherkin/step_trie.insert` and `gherkin/step_trie.lookup` now
+  take `phase: StepPhase` in place of a keyword `String`, and the trie has
+  no `"*"` wildcard handler. `insert` now returns
+  `Result(StepTrie(handler), String)`: a second handler for the same phase
+  and pattern is an `Error` in place of a silent replacement.
+- BREAKING: A pattern registered two times in one phase is now an error.
+  Before, the second definition replaced the first without a message. Now
+  `given`, `when_` and `then_` keep the first definition and record the
+  error. `find_step` and `validate` return it, and each scenario that uses
+  the registry fails with it, for example
+  `Duplicate step definition: Given "I have {int} items" is already defined. Each pattern can have one definition for each of Given, When and Then.`
+  The same pattern in two phases is not a duplicate.
+- BREAKING: The first step of a Background, and of a Scenario or Scenario
+  Outline when the Background has no steps, must use Given, When or Then.
+  Before, a leading `And` or `But` was matched as a `Given` step. Now a
+  `.feature` file with a leading `And`, `But` or `*` gives a parse error
+  that names the line, for example
+  `line 3: "And a" has no step before it. ...`. An inline feature with a
+  leading `And`, `But` or `*` fails each scenario with the same message
+  before any step runs. When the Background has steps, a Scenario can start
+  with `And`, `But` or `*`: the step takes the phase of the last Background
+  step.
+- `gherkin/parser.parse_file` now puts the path at the start of a parse
+  error, for example
+  `test/cart.feature: line 3: "And a" has no step before it. ...`.
+  `gherkin/discover` gives the same error text as before.
+- A step line in a feature description, before the first Background or
+  Scenario, is now description text. Before, a `Given`, `When`, `Then`,
+  `And` or `But` line there was dropped. A `* ` list item in a description
+  stays description text.
 
 ### Fixed
 

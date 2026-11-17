@@ -1,7 +1,9 @@
 import dream_test/gherkin/step_trie
+import dream_test/gherkin/types.{GivenPhase, ThenPhase}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
 import gleam/option.{Some}
+import gleam/result
 
 pub fn tests() {
   describe("Step trie", [
@@ -44,25 +46,22 @@ pub fn tests() {
       },
     ),
     it("lookup finds the most specific pattern and captures typed values", fn() {
-      let trie =
+      use trie <- result.try(
         step_trie.new()
         |> step_trie.insert(
-          keyword: "Given",
-          pattern: "I have an empty cart",
-          handler: "empty",
-        )
-        |> step_trie.insert(
-          keyword: "Given",
+          phase: GivenPhase,
           pattern: "I have {int} items",
           handler: "count",
-        )
-        |> step_trie.insert(
-          keyword: "Then",
-          pattern: "the total is ${float}USD",
-          handler: "total_usd",
-        )
+        ),
+      )
+      use trie <- result.try(step_trie.insert(
+        trie,
+        phase: ThenPhase,
+        pattern: "the total is ${float}USD",
+        handler: "total_usd",
+      ))
 
-      step_trie.lookup(trie, "Then", "the total is $19.99USD")
+      step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
       |> should
       |> be_equal(
         Some(
@@ -72,6 +71,28 @@ pub fn tests() {
         ),
       )
       |> or_fail_with("expected float capture for $19.99USD")
+    }),
+    it("insert rejects a second definition of a pattern in one phase", fn() {
+      use trie <- result.try(
+        step_trie.new()
+        |> step_trie.insert(
+          phase: GivenPhase,
+          pattern: "I have {int} items",
+          handler: "first",
+        ),
+      )
+
+      step_trie.insert(
+        trie,
+        phase: GivenPhase,
+        pattern: "I have {int} items",
+        handler: "second",
+      )
+      |> should
+      |> be_equal(Error(
+        "Duplicate step definition: Given \"I have {int} items\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+      ))
+      |> or_fail_with("expected a duplicate step definition error")
     }),
   ])
 }

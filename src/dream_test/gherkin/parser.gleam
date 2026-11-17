@@ -5,14 +5,20 @@
 //// into runnable tests via `dream_test/gherkin/feature`.
 ////
 //// The parser supports common Gherkin syntax:
-//// Feature / Scenario / Scenario Outline, Background, tags (`@tag`), steps,
-//// DocStrings (`"""`), DataTables (`| ... |`), Examples tables, and comments.
+//// Feature / Scenario / Scenario Outline, Background, tags (`@tag`), steps
+//// (`Given`, `When`, `Then`, `And`, `But` and `*`), DocStrings (`"""`),
+//// DataTables (`| ... |`), Examples tables, and comments.
+////
+//// `And`, `But` and `*` take the phase of the step before them. The first
+//// step of a Background, or of a Scenario or Scenario Outline with no
+//// Background steps before it, must use `Given`, `When` or `Then`. Otherwise
+//// parsing fails with an error that names the line.
 
 import dream_test/file
 import dream_test/gherkin/types.{
   type Background, type ExamplesTable, type Feature, type Scenario, type Step,
-  type StepKeyword, And, Background, But, DataTable, DocString, ExamplesTable,
-  Feature, Given, Scenario, ScenarioOutline, Step, Then, When,
+  type StepKeyword, And, Asterisk, Background, But, DataTable, DocString,
+  ExamplesTable, Feature, Given, Scenario, ScenarioOutline, Step, Then, When,
 }
 import gleam/int
 import gleam/list
@@ -39,7 +45,8 @@ const repeated_doc_string_error = "Step cannot have more than one DocString"
 /// ## Returns
 ///
 /// - `Ok(Feature)`: Successfully parsed feature
-/// - `Error(String)`: Parse error with description
+/// - `Error(String)`: Read error, or parse error that starts with the path
+///   (for example `"test/cart.feature: line 3: ..."`)
 ///
 /// ## Example
 ///
@@ -52,7 +59,7 @@ pub fn parse_file(path path: String) -> Result(Feature, String) {
     Ok(content) ->
       case parse_string(content) {
         Ok(feature) -> Ok(feature_with_source(feature, path))
-        Error(message) -> Error(message)
+        Error(message) -> Error(path <> ": " <> message)
       }
     Error(error) ->
       Error("Failed to read feature file: " <> file.error_to_string(error))
@@ -139,6 +146,8 @@ type ParserState {
     doc_string_indentation: Int,
     in_background: Bool,
     in_scenario_outline: Bool,
+    /// Number of the line the parser reads now, from 1.
+    line_number: Int,
   )
 }
 
@@ -160,6 +169,7 @@ fn initial_state() -> ParserState {
     doc_string_indentation: 0,
     in_background: False,
     in_scenario_outline: False,
+    line_number: 0,
   )
 }
 
@@ -174,7 +184,9 @@ fn parse_lines(
   case lines {
     [] -> finalize_feature(state)
     [line, ..rest] -> {
-      case parse_line(line, state) {
+      let numbered_state =
+        ParserState(..state, line_number: state.line_number + 1)
+      case parse_line(line, numbered_state) {
         Ok(new_state) -> parse_lines(rest, new_state)
         Error(msg) -> Error(msg)
       }
@@ -285,11 +297,12 @@ fn handle_normal_line(
     "Examples:" <> _ -> start_examples(state)
 
     // Steps
-    "Given " <> rest -> parse_step(Given, rest, state)
-    "When " <> rest -> parse_step(When, rest, state)
-    "Then " <> rest -> parse_step(Then, rest, state)
-    "And " <> rest -> parse_step(And, rest, state)
-    "But " <> rest -> parse_step(But, rest, state)
+    "Given " <> rest -> parse_step(Given, rest, trimmed, state)
+    "When " <> rest -> parse_step(When, rest, trimmed, state)
+    "Then " <> rest -> parse_step(Then, rest, trimmed, state)
+    "And " <> rest -> parse_step(And, rest, trimmed, state)
+    "But " <> rest -> parse_step(But, rest, trimmed, state)
+    "* " <> rest -> parse_step(Asterisk, rest, trimmed, state)
 
     // DocString start
     "\"\"\"" <> type_hint ->
@@ -472,13 +485,54 @@ fn build_scenario(
 // Step Parsing
 // ============================================================================
 
+/// A step line before the first Background, Scenario or Scenario Outline is
+/// description text. This keeps a `* ` list in a feature description as
+/// text.
 fn parse_step(
+  keyword: StepKeyword,
+  text: String,
+  line: String,
+  state: ParserState,
+) -> Result(ParserState, String) {
+  case state.in_background, state.current_scenario_name {
+    False, None -> parse_description_or_unknown(line, state)
+    _, _ -> add_step(keyword, text, state)
+  }
+}
+
+/// `And`, `But` and `*` take the phase of the step before them, so they
+/// cannot be the first step when no step comes before them.
+fn add_step(
   keyword: StepKeyword,
   text: String,
   state: ParserState,
 ) -> Result(ParserState, String) {
   let step = Step(keyword: keyword, text: string.trim(text), argument: None)
-  Ok(ParserState(..state, current_steps: [step, ..state.current_steps]))
+  case has_previous_step(state), types.resolve_phase(keyword, None) {
+    False, Error(Nil) -> Error(no_previous_step_error(step, state.line_number))
+    _, _ ->
+      Ok(ParserState(..state, current_steps: [step, ..state.current_steps]))
+  }
+}
+
+/// A step comes before the next step when the current Background or
+/// Scenario has steps, or when a Scenario follows a Background with steps.
+fn has_previous_step(state: ParserState) -> Bool {
+  case state.current_steps, state.in_background, state.background {
+    [_, ..], _, _ -> True
+    [], False, Some(Background(steps: [_, ..])) -> True
+    _, _, _ -> False
+  }
+}
+
+fn no_previous_step_error(step: Step, line_number: Int) -> String {
+  "line "
+  <> int.to_string(line_number)
+  <> ": \""
+  <> types.keyword_to_string(step.keyword)
+  <> " "
+  <> step.text
+  <> "\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then."
 }
 
 // ============================================================================

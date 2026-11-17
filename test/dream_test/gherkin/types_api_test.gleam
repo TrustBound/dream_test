@@ -63,15 +63,22 @@ pub fn tests() {
     }),
 
     it("keyword_to_string names every keyword", fn() {
-      [types.Given, types.When, types.Then, types.And, types.But]
+      [
+        types.Given,
+        types.When,
+        types.Then,
+        types.And,
+        types.But,
+        types.Asterisk,
+      ]
       |> list.map(types.keyword_to_string)
       |> should
-      |> be_equal(["Given", "When", "Then", "And", "But"])
+      |> be_equal(["Given", "When", "Then", "And", "But", "*"])
       |> or_fail_with("each keyword should have its name")
     }),
 
     it("keyword_from_string reads every keyword", fn() {
-      ["Given", "When", "Then", "And", "But"]
+      ["Given", "When", "Then", "And", "But", "*"]
       |> list.map(types.keyword_from_string)
       |> should
       |> be_equal([
@@ -80,8 +87,83 @@ pub fn tests() {
         Some(types.Then),
         Some(types.And),
         Some(types.But),
+        Some(types.Asterisk),
       ])
       |> or_fail_with("each name should give its keyword")
     }),
+
+    it("resolve_keyword resolves * based on previous keyword", fn() {
+      types.resolve_keyword(types.Asterisk, types.When)
+      |> should
+      |> be_equal(types.When)
+      |> or_fail_with("* after When should resolve to When")
+    }),
+
+    it("resolve_phase gives Given, When and Then their own phase", fn() {
+      [types.Given, types.When, types.Then]
+      |> list.map(resolve_phase_after_then)
+      |> should
+      |> be_equal([
+        Ok(types.GivenPhase),
+        Ok(types.WhenPhase),
+        Ok(types.ThenPhase),
+      ])
+      |> or_fail_with("each primary keyword should give its own phase")
+    }),
+
+    it("resolve_phase gives And, But and * the previous phase", fn() {
+      [types.And, types.But, types.Asterisk]
+      |> list.map(resolve_phase_after_then)
+      |> should
+      |> be_equal([
+        Ok(types.ThenPhase),
+        Ok(types.ThenPhase),
+        Ok(types.ThenPhase),
+      ])
+      |> or_fail_with("each conjunction should take the previous phase")
+    }),
+
+    it(
+      "resolve_phase gives Given, When and Then a phase with no previous",
+      fn() {
+        [types.Given, types.When, types.Then]
+        |> list.map(resolve_phase_first)
+        |> should
+        |> be_equal([
+          Ok(types.GivenPhase),
+          Ok(types.WhenPhase),
+          Ok(types.ThenPhase),
+        ])
+        |> or_fail_with("a primary keyword needs no previous phase")
+      },
+    ),
+
+    it("resolve_phase gives And, But and * no phase with no previous", fn() {
+      [types.And, types.But, types.Asterisk]
+      |> list.map(resolve_phase_first)
+      |> should
+      |> be_equal([Error(Nil), Error(Nil), Error(Nil)])
+      |> or_fail_with("a conjunction with no previous step has no phase")
+    }),
+
+    it("phase_to_string names every phase", fn() {
+      [types.GivenPhase, types.WhenPhase, types.ThenPhase]
+      |> list.map(types.phase_to_string)
+      |> should
+      |> be_equal(["Given", "When", "Then"])
+      |> or_fail_with("each phase should have the name of its keyword")
+    }),
   ])
+}
+
+fn resolve_phase_after_then(
+  keyword: types.StepKeyword,
+) -> Result(types.StepPhase, Nil) {
+  types.resolve_phase(keyword, Some(types.ThenPhase))
+}
+
+fn resolve_phase_first(
+  keyword: types.StepKeyword,
+) -> Result(types.StepPhase, Nil) {
+  types.resolve_phase(keyword, None)
 }

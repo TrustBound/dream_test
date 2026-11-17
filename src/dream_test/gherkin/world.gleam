@@ -12,7 +12,7 @@
 ////
 //// ```gleam
 //// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-//// import dream_test/gherkin/steps.{type StepContext, get_float, step}
+//// import dream_test/gherkin/steps.{type StepContext, get_float}
 //// import dream_test/gherkin/world.{get_or, put}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import dream_test/reporters/bdd
@@ -46,9 +46,9 @@
 ////
 //// pub fn register(registry) {
 ////   registry
-////   |> step("I have a balance of ${float}", step_have_balance)
-////   |> step("I withdraw ${float}", step_withdraw)
-////   |> step("my balance should be ${float}", step_balance_is)
+////   |> steps.given("I have a balance of ${float}", step_have_balance)
+////   |> steps.when_("I withdraw ${float}", step_withdraw)
+////   |> steps.then_("my balance should be ${float}", step_balance_is)
 //// }
 ////
 //// pub fn tests() {
@@ -165,7 +165,7 @@ pub fn cleanup(world world: World) -> Nil {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, get_float, step}
+/// import dream_test/gherkin/steps.{type StepContext, get_float}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -199,9 +199,9 @@ pub fn cleanup(world world: World) -> Nil {
 ///
 /// pub fn register(registry) {
 ///   registry
-///   |> step("I have a balance of ${float}", step_have_balance)
-///   |> step("I withdraw ${float}", step_withdraw)
-///   |> step("my balance should be ${float}", step_balance_is)
+///   |> steps.given("I have a balance of ${float}", step_have_balance)
+///   |> steps.when_("I withdraw ${float}", step_withdraw)
+///   |> steps.then_("my balance should be ${float}", step_balance_is)
 /// }
 ///
 /// pub fn tests() {
@@ -248,7 +248,7 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then}
-/// import dream_test/gherkin/steps.{type StepContext, step}
+/// import dream_test/gherkin/steps.{type StepContext}
 /// import dream_test/gherkin/world.{get, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -274,8 +274,8 @@ pub fn put(world world: World, key key: String, value value: a) -> Nil {
 ///
 /// pub fn register(registry) {
 ///   registry
-///   |> step("count is stored", step_store)
-///   |> step("count should be 42", step_count_is_42)
+///   |> steps.given("count is stored", step_store)
+///   |> steps.then_("count should be 42", step_count_is_42)
 /// }
 ///
 /// pub fn tests() {
@@ -320,7 +320,7 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, get_float, step}
+/// import dream_test/gherkin/steps.{type StepContext, get_float}
 /// import dream_test/gherkin/world.{get_or, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -354,9 +354,9 @@ pub fn get(world world: World, key key: String) -> Result(a, String) {
 ///
 /// pub fn register(registry) {
 ///   registry
-///   |> step("I have a balance of ${float}", step_have_balance)
-///   |> step("I withdraw ${float}", step_withdraw)
-///   |> step("my balance should be ${float}", step_balance_is)
+///   |> steps.given("I have a balance of ${float}", step_have_balance)
+///   |> steps.when_("I withdraw ${float}", step_withdraw)
+///   |> steps.then_("my balance should be ${float}", step_balance_is)
 /// }
 ///
 /// pub fn tests() {
@@ -400,7 +400,7 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, step}
+/// import dream_test/gherkin/steps.{type StepContext}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -427,9 +427,9 @@ pub fn get_or(world world: World, key key: String, default default: a) -> a {
 ///
 /// pub fn register(registry) {
 ///   registry
-///   |> step("temp is stored", step_store)
-///   |> step("temp is deleted", step_delete)
-///   |> step("temp should be absent", step_is_absent)
+///   |> steps.given("temp is stored", step_store)
+///   |> steps.when_("temp is deleted", step_delete)
+///   |> steps.then_("temp should be absent", step_is_absent)
 /// }
 ///
 /// pub fn tests() {
@@ -473,7 +473,7 @@ pub fn has(world world: World, key key: String) -> Bool {
 ///
 /// ```gleam
 /// import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-/// import dream_test/gherkin/steps.{type StepContext, step}
+/// import dream_test/gherkin/steps.{type StepContext}
 /// import dream_test/gherkin/world.{delete, has, put}
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
@@ -500,9 +500,9 @@ pub fn has(world world: World, key key: String) -> Bool {
 ///
 /// pub fn register(registry) {
 ///   registry
-///   |> step("temp is stored", step_store)
-///   |> step("temp is deleted", step_delete)
-///   |> step("temp should be absent", step_is_absent)
+///   |> steps.given("temp is stored", step_store)
+///   |> steps.when_("temp is deleted", step_delete)
+///   |> steps.then_("temp should be absent", step_is_absent)
 /// }
 ///
 /// pub fn tests() {

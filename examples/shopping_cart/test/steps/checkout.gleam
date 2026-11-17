@@ -14,7 +14,7 @@ import shopping_cart/types as cart_types
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
-  |> steps.step("I checkout", step_checkout)
+  |> steps.when_("I checkout", step_checkout)
 }
 
 // ============================================================================

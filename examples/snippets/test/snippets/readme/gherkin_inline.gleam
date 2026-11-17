@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int, step}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import gleam/result
@@ -7,11 +7,11 @@ import gleam/result
 pub fn tests() {
   let steps =
     steps.new()
-    |> step("I have {int} items", fn(ctx: StepContext) {
+    |> steps.given("I have {int} items", fn(ctx: StepContext) {
       put(ctx.world, "cart", get_int(ctx.captures, 0) |> result.unwrap(0))
       Ok(succeed())
     })
-    |> step("I add {int} more", fn(ctx: StepContext) {
+    |> steps.when_("I add {int} more", fn(ctx: StepContext) {
       let current = get_or(ctx.world, "cart", 0)
       put(
         ctx.world,
@@ -20,7 +20,7 @@ pub fn tests() {
       )
       Ok(succeed())
     })
-    |> step("I should have {int} items", fn(ctx: StepContext) {
+    |> steps.then_("I should have {int} items", fn(ctx: StepContext) {
       get_or(ctx.world, "cart", 0)
       |> should
       |> be_equal(get_int(ctx.captures, 0) |> result.unwrap(0))

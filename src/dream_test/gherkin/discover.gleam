@@ -10,7 +10,7 @@
 ////
 //// ```gleam
 //// import dream_test/gherkin/discover
-//// import dream_test/gherkin/steps.{type StepContext, get_int, step}
+//// import dream_test/gherkin/steps.{type StepContext, get_int}
 //// import dream_test/gherkin/world.{get_or, put}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import gleam/result
@@ -44,10 +44,10 @@
 ////   // Define step handlers
 ////   let steps =
 ////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     |> steps.given("the server is running", step_server_running)
+////     |> steps.given("the cart is empty", step_empty_cart)
+////     |> steps.when_("I add {int} items", step_add_items)
+////     |> steps.then_("the cart should have {int} items", step_verify_count)
 ////
 ////   // Discover and load all .feature files
 ////   discover.features("test/*.feature")
@@ -159,10 +159,10 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 /// // Define step handlers
 /// let steps =
 ///   steps.new()
-///   |> step("the server is running", step_server_running)
-///   |> step("the cart is empty", step_empty_cart)
-///   |> step("I add {int} items", step_add_items)
-///   |> step("the cart should have {int} items", step_verify_count)
+///   |> steps.given("the server is running", step_server_running)
+///   |> steps.given("the cart is empty", step_empty_cart)
+///   |> steps.when_("I add {int} items", step_add_items)
+///   |> steps.then_("the cart should have {int} items", step_verify_count)
 ///
 /// // Discover and load all .feature files
 /// discover.features("test/*.feature")
@@ -330,8 +330,10 @@ fn parse_into(parsed: ParsedFeatures, path: String) -> ParsedFeatures {
   }
 }
 
+/// `parser.parse_file` puts the path at the start of a parse error, and a
+/// read error names the path, so the message is complete.
 fn format_parse_failure(failure: ParseFailure) -> String {
-  failure.path <> ": " <> failure.message
+  failure.message
 }
 
 fn error_to_node(failure: ParseFailure) -> Node(Nil) {

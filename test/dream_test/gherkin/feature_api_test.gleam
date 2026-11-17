@@ -275,6 +275,152 @@ pub fn tests() {
       |> be_equal([test_types.Passed])
       |> or_fail_with("a hand-built Then step should match the Then handler")
     }),
+    it("asterisk builds an InlineStep with the Asterisk keyword", fn() {
+      gfeature.asterisk("I pack a passport")
+      |> should
+      |> be_equal(gfeature.InlineStep(
+        keyword: gherkin_types.Asterisk,
+        text: "I pack a passport",
+      ))
+      |> or_fail_with("asterisk should use the Asterisk keyword")
+    }),
+
+    it("a * step runs the handler of the phase before it", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("a trip", gherkin_step_ok)
+        |> steps.given("I pack a passport", gherkin_step_ok)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [
+            gfeature.given("a trip"),
+            gfeature.asterisk("I pack a passport"),
+          ]),
+        ])
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(fn(result) { result.status })
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("a * step after Given should match a Given handler")
+    }),
+
+    it(
+      "a scenario that starts with And continues the last Background step",
+      fn() {
+        let registry =
+          steps.new()
+          |> steps.given("a base", gherkin_step_ok)
+          |> steps.given("another base", gherkin_step_ok)
+        let suite =
+          gfeature.feature_with_background(
+            "F",
+            registry,
+            gfeature.background([gfeature.given("a base")]),
+            [gfeature.scenario("S", [gfeature.and("another base")])],
+          )
+
+        runner.new([suite])
+        |> runner.run()
+        |> list.map(fn(result) { result.status })
+        |> should
+        |> be_equal([test_types.Passed])
+        |> or_fail_with("a leading And should take the Given phase")
+      },
+    ),
+
+    it("a parsed scenario that starts with And continues the Background", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("a base", gherkin_step_ok)
+        |> steps.given("another base", gherkin_step_ok)
+
+      run_parsed(
+        "Feature: F\nBackground:\n  Given a base\nScenario: S\n  And another base\n",
+        registry,
+      )
+      |> list.map(fn(result) { result.status })
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("a leading And should take the Given phase")
+    }),
+
+    it("an inline scenario that starts with And fails with no Background", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("a base", gherkin_step_ok)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.and("a base")]),
+        ])
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(fn(result) { result.failures })
+      |> should
+      |> be_equal([
+        [
+          test_types.AssertionFailure(
+            operator: "step",
+            message: "\"And a base\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+            payload: None,
+          ),
+        ],
+      ])
+      |> or_fail_with("a leading And should fail the scenario")
+    }),
+
+    it("an inline Background that starts with But fails the scenario", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("a base", gherkin_step_ok)
+      let suite =
+        gfeature.feature_with_background(
+          "F",
+          registry,
+          gfeature.background([gfeature.but("a base")]),
+          [gfeature.scenario("S", [gfeature.given("a base")])],
+        )
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(fn(result) { result.failures })
+      |> should
+      |> be_equal([
+        [
+          test_types.AssertionFailure(
+            operator: "step",
+            message: "\"But a base\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+            payload: None,
+          ),
+        ],
+      ])
+      |> or_fail_with("a leading But in a Background should fail the scenario")
+    }),
+
+    it("a registry with a duplicate step definition fails every scenario", fn() {
+      let registry =
+        steps.new()
+        |> steps.then_("it works", gherkin_step_ok)
+        |> steps.then_("it works", gherkin_step_ok)
+      let suite = gfeature.feature("F", registry, [gfeature.scenario("S", [])])
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(fn(result) { result.failures })
+      |> should
+      |> be_equal([
+        [
+          test_types.AssertionFailure(
+            operator: "step",
+            message: "Duplicate step definition: Then \"it works\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+            payload: None,
+          ),
+        ],
+      ])
+      |> or_fail_with("a duplicate should fail a scenario with no steps too")
+    }),
   ])
 }
 

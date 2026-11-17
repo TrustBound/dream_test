@@ -23,17 +23,17 @@ fn no_checkout_result_message(_e: e) -> String {
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
-  |> steps.step("the cart should contain {int} items", step_verify_item_count)
-  |> steps.step("the subtotal should be ${float}", step_verify_subtotal)
-  |> steps.step("the discount should be ${float}", step_verify_discount)
-  |> steps.step("the total should be ${float}", step_verify_total)
-  |> steps.step("the checkout should succeed", step_verify_checkout_success)
-  |> steps.step(
+  |> steps.then_("the cart should contain {int} items", step_verify_item_count)
+  |> steps.then_("the subtotal should be ${float}", step_verify_subtotal)
+  |> steps.then_("the discount should be ${float}", step_verify_discount)
+  |> steps.then_("the total should be ${float}", step_verify_total)
+  |> steps.then_("the checkout should succeed", step_verify_checkout_success)
+  |> steps.then_(
     "the checkout should fail with {string}",
     step_verify_checkout_failure,
   )
-  |> steps.step("the order total should be ${float}", step_verify_order_total)
-  |> steps.step(
+  |> steps.then_("the order total should be ${float}", step_verify_order_total)
+  |> steps.then_(
     "the operation should fail with {string}",
     step_verify_operation_failure,
   )

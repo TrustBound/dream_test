@@ -45,8 +45,8 @@ If your tests are mostly “function input → output”, the unit DSL (`describ
 ### The core pieces
 
 - **Feature**: a suite of scenarios
-- **Scenario**: a list of steps (Given/When/Then/And/But)
-- **Step registry**: maps step patterns to handlers
+- **Scenario**: a list of steps (Given/When/Then/And/But/`*`)
+- **Step registry**: maps step patterns to handlers, one phase (Given, When or Then) for each definition
 - **World**: per-scenario state (isolated between scenarios)
 - **Captures**: placeholder values parsed from step text
 
@@ -66,7 +66,7 @@ That’s why the examples annotate `context: StepContext` (it’s the minimal ty
 
 ```gleam
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int, step}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -98,9 +98,9 @@ fn step_should_have(context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new()
-    |> step("I have {int} items in my cart", step_have_items)
-    |> step("I add {int} more items", step_add_items)
-    |> step("I should have {int} items total", step_should_have)
+    |> steps.given("I have {int} items in my cart", step_have_items)
+    |> steps.when_("I add {int} more items", step_add_items)
+    |> steps.then_("I should have {int} items total", step_should_have)
 
   feature("Shopping Cart", steps, [
     scenario("Adding items to cart", [
@@ -137,7 +137,7 @@ Typed helpers like `get_int` parse the capture into the right type.
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, get_float, get_int, get_string, get_word, step,
+  type StepContext, get_float, get_int, get_string, get_word,
 }
 import dream_test/gherkin/world.{put}
 import dream_test/matchers.{succeed}
@@ -181,11 +181,11 @@ fn step_pass(_context) {
 pub fn tests() {
   let steps =
     steps.new()
-    |> step("I have {int} items", step_int)
-    |> step("the price is ${float}", step_float)
-    |> step("the message is {string}", step_string)
-    |> step("the user is {word}", step_word)
-    |> step("everything works", step_pass)
+    |> steps.given("I have {int} items", step_int)
+    |> steps.given("the price is ${float}", step_float)
+    |> steps.given("the message is {string}", step_string)
+    |> steps.given("the user is {word}", step_word)
+    |> steps.then_("everything works", step_pass)
 
   feature("Placeholder Types", steps, [
     scenario("Using different placeholders", [
@@ -204,6 +204,86 @@ pub fn main() {
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
+}
+```
+
+### Phases: Given, When, Then, And, But and `*`
+
+Given, When and Then are the three phases of a scenario: Arrange, Act and Assert.
+Each step definition belongs to one phase. Register it with `steps.given`, `steps.when_` or `steps.then_`.
+A step matches only the step definitions of its phase, so a `Given` definition never runs for a `When` step.
+
+`And`, `But` and `*` take the phase of the step before them.
+Use `*` (the `asterisk` helper in the inline DSL) for a list of steps where Given, When or Then reads badly.
+
+Rules for the first step:
+
+- The first step of a Background must use Given, When or Then.
+- The first step of a Scenario or Scenario Outline must use Given, When or Then, unless the Background has steps.
+- When the Background has steps, a Scenario can start with `And`, `But` or `*`. That step takes the phase of the last Background step.
+
+A `.feature` file that breaks these rules does not parse. The error names the file and the line.
+An inline feature that breaks these rules fails each scenario with the same message, before any step runs.
+
+Each pattern can have one step definition in each phase.
+A second definition of the same pattern in the same phase is a duplicate.
+`steps.validate` returns the duplicates, and each scenario that uses the registry fails with them.
+The same pattern in two phases is not a duplicate.
+
+#### Phases and `*` steps <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_phases.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/gherkin/feature.{
+  and, asterisk, background, feature_with_background, given, scenario, then,
+  when,
+}
+import dream_test/gherkin/steps.{type StepContext}
+import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+
+fn step_trip(context: StepContext) {
+  put(context.world, "bag", 0)
+  Ok(succeed())
+}
+
+fn step_pack(context: StepContext) {
+  put(context.world, "bag", get_or(context.world, "bag", 0) + 1)
+  Ok(succeed())
+}
+
+fn step_close_bag(_context: StepContext) {
+  Ok(succeed())
+}
+
+fn step_bag_has_two(context: StepContext) {
+  get_or(context.world, "bag", 0)
+  |> should
+  |> be_equal(2)
+  |> or_fail_with("expected two things in the bag")
+}
+
+pub fn tests() {
+  let steps =
+    steps.new()
+    |> steps.given("I plan a trip", step_trip)
+    |> steps.given("I pack a passport", step_pack)
+    |> steps.given("I pack a toothbrush", step_pack)
+    |> steps.when_("I close the bag", step_close_bag)
+    |> steps.then_("the bag has 2 things", step_bag_has_two)
+
+  feature_with_background(
+    "Packing",
+    steps,
+    background([given("I plan a trip")]),
+    [
+      scenario("Packing for a trip", [
+        and("I pack a passport"),
+        asterisk("I pack a toothbrush"),
+        when("I close the bag"),
+        then("the bag has 2 things"),
+      ]),
+    ],
+  )
 }
 ```
 
@@ -243,7 +323,7 @@ Feature: Shopping Cart
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int, step}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -280,10 +360,10 @@ pub fn tests() {
   // Define step handlers
   let steps =
     steps.new()
-    |> step("the server is running", step_server_running)
-    |> step("the cart is empty", step_empty_cart)
-    |> step("I add {int} items", step_add_items)
-    |> step("the cart should have {int} items", step_verify_count)
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when_("I add {int} items", step_add_items)
+    |> steps.then_("the cart should have {int} items", step_verify_count)
 
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -310,7 +390,7 @@ Use discovery when you want real `.feature` files (e.g. written by QA or copied 
 
 ```gleam
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{type StepContext, get_int, step}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/gherkin/world.{get_or, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -347,10 +427,10 @@ pub fn tests() {
   // Define step handlers
   let steps =
     steps.new()
-    |> step("the server is running", step_server_running)
-    |> step("the cart is empty", step_empty_cart)
-    |> step("I add {int} items", step_add_items)
-    |> step("the cart should have {int} items", step_verify_count)
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when_("I add {int} items", step_add_items)
+    |> steps.then_("the cart should have {int} items", step_verify_count)
 
   // Discover and load all .feature files
   discover.features("test/*.feature")

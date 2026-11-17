@@ -1,7 +1,7 @@
 import dream_test/discover
 import dream_test/file
 import dream_test/gherkin/discover as gherkin_discover
-import dream_test/gherkin/steps.{type StepContext, new, step}
+import dream_test/gherkin/steps.{type StepContext, new}
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{
@@ -301,7 +301,7 @@ pub fn tests() {
 
       let registry =
         new()
-        |> step("ok", step_ok)
+        |> steps.given("ok", step_ok)
 
       let suite =
         gherkin_discover.features(feature_path)

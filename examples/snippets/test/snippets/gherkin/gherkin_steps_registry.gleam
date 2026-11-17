@@ -1,7 +1,9 @@
+import dream_test/gherkin/step_trie.{type StepMatch}
 import dream_test/gherkin/steps.{
-  type StepContext, capture_count, find_step, get_int, given, then_, when_,
+  type StepContext, type StepHandler, capture_count, find_step, get_int, given,
+  then_, validate, when_,
 }
-import dream_test/gherkin/types.{Given, Then, When}
+import dream_test/gherkin/types.{GivenPhase, ThenPhase, WhenPhase}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/unit.{describe, it}
 import gleam/result
@@ -15,7 +17,11 @@ pub fn tests() {
     it("can find a step and count captures", fn() {
       let registry = steps.new() |> given("I have {int} items", step_pass)
 
-      use matched <- result.try(find_step(registry, Given, "I have 3 items"))
+      use matched <- result.try(find_step(
+        registry,
+        GivenPhase,
+        "I have 3 items",
+      ))
 
       capture_count(matched.captures)
       |> should
@@ -25,7 +31,11 @@ pub fn tests() {
     it("can extract an int capture", fn() {
       let registry = steps.new() |> given("I have {int} items", step_pass)
 
-      use matched <- result.try(find_step(registry, Given, "I have 3 items"))
+      use matched <- result.try(find_step(
+        registry,
+        GivenPhase,
+        "I have 3 items",
+      ))
       use count <- result.try(get_int(matched.captures, 0))
 
       count
@@ -36,7 +46,7 @@ pub fn tests() {
     it("registers a When step", fn() {
       let registry = steps.new() |> when_("I add {int} items", step_pass)
 
-      use _matched <- result.try(find_step(registry, When, "I add 2 items"))
+      use _matched <- result.try(find_step(registry, WhenPhase, "I add 2 items"))
       Ok(succeed())
     }),
     it("registers a Then step", fn() {
@@ -45,10 +55,43 @@ pub fn tests() {
 
       use _matched <- result.try(find_step(
         registry,
-        Then,
+        ThenPhase,
         "I should have 5 items",
       ))
       Ok(succeed())
     }),
+    it("a Given step definition does not match a When step", fn() {
+      let registry = steps.new() |> given("I add {int} items", step_pass)
+
+      find_step(registry, WhenPhase, "I add 2 items")
+      |> result.map(capture_count_of)
+      |> should
+      |> be_equal(Error("Undefined step: When I add 2 items"))
+      |> or_fail_with("expected the Given definition not to match")
+    }),
+    it("validate reports a pattern defined twice in one phase", fn() {
+      steps.new()
+      |> given("I have {int} items", step_pass)
+      |> given("I have {int} items", step_pass)
+      |> validate
+      |> should
+      |> be_equal(Error(
+        "Duplicate step definition: Given \"I have {int} items\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+      ))
+      |> or_fail_with("expected a duplicate step definition error")
+    }),
+    it("validate accepts one pattern in two phases", fn() {
+      steps.new()
+      |> given("everything is fine", step_pass)
+      |> then_("everything is fine", step_pass)
+      |> validate
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("expected one pattern in two phases to be valid")
+    }),
   ])
+}
+
+fn capture_count_of(matched: StepMatch(StepHandler)) -> Int {
+  capture_count(matched.captures)
 }

@@ -450,7 +450,113 @@ pub fn tests() {
       |> be_equal(Ok(Some(gtypes.ExamplesTable(headers: ["n"], rows: [["1"]]))))
       |> or_fail_with("a named Examples should hold its table")
     }),
+    it("parse_string reads a * step", fn() {
+      parser.parse_string(
+        "Feature: F\nScenario: S\n  Given a\n  * I pack a passport\n",
+      )
+      |> result.map(first_scenario_steps)
+      |> should
+      |> be_equal(
+        Ok([
+          gtypes.Step(keyword: gtypes.Given, text: "a", argument: None),
+          gtypes.Step(
+            keyword: gtypes.Asterisk,
+            text: "I pack a passport",
+            argument: None,
+          ),
+        ]),
+      )
+      |> or_fail_with("a * line should be a step with the Asterisk keyword")
+    }),
+
+    it("parse_string rejects a Scenario that starts with And", fn() {
+      parser.parse_string("Feature: F\nScenario: S\n  And a\n")
+      |> should
+      |> be_equal(Error(
+        "line 3: \"And a\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("a leading And with no Background should be an error")
+    }),
+
+    it("parse_string rejects a Scenario that starts with *", fn() {
+      parser.parse_string("Feature: F\nScenario: S\n  * a\n")
+      |> should
+      |> be_equal(Error(
+        "line 3: \"* a\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("a leading * with no Background should be an error")
+    }),
+
+    it("parse_string rejects a Scenario Outline that starts with But", fn() {
+      parser.parse_string("Feature: F\nScenario Outline: O\n  But <n>\n")
+      |> should
+      |> be_equal(Error(
+        "line 3: \"But <n>\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("a leading But in an outline should be an error")
+    }),
+
+    it("parse_string rejects a Background that starts with And", fn() {
+      parser.parse_string(
+        "Feature: F\nBackground:\n  And a\nScenario: S\n  Given b\n",
+      )
+      |> should
+      |> be_equal(Error(
+        "line 3: \"And a\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("a leading And in a Background should be an error")
+    }),
+
+    it("parse_string rejects a leading And after an empty Background", fn() {
+      parser.parse_string("Feature: F\nBackground:\nScenario: S\n  And a\n")
+      |> should
+      |> be_equal(Error(
+        "line 4: \"And a\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("an empty Background has no step to continue")
+    }),
+
+    it(
+      "parse_string accepts a Scenario that starts with And after a Background step",
+      fn() {
+        parser.parse_string(
+          "Feature: F\nBackground:\n  Given a\nScenario: S\n  And b\n",
+        )
+        |> result.map(first_scenario_steps)
+        |> should
+        |> be_equal(
+          Ok([gtypes.Step(keyword: gtypes.And, text: "b", argument: None)]),
+        )
+        |> or_fail_with("a leading And should continue the Background")
+      },
+    ),
+
+    it("parse_string keeps a * line in the feature description", fn() {
+      parser.parse_string(
+        "Feature: F\n  * a list item\nScenario: S\n  Given a\n",
+      )
+      |> result.map(description_of)
+      |> should
+      |> be_equal(Ok(Some("* a list item")))
+      |> or_fail_with("a * line before any scenario should be description")
+    }),
+
+    it("parse_file puts the path at the start of a parse error", fn() {
+      let path = "./test/tmp/features/parser_api_leading_and.feature"
+      let _ = file.write(path, "Feature: F\nScenario: S\n  And a\n")
+
+      parser.parse_file(path)
+      |> should
+      |> be_equal(Error(
+        "./test/tmp/features/parser_api_leading_and.feature: line 3: \"And a\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
+      ))
+      |> or_fail_with("a parse error from a file should name the file and line")
+    }),
   ])
+}
+
+fn description_of(feature: gtypes.Feature) -> Option(String) {
+  feature.description
 }
 
 fn first_scenario_steps(feature: gtypes.Feature) -> List(gtypes.Step) {

@@ -1,7 +1,8 @@
 import dream_test/gherkin/types.{
-  And, Background, DataTable, DocString, ExamplesTable, Feature, Given, Scenario,
-  ScenarioOutline, Step, Then, empty_background, empty_examples,
-  keyword_from_string, keyword_to_string, resolve_keyword,
+  And, Asterisk, Background, DataTable, DocString, ExamplesTable, Feature, Given,
+  GivenPhase, Scenario, ScenarioOutline, Step, Then, WhenPhase, empty_background,
+  empty_examples, keyword_from_string, keyword_to_string, phase_to_string,
+  resolve_keyword, resolve_phase,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
@@ -26,6 +27,24 @@ pub fn tests() {
       |> should
       |> be_equal(Given)
       |> or_fail_with("expected And after Given to resolve to Given")
+    }),
+    it("resolve_phase gives And the phase of the step before it", fn() {
+      resolve_phase(keyword: And, previous: Some(GivenPhase))
+      |> should
+      |> be_equal(Ok(GivenPhase))
+      |> or_fail_with("expected And after Given to be a Given step")
+    }),
+    it("resolve_phase gives no phase to a * step with no step before it", fn() {
+      resolve_phase(keyword: Asterisk, previous: None)
+      |> should
+      |> be_equal(Error(Nil))
+      |> or_fail_with("expected a leading * step to have no phase")
+    }),
+    it("phase_to_string names the phase", fn() {
+      phase_to_string(WhenPhase)
+      |> should
+      |> be_equal("When")
+      |> or_fail_with("expected When")
     }),
     it("Step can be constructed", fn() {
       Step(keyword: Given, text: "I have 1 item", argument: None)

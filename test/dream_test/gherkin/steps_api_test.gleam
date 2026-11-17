@@ -4,6 +4,7 @@ import dream_test/gherkin/types as gtypes
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
+import gleam/result
 
 pub fn tests() {
   describe("dream_test/gherkin/steps", [
@@ -15,7 +16,7 @@ pub fn tests() {
 
       // Act
       let result =
-        steps.find_step(registry, gtypes.Given, "I have 3 items of apples")
+        steps.find_step(registry, gtypes.GivenPhase, "I have 3 items of apples")
 
       // Assert
       case result {
@@ -36,7 +37,7 @@ pub fn tests() {
 
       // Act
       let result =
-        steps.find_step(registry, gtypes.Given, "I have 3 items of apples")
+        steps.find_step(registry, gtypes.GivenPhase, "I have 3 items of apples")
 
       // Assert
       case result {
@@ -57,7 +58,7 @@ pub fn tests() {
 
       // Act
       let result =
-        steps.find_step(registry, gtypes.Given, "I have 3 items of apples")
+        steps.find_step(registry, gtypes.GivenPhase, "I have 3 items of apples")
 
       // Assert
       case result {
@@ -77,7 +78,8 @@ pub fn tests() {
         |> steps.given("I say {string}", steps_test_handler)
 
       // Act
-      let result = steps.find_step(registry, gtypes.Given, "I say \"hello\"")
+      let result =
+        steps.find_step(registry, gtypes.GivenPhase, "I say \"hello\"")
 
       // Assert
       case result {
@@ -92,7 +94,7 @@ pub fn tests() {
 
     it("find_step returns Error for undefined steps", fn() {
       let registry = steps.new()
-      case steps.find_step(registry, gtypes.Given, "I do not exist") {
+      case steps.find_step(registry, gtypes.GivenPhase, "I do not exist") {
         Ok(_) -> Ok(fail_with("expected undefined step error"))
         Error(_msg) -> Ok(test_types.AssertionOk)
       }
@@ -106,25 +108,66 @@ pub fn tests() {
       }
     }),
 
-    it("find_step names an And step in the undefined step error", fn() {
-      steps.find_step(steps.new(), gtypes.And, "x")
+    it("find_step names a Then step in the undefined step error", fn() {
+      steps.find_step(steps.new(), gtypes.ThenPhase, "x")
       |> should
-      |> be_equal(Error("Undefined step: And x"))
-      |> or_fail_with("the error should name the And keyword")
-    }),
-
-    it("find_step names a But step in the undefined step error", fn() {
-      steps.find_step(steps.new(), gtypes.But, "x")
-      |> should
-      |> be_equal(Error("Undefined step: But x"))
-      |> or_fail_with("the error should name the But keyword")
+      |> be_equal(Error("Undefined step: Then x"))
+      |> or_fail_with("the error should name the Then phase")
     }),
 
     it("find_step names a When step in the undefined step error", fn() {
-      steps.find_step(steps.new(), gtypes.When, "x")
+      steps.find_step(steps.new(), gtypes.WhenPhase, "x")
       |> should
       |> be_equal(Error("Undefined step: When x"))
-      |> or_fail_with("the error should name the When keyword")
+      |> or_fail_with("the error should name the When phase")
+    }),
+
+    it("find_step does not match a definition of another phase", fn() {
+      steps.new()
+      |> steps.given("a b", steps_test_handler)
+      |> steps.find_step(gtypes.ThenPhase, "a b")
+      |> result.map(capture_count_of)
+      |> should
+      |> be_equal(Error("Undefined step: Then a b"))
+      |> or_fail_with("a Given definition should not match a Then step")
+    }),
+
+    it("find_step returns the duplicate step definition error", fn() {
+      steps.new()
+      |> steps.given("a b", steps_test_handler)
+      |> steps.given("a b", steps_test_handler)
+      |> steps.find_step(gtypes.GivenPhase, "a b")
+      |> result.map(capture_count_of)
+      |> should
+      |> be_equal(Error(
+        "Duplicate step definition: Given \"a b\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+      ))
+      |> or_fail_with("a duplicate should make find_step fail")
+    }),
+
+    it("validate returns Ok for a registry without duplicates", fn() {
+      steps.new()
+      |> steps.given("a b", steps_test_handler)
+      |> steps.when_("a b", steps_test_handler)
+      |> steps.then_("a b", steps_test_handler)
+      |> steps.validate
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("one pattern in three phases is not a duplicate")
+    }),
+
+    it("validate gives one line for each duplicate in registration order", fn() {
+      steps.new()
+      |> steps.given("a b", steps_test_handler)
+      |> steps.given("a b", steps_test_handler)
+      |> steps.then_("c", steps_test_handler)
+      |> steps.then_("c", steps_test_handler)
+      |> steps.validate
+      |> should
+      |> be_equal(Error(
+        "Duplicate step definition: Given \"a b\" is already defined. Each pattern can have one definition for each of Given, When and Then.\nDuplicate step definition: Then \"c\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+      ))
+      |> or_fail_with("each duplicate should have its own line")
     }),
 
     it("get_int returns Error for a capture that is not an int", fn() {
@@ -203,4 +246,8 @@ fn steps_test_handler(
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
+}
+
+fn capture_count_of(matched: step_trie.StepMatch(steps.StepHandler)) -> Int {
+  steps.capture_count(matched.captures)
 }

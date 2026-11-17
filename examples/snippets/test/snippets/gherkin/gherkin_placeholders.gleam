@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, get_float, get_int, get_string, get_word, step,
+  type StepContext, get_float, get_int, get_string, get_word,
 }
 import dream_test/gherkin/world.{put}
 import dream_test/matchers.{succeed}
@@ -44,11 +44,11 @@ fn step_pass(_context) {
 pub fn tests() {
   let steps =
     steps.new()
-    |> step("I have {int} items", step_int)
-    |> step("the price is ${float}", step_float)
-    |> step("the message is {string}", step_string)
-    |> step("the user is {word}", step_word)
-    |> step("everything works", step_pass)
+    |> steps.given("I have {int} items", step_int)
+    |> steps.given("the price is ${float}", step_float)
+    |> steps.given("the message is {string}", step_string)
+    |> steps.given("the user is {word}", step_word)
+    |> steps.then_("everything works", step_pass)
 
   feature("Placeholder Types", steps, [
     scenario("Using different placeholders", [

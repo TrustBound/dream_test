@@ -18,8 +18,8 @@ import shopping_cart/types as cart_types
 
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
-  |> steps.step("I apply a {int}% discount", step_apply_percent_discount)
-  |> steps.step("I apply a ${float} discount", step_apply_fixed_discount)
+  |> steps.when_("I apply a {int}% discount", step_apply_percent_discount)
+  |> steps.when_("I apply a ${float} discount", step_apply_fixed_discount)
 }
 
 // ============================================================================

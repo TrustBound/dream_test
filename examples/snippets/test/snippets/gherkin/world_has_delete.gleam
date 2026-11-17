@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, step}
+import dream_test/gherkin/steps.{type StepContext}
 import dream_test/gherkin/world.{delete, has, put}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
@@ -25,9 +25,9 @@ fn step_is_absent(context: StepContext) {
 
 pub fn register(registry) {
   registry
-  |> step("temp is stored", step_store)
-  |> step("temp is deleted", step_delete)
-  |> step("temp should be absent", step_is_absent)
+  |> steps.given("temp is stored", step_store)
+  |> steps.when_("temp is deleted", step_delete)
+  |> steps.then_("temp should be absent", step_is_absent)
 }
 
 pub fn tests() {
