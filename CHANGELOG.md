@@ -67,6 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     measured file, because older versions map only the first line of each
     function to its source line. The warning does not fail the run
 
+- **Coverage badge** (`.github/workflows/ci.yml`, `README.md`,
+  `documentation/12-coverage-badge.md`)
+
+  - A push to `main` publishes the coverage total to `coverage.json` on the
+    `badges` branch. The README shows it as a shields.io badge, with the
+    colour rule of the coverage table
+  - The CI coverage run writes its JSON summary to
+    `build/coverage/coverage.json`
+  - A new guide shows how to set up the same badge in your own repository
+
 ### Changed
 
 - **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)

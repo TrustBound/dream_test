@@ -256,6 +256,7 @@ pub fn tests() {
 ### What's Next?
 
 - Go back to [Gherkin / BDD testing](10-gherkin-bdd.md)
+- Go on to [Coverage badge on GitHub](12-coverage-badge.md)
 - Go back to [Documentation README](README.md)
 - Jump to the API reference on Hexdocs: [Dream Test on Hexdocs](https://hexdocs.pm/dream_test/)
 

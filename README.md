@@ -9,6 +9,9 @@
   <a href="https://hexdocs.pm/dream_test/">
     <img src="https://img.shields.io/badge/docs-hexdocs-8e4bff" alt="Documentation">
   </a>
+  <a href="https://github.com/TrustBound/dream_test/actions/workflows/ci.yml?query=branch%3Amain">
+    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/TrustBound/dream_test/badges/coverage.json" alt="Coverage">
+  </a>
   <a href="https://github.com/TrustBound/dream_test/blob/main/LICENSE.md">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   </a>
@@ -498,6 +501,10 @@ fn coverage_table() -> String {
 ### Errors
 
 Every coverage error fails the run. The runner prints the error under `Coverage failed`, with what failed, the reason and the fix. Coverage measures one run per BEAM instance.
+
+### Coverage badge
+
+To show a live coverage badge in your README, see [Coverage badge on GitHub](documentation/12-coverage-badge.md). Your own CI writes the badge file to a `badges` branch, and shields.io draws it. No outside coverage service is needed.
 
 ### Line accuracy (Gleam 1.19)
 

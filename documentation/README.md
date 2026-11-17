@@ -39,6 +39,7 @@ That’s why you’ll see the same patterns repeated:
 9. [Snapshot testing](09-snapshot-testing.md) — when snapshots make tests clearer (and when they make them worse).
 10. [Gherkin / BDD](10-gherkin-bdd.md) — scenario testing with a world state and placeholder captures.
 11. [Utilities](11-utilities.md) — small helpers that make tests less repetitive and more reliable.
+12. [Coverage badge on GitHub](12-coverage-badge.md) — a live coverage badge from your own CI, with no outside service.
 
 ### If you only need one thing…
 

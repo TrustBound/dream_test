@@ -24,7 +24,8 @@ pub fn main() {
   |> runner.coverage(
     coverage.new()
     |> coverage.show_missing()
-    |> coverage.merge_lcov("build/coverage/parts/*.info"),
+    |> coverage.merge_lcov("build/coverage/parts/*.info")
+    |> coverage.json_path("build/coverage/coverage.json"),
   )
   |> runner.exit_on_failure()
   |> runner.run()
