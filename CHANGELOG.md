@@ -120,6 +120,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gherkin/discover.to_suite` now gives the full file path as the source of
   a parse error test. Before, it cut the path at the first `": "`, so a
   path such as `features/a: b.feature` gave the source `features/a`.
+- The Gherkin parser now gives the error
+  `Step cannot have more than one DocString` for a step with two
+  DocStrings. Before, it kept the second DocString and dropped the first
+  without a message.
+- The Gherkin parser now removes the indentation of the opening `"""` from
+  each DocString line, as standard Gherkin does. A line with less
+  indentation loses only the indentation it has. Before, each line kept
+  all its indentation, so a DocString inside an indented step started with
+  spaces.
+- The Gherkin parser now reads `Background: <name>` and `Examples: <name>`.
+  Before, it read only `Background:` and `Examples:` with no name. With a
+  name, the parser ignored the line, so the background steps went to no
+  background and the Examples rows went to no table. The name is not kept,
+  because `Background` and `ExamplesTable` have no field for it.
 - The BDD reporter without colour now writes the skipped, pending, timed out
   and setup failed counts of its summary as plain text. Before, it put ANSI
   colour codes around these counts, also when colour was off.

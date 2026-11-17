@@ -14,12 +14,15 @@ import dream_test/gherkin/types.{
   type StepKeyword, And, Background, But, DataTable, DocString, ExamplesTable,
   Feature, Given, Scenario, ScenarioOutline, Step, Then, When,
 }
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 
 const step_argument_conflict_error =
   "Step cannot have both a DataTable and a DocString"
+
+const repeated_doc_string_error = "Step cannot have more than one DocString"
 
 // ============================================================================
 // Public API
@@ -131,6 +134,9 @@ type ParserState {
     in_doc_string: Bool,
     doc_string_content: List(String),
     doc_string_type: Option(String),
+    /// Number of whitespace characters before the opening `"""`. Each
+    /// content line loses up to this many leading whitespace characters.
+    doc_string_indentation: Int,
     in_background: Bool,
     in_scenario_outline: Bool,
   )
@@ -151,6 +157,7 @@ fn initial_state() -> ParserState {
     in_doc_string: False,
     doc_string_content: [],
     doc_string_type: None,
+    doc_string_indentation: 0,
     in_background: False,
     in_scenario_outline: False,
   )
@@ -181,7 +188,7 @@ fn parse_line(line: String, state: ParserState) -> Result(ParserState, String) {
   // Handle doc string mode
   case state.in_doc_string {
     True -> handle_doc_string_line(trimmed, line, state)
-    False -> handle_normal_line(trimmed, state)
+    False -> handle_normal_line(trimmed, line, state)
   }
 }
 
@@ -204,7 +211,8 @@ fn close_doc_string(state: ParserState) -> Result(ParserState, String) {
   // Attach to the most recent step (head of list, since steps are prepended)
   case state.current_steps {
     [Step(_, _, Some(DataTable(_))), ..] -> Error(step_argument_conflict_error)
-    [Step(keyword, text, _), ..rest] -> {
+    [Step(_, _, Some(DocString(..))), ..] -> Error(repeated_doc_string_error)
+    [Step(keyword, text, None), ..rest] -> {
       let updated_step = Step(keyword, text, Some(doc_string))
       Ok(
         ParserState(
@@ -224,13 +232,29 @@ fn append_doc_string_line(
   line: String,
   state: ParserState,
 ) -> Result(ParserState, String) {
+  let content_line = remove_indentation(line, state.doc_string_indentation)
   Ok(
-    ParserState(..state, doc_string_content: [line, ..state.doc_string_content]),
+    ParserState(..state, doc_string_content: [
+      content_line,
+      ..state.doc_string_content
+    ]),
   )
+}
+
+/// Count the whitespace characters at the start of a line.
+fn indentation_of(line: String) -> Int {
+  string.length(line) - string.length(string.trim_start(line))
+}
+
+/// Remove up to `count` whitespace characters from the start of a line.
+/// A line with less indentation loses only the indentation it has.
+fn remove_indentation(line: String, count: Int) -> String {
+  string.drop_start(line, int.min(count, indentation_of(line)))
 }
 
 fn handle_normal_line(
   trimmed: String,
+  original: String,
   state: ParserState,
 ) -> Result(ParserState, String) {
   case trimmed {
@@ -245,7 +269,9 @@ fn handle_normal_line(
     "Feature:" <> rest -> parse_feature_line(rest, state)
 
     // Background
-    "Background:" -> start_background(state)
+    // Background, with or without a name. `Background` has no field for
+    // the name, so the parser drops it.
+    "Background:" <> _ -> start_background(state)
 
     // Scenario
     "Scenario:" <> rest -> start_scenario(rest, state)
@@ -254,7 +280,9 @@ fn handle_normal_line(
     "Scenario Outline:" <> rest -> start_scenario_outline(rest, state)
 
     // Examples
-    "Examples:" -> start_examples(state)
+    // Examples, with or without a name. `ExamplesTable` has no field for
+    // the name, so the parser drops it.
+    "Examples:" <> _ -> start_examples(state)
 
     // Steps
     "Given " <> rest -> parse_step(Given, rest, state)
@@ -264,7 +292,8 @@ fn handle_normal_line(
     "But " <> rest -> parse_step(But, rest, state)
 
     // DocString start
-    "\"\"\"" <> type_hint -> start_doc_string(type_hint, state)
+    "\"\"\"" <> type_hint ->
+      start_doc_string(type_hint, indentation_of(original), state)
 
     // DataTable row
     "|" <> _ -> parse_table_row(trimmed, state)
@@ -458,6 +487,7 @@ fn parse_step(
 
 fn start_doc_string(
   type_hint: String,
+  indentation: Int,
   state: ParserState,
 ) -> Result(ParserState, String) {
   let content_type = case string.trim(type_hint) {
@@ -470,6 +500,7 @@ fn start_doc_string(
       in_doc_string: True,
       doc_string_content: [],
       doc_string_type: content_type,
+      doc_string_indentation: indentation,
     ),
   )
 }

@@ -4,7 +4,8 @@ import dream_test/gherkin/types as gtypes
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
-import gleam/option.{None, Some}
+import gleam/option.{type Option, None, Some}
+import gleam/result
 
 pub fn tests() {
   describe("dream_test/gherkin/parser", [
@@ -382,5 +383,92 @@ pub fn tests() {
       ))
       |> or_fail_with("a missing file should give a read error")
     }),
+
+    it("parse_string rejects a second DocString on one step", fn() {
+      let content =
+        "Feature: F\nScenario: S\n  Given text\n    \"\"\"\n    one\n    \"\"\"\n    \"\"\"\n    two\n    \"\"\"\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("Step cannot have more than one DocString"))
+      |> or_fail_with("a second DocString should be a parse error")
+    }),
+
+    it(
+      "parse_string removes the delimiter indentation from DocString lines",
+      fn() {
+        let content =
+          "Feature: F\nScenario: S\n  Given text\n    \"\"\"\n    one\n      two\n\n   three\n    \"\"\"\n"
+
+        parser.parse_string(content)
+        |> result.map(first_scenario_steps)
+        |> should
+        |> be_equal(
+          Ok([
+            gtypes.Step(
+              keyword: gtypes.Given,
+              text: "text",
+              argument: Some(gtypes.DocString(
+                content: "one\n  two\n\nthree",
+                content_type: None,
+              )),
+            ),
+          ]),
+        )
+        |> or_fail_with(
+          "each line should lose the indentation of the delimiter",
+        )
+      },
+    ),
+
+    it("parse_string reads the steps of a Background with a name", fn() {
+      let content =
+        "Feature: F\n  Background: Logged in\n    Given a user\n  Scenario: S\n    Then it works\n"
+
+      parser.parse_string(content)
+      |> result.map(background_of)
+      |> should
+      |> be_equal(
+        Ok(
+          Some(
+            gtypes.Background(steps: [
+              gtypes.Step(keyword: gtypes.Given, text: "a user", argument: None),
+            ]),
+          ),
+        ),
+      )
+      |> or_fail_with("a named Background should hold its steps")
+    }),
+
+    it("parse_string reads the Examples table of an Examples with a name", fn() {
+      let content =
+        "Feature: F\n  Scenario Outline: O\n    Given <n>\n    Examples: Small numbers\n      | n |\n      | 1 |\n"
+
+      parser.parse_string(content)
+      |> result.map(first_scenario_examples)
+      |> should
+      |> be_equal(Ok(Some(gtypes.ExamplesTable(headers: ["n"], rows: [["1"]]))))
+      |> or_fail_with("a named Examples should hold its table")
+    }),
   ])
+}
+
+fn first_scenario_steps(feature: gtypes.Feature) -> List(gtypes.Step) {
+  case feature.scenarios {
+    [first, ..] -> first.steps
+    [] -> []
+  }
+}
+
+fn background_of(feature: gtypes.Feature) -> Option(gtypes.Background) {
+  feature.background
+}
+
+fn first_scenario_examples(
+  feature: gtypes.Feature,
+) -> Option(gtypes.ExamplesTable) {
+  case feature.scenarios {
+    [gtypes.ScenarioOutline(examples: examples, ..), ..] -> Some(examples)
+    _ -> None
+  }
 }
