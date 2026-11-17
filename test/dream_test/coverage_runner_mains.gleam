@@ -57,6 +57,30 @@ pub fn below_minimum_without_exit_on_failure() -> Nil {
   Nil
 }
 
+pub fn below_minimum_per_file_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(
+      fixture_coverage() |> coverage.minimum_percent_per_file(50.0),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+pub fn below_both_minimums_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(
+      fixture_coverage()
+      |> coverage.minimum_percent(50.0)
+      |> coverage.minimum_percent_per_file(50.0),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
 pub fn missing_source_directory_with_exit_on_failure() -> Nil {
   let _ =
     runner.new([fixture_tests()])

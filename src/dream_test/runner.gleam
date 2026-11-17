@@ -1669,11 +1669,19 @@ fn write_coverage_result(
         report: report,
         config: config,
       ))
-      write_minimum_result(
-        coverage.check_minimum(config: config, report: report),
-        output,
-        outcome,
-      )
+      let total_met =
+        write_minimum_result(
+          coverage.check_minimum(config: config, report: report),
+          output,
+          outcome,
+        )
+      let each_file_met =
+        write_minimum_result(
+          coverage.check_minimum_per_file(config: config, report: report),
+          output,
+          outcome,
+        )
+      total_met && each_file_met
     }
     Error(error) -> write_coverage_error(error, output, outcome)
   }

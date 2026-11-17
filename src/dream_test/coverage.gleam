@@ -145,7 +145,9 @@
 //// - `coverage.color()` prints the table in colour: the `Cover` cell is
 ////   green at `100.0%`, red below the minimum and yellow in between (with no
 ////   valid minimum: yellow from `50.0%`, red below it), and the
-////   `Missing` column is red.
+////   `Missing` column is red. With a valid
+////   `coverage.minimum_percent_per_file`, the file rows use that minimum,
+////   and the total row keeps `coverage.minimum_percent`.
 //// - `coverage.sort_by_coverage()` lists the lowest coverage first.
 //// - `coverage.hide_complete()` leaves out files where every line ran. The
 ////   total still counts them, and a line says how many were left out:
@@ -270,14 +272,16 @@
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
 //// |              | `json_path`, `cobertura_path`, `markdown_path`,           |
 //// |              | `html_path`,                                              |
-//// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
+//// |              | `show_missing`, `minimum_percent`,                        |
+//// |              | `minimum_percent_per_file`, `merge_lcov`,                 |
 //// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
 //// |              | `require_exclusion_reasons`                               |
 //// | **Table**    | `color`, `sort_by_coverage`, `hide_complete`              |
 //// | **Read**     | `shows_missing`, `shows_excluded`, `uses_color`,          |
 //// |              | `sorts_by_coverage`, `hides_complete`, `lcov_file`,       |
-//// |              | `minimum`                                                 |
-//// | **Run**      | `start`, `finish`, `check_minimum`                        |
+//// |              | `minimum`, `minimum_per_file`                             |
+//// | **Run**      | `start`, `finish`, `check_minimum`,                       |
+//// |              | `check_minimum_per_file`                                  |
 ////
 //// ## Import Style
 ////
@@ -317,6 +321,7 @@ pub opaque type CoverageConfig {
     lcov_path: Option(String),
     show_missing: Bool,
     minimum_percent: Option(Float),
+    minimum_percent_per_file: Option(Float),
     merge_lcov_patterns: List(String),
     exclude_patterns: List(ExcludePattern),
     show_excluded: Bool,
@@ -408,6 +413,9 @@ pub type CoverageError {
   HtmlSourceReadFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
+  /// The value given to `coverage.minimum_percent_per_file` is not from 0.0
+  /// to 100.0.
+  InvalidMinimumPercentPerFile(value: Float)
   /// The environment variable read by `runner.coverage_from_environment`
   /// has a value that does not say if coverage is on or off. `name` is the
   /// variable and `value` is its value.
@@ -423,6 +431,15 @@ pub type CoverageError {
     total: Int,
     minimum_percent: Float,
     lines_needed: Int,
+  )
+  /// One or more files are below the value given to
+  /// `coverage.minimum_percent_per_file`.
+  ///
+  /// - `minimum_percent`: the minimum, rounded to one decimal place
+  /// - `files`: every file below the minimum, sorted by path
+  FilesBelowMinimumPercent(
+    minimum_percent: Float,
+    files: List(FileBelowMinimum),
   )
   /// No file matches a pattern given to `coverage.merge_lcov`.
   NoLcovFilesMatched(pattern: String)
@@ -484,6 +501,17 @@ pub type CoverageError {
     line_number: Int,
     marker: String,
   )
+}
+
+/// A file below the minimum from `coverage.minimum_percent_per_file`, in
+/// `FilesBelowMinimumPercent`.
+///
+/// - `source_path`: the source file, as in the report
+/// - `hit`: executable lines that ran
+/// - `total`: executable lines
+/// - `lines_needed`: how many lines must run to reach the minimum
+pub type FileBelowMinimum {
+  FileBelowMinimum(source_path: String, hit: Int, total: Int, lines_needed: Int)
 }
 
 /// Why the `cover` tool did not start.
@@ -557,6 +585,7 @@ pub fn new() -> CoverageConfig {
     lcov_path: Some("build/coverage/lcov.info"),
     show_missing: False,
     minimum_percent: None,
+    minimum_percent_per_file: None,
     merge_lcov_patterns: [],
     exclude_patterns: [],
     show_excluded: False,
@@ -819,6 +848,49 @@ pub fn minimum_percent(
   percent percent: Float,
 ) -> CoverageConfig {
   CoverageConfig(..config, minimum_percent: Some(percent))
+}
+
+/// Fail the run when any measured file is below a percent.
+///
+/// Use it when one file with few tests must not hide behind a high total.
+/// Every measured file must reach the minimum. Files that `coverage.exclude`
+/// left out and files with no executable lines pass. Lines that markers
+/// ignore do not count.
+///
+/// The value must be from `0.0` to `100.0` and is rounded to one decimal
+/// place. The check is exact and the same as `coverage.minimum_percent`: a
+/// file passes when it is equal to the minimum or above it. It works with
+/// `coverage.minimum_percent` or without it.
+///
+/// With the runner, a failure prints a `Coverage failed` block after the
+/// table that lists every file below the minimum, and
+/// `runner.exit_on_failure` then exits with status 1. When the total is
+/// below `coverage.minimum_percent` too, a separate block reports the total
+/// first.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `percent`: the minimum coverage of each file, from `0.0` to `100.0`
+///
+/// ## Returns
+///
+/// The updated settings. An out-of-range value is reported by
+/// `coverage.start` and `coverage.check_minimum_per_file` as
+/// `InvalidMinimumPercentPerFile`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(90.0)
+/// |> coverage.minimum_percent_per_file(70.0)
+/// ```
+pub fn minimum_percent_per_file(
+  config config: CoverageConfig,
+  percent percent: Float,
+) -> CoverageConfig {
+  CoverageConfig(..config, minimum_percent_per_file: Some(percent))
 }
 
 /// Add the coverage in other LCOV files to this run's report.
@@ -1230,6 +1302,32 @@ pub fn minimum(config config: CoverageConfig) -> Option(Float) {
   config.minimum_percent
 }
 
+/// The minimum coverage of each file, from
+/// `coverage.minimum_percent_per_file`.
+///
+/// The value is returned as given, even when it is not from 0.0 to 100.0.
+/// `coverage.check_minimum_per_file` reports an invalid value.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to read
+///
+/// ## Returns
+///
+/// `Some(percent)` when a per-file minimum is set, otherwise `None`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent_per_file(70.0)
+/// |> coverage.minimum_per_file()
+/// // -> Some(70.0)
+/// ```
+pub fn minimum_per_file(config config: CoverageConfig) -> Option(Float) {
+  config.minimum_percent_per_file
+}
+
 /// The LCOV file that `coverage.finish` writes, if any.
 ///
 /// ## Example
@@ -1276,9 +1374,12 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 pub fn start(
   config config: CoverageConfig,
 ) -> Result(CoverageSession, CoverageError) {
-  case validate_minimum_percent(config.minimum_percent) {
-    Ok(Nil) -> start_with_valid_minimum(config)
-    Error(error) -> Error(error)
+  case
+    validate_minimum_percent(config.minimum_percent),
+    validate_minimum_percent_per_file(config.minimum_percent_per_file)
+  {
+    Ok(Nil), Ok(Nil) -> start_with_valid_minimum(config)
+    Error(error), _ | _, Error(error) -> Error(error)
   }
 }
 
@@ -1289,6 +1390,17 @@ fn validate_minimum_percent(
     None -> Ok(Nil)
     Some(value) if value <. 0.0 || value >. 100.0 ->
       Error(InvalidMinimumPercent(value: value))
+    Some(_) -> Ok(Nil)
+  }
+}
+
+fn validate_minimum_percent_per_file(
+  minimum: Option(Float),
+) -> Result(Nil, CoverageError) {
+  case minimum {
+    None -> Ok(Nil)
+    Some(value) if value <. 0.0 || value >. 100.0 ->
+      Error(InvalidMinimumPercentPerFile(value: value))
     Some(_) -> Ok(Nil)
   }
 }
@@ -2977,6 +3089,106 @@ fn check_counts_against_minimum(
         lines_needed: { minimum_tenths * total + 999 } / 1000,
       ))
   }
+}
+
+/// Check each file against `coverage.minimum_percent_per_file`.
+///
+/// Passes when no per-file minimum is set, or when every file in the report
+/// is equal to the minimum or above it. A file with no executable lines
+/// passes. Excluded files are not in the report, so they pass too. The
+/// comparison is exact and uses the minimum rounded to one decimal place,
+/// the same as `coverage.check_minimum`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings that hold the per-file minimum
+/// - `report`: the report to check
+///
+/// ## Returns
+///
+/// - `Ok(Nil)` when every file meets the minimum
+/// - `Error(FilesBelowMinimumPercent(..))` with every file below it, sorted
+///   by path
+/// - `Error(InvalidMinimumPercentPerFile(..))` when the minimum is not from
+///   0.0 to 100.0
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent_per_file(50.0)
+/// |> coverage.check_minimum_per_file(coverage_report)
+/// // -> Error(FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
+/// //      FileBelowMinimum(source_path: "src/app/cart.gleam", hit: 3,
+/// //        total: 10, lines_needed: 5),
+/// //    ]))
+/// ```
+pub fn check_minimum_per_file(
+  config config: CoverageConfig,
+  report coverage_report: CoverageReport,
+) -> Result(Nil, CoverageError) {
+  case
+    config.minimum_percent_per_file,
+    validate_minimum_percent_per_file(config.minimum_percent_per_file)
+  {
+    None, _ -> Ok(Nil)
+    _, Error(error) -> Error(error)
+    Some(minimum), Ok(Nil) ->
+      files_below_minimum(
+        report.files(coverage_report),
+        round(minimum *. 10.0),
+        [],
+      )
+  }
+}
+
+fn files_below_minimum(
+  files: List(FileCoverage),
+  minimum_tenths: Int,
+  below_reversed: List(FileBelowMinimum),
+) -> Result(Nil, CoverageError) {
+  case files, below_reversed {
+    [], [] -> Ok(Nil)
+    [], _ ->
+      Error(FilesBelowMinimumPercent(
+        minimum_percent: int.to_float(minimum_tenths) /. 10.0,
+        files: list.sort(list.reverse(below_reversed), compare_file_paths),
+      ))
+    [file, ..rest], _ ->
+      files_below_minimum(
+        rest,
+        minimum_tenths,
+        add_if_below_minimum(below_reversed, file, minimum_tenths),
+      )
+  }
+}
+
+fn add_if_below_minimum(
+  below_reversed: List(FileBelowMinimum),
+  file: FileCoverage,
+  minimum_tenths: Int,
+) -> List(FileBelowMinimum) {
+  let hit = report.hit_line_count(file)
+  let total = report.executable_line_count(file)
+  case hit * 1000 >= minimum_tenths * total {
+    True -> below_reversed
+    False -> [
+      FileBelowMinimum(
+        source_path: report.source_path(file),
+        hit: hit,
+        total: total,
+        lines_needed: { minimum_tenths * total + 999 } / 1000,
+      ),
+      ..below_reversed
+    ]
+  }
+}
+
+fn compare_file_paths(
+  left: FileBelowMinimum,
+  right: FileBelowMinimum,
+) -> Order {
+  string.compare(left.source_path, right.source_path)
 }
 
 // =============================================================================

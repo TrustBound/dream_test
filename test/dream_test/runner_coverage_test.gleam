@@ -107,6 +107,20 @@ fn below_minimum() -> String {
   <> "\n"
 }
 
+fn below_minimum_per_file() -> String {
+  "\nCoverage failed\n"
+  <> "  Coverage of 2 files is below the per-file minimum 50.0%:\n"
+  <> "    test/coverage_fixtures/coverage_fixture_ffi.erl 0.0%, 0 of 1 lines ran (needs 1 more line)\n"
+  <> "    test/coverage_fixtures/nested/deep.gleam 0.0%, 0 of 1 lines ran (needs 1 more line)\n"
+  <> "  Reason: coverage.minimum_percent_per_file(...) needs each measured file to reach the minimum, and too few executable lines ran in these files.\n"
+  <> "  Fix: add tests for the lines that did not run in these files (coverage.show_missing() lists them), or lower coverage.minimum_percent_per_file(...).\n"
+  <> "\n"
+}
+
+fn below_minimum_exit_line() -> String {
+  "Tests: 1 passed. Exit status 1, because coverage is below the minimum.\n"
+}
+
 pub fn tests() {
   describe("runner.coverage", [
     it("prints the table with a Missing column and exits 0", fn() {
@@ -147,6 +161,28 @@ pub fn tests() {
           <> "Tests: 1 passed. Exit status 1, because coverage is below the minimum.\n",
       ))
       |> or_fail_with("expected the minimum failure and exit status 1")
+    }),
+    it("fails files below the per-file minimum and exits 1", fn() {
+      run_main("below_minimum_per_file_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        table() <> below_minimum_per_file() <> below_minimum_exit_line(),
+      ))
+      |> or_fail_with("expected the per-file failure and exit status 1")
+    }),
+    it("prints the total and the per-file failure when both fail", fn() {
+      run_main("below_both_minimums_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        table()
+          <> below_minimum()
+          <> below_minimum_exit_line()
+          <> below_minimum_per_file()
+          <> below_minimum_exit_line(),
+      ))
+      |> or_fail_with("expected two failure blocks and exit status 1")
     }),
     it("reports a minimum failure but exits 0 without exit_on_failure", fn() {
       run_main("below_minimum_without_exit_on_failure")

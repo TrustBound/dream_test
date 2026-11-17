@@ -87,17 +87,18 @@
 
 import dream_test/coverage.{
   type AnalysisCause, type CoverageConfig, type CoverageError,
-  type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
-  BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed, CoverAlreadyRunning,
-  CoverDidNotStart, CoverStartFailed, EmbeddedMode, EncryptedDebugInfo,
-  EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
-  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
-  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
-  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  type FileBelowMinimum, type InstrumentCause, type LoadCause, type StartCause,
+  AlreadyInstrumented, BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed,
+  CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
+  EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
+  ExcludeWithoutReason, FilesBelowMinimumPercent, HtmlSourceReadFailed,
+  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidEnvironmentValue, InvalidMinimumPercent, InvalidMinimumPercentPerFile,
+  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
+  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
   SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
   UnknownAnalysisError, UnknownInstrumentError,
 }
@@ -127,11 +128,9 @@ pub type RunOutcome {
 /// One row of the table. A row can take more than one line of output when
 /// its `Missing` or `Excluded` cell wraps.
 type CoverageRow {
-  /// `measured` is the report the counts come from: one file for a file row,
-  /// the whole report for the total, `None` for the header. Colours come
-  /// from it.
+  /// `measured` is where the counts come from. Colours come from it.
   CountsRow(
-    measured: Option(CoverageReport),
+    measured: Measured,
     label: String,
     lines: String,
     percent: String,
@@ -141,6 +140,16 @@ type CoverageRow {
   /// A file that an exclude pattern left out. Its text starts in the
   /// `Lines` column.
   ExcludedFileRow(label: String, text: String)
+}
+
+/// Where the counts of a row come from.
+type Measured {
+  /// The header has no counts.
+  NotMeasured
+  /// A report that holds only the file of the row.
+  MeasuredFile(report: CoverageReport)
+  /// The whole report, for the total row.
+  MeasuredTotal(report: CoverageReport)
 }
 
 /// Which of the optional columns the table shows.
@@ -239,13 +248,7 @@ pub fn render(
   let file_rows = list.map(shown_files, file_row)
   let excluded_file_rows =
     excluded_file_rows(columns, report.excluded_files(coverage_report))
-  let total_row =
-    row_from_counts(
-      "Total",
-      coverage_report,
-      report.total_hit_line_count(coverage_report),
-      report.total_executable_line_count(coverage_report),
-    )
+  let total_row = total_row(coverage_report)
   let rows =
     list.flatten([
       [header_row()],
@@ -272,7 +275,7 @@ pub fn render(
 /// the table does not show.
 fn header_row() -> CoverageRow {
   CountsRow(
-    measured: None,
+    measured: NotMeasured,
     label: "File",
     lines: "Lines",
     percent: "Cover",
@@ -285,7 +288,7 @@ fn file_row(file: FileCoverage) -> CoverageRow {
   let hit = report.hit_line_count(file)
   let total = report.executable_line_count(file)
   CountsRow(
-    measured: Some(report.new([file])),
+    measured: MeasuredFile(report.new([file])),
     label: report.source_path(file),
     lines: format.line_counts(hit: hit, total: total),
     percent: format.percent(hit: hit, total: total),
@@ -298,15 +301,12 @@ fn file_row(file: FileCoverage) -> CoverageRow {
   )
 }
 
-fn row_from_counts(
-  label: String,
-  measured: CoverageReport,
-  hit: Int,
-  total: Int,
-) -> CoverageRow {
+fn total_row(coverage_report: CoverageReport) -> CoverageRow {
+  let hit = report.total_hit_line_count(coverage_report)
+  let total = report.total_executable_line_count(coverage_report)
   CountsRow(
-    measured: Some(measured),
-    label: label,
+    measured: MeasuredTotal(coverage_report),
+    label: "Total",
     lines: format.line_counts(hit: hit, total: total),
     percent: format.percent(hit: hit, total: total),
     missing: [],
@@ -491,19 +491,51 @@ fn optional_cells(
 /// Green at 100.0%. Below that, the minimum decides the colour when one is
 /// set and valid, and a fixed rule decides it otherwise. The header and a
 /// `-` cell stay plain.
-fn percent_color(
-  columns: Columns,
-  measured: Option(CoverageReport),
-) -> CellColor {
+fn percent_color(columns: Columns, measured: Measured) -> CellColor {
   case columns.color, measured {
-    True, Some(measured_report) ->
-      measured_percent_color(columns.config, measured_report)
+    True, MeasuredFile(measured_report) ->
+      measured_percent_color(
+        file_minimum_check(columns.config, measured_report),
+        measured_report,
+      )
+    True, MeasuredTotal(measured_report) ->
+      measured_percent_color(
+        total_minimum_check(columns.config, measured_report),
+        measured_report,
+      )
     _, _ -> Plain
   }
 }
 
-fn measured_percent_color(
+/// The result of the minimum check that decides a colour, or `None` when
+/// no minimum applies.
+type MinimumCheck =
+  Option(Result(Nil, CoverageError))
+
+/// A file row uses the per-file minimum when it is set, and the total
+/// minimum otherwise.
+fn file_minimum_check(
   config: CoverageConfig,
+  measured_report: CoverageReport,
+) -> MinimumCheck {
+  case coverage.minimum_per_file(config) {
+    Some(_) -> Some(coverage.check_minimum_per_file(config, measured_report))
+    None -> total_minimum_check(config, measured_report)
+  }
+}
+
+fn total_minimum_check(
+  config: CoverageConfig,
+  measured_report: CoverageReport,
+) -> MinimumCheck {
+  case coverage.minimum(config) {
+    Some(_) -> Some(coverage.check_minimum(config, measured_report))
+    None -> None
+  }
+}
+
+fn measured_percent_color(
+  check: MinimumCheck,
   measured_report: CoverageReport,
 ) -> CellColor {
   let hit = report.total_hit_line_count(measured_report)
@@ -511,7 +543,7 @@ fn measured_percent_color(
   case total, hit == total {
     0, _ -> Plain
     _, True -> Green
-    _, False -> incomplete_color(config, measured_report, hit, total)
+    _, False -> incomplete_color(check, hit, total)
   }
 }
 
@@ -519,19 +551,12 @@ fn measured_percent_color(
 /// minimum", so the colour matches the minimum check exactly: red below it,
 /// yellow at it or above. With no minimum, or an invalid one (the runner
 /// reports that as its own failure), the fixed rule decides.
-fn incomplete_color(
-  config: CoverageConfig,
-  measured_report: CoverageReport,
-  hit: Int,
-  total: Int,
-) -> CellColor {
-  case
-    coverage.minimum(config),
-    coverage.check_minimum(config, measured_report)
-  {
-    Some(_), Ok(Nil) -> Yellow
-    Some(_), Error(BelowMinimumPercent(..)) -> Red
-    _, _ -> fixed_rule_color(hit, total)
+fn incomplete_color(check: MinimumCheck, hit: Int, total: Int) -> CellColor {
+  case check {
+    Some(Ok(Nil)) -> Yellow
+    Some(Error(BelowMinimumPercent(..)))
+    | Some(Error(FilesBelowMinimumPercent(..))) -> Red
+    _ -> fixed_rule_color(hit, total)
   }
 }
 
@@ -544,12 +569,9 @@ fn fixed_rule_color(hit: Int, total: Int) -> CellColor {
 }
 
 /// The lines that did not run are red. The header stays plain.
-fn missing_color(
-  columns: Columns,
-  measured: Option(CoverageReport),
-) -> CellColor {
+fn missing_color(columns: Columns, measured: Measured) -> CellColor {
   case columns.color, measured {
-    True, Some(_) -> Red
+    True, MeasuredFile(_) | True, MeasuredTotal(_) -> Red
     _, _ -> Plain
   }
 }
@@ -689,7 +711,7 @@ type ExitReason {
 
 fn exit_reason(error: CoverageError) -> ExitReason {
   case error {
-    BelowMinimumPercent(..) ->
+    BelowMinimumPercent(..) | FilesBelowMinimumPercent(..) ->
       ExitReason(
         alone: "coverage is below the minimum",
         with_failed_tests: "tests failed and coverage is below the minimum",
@@ -803,6 +825,16 @@ fn error_message(error: CoverageError) -> ErrorMessage {
       )
     BelowMinimumPercent(hit, total, minimum, lines_needed) ->
       below_minimum_message(hit, total, minimum, lines_needed)
+    InvalidMinimumPercentPerFile(value) ->
+      ErrorMessage(
+        what: "The per-file coverage minimum "
+          <> float.to_string(value)
+          <> " is not a percent.",
+        reason: "coverage.minimum_percent_per_file(...) takes a value from 0.0 to 100.0.",
+        fix: "pass a value from 0.0 to 100.0, for example coverage.minimum_percent_per_file(70.0).",
+      )
+    FilesBelowMinimumPercent(minimum, files) ->
+      files_below_minimum_message(minimum, files)
     NoLcovFilesMatched(pattern) ->
       ErrorMessage(
         what: "No LCOV files match \"" <> pattern <> "\".",
@@ -1173,6 +1205,37 @@ fn below_minimum_message(
       <> ".",
     fix: "add tests for the lines that did not run (coverage.show_missing() lists them), or lower coverage.minimum_percent(...).",
   )
+}
+
+fn files_below_minimum_message(
+  minimum: Float,
+  files: List(FileBelowMinimum),
+) -> ErrorMessage {
+  ErrorMessage(
+    what: "Coverage of "
+      <> format.file_count(list.length(files))
+      <> " is below the per-file minimum "
+      <> float.to_string(minimum)
+      <> "%:\n"
+      <> string.join(list.map(files, file_below_minimum_line), "\n"),
+    reason: "coverage.minimum_percent_per_file(...) needs each measured file to reach the minimum, and too few executable lines ran in these files.",
+    fix: "add tests for the lines that did not run in these files (coverage.show_missing() lists them), or lower coverage.minimum_percent_per_file(...).",
+  )
+}
+
+/// `  src/app/cart.gleam 30.0%, 3 of 10 lines ran (needs 2 more lines)`
+fn file_below_minimum_line(file: FileBelowMinimum) -> String {
+  "  "
+  <> file.source_path
+  <> " "
+  <> format.percent(hit: file.hit, total: file.total)
+  <> ", "
+  <> int.to_string(file.hit)
+  <> " of "
+  <> int.to_string(file.total)
+  <> " lines ran (needs "
+  <> more_lines(file.lines_needed - file.hit)
+  <> ")"
 }
 
 fn more_lines(count: Int) -> String {
