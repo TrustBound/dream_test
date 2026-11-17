@@ -1,5 +1,6 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
+import dream_test/reporters/json
 import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, group, it}
@@ -28,6 +29,142 @@ fn sample_results() -> List(types.TestResult) {
         types.AssertionFailure(operator: "fail", message: "nope", payload: None),
       ],
       kind: types.Unit,
+    ),
+  ]
+}
+
+fn result_of(
+  full_name: List(String),
+  status: types.Status,
+  failures: List(types.AssertionFailure),
+  kind: types.TestKind,
+) -> types.TestResult {
+  types.TestResult(
+    name: "fallback",
+    full_name: full_name,
+    status: status,
+    duration_ms: 0,
+    tags: [],
+    failures: failures,
+    kind: kind,
+  )
+}
+
+fn failure(
+  message: String,
+  payload: types.FailurePayload,
+) -> types.AssertionFailure {
+  types.AssertionFailure(
+    operator: "check",
+    message: message,
+    payload: Some(payload),
+  )
+}
+
+fn timeout_failure() -> types.AssertionFailure {
+  types.AssertionFailure(
+    operator: "timeout",
+    message: "too slow",
+    payload: None,
+  )
+}
+
+/// One test of each status, in one group.
+fn every_status() -> List(types.TestResult) {
+  [
+    result_of(["s", "passes"], types.Passed, [], types.Unit),
+    result_of(
+      ["s", "fails"],
+      types.Failed,
+      [failure("bad", types.EqualityFailure(actual: "1", expected: "2"))],
+      types.Unit,
+    ),
+    result_of(["s", "skips"], types.Skipped, [], types.Unit),
+    result_of(["s", "waits"], types.Pending, [], types.Unit),
+    result_of(
+      ["s", "times out"],
+      types.TimedOut,
+      [timeout_failure()],
+      types.Unit,
+    ),
+    result_of(
+      ["s", "has no setup"],
+      types.SetupFailed,
+      [
+        types.AssertionFailure(
+          operator: "before_each",
+          message: "no db",
+          payload: None,
+        ),
+      ],
+      types.Unit,
+    ),
+  ]
+}
+
+/// One failure of each payload, with both values of every Bool.
+fn every_payload() -> List(types.AssertionFailure) {
+  [
+    failure("", types.BooleanFailure(actual: True, expected: False)),
+    failure("", types.BooleanFailure(actual: False, expected: True)),
+    failure("", types.OptionFailure(actual: "None", expected_some: True)),
+    failure("", types.OptionFailure(actual: "Some(1)", expected_some: False)),
+    failure("", types.ResultFailure(actual: "Error(1)", expected_ok: True)),
+    failure("", types.ResultFailure(actual: "Ok(1)", expected_ok: False)),
+    failure(
+      "",
+      types.CollectionFailure(
+        actual: "[1]",
+        expected: "2",
+        operation: "contain",
+      ),
+    ),
+    failure(
+      "",
+      types.ComparisonFailure(actual: "1", expected: "2", operator: "greater"),
+    ),
+    failure(
+      "",
+      types.StringMatchFailure(
+        actual: "abc",
+        pattern: "x",
+        operation: "start_with",
+      ),
+    ),
+    failure(
+      "",
+      types.SnapshotFailure(
+        actual: "new",
+        expected: "",
+        snapshot_path: "a.snap",
+        is_missing: True,
+      ),
+    ),
+    failure(
+      "",
+      types.SnapshotFailure(
+        actual: "new",
+        expected: "old",
+        snapshot_path: "b.snap",
+        is_missing: False,
+      ),
+    ),
+    failure("", types.CustomMatcherFailure(actual: "7", description: "is even")),
+  ]
+}
+
+fn config(color: Bool, mode: reporter_types.BddOutputMode) {
+  reporter_types.BddReporterConfig(color: color, mode: mode)
+}
+
+fn gherkin_results() -> List(types.TestResult) {
+  [
+    result_of(["Cart", "adds"], types.Passed, [], types.GherkinScenario("c1")),
+    result_of(
+      ["Cart", "removes"],
+      types.Failed,
+      [failure("gone", types.EqualityFailure(actual: "1", expected: "0"))],
+      types.GherkinScenario("c2"),
     ),
   ]
 }
@@ -97,6 +234,383 @@ pub fn tests() {
         |> should
         |> be_equal(expected)
         |> or_fail_with("bdd.format should render a basic BDD-style report")
+      }),
+    ]),
+
+    group("builders", [
+      it("color leaves a JSON reporter as it is", fn() {
+        bdd.color(json.new())
+        |> should
+        |> be_equal(json.new())
+        |> or_fail_with("color should change only a BDD reporter")
+      }),
+
+      it("summary_only leaves a JSON reporter as it is", fn() {
+        bdd.summary_only(json.new())
+        |> should
+        |> be_equal(json.new())
+        |> or_fail_with("summary_only should change only a BDD reporter")
+      }),
+
+      it("failures_only leaves a JSON reporter as it is", fn() {
+        bdd.failures_only(json.new())
+        |> should
+        |> be_equal(json.new())
+        |> or_fail_with("failures_only should change only a BDD reporter")
+      }),
+
+      it("failures_only keeps the colour setting", fn() {
+        bdd.new()
+        |> bdd.color()
+        |> bdd.failures_only()
+        |> should
+        |> be_equal(
+          reporter_types.Bdd(config(True, reporter_types.BddFailuresOnly)),
+        )
+        |> or_fail_with("failures_only should keep colour on")
+      }),
+    ]),
+
+    group("render", [
+      it("writes every status without colour", fn() {
+        bdd.render(config(False, reporter_types.BddFull), every_status())
+        |> should
+        |> be_equal(
+          "s\n"
+          <> "  ✓ passes\n"
+          <> "  ✗ fails\n"
+          <> "    check\n"
+          <> "      Message: bad\n"
+          <> "      Expected: 2\n"
+          <> "      Actual:   1\n"
+          <> "  - skips\n"
+          <> "  ~ waits\n"
+          <> "  ! times out\n"
+          <> "    timeout\n"
+          <> "      Message: too slow\n"
+          <> "  ⚠ has no setup\n"
+          <> "    before_each\n"
+          <> "      Message: no db\n"
+          <> "\n"
+          <> "Failures:\n"
+          <> "s\n"
+          <> "  ✗ fails\n"
+          <> "    check\n"
+          <> "      Message: bad\n"
+          <> "      Expected: 2\n"
+          <> "      Actual:   1\n"
+          <> "  ! times out\n"
+          <> "    timeout\n"
+          <> "      Message: too slow\n"
+          <> "  ⚠ has no setup\n"
+          <> "    before_each\n"
+          <> "      Message: no db\n"
+          <> "\n"
+          <> "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+        )
+        |> or_fail_with("every status should have its marker and failures")
+      }),
+
+      it("writes every status with colour", fn() {
+        bdd.render(config(True, reporter_types.BddFull), every_status())
+        |> should
+        |> be_equal(
+          "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[32m✓\u{001B}[0m passes\n"
+          <> "  \u{001B}[31m✗\u{001B}[0m \u{001B}[31mfails\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mbad\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m1\u{001B}[0m\n"
+          <> "  \u{001B}[33m-\u{001B}[0m \u{001B}[33mskips\u{001B}[0m\n"
+          <> "  \u{001B}[33m~\u{001B}[0m \u{001B}[33mwaits\u{001B}[0m\n"
+          <> "  \u{001B}[31m!\u{001B}[0m \u{001B}[31mtimes out\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mtimeout\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mtoo slow\u{001B}[0m\n"
+          <> "  \u{001B}[31m⚠\u{001B}[0m \u{001B}[31mhas no setup\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mbefore_each\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mno db\u{001B}[0m\n"
+          <> "\n"
+          <> "\u{001B}[1m\u{001B}[31mFailures:\u{001B}[0m\u{001B}[0m\n"
+          <> "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[31m✗\u{001B}[0m \u{001B}[31mfails\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mbad\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m1\u{001B}[0m\n"
+          <> "  \u{001B}[31m!\u{001B}[0m \u{001B}[31mtimes out\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mtimeout\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mtoo slow\u{001B}[0m\n"
+          <> "  \u{001B}[31m⚠\u{001B}[0m \u{001B}[31mhas no setup\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mbefore_each\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mno db\u{001B}[0m\n"
+          <> "\n"
+          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m6\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m1\u{001B}[0m passed, \u{001B}[31m1\u{001B}[0m\u{001B}[2m setup failed\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m timed out\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m pending\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m skipped\u{001B}[0m in \u{001B}[36m0ms\u{001B}[0m\n",
+        )
+        |> or_fail_with("every status should have its colour")
+      }),
+
+      it("writes only the failures in failures_only mode", fn() {
+        bdd.render(
+          config(False, reporter_types.BddFailuresOnly),
+          every_status(),
+        )
+        |> should
+        |> be_equal(
+          "s\n"
+          <> "  ✗ fails\n"
+          <> "    check\n"
+          <> "      Message: bad\n"
+          <> "      Expected: 2\n"
+          <> "      Actual:   1\n"
+          <> "  ! times out\n"
+          <> "    timeout\n"
+          <> "      Message: too slow\n"
+          <> "  ⚠ has no setup\n"
+          <> "    before_each\n"
+          <> "      Message: no db\n"
+          <> "\n"
+          <> "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+        )
+        |> or_fail_with("only failed, timed out and setup failed tests")
+      }),
+
+      it("writes only the summary in summary_only mode", fn() {
+        bdd.render(config(False, reporter_types.BddSummaryOnly), every_status())
+        |> should
+        |> be_equal(
+          "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+        )
+        |> or_fail_with("only the summary line")
+      }),
+
+      it("writes Feature and Scenario for Gherkin results", fn() {
+        bdd.render(config(False, reporter_types.BddFull), gherkin_results())
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  ✓ Scenario: adds\n"
+          <> "  ✗ Scenario: removes\n"
+          <> "    check\n"
+          <> "      Message: gone\n"
+          <> "      Expected: 0\n"
+          <> "      Actual:   1\n"
+          <> "\n"
+          <> "Failures:\n"
+          <> "Feature: Cart\n"
+          <> "  ✗ Scenario: removes\n"
+          <> "    check\n"
+          <> "      Message: gone\n"
+          <> "      Expected: 0\n"
+          <> "      Actual:   1\n"
+          <> "\n"
+          <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n",
+        )
+        |> or_fail_with(
+          "Gherkin results should have Feature and Scenario labels",
+        )
+      }),
+    ]),
+
+    group("format", [
+      it("writes every failure payload", fn() {
+        bdd.format([
+          result_of(
+            ["p", "payloads"],
+            types.Failed,
+            every_payload(),
+            types.Unit,
+          ),
+        ])
+        |> should
+        |> be_equal(
+          "p\n"
+          <> "  ✗ payloads\n"
+          <> "    check\n"
+          <> "      Expected: False\n"
+          <> "      Actual:   True\n"
+          <> "    check\n"
+          <> "      Expected: True\n"
+          <> "      Actual:   False\n"
+          <> "    check\n"
+          <> "      Expected: Some(_)\n"
+          <> "      Actual:   None\n"
+          <> "    check\n"
+          <> "      Expected: None\n"
+          <> "      Actual:   Some(1)\n"
+          <> "    check\n"
+          <> "      Expected: Ok(_)\n"
+          <> "      Actual:   Error(1)\n"
+          <> "    check\n"
+          <> "      Expected: Error(_)\n"
+          <> "      Actual:   Ok(1)\n"
+          <> "    check\n"
+          <> "      Operation: contain\n"
+          <> "      Expected: 2\n"
+          <> "      Actual:   [1]\n"
+          <> "    check\n"
+          <> "      Operator: greater\n"
+          <> "      Expected: 2\n"
+          <> "      Actual:   1\n"
+          <> "    check\n"
+          <> "      Operation: start_with\n"
+          <> "      Pattern:   x\n"
+          <> "      Actual:    abc\n"
+          <> "    check\n"
+          <> "      Snapshot missing: a.snap\n"
+          <> "    check\n"
+          <> "      Snapshot: b.snap\n"
+          <> "      Expected: old\n"
+          <> "      Actual:   new\n"
+          <> "    check\n"
+          <> "      Description: is even\n"
+          <> "      Actual:      7\n"
+          <> "\n"
+          <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+        )
+        |> or_fail_with("each payload should have its own lines")
+      }),
+
+      it("writes every failure payload with colour", fn() {
+        bdd.render(config(True, reporter_types.BddFailuresOnly), [
+          result_of(
+            ["p", "payloads"],
+            types.Failed,
+            every_payload(),
+            types.Unit,
+          ),
+        ])
+        |> should
+        |> be_equal(
+          "\u{001B}[1m\u{001B}[36mp\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[31m✗\u{001B}[0m \u{001B}[31mpayloads\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mFalse\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mTrue\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mTrue\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mFalse\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mSome(_)\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mNone\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mNone\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mSome(1)\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mOk(_)\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mError(1)\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mError(_)\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mOk(1)\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Operation: \u{001B}[0m\u{001B}[36mcontain\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m[1]\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Operator: \u{001B}[0m\u{001B}[36mgreater\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m1\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Operation: \u{001B}[0m\u{001B}[36mstart_with\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Pattern:   \u{001B}[0m\u{001B}[32mx\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:    \u{001B}[0m\u{001B}[31mabc\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Snapshot missing: \u{001B}[0m\u{001B}[33ma.snap\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Snapshot: \u{001B}[0m\u{001B}[36mb.snap\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32mold\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31mnew\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Description: \u{001B}[0m\u{001B}[36mis even\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Actual:      \u{001B}[0m\u{001B}[31m7\u{001B}[0m\n"
+          <> "\n"
+          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m1\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m0\u{001B}[0m passed in \u{001B}[36m0ms\u{001B}[0m\n",
+        )
+        |> or_fail_with("each payload should have its own colours")
+      }),
+
+      it("writes a test with no full name or one name at the top level", fn() {
+        bdd.format([
+          result_of([], types.Passed, [], types.Unit),
+          result_of(["alone"], types.Passed, [], types.Unit),
+        ])
+        |> should
+        |> be_equal(
+          "✓ \n✓ alone\n\nSummary: 2 run, 0 failed, 2 passed in 0ms\n",
+        )
+        |> or_fail_with("tests with no group should have no indent")
+      }),
+
+      it("sorts a group before the tests of a longer path", fn() {
+        bdd.format([
+          result_of(["a", "b", "c"], types.Passed, [], types.Unit),
+          result_of(["a", "b"], types.Passed, [], types.Unit),
+          result_of(["a", "b"], types.Skipped, [], types.Unit),
+        ])
+        |> should
+        |> be_equal(
+          "a\n"
+          <> "  ✓ b\n"
+          <> "  - b\n"
+          <> "  b\n"
+          <> "    ✓ c\n"
+          <> "\n"
+          <> "Summary: 3 run, 0 failed, 2 passed, 1 skipped in 0ms\n",
+        )
+        |> or_fail_with("the shorter path should come first")
+      }),
+
+      it("writes Gherkin results with one summary", fn() {
+        bdd.format(gherkin_results())
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: adds ✓\n"
+          <> "  Scenario: removes ✗\n"
+          <> "      ✗ check\n"
+          <> "        Message: gone\n"
+          <> "        Expected: 0\n"
+          <> "        Actual:   1\n"
+          <> "\n"
+          <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n",
+        )
+        |> or_fail_with("the Gherkin summary should be replaced by one summary")
+      }),
+
+      it("writes unit and Gherkin results together", fn() {
+        bdd.format([
+          result_of(["Math", "adds"], types.Passed, [], types.Unit),
+          ..gherkin_results()
+        ])
+        |> should
+        |> be_equal(
+          "Math\n"
+          <> "  ✓ adds\n"
+          <> "Feature: Cart\n"
+          <> "  Scenario: adds ✓\n"
+          <> "  Scenario: removes ✗\n"
+          <> "      ✗ check\n"
+          <> "        Message: gone\n"
+          <> "        Expected: 0\n"
+          <> "        Actual:   1\n"
+          <> "\n"
+          <> "Summary: 3 run, 1 failed, 2 passed in 0ms\n",
+        )
+        |> or_fail_with("unit results should come before Gherkin results")
+      }),
+
+      it("shows the duration of a slow test", fn() {
+        bdd.format([
+          types.TestResult(
+            ..result_of(["s", "slow"], types.Passed, [], types.Unit),
+            duration_ms: 1500,
+          ),
+        ])
+        |> should
+        |> be_equal(
+          "s\n  ✓ slow (1.5s)\n\nSummary: 1 run, 0 failed, 1 passed in 1.5s\n",
+        )
+        |> or_fail_with("a slow test should show its duration")
       }),
     ]),
 
