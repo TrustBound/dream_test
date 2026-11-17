@@ -1,5 +1,5 @@
 -module(dream_test_gherkin_world_ffi).
--export([create_table/1, delete_table/1, insert/3, lookup/2, delete_key/2, unique_id/0, unsafe_coerce/1]).
+-export([create_table/1, delete_table/1, insert/3, lookup/2, delete_key/2, unique_id/0]).
 
 %% Create a new ETS table with a unique name
 create_table(Name) ->
@@ -33,16 +33,3 @@ delete_key(Table, Key) ->
 unique_id() ->
     Int = erlang:unique_integer([positive]),
     integer_to_binary(Int).
-
-%% Unsafe coercion - just returns the value wrapped in Ok
-%% The caller is responsible for type safety
-unsafe_coerce(Value) ->
-    {ok, Value}.
-
-
-
-
-
-
-
-
