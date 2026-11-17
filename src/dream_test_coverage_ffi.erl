@@ -8,7 +8,8 @@
     is_regular_file/1,
     erlang_function_last_line/1,
     system_time_ms/0,
-    environment_variable/1
+    environment_variable/1,
+    delete_html_pages/1
 ]).
 
 %% Erlang side of `dream_test/coverage`.
@@ -181,4 +182,15 @@ environment_variable(Name) ->
     case os:getenv(unicode:characters_to_list(Name)) of
         false -> {error, nil};
         Value -> {ok, unicode:characters_to_binary(Value)}
+    end.
+
+%% Delete the `files` folder of an HTML report and everything in it, before
+%% `coverage.html_path` writes new pages. A folder that does not exist is
+%% fine. Any other failure is an `html_delete_failed` error for the folder.
+delete_html_pages(Path) ->
+    case file:del_dir_r(Path) of
+        ok -> {ok, nil};
+        {error, enoent} -> {ok, nil};
+        {error, Reason} ->
+            {error, {html_delete_failed, Path, dream_test_file_ffi:make_error(Path, Reason)}}
     end.

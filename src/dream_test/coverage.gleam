@@ -411,6 +411,10 @@ pub type CoverageError {
   /// A source file could not be read to show it in the HTML report from
   /// `coverage.html_path`.
   HtmlSourceReadFailed(path: String, error: FileError)
+  /// The `files` folder of the HTML directory from `coverage.html_path`
+  /// could not be deleted before new pages were written. `path` is that
+  /// folder.
+  HtmlDeleteFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
   /// The value given to `coverage.minimum_percent_per_file` is not from 0.0
@@ -746,8 +750,14 @@ pub fn markdown_path(
 /// in a browser. See `dream_test/coverage/html` for the pages and their
 /// paths. The pages hold the same files and lines as the LCOV file:
 /// excluded files and ignored lines are left out of the counts. Folders are
-/// created when needed, and pages from an earlier run are written over. Off
-/// by default.
+/// created when needed. Off by default.
+///
+/// Before it writes the pages, coverage deletes the folder
+/// `<directory>/files` and everything in it, so a page of a source file that
+/// was removed or renamed does not stay. Coverage deletes only that one
+/// folder. It does not delete the directory itself or other files in it, so
+/// keep your own files out of `<directory>/files`. If the folder cannot be
+/// deleted, coverage fails with `HtmlDeleteFailed`.
 ///
 /// ## Parameters
 ///
@@ -1926,16 +1936,31 @@ fn write_report(
   }
 }
 
-/// Write a page per file, then the index. A source file that cannot be read
-/// stops the run before its page is written.
+/// Delete the pages of an earlier run, write a page per file, then the
+/// index. A source file that cannot be read stops the run before its page is
+/// written.
 fn write_html(
   directory: Option(String),
   coverage_report: CoverageReport,
 ) -> Result(CoverageReport, CoverageError) {
   case directory {
     None -> Ok(coverage_report)
-    Some(path) ->
-      write_html_pages(path, report.files(coverage_report), coverage_report)
+    Some(path) -> delete_then_write_html_pages(path, coverage_report)
+  }
+}
+
+fn delete_then_write_html_pages(
+  directory: String,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case delete_html_pages(directory <> "/files") {
+    Ok(Nil) ->
+      write_html_pages(
+        directory,
+        report.files(coverage_report),
+        coverage_report,
+      )
+    Error(error) -> Error(error)
   }
 }
 
@@ -3358,6 +3383,11 @@ fn analyse_module(
   module_name: String,
   source_path: String,
 ) -> Result(List(LineCoverage), CoverageError)
+
+/// Delete a folder and everything in it. A folder that does not exist is
+/// fine.
+@external(erlang, "dream_test_coverage_ffi", "delete_html_pages")
+fn delete_html_pages(path: String) -> Result(Nil, CoverageError)
 
 @external(erlang, "dream_test_coverage_ffi", "match_files")
 fn match_files(pattern: String) -> List(String)

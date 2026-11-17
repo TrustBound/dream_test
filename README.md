@@ -405,6 +405,8 @@ fn coverage_config() {
 
 When a file cannot be written, coverage fails with a `Coverage failed` message that names the format and the path.
 
+Before it writes the HTML pages, coverage deletes the `files` folder in the HTML directory, so no page of a removed source file stays. It deletes only that folder. Other files in the HTML directory stay.
+
 ### Coverage from a server
 
 Code in another BEAM instance, for example an application server that integration tests start as an OS process, is not in the test run. The server measures itself with `coverage.start` and `coverage.finish` and writes an LCOV file when it stops. The test run adds that file with `coverage.merge_lcov`:

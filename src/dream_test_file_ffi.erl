@@ -1,5 +1,7 @@
 -module(dream_test_file_ffi).
 -export([read_file/1, write_file/2, delete_file/1, delete_files_matching/2]).
+%% Also used by dream_test_coverage_ffi, so its errors match `FileError`.
+-export([make_error/2]).
 
 %% Read a file and return its contents as a binary string.
 %% Returns {ok, Binary} on success, {error, FileError} on failure.

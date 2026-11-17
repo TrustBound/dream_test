@@ -91,16 +91,17 @@ import dream_test/coverage.{
   AlreadyInstrumented, BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed,
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  ExcludeWithoutReason, FilesBelowMinimumPercent, HtmlSourceReadFailed,
-  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
-  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidEnvironmentValue, InvalidMinimumPercent, InvalidMinimumPercentPerFile,
-  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
-  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
-  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  ExcludeWithoutReason, FilesBelowMinimumPercent, HtmlDeleteFailed,
+  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
+  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
+  InvalidMinimumPercent, InvalidMinimumPercentPerFile, JsonWriteFailed,
+  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
+  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
+  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
 import dream_test/coverage/format
 import dream_test/coverage/report.{
@@ -802,6 +803,16 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> file.error_to_string(error)
           <> ").",
         fix: "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
+      )
+    HtmlDeleteFailed(path, error) ->
+      ErrorMessage(
+        what: "Could not delete the old HTML coverage pages in \""
+          <> path
+          <> "\".",
+        reason: "coverage.html_path(...) deletes this folder before it writes new pages, so that no page of a removed source file stays, but the folder cannot be deleted ("
+          <> file.error_to_string(error)
+          <> ").",
+        fix: "make this folder and everything in it writable by the user that runs the tests, or delete the folder yourself.",
       )
     InvalidMinimumPercent(value) ->
       ErrorMessage(

@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - JSON (`coverage.json_path`), Cobertura XML (`coverage.cobertura_path`),
     Markdown (`coverage.markdown_path`) and HTML with annotated source
     (`coverage.html_path`)
+  - `coverage.html_path` deletes the `files` folder of the HTML directory
+    before it writes new pages, so no page of a removed source file stays
 
 - **Coverage from other BEAM instances** (`coverage.merge_lcov`)
 

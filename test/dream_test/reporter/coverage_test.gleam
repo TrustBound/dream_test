@@ -4,16 +4,16 @@ import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoberturaWriteFailed, CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed,
   EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, ExcludeWithoutReason, HtmlSourceReadFailed,
-  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
-  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidEnvironmentValue, InvalidMinimumPercent, JsonWriteFailed,
-  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
-  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  ExcludeMatchedNothing, ExcludeWithoutReason, HtmlDeleteFailed,
+  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
+  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
+  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
+  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -1040,6 +1040,19 @@ pub fn tests() {
           "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
         ))
         |> or_fail_with("expected the HtmlSourceReadFailed message")
+      }),
+      it("describes HtmlDeleteFailed", fn() {
+        render_failure_for(HtmlDeleteFailed(
+          "html/files",
+          FileSystemError("html/files", "eexist"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not delete the old HTML coverage pages in \"html/files\".",
+          "coverage.html_path(...) deletes this folder before it writes new pages, so that no page of a removed source file stays, but the folder cannot be deleted (File error (eexist): html/files).",
+          "make this folder and everything in it writable by the user that runs the tests, or delete the folder yourself.",
+        ))
+        |> or_fail_with("expected the HtmlDeleteFailed message")
       }),
       it("describes LcovWriteFailed with PermissionDenied", fn() {
         render_failure_for(LcovWriteFailed(

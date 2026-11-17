@@ -7,7 +7,7 @@ import coverage_fixtures/nested/deep
 import coverage_fixtures/sample
 import dream_test/coverage.{
   type CoverageError, type CoverageSession, type StartCause, BelowMinimumPercent,
-  CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed,
+  CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed, HtmlDeleteFailed,
   HtmlSourceReadFailed, HtmlWriteFailed, InvalidMinimumPercent, JsonWriteFailed,
   LcovWriteFailed, MarkdownWriteFailed, NoSourceFiles, SourceDirectoryNotFound,
   SourceDirectoryOutsideSourceRoot,
@@ -18,10 +18,13 @@ import dream_test/coverage/report.{
 import dream_test/coverage_child_support.{
   add_source, child_project, compile_source, make_unreadable, run_in_child,
 }
-import dream_test/file.{IsDirectory, PermissionDenied, read, write}
+import dream_test/file.{
+  FileSystemError, IsDirectory, NotFound, PermissionDenied, read, write,
+}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, group, it}
+import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
@@ -196,6 +199,11 @@ fn fixture_deep_page_body() {
 fn is_ok(value: Result(a, b)) -> Bool {
   result.is_ok(value)
 }
+
+/// Set the permission bits of a file or folder, for tests that need a
+/// folder that cannot be changed.
+@external(erlang, "file", "change_mode")
+fn change_mode(path: String, mode: Int) -> Dynamic
 
 fn output_path(name: String) -> String {
   "test/tmp/coverage_api_test/" <> int.to_string(unique_port()) <> "_" <> name
@@ -571,17 +579,64 @@ pub fn tests() {
         )
         |> or_fail_with("expected HtmlWriteFailed")
       }),
-      it("return HtmlWriteFailed when a source page path is a directory", fn() {
+      it("return HtmlWriteFailed when a source page cannot be written", fn() {
         let directory = output_path("html_page_blocked")
         let page_path =
-          directory <> "/files/test/coverage_fixtures/sample.gleam.html"
-        let _ = write(page_path <> "/blocker", "")
-        measure_classify(fixture_config() |> coverage.html_path(directory))
+          directory
+          <> "/files/test/coverage_fixtures/coverage_fixture_ffi.erl.html"
+        let _ = write(directory <> "/keep.txt", "")
+        let _ = change_mode(directory, 0o555)
+        let result =
+          measure_classify(fixture_config() |> coverage.html_path(directory))
+        let _ = change_mode(directory, 0o755)
+        result
+        |> should
+        |> be_equal(Ok(Error(HtmlWriteFailed(page_path, NotFound(page_path)))))
+        |> or_fail_with("expected HtmlWriteFailed for the page")
+      }),
+      it("delete a page from an earlier run", fn() {
+        let directory = output_path("html_stale")
+        let stale_page = directory <> "/files/src/removed.gleam.html"
+        let _ = write(stale_page, "stale")
+        let _ =
+          measure_classify(fixture_config() |> coverage.html_path(directory))
+        read(stale_page)
+        |> should
+        |> be_equal(Error(NotFound(stale_page)))
+        |> or_fail_with("expected the stale page to be deleted")
+      }),
+      it("keep other files in the HTML directory", fn() {
+        let directory = output_path("html_own_file")
+        let own_file = directory <> "/notes.txt"
+        let _ = write(directory <> "/files/src/removed.gleam.html", "stale")
+        let _ = write(own_file, "mine")
+        let _ =
+          measure_classify(fixture_config() |> coverage.html_path(directory))
+        read(own_file)
+        |> should
+        |> be_equal(Ok("mine"))
+        |> or_fail_with("expected the user's own file to stay")
+      }),
+      it("return HtmlDeleteFailed when old pages cannot be deleted", fn() {
+        let directory = output_path("html_delete_blocked")
+        let files_path = directory <> "/files"
+        let locked = files_path <> "/locked"
+        let _ = write(locked <> "/page.html", "stale")
+        let _ = change_mode(locked, 0o555)
+        let result =
+          measure_classify(fixture_config() |> coverage.html_path(directory))
+        let _ = change_mode(locked, 0o755)
+        result
         |> should
         |> be_equal(
-          Ok(Error(HtmlWriteFailed(page_path, IsDirectory(page_path)))),
+          Ok(
+            Error(HtmlDeleteFailed(
+              files_path,
+              FileSystemError(files_path, "eexist"),
+            )),
+          ),
         )
-        |> or_fail_with("expected HtmlWriteFailed for the page")
+        |> or_fail_with("expected HtmlDeleteFailed")
       }),
       it(
         "return HtmlSourceReadFailed when a source file cannot be read at finish",
