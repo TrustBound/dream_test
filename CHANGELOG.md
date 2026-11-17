@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end of a run. It always gives a line, because `ProgressEvent` has no hook
   events. The runner now uses it in place of `progress.handle_event`.
 
+### Changed
+
+- BREAKING: A test body that runs past its timeout is now always
+  `TimedOut`. Before, a sequential run (`max_concurrency` 1) gave
+  `Failed`, and a parallel run gave `TimedOut` or `Failed`, by which of two
+  deadlines ended first. Now the sandbox timeout of the body is the only
+  deadline. It counts from the start of the body, and each hook has its own
+  timeout. The failure is still `timeout: test timed out`, and the
+  `after_each` hooks still run.
+
 ### Fixed
 
 - Coverage no longer counts the line of a function with an

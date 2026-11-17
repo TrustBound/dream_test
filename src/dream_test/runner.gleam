@@ -339,7 +339,9 @@ pub fn max_concurrency(
 
 /// Set the default timeout (milliseconds) applied to tests without an explicit timeout.
 ///
-/// Tests that exceed the timeout are killed and reported as `TimedOut`.
+/// The timeout counts from the start of the test body. A body that runs
+/// longer is killed and reported as `TimedOut`, in parallel and in
+/// sequential runs. Each hook gets the same timeout on its own.
 ///
 /// ## Example
 ///

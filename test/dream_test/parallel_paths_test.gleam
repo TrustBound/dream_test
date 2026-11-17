@@ -98,7 +98,7 @@ pub fn tests() {
       |> summaries
       |> should
       |> be_equal([
-        #(["root", "sleeps"], Failed, [failure("timeout", "test timed out")]),
+        #(["root", "sleeps"], TimedOut, [failure("timeout", "test timed out")]),
       ])
       |> or_fail_with("a slow test should time out")
     }),
@@ -309,8 +309,9 @@ pub fn tests() {
     }),
 
     it("a test with its own timeout times out while another runs on", fn() {
-      // The runner hook holds each worker for 30ms, so the 20ms deadline of
-      // "short" passes before its body starts, while "long" still runs.
+      // The runner hook holds each worker for 30ms before the bodies start.
+      // The 20ms deadline of "short" counts from the start of its body, so
+      // it ends while "long" still runs.
       runner.new([
         describe("root", [
           timed_test("short", Some(20), 1000),
@@ -332,10 +333,10 @@ pub fn tests() {
       |> or_fail_with("the short test should time out and the long one pass")
     }),
 
-    it("a test past its deadline during a slow progress write fails", fn() {
+    it("a test past its deadline during a slow progress write times out", fn() {
       // Each progress write takes 100ms. While the runner writes the line of
-      // "fast", the 50ms sandbox timeout of "slow" ends its body, so "slow"
-      // fails with the sandbox timeout and not with the runner deadline.
+      // "fast", the 50ms sandbox timeout of "slow" ends its body. The sandbox
+      // timeout is the only deadline, so "slow" times out.
       runner.new([
         describe("root", [
           timed_test("slow", None, 1000),
@@ -353,7 +354,7 @@ pub fn tests() {
       |> summaries
       |> should
       |> be_equal([
-        #(["root", "slow"], Failed, [failure("timeout", "test timed out")]),
+        #(["root", "slow"], TimedOut, [failure("timeout", "test timed out")]),
         #(["root", "fast"], Passed, []),
       ])
       |> or_fail_with("the slow test should time out after the slow write")
