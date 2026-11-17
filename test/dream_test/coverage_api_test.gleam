@@ -8,8 +8,9 @@ import coverage_fixtures/sample
 import dream_test/coverage.{
   type CoverageError, type CoverageSession, type StartCause, BelowMinimumPercent,
   CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed, HtmlDeleteFailed,
-  HtmlSourceReadFailed, HtmlWriteFailed, InvalidMinimumPercent, JsonWriteFailed,
-  LcovWriteFailed, MarkdownWriteFailed, NoSourceFiles, SourceDirectoryNotFound,
+  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
+  HtmlWriteFailed, InvalidMinimumPercent, JsonWriteFailed, LcovWriteFailed,
+  MarkdownWriteFailed, NoSourceFiles, SourceDirectoryNotFound,
   SourceDirectoryOutsideSourceRoot,
 }
 import dream_test/coverage/report.{
@@ -193,6 +194,15 @@ fn fixture_deep_page_body() {
     "</table>\n",
     "</body>\n",
     "</html>\n",
+  ])
+}
+
+/// The start of the section of nested/deep.gleam on the combined page.
+fn deep_section_start() {
+  string.concat([
+    "<section id=\"file-test~2Fcoverage_fixtures~2Fnested~2Fdeep.gleam\">\n",
+    "<h2>test/coverage_fixtures/nested/deep.gleam</h2>\n",
+    "<p>Lines: 0/1. Cover: <span class=\"low\">0.0%</span>.</p>\n",
   ])
 }
 
@@ -670,6 +680,76 @@ pub fn tests() {
             ),
           )
           |> or_fail_with("expected HtmlSourceReadFailed")
+        },
+      ),
+      it("write the combined HTML page with a section per file", fn() {
+        let path = output_path("html_file") <> "/all.html"
+        let _ = measure_classify(fixture_config() |> coverage.html_file(path))
+        read(path)
+        |> result.map(string.contains(_, deep_section_start()))
+        |> should
+        |> be_equal(Ok(True))
+        |> or_fail_with("expected the combined page with the deep section")
+      }),
+      it("write the HTML directory and the combined page together", fn() {
+        let directory = output_path("html_both")
+        let _ =
+          measure_classify(
+            fixture_config()
+            |> coverage.html_path(directory <> "/html")
+            |> coverage.html_file(directory <> "/all.html"),
+          )
+        #(
+          is_ok(read(directory <> "/html/index.html")),
+          is_ok(read(directory <> "/all.html")),
+        )
+        |> should
+        |> be_equal(#(True, True))
+        |> or_fail_with("expected the index and the combined page")
+      }),
+      it(
+        "return HtmlFileWriteFailed when the combined page path is a directory",
+        fn() {
+          measure_classify(fixture_config() |> coverage.html_file("test"))
+          |> should
+          |> be_equal(
+            Ok(Error(HtmlFileWriteFailed("test", IsDirectory("test")))),
+          )
+          |> or_fail_with("expected HtmlFileWriteFailed")
+        },
+      ),
+      it(
+        "return HtmlFileSourceReadFailed when a source file cannot be read for the combined page",
+        fn() {
+          run_in_child(fn() {
+            let _ = child_project("html_file_unreadable")
+            add_source(
+              "plain.erl",
+              "-module(plain).\n-export([one/0]).\none() -> 1.\n",
+            )
+            compile_source("plain.erl", "debug_info")
+            let config =
+              coverage.new()
+              |> coverage.no_lcov()
+              |> coverage.html_file("build/all.html")
+            case coverage.start(config) {
+              Ok(session) -> {
+                make_unreadable("plain.erl")
+                coverage.finish(session)
+              }
+              Error(error) -> Error(error)
+            }
+          })
+          |> should
+          |> be_equal(
+            Ok(
+              Error(HtmlFileSourceReadFailed(
+                "src/plain.erl",
+                PermissionDenied("src/plain.erl"),
+              )),
+            ),
+          )
+          |> or_fail_with("expected HtmlFileSourceReadFailed")
         },
       ),
     ]),

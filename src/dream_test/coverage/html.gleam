@@ -1,15 +1,18 @@
-//// Coverage as HTML pages: an index and one page per source file.
+//// Coverage as HTML: an index and one page per source file, or one
+//// combined page.
 ////
-//// `coverage.html_path` writes these pages to a directory when coverage
-//// finishes. Open `index.html` in a browser. Call the functions here
-//// yourself to build the pages in a custom pipeline, for example to serve
-//// them from a development server.
+//// `coverage.html_path` writes the index and the source pages to a
+//// directory when coverage finishes. Open `index.html` in a browser.
+//// `coverage.html_file` writes the combined page to one file. Either or
+//// both can be on. Call the functions here yourself to build the pages in
+//// a custom pipeline, for example to serve them from a development server.
 ////
 //// ```gleam
 //// import dream_test/coverage
 ////
 //// coverage.new()
 //// |> coverage.html_path("build/coverage/html")
+//// |> coverage.html_file("build/coverage/all.html")
 //// ```
 ////
 //// ## Pages
@@ -22,6 +25,10 @@
 ////   and hit count. A row has the class `hit`, `missed`, `not-executable` or
 ////   `ignored`. An ignored row has a `title` with its reason, and the page
 ////   lists the ignored ranges above the source.
+//// - The combined page has the same table as `index.html`, then the same
+////   annotated source of each file, in the order of the table. Each file is
+////   in a `<section>` with an `id`, and each file name in the table links to
+////   its section.
 ////
 //// The pages are self-contained: the CSS is inline, there is no JavaScript
 //// and nothing loads from another place. The colours follow the light or
@@ -39,11 +46,19 @@
 //// (from a path that starts with `/`) are changed too, so no two source
 //// paths get the same page, and no page leaves the `files` folder.
 ////
+//// ## Section ids
+////
+//// The `id` of a section on the combined page is `file-` and the source
+//// path, with the same character rule as page paths. A `/` also becomes
+//// `~2F`. For example, `src/app/my cart.gleam` has the id
+//// `file-src~2Fapp~2Fmy~20cart.gleam`. A `~` in a path becomes `~7E`, so
+//// no two source paths get the same id.
+////
 //// ## Available Functions
 ////
 //// | Category  | Functions                         |
 //// |-----------|-----------------------------------|
-//// | **Pages** | `index`, `source_page`            |
+//// | **Pages** | `index`, `source_page`, `combined` |
 //// | **Paths** | `page_path`                       |
 ////
 //// ## Import Style
@@ -61,6 +76,7 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 /// Render the index page of a coverage report.
@@ -84,14 +100,105 @@ import gleam/string
 /// // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
 /// ```
 pub fn index(report coverage_report: CoverageReport) -> String {
-  let hit = report.total_hit_line_count(coverage_report)
-  let total = report.total_executable_line_count(coverage_report)
   document(title: "Coverage", body: [
     "<h1>Coverage</h1>\n",
+    summary_table(coverage_report, PageLinks),
+  ])
+}
+
+/// Render the combined page of a coverage report: the table of the index,
+/// then the annotated source of every file, on one page.
+///
+/// ## Parameters
+///
+/// - `report`: the report to render
+/// - `sources`: the text of each source file, by its source path from
+///   `report.source_path`. A file that is not in `sources` is shown with
+///   no source text, so each line has only its number and hit count.
+///
+/// ## Returns
+///
+/// A complete HTML document. Each file name in the table links to the
+/// section of that file on the same page. The module docs list how the
+/// section ids are made.
+///
+/// ## Example
+///
+/// ```gleam
+/// let coverage_report =
+///   report.new([
+///     report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
+///   ])
+/// html.combined(
+///   report: coverage_report,
+///   sources: dict.from_list([#("src/a.gleam", "pub fn a() { 1 }\n")]),
+/// )
+/// // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// ```
+pub fn combined(
+  report coverage_report: CoverageReport,
+  sources sources: Dict(String, String),
+) -> String {
+  document(title: "Coverage", body: [
+    "<h1>Coverage</h1>\n",
+    summary_table(coverage_report, SectionLinks),
+    file_sections(report.files(coverage_report), sources, []),
+  ])
+}
+
+fn file_sections(
+  files: List(FileCoverage),
+  sources: Dict(String, String),
+  sections_reversed: List(String),
+) -> String {
+  case files {
+    [] -> string.concat(list.reverse(sections_reversed))
+    [file, ..rest] ->
+      file_sections(rest, sources, [
+        file_section(file, sources),
+        ..sections_reversed
+      ])
+  }
+}
+
+fn file_section(file: FileCoverage, sources: Dict(String, String)) -> String {
+  let source_path = report.source_path(file)
+  let source = result.unwrap(dict.get(sources, source_path), "")
+  "<section id=\""
+  <> section_id(source_path)
+  <> "\">\n"
+  <> annotated_source(file, source, "h2")
+  <> "</section>\n"
+}
+
+/// The id of the section of a source file on the combined page.
+fn section_id(source_path: String) -> String {
+  "file-" <> encode_characters(source_path)
+}
+
+/// Where a file name in the summary table links to: its own page next to
+/// the index, or its section on the combined page.
+type FileLinks {
+  PageLinks
+  SectionLinks
+}
+
+fn file_link(links: FileLinks, source_path: String) -> String {
+  case links {
+    PageLinks -> page_path(source_path)
+    SectionLinks -> "#" <> section_id(source_path)
+  }
+}
+
+/// The table of files with a total row, and the summary of excluded files.
+fn summary_table(coverage_report: CoverageReport, links: FileLinks) -> String {
+  let hit = report.total_hit_line_count(coverage_report)
+  let total = report.total_executable_line_count(coverage_report)
+  string.concat([
     "<table>\n",
     "<thead><tr><th>File</th><th class=\"number\">Lines</th><th class=\"number\">Cover</th><th>Missing</th><th>Excluded</th></tr></thead>\n",
     "<tbody>\n",
-    string.concat(list.map(report.files(coverage_report), file_row)),
+    file_rows(report.files(coverage_report), links, []),
     string.concat(list.map(
       report.excluded_files(coverage_report),
       excluded_file_row,
@@ -134,6 +241,22 @@ pub fn index(report coverage_report: CoverageReport) -> String {
 /// ```
 pub fn source_page(file file: FileCoverage, source source: String) -> String {
   let source_path = report.source_path(file)
+  document(title: source_path <> " - Coverage", body: [
+    "<p><a href=\"",
+    index_link(source_path),
+    "\">All files</a></p>\n",
+    annotated_source(file, source, "h1"),
+  ])
+}
+
+/// The heading, the counts, the ignored ranges and the source rows of one
+/// file. `heading` is the tag of the heading, for example `h1`.
+fn annotated_source(
+  file: FileCoverage,
+  source: String,
+  heading: String,
+) -> String {
+  let source_path = report.source_path(file)
   let hit = report.hit_line_count(file)
   let total = report.executable_line_count(file)
   let page =
@@ -144,13 +267,10 @@ pub fn source_page(file file: FileCoverage, source source: String) -> String {
   let source_lines = source_lines(source)
   let line_count =
     list.fold(report.lines(file), list.length(source_lines), max_line)
-  document(title: source_path <> " - Coverage", body: [
-    "<p><a href=\"",
-    index_link(source_path),
-    "\">All files</a></p>\n",
-    "<h1>",
+  string.concat([
+    "<" <> heading <> ">",
     format.escape_markup(source_path),
-    "</h1>\n",
+    "</" <> heading <> ">\n",
     "<p>Lines: ",
     format.line_counts(hit: hit, total: total),
     ". Cover: <span class=\"",
@@ -199,16 +319,28 @@ pub fn page_path(source_path source_path: String) -> String {
 }
 
 // =============================================================================
-// Index
+// Summary table
 // =============================================================================
 
-fn file_row(file: FileCoverage) -> String {
+fn file_rows(
+  files: List(FileCoverage),
+  links: FileLinks,
+  rows_reversed: List(String),
+) -> String {
+  case files {
+    [] -> string.concat(list.reverse(rows_reversed))
+    [file, ..rest] ->
+      file_rows(rest, links, [file_row(file, links), ..rows_reversed])
+  }
+}
+
+fn file_row(file: FileCoverage, links: FileLinks) -> String {
   let source_path = report.source_path(file)
   let hit = report.hit_line_count(file)
   let total = report.executable_line_count(file)
   row([
     "<td><a href=\""
-      <> format.escape_markup(page_path(source_path))
+      <> format.escape_markup(file_link(links, source_path))
       <> "\">"
       <> format.escape_markup(source_path)
       <> "</a></td>",

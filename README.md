@@ -387,9 +387,9 @@ fn coverage_config() {
 
 ### Output files
 
-Coverage writes LCOV unless you set `coverage.no_lcov()`. It can also write JSON, Cobertura XML (for GitLab, Jenkins and Azure DevOps), Markdown (for `$GITHUB_STEP_SUMMARY` or a pull request comment) and HTML (an index page and one page for each source file):
+Coverage writes LCOV unless you set `coverage.no_lcov()`. It can also write JSON, Cobertura XML (for GitLab, Jenkins and Azure DevOps), Markdown (for `$GITHUB_STEP_SUMMARY` or a pull request comment) and HTML (an index page and one page for each source file, or one combined page with the same table and source):
 
-#### Write every format <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/coverage/coverage_outputs.gleam#L25-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Write every format <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/coverage/coverage_outputs.gleam#L25-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -399,6 +399,7 @@ fn coverage_config() {
   |> coverage.cobertura_path("build/coverage/cobertura.xml")
   |> coverage.markdown_path("build/coverage/coverage.md")
   |> coverage.html_path("build/coverage/html")
+  |> coverage.html_file("build/coverage/all.html")
 }
 ```
 
@@ -406,6 +407,8 @@ fn coverage_config() {
 When a file cannot be written, coverage fails with a `Coverage failed` message that names the format and the path.
 
 Before it writes the HTML pages, coverage deletes the `files` folder in the HTML directory, so no page of a removed source file stays. It deletes only that folder. Other files in the HTML directory stay.
+
+`coverage.html_file` writes one self-contained page: the table, then the source of each file, with each file name linked to its source. Attach it to a CI run, or send it as one file. You can turn on `html_path`, `html_file` or both.
 
 ### Coverage from a server
 

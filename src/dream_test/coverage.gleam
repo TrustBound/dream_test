@@ -170,6 +170,7 @@
 //// |> coverage.cobertura_path("build/coverage/cobertura.xml")
 //// |> coverage.markdown_path("build/coverage/coverage.md")
 //// |> coverage.html_path("build/coverage/html")
+//// |> coverage.html_file("build/coverage/all.html")
 //// ```
 ////
 //// - JSON: a summary per file, with missing lines, ignored lines and
@@ -180,6 +181,8 @@
 ////   (`dream_test/coverage/markdown`).
 //// - HTML: an index page and a page per source file that shows each line
 ////   with its hit count (`dream_test/coverage/html`).
+//// - Combined HTML: the same table and annotated source on one page
+////   (`dream_test/coverage/html`).
 ////
 //// A file that cannot be written fails coverage with a `Coverage failed`
 //// message that names the format and the path.
@@ -271,7 +274,7 @@
 //// |--------------|-----------------------------------------------------------|
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
 //// |              | `json_path`, `cobertura_path`, `markdown_path`,           |
-//// |              | `html_path`,                                              |
+//// |              | `html_path`, `html_file`,                                 |
 //// |              | `show_missing`, `minimum_percent`,                        |
 //// |              | `minimum_percent_per_file`, `merge_lcov`,                 |
 //// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
@@ -333,6 +336,7 @@ pub opaque type CoverageConfig {
     cobertura_path: Option(String),
     markdown_path: Option(String),
     html_path: Option(String),
+    html_file: Option(String),
   )
 }
 
@@ -415,6 +419,11 @@ pub type CoverageError {
   /// could not be deleted before new pages were written. `path` is that
   /// folder.
   HtmlDeleteFailed(path: String, error: FileError)
+  /// The combined HTML page from `coverage.html_file` could not be written.
+  HtmlFileWriteFailed(path: String, error: FileError)
+  /// A source file could not be read to show it in the combined HTML page
+  /// from `coverage.html_file`.
+  HtmlFileSourceReadFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
   /// The value given to `coverage.minimum_percent_per_file` is not from 0.0
@@ -600,6 +609,7 @@ pub fn new() -> CoverageConfig {
     cobertura_path: None,
     markdown_path: None,
     html_path: None,
+    html_file: None,
   )
 }
 
@@ -779,6 +789,42 @@ pub fn html_path(
   directory directory: String,
 ) -> CoverageConfig {
   CoverageConfig(..config, html_path: Some(directory))
+}
+
+/// Write the HTML report as one combined page to this file when coverage
+/// finishes.
+///
+/// The page has the table of `coverage.html_path`'s `index.html`, then the
+/// annotated source of every file, in the order of the table. Each file
+/// name in the table links to the source of that file on the same page.
+/// The page is self-contained, so you can attach it to a CI run or send it
+/// as one file. See `dream_test/coverage/html` for the page. Folders are
+/// created when needed, and a file from an earlier run is written over. Off
+/// by default.
+///
+/// `coverage.html_path` and `coverage.html_file` can both be on. Coverage
+/// writes the HTML directory first, then this file.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write the page to
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.html_file("build/coverage/all.html")
+/// ```
+pub fn html_file(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, html_file: Some(path))
 }
 
 /// Do not write an LCOV file. The table is still printed.
@@ -1919,7 +1965,8 @@ fn analyse_then_continue(
 }
 
 /// Write every file the settings ask for, in this order: LCOV, JSON,
-/// Cobertura, Markdown, HTML. The first write that fails stops the run.
+/// Cobertura, Markdown, the HTML directory, the combined HTML page. The
+/// first write that fails stops the run.
 fn write_report(
   coverage_report: CoverageReport,
   config: CoverageConfig,
@@ -1931,8 +1978,90 @@ fn write_report(
     #(config.markdown_path, MarkdownOutput),
   ]
   case write_outputs(outputs, coverage_report, config) {
-    Ok(Nil) -> write_html(config.html_path, coverage_report)
+    Ok(Nil) -> write_html_then_combined(config, coverage_report)
     Error(error) -> Error(error)
+  }
+}
+
+fn write_html_then_combined(
+  config: CoverageConfig,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case write_html(config.html_path, coverage_report) {
+    Ok(_) -> write_combined_html(config.html_file, coverage_report)
+    Error(error) -> Error(error)
+  }
+}
+
+/// Read every source file, then write the combined page. A source file that
+/// cannot be read stops the run before the page is written.
+fn write_combined_html(
+  path: Option(String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case path {
+    None -> Ok(coverage_report)
+    Some(file_path) ->
+      read_sources_then_write_combined(
+        file_path,
+        report.files(coverage_report),
+        dict.new(),
+        coverage_report,
+      )
+  }
+}
+
+fn read_sources_then_write_combined(
+  path: String,
+  files: List(FileCoverage),
+  sources: Dict(String, String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case files {
+    [] -> write_combined_page(path, sources, coverage_report)
+    [file_coverage, ..rest] ->
+      read_source_then_continue(
+        CombinedRun(path: path, report: coverage_report),
+        report.source_path(file_coverage),
+        rest,
+        sources,
+      )
+  }
+}
+
+/// The combined page file and the report that it shows.
+type CombinedRun {
+  CombinedRun(path: String, report: CoverageReport)
+}
+
+fn read_source_then_continue(
+  run: CombinedRun,
+  source_path: String,
+  rest: List(FileCoverage),
+  sources: Dict(String, String),
+) -> Result(CoverageReport, CoverageError) {
+  case file.read(source_path) {
+    Ok(source) ->
+      read_sources_then_write_combined(
+        run.path,
+        rest,
+        dict.insert(sources, source_path, source),
+        run.report,
+      )
+    Error(error) ->
+      Error(HtmlFileSourceReadFailed(path: source_path, error: error))
+  }
+}
+
+fn write_combined_page(
+  path: String,
+  sources: Dict(String, String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  let page = html.combined(report: coverage_report, sources: sources)
+  case file.write(path, page) {
+    Ok(Nil) -> Ok(coverage_report)
+    Error(error) -> Error(HtmlFileWriteFailed(path: path, error: error))
   }
 }
 

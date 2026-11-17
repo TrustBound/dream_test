@@ -92,16 +92,16 @@ import dream_test/coverage.{
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
   ExcludeWithoutReason, FilesBelowMinimumPercent, HtmlDeleteFailed,
-  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
-  InvalidMinimumPercent, InvalidMinimumPercentPerFile, JsonWriteFailed,
-  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
-  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
+  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidEnvironmentValue, InvalidMinimumPercent, InvalidMinimumPercentPerFile,
+  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
+  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/format
 import dream_test/coverage/report.{
@@ -804,6 +804,18 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> ").",
         fix: "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
       )
+    HtmlFileWriteFailed(path, error) ->
+      write_message(html_file_output(), path, error)
+    HtmlFileSourceReadFailed(path, error) ->
+      ErrorMessage(
+        what: "Could not read the source file \""
+          <> path
+          <> "\" to show it in the combined HTML coverage page.",
+        reason: "the combined HTML page shows the source of each measured file, but this file cannot be read ("
+          <> file.error_to_string(error)
+          <> ").",
+        fix: "make the file readable by the user that runs the tests, or remove coverage.html_file(...).",
+      )
     HtmlDeleteFailed(path, error) ->
       ErrorMessage(
         what: "Could not delete the old HTML coverage pages in \""
@@ -1144,6 +1156,14 @@ fn html_output() -> OutputFile {
     name: "HTML coverage page",
     setting: "coverage.html_path",
     directory_fix: "delete the folder at this path, or give another directory to coverage.html_path(...).",
+  )
+}
+
+fn html_file_output() -> OutputFile {
+  OutputFile(
+    name: "combined HTML coverage page",
+    setting: "coverage.html_file",
+    directory_fix: "give a file name with coverage.html_file(...), for example build/coverage/all.html.",
   )
 }
 

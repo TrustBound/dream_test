@@ -5,15 +5,16 @@ import dream_test/coverage.{
   CoberturaWriteFailed, CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed,
   EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
   ExcludeMatchedNothing, ExcludeWithoutReason, HtmlDeleteFailed,
-  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
-  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
-  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
+  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidEnvironmentValue, InvalidMinimumPercent, JsonWriteFailed,
+  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
+  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
+  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -1040,6 +1041,32 @@ pub fn tests() {
           "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
         ))
         |> or_fail_with("expected the HtmlSourceReadFailed message")
+      }),
+      it("describes HtmlFileWriteFailed with IsDirectory", fn() {
+        render_failure_for(HtmlFileWriteFailed(
+          "build/all.html",
+          IsDirectory("build/all.html"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the combined HTML coverage page \"build/all.html\".",
+          "the path is a directory, not a file (Is a directory: build/all.html).",
+          "give a file name with coverage.html_file(...), for example build/coverage/all.html.",
+        ))
+        |> or_fail_with("expected the HtmlFileWriteFailed message")
+      }),
+      it("describes HtmlFileSourceReadFailed", fn() {
+        render_failure_for(HtmlFileSourceReadFailed(
+          "src/a.gleam",
+          PermissionDenied("src/a.gleam"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not read the source file \"src/a.gleam\" to show it in the combined HTML coverage page.",
+          "the combined HTML page shows the source of each measured file, but this file cannot be read (Permission denied: src/a.gleam).",
+          "make the file readable by the user that runs the tests, or remove coverage.html_file(...).",
+        ))
+        |> or_fail_with("expected the HtmlFileSourceReadFailed message")
       }),
       it("describes HtmlDeleteFailed", fn() {
         render_failure_for(HtmlDeleteFailed(

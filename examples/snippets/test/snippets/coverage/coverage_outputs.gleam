@@ -29,6 +29,7 @@ fn coverage_config() {
   |> coverage.cobertura_path("build/coverage/cobertura.xml")
   |> coverage.markdown_path("build/coverage/coverage.md")
   |> coverage.html_path("build/coverage/html")
+  |> coverage.html_file("build/coverage/all.html")
 }
 
 fn table_only_config() {

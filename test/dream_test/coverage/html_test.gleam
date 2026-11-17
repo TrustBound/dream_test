@@ -4,6 +4,7 @@ import dream_test/coverage/html
 import dream_test/coverage/report.{LineCoverage}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, group, it}
+import gleam/dict
 import gleam/option.{None, Some}
 import gleam/string
 
@@ -158,6 +159,40 @@ fn cart_page_body() {
   ])
 }
 
+/// The text after the summary table of a combined page: the excluded
+/// summary and the sections.
+fn after_summary_table(document: String) -> String {
+  case string.split_once(document, "</table>\n") {
+    Ok(#(_, rest)) -> rest
+    Error(Nil) -> document
+  }
+}
+
+/// The cart page body as a section of the combined page.
+fn cart_section() {
+  string.concat([
+    "<section id=\"file-src~2Fapp~2Fcart.gleam\">\n",
+    "<h2>src/app/cart.gleam</h2>\n",
+    "<p>Lines: 1/3. Cover: <span class=\"low\">33.3%</span>.</p>\n",
+    "<p>Ignored: 4-5 (debug &lt;x&gt;), 6</p>\n",
+    "<table class=\"source\">\n",
+    source_header(),
+    "<tbody>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">1</td><td class=\"number\"></td><td>fn a() {</td></tr>\n",
+    "<tr class=\"hit\"><td class=\"number\">2</td><td class=\"number\">3</td><td>  &quot;&lt;b&gt;&quot; &amp; &apos;c&apos;</td></tr>\n",
+    "<tr class=\"missed\"><td class=\"number\">3</td><td class=\"number\">0</td><td>  x</td></tr>\n",
+    "<tr class=\"ignored\" title=\"ignored: debug &lt;x&gt;\"><td class=\"number\">4</td><td class=\"number\">ignored</td><td>  y</td></tr>\n",
+    "<tr class=\"ignored\" title=\"ignored: debug &lt;x&gt;\"><td class=\"number\">5</td><td class=\"number\">ignored</td><td>  z</td></tr>\n",
+    "<tr class=\"ignored\" title=\"ignored\"><td class=\"number\">6</td><td class=\"number\">ignored</td><td>  w</td></tr>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">7</td><td class=\"number\"></td><td>}</td></tr>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">8</td><td class=\"number\"></td><td></td></tr>\n",
+    "<tr class=\"missed\"><td class=\"number\">9</td><td class=\"number\">0</td><td></td></tr>\n",
+    "</tbody>\n",
+    "</table>\n",
+    "</section>\n",
+  ])
+}
+
 pub fn tests() {
   describe("dream_test/coverage/html", [
     group("index", [
@@ -223,6 +258,71 @@ pub fn tests() {
           |> or_fail_with("expected the cart page body")
         },
       ),
+    ]),
+    group("combined", [
+      it(
+        "renders the table with section links, then a section per file in report order",
+        fn() {
+          report.new([
+            report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
+            report.file("src/my b~.gleam", [LineCoverage(line: 1, calls: 0)]),
+          ])
+          |> html.combined(sources: dict.from_list([#("src/a.gleam", "x")]))
+          |> should
+          |> be_equal(
+            expected_document("Coverage", [
+              "<h1>Coverage</h1>\n",
+              "<table>\n",
+              table_header(),
+              "<tbody>\n",
+              "<tr><td><a href=\"#file-src~2Fa.gleam\">src/a.gleam</a></td><td class=\"number\">1/1</td><td class=\"number complete\">100.0%</td><td></td><td></td></tr>\n",
+              "<tr><td><a href=\"#file-src~2Fmy~20b~7E.gleam\">src/my b~.gleam</a></td><td class=\"number\">0/1</td><td class=\"number low\">0.0%</td><td>1</td><td></td></tr>\n",
+              "</tbody>\n",
+              "<tfoot><tr><td>Total</td><td class=\"number\">1/2</td><td class=\"number partial\">50.0%</td><td></td><td></td></tr>\n",
+              "</tfoot>\n",
+              "</table>\n",
+              "<section id=\"file-src~2Fa.gleam\">\n",
+              "<h2>src/a.gleam</h2>\n",
+              "<p>Lines: 1/1. Cover: <span class=\"complete\">100.0%</span>.</p>\n",
+              "<table class=\"source\">\n",
+              source_header(),
+              "<tbody>\n",
+              "<tr class=\"hit\"><td class=\"number\">1</td><td class=\"number\">1</td><td>x</td></tr>\n",
+              "</tbody>\n",
+              "</table>\n",
+              "</section>\n",
+              "<section id=\"file-src~2Fmy~20b~7E.gleam\">\n",
+              "<h2>src/my b~.gleam</h2>\n",
+              "<p>Lines: 0/1. Cover: <span class=\"low\">0.0%</span>.</p>\n",
+              "<table class=\"source\">\n",
+              source_header(),
+              "<tbody>\n",
+              "<tr class=\"missed\"><td class=\"number\">1</td><td class=\"number\">0</td><td></td></tr>\n",
+              "</tbody>\n",
+              "</table>\n",
+              "</section>\n",
+            ]),
+          )
+          |> or_fail_with("expected the combined document")
+        },
+      ),
+      it("renders ignored, missed and escaped lines in a section", fn() {
+        report.new([cart_file()])
+        |> html.combined(
+          sources: dict.from_list([#("src/app/cart.gleam", cart_source())]),
+        )
+        |> after_summary_table()
+        |> should
+        |> be_equal(
+          string.concat([
+            "<p>Excluded: 3 lines in 1 file</p>\n",
+            cart_section(),
+            "</body>\n",
+            "</html>\n",
+          ]),
+        )
+        |> or_fail_with("expected the cart section")
+      }),
     ]),
     group("page_path", [
       it("keeps a plain source path", fn() {
