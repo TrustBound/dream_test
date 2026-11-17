@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `and` and `but` helpers do not change. Code that builds the record by hand
   must change, for example `InlineStep(keyword: "When", text: "I add 3")`
   becomes `InlineStep(keyword: gherkin_types.When, text: "I add 3")`.
+- BREAKING: `gherkin/discover.with_registry` now gives a new opaque type,
+  `RunnableDiscovery`, and `gherkin/discover.to_suite` takes only that type.
+  Before, `to_suite` took a `FeatureDiscovery` and panicked when no registry
+  was attached. Now a suite without step definitions cannot compile. The
+  usual call
+  `discover.features("test/*.feature") |> discover.with_registry(steps) |> discover.to_suite("features")`
+  does not change. Code that writes the type of the `with_registry` result
+  must change `FeatureDiscovery` to `RunnableDiscovery`, and code that called
+  `to_suite` without `with_registry` must add the call.
 
 ### Fixed
 
@@ -108,6 +117,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pretty JSON (`json.format_pretty`, `json.report_pretty` and the JSON
   reporter with `pretty`) now writes an empty list as `[]`. Before, it
   wrote `[`, a line of spaces, and `]`. Compact JSON does not change.
+- `gherkin/discover.to_suite` now gives the full file path as the source of
+  a parse error test. Before, it cut the path at the first `": "`, so a
+  path such as `features/a: b.feature` gave the source `features/a`.
 - The BDD reporter without colour now writes the skipped, pending, timed out
   and setup failed counts of its summary as plain text. Before, it put ANSI
   colour codes around these counts, also when colour was off.

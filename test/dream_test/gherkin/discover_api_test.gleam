@@ -1,10 +1,14 @@
 import dream_test/file
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps
-import dream_test/matchers.{be_empty, contain, have_length, or_fail_with, should}
+import dream_test/matchers.{
+  be_empty, be_equal, contain, have_length, or_fail_with, should,
+}
 import dream_test/runner
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
+import gleam/list
+import gleam/option.{type Option, Some}
 
 pub fn tests() {
   describe("dream_test/gherkin/discover", [
@@ -111,5 +115,103 @@ pub fn tests() {
         |> or_fail_with("expected a parse-error test result")
       },
     ),
+
+    it("load gives a parse error as the path and the parser message", fn() {
+      let _ = file.write("./test/tmp/features/discover_text.feature", "NOT\n")
+
+      let discover.LoadResult(features: _, errors: errors) =
+        discover.features("./test/tmp/features/discover_text.feature")
+        |> discover.load()
+
+      errors
+      |> should
+      |> be_equal([
+        "test/tmp/features/discover_text.feature: No Feature found in content",
+      ])
+      |> or_fail_with("the error should name the path and the message")
+    }),
+
+    it("to_suite names a parse error test after the path and message", fn() {
+      let _ = file.write("./test/tmp/features/discover_name.feature", "NOT\n")
+
+      let suite =
+        discover.features("./test/tmp/features/discover_name.feature")
+        |> discover.with_registry(steps.new())
+        |> discover.to_suite("Features")
+
+      test_names(suite.children)
+      |> should
+      |> be_equal([
+        "Parse Error: test/tmp/features/discover_name.feature: No Feature found in content",
+      ])
+      |> or_fail_with("the test name should hold the path and the message")
+    }),
+
+    it("to_suite gives the full path with ': ' as the parse error source", fn() {
+      let _ = file.write("./test/tmp/features/discover: colon.feature", "NOT\n")
+
+      let suite =
+        discover.features("./test/tmp/features/discover: colon.feature")
+        |> discover.with_registry(steps.new())
+        |> discover.to_suite("Features")
+
+      test_sources(suite.children)
+      |> should
+      |> be_equal([Some("test/tmp/features/discover: colon.feature")])
+      |> or_fail_with("the source should be the whole path")
+    }),
+
+    it("to_suite runs the scenarios with the attached registry", fn() {
+      let _ =
+        file.write(
+          "./test/tmp/features/discover_good.feature",
+          "Feature: Good\n  Scenario: One\n    Given a thing\n",
+        )
+      let registry = steps.new() |> steps.given("a thing", step_ok)
+
+      let suite =
+        discover.features("./test/tmp/features/discover_good.feature")
+        |> discover.with_registry(registry)
+        |> discover.to_suite("Features")
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("the scenario should pass with the registry handler")
+    }),
   ])
+}
+
+fn test_names(nodes: List(test_types.Node(Nil))) -> List(String) {
+  list.filter_map(nodes, test_name)
+}
+
+fn test_name(node: test_types.Node(Nil)) -> Result(String, Nil) {
+  case node {
+    test_types.Test(name: name, ..) -> Ok(name)
+    _ -> Error(Nil)
+  }
+}
+
+fn test_sources(nodes: List(test_types.Node(Nil))) -> List(Option(String)) {
+  list.filter_map(nodes, test_source)
+}
+
+fn test_source(node: test_types.Node(Nil)) -> Result(Option(String), Nil) {
+  case node {
+    test_types.Test(source: source, ..) -> Ok(source)
+    _ -> Error(Nil)
+  }
+}
+
+fn result_status(result: test_types.TestResult) -> test_types.Status {
+  result.status
+}
+
+fn step_ok(
+  _context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  Ok(test_types.AssertionOk)
 }
