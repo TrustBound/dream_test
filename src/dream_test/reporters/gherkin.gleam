@@ -241,6 +241,7 @@ fn format_failure_details(result: TestResult) -> String {
   case result.status {
     Failed -> format_all_failures(result.failures, "")
     SetupFailed -> format_all_failures(result.failures, "")
+    TimedOut -> format_all_failures(result.failures, "")
     _ -> ""
   }
 }

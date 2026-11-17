@@ -119,6 +119,8 @@ pub fn tests() {
           <> "Feature: Checkout\n"
           <> "  Scenario: pays ~\n"
           <> "  Scenario: waits !\n"
+          <> "      ✗ check\n"
+          <> "        Message: too slow\n"
           <> "  Scenario: ships ⚠\n"
           <> "      ✗ check\n"
           <> "        Message: no db\n"

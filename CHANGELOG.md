@@ -82,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `SandboxCrashed` as a `String`. Before, it was an Erlang charlist, so
   the parallel runner crashed when it put the reason of a crashed hook in
   its error text.
+- The Gherkin reporter now writes the failures of a timed out scenario,
+  for example `timeout` with its message, under the scenario line. The BDD
+  reporter already did this. Before, the Gherkin reporter showed only the
+  `!` marker and no reason.
 - Pretty JSON (`json.format_pretty`, `json.report_pretty` and the JSON
   reporter with `pretty`) now writes an empty list as `[]`. Before, it
   wrote `[`, a line of spaces, and `]`. Compact JSON does not change.
