@@ -150,6 +150,17 @@ pub fn tests() {
       |> or_fail_with("expected enotdir for a file path")
     }),
 
+    it("delete_files_matching skips a matching name it cannot delete", fn() {
+      let dir = "./test/tmp/file_api_test/skip_" <> int.to_string(unique_port())
+      let _ = write(dir <> "/a.tmp", "a")
+      let _ = write(dir <> "/sub.tmp/inner.txt", "a directory named sub.tmp")
+
+      delete_files_matching(dir, ".tmp")
+      |> should
+      |> be_equal(Ok(1))
+      |> or_fail_with("only a.tmp should be deleted, not the sub.tmp directory")
+    }),
+
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should
