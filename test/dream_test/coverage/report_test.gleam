@@ -1,6 +1,7 @@
-import dream_test/coverage/report.{LineCoverage}
+import dream_test/coverage/report.{ExcludedFile, IgnoredRange, LineCoverage}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
+import gleam/option.{None, Some}
 
 fn cart_file() {
   report.file("src/app/cart.gleam", [
@@ -12,6 +13,30 @@ fn cart_file() {
 
 fn types_file() {
   report.file("src/app/types.gleam", [])
+}
+
+fn debug_range() {
+  IgnoredRange(first_line: 40, last_line: 44, reason: Some("debug only"))
+}
+
+fn single_range() {
+  IgnoredRange(first_line: 71, last_line: 71, reason: None)
+}
+
+fn generated_file() {
+  ExcludedFile(
+    source_path: "src/app/generated/db.gleam",
+    pattern: "src/app/generated/**",
+    reason: Some("generated code"),
+  )
+}
+
+fn ffi_file() {
+  ExcludedFile(
+    source_path: "src/app_ffi.erl",
+    pattern: "src/**/*_ffi.erl",
+    reason: None,
+  )
 }
 
 pub fn tests() {
@@ -64,6 +89,45 @@ pub fn tests() {
       |> should
       |> be_equal(6)
       |> or_fail_with("expected 6 executable lines in total")
+    }),
+    it("a file built with file has no ignored ranges", fn() {
+      report.ignored_ranges(cart_file())
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected no ignored ranges")
+    }),
+    it("add_ignored_ranges adds ranges sorted by first line", fn() {
+      cart_file()
+      |> report.add_ignored_ranges([single_range()])
+      |> report.add_ignored_ranges([debug_range()])
+      |> report.ignored_ranges()
+      |> should
+      |> be_equal([debug_range(), single_range()])
+      |> or_fail_with("expected 40-44, then 71")
+    }),
+    it("add_ignored_ranges does not change the counts", fn() {
+      cart_file()
+      |> report.add_ignored_ranges([debug_range()])
+      |> report.executable_line_count()
+      |> should
+      |> be_equal(3)
+      |> or_fail_with("expected 3 executable lines")
+    }),
+    it("a report built with new has no excluded files", fn() {
+      report.new([cart_file()])
+      |> report.excluded_files()
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected no excluded files")
+    }),
+    it("add_excluded_files adds files in the order given", fn() {
+      report.new([cart_file()])
+      |> report.add_excluded_files([generated_file()])
+      |> report.add_excluded_files([ffi_file()])
+      |> report.excluded_files()
+      |> should
+      |> be_equal([generated_file(), ffi_file()])
+      |> or_fail_with("expected the generated file, then the FFI file")
     }),
     it("an empty report has no lines", fn() {
       report.new([])

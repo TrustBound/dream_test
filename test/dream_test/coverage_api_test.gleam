@@ -109,6 +109,21 @@ pub fn tests() {
         |> be_equal(False)
         |> or_fail_with("expected missing lines to be hidden by default")
       }),
+      it("new does not show excluded lines and files", fn() {
+        coverage.new()
+        |> coverage.shows_excluded()
+        |> should
+        |> be_equal(False)
+        |> or_fail_with("expected exclusions to be listed only on request")
+      }),
+      it("show_excluded turns the Excluded column on", fn() {
+        coverage.new()
+        |> coverage.show_excluded()
+        |> coverage.shows_excluded()
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("expected exclusions to be listed")
+      }),
       it("show_missing turns the Missing column on", fn() {
         coverage.new()
         |> coverage.show_missing()

@@ -83,5 +83,32 @@ pub fn tests() {
       ))
       |> or_fail_with("expected the coverage error and exit status 1")
     }),
+    it("prints the Excluded count line without show_excluded", fn() {
+      run_main("excluded_summary_without_show_excluded")
+      |> should
+      |> be_equal(#(
+        0,
+        "\nCoverage\n"
+          <> "File                                         Lines  Cover\n"
+          <> "test/coverage_ignore_fixtures/ignored.gleam  0/3    0.0%\n"
+          <> "Total                                        0/3    0.0%\n"
+          <> "Excluded: 1 file, 6 lines in 1 file\n",
+      ))
+      |> or_fail_with("expected the table with the Excluded line and exit 0")
+    }),
+    it("fails an exclusion without a reason and exits 1", fn() {
+      run_main("exclusion_without_reason_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        "\nCoverage failed\n"
+          <> "  The exclude pattern \"test/coverage_fixtures/nested/**\" has no reason.\n"
+          <> "  Reason: coverage.require_exclusion_reasons() is on, so every exclude pattern must say why its files are left out of coverage.\n"
+          <> "  Fix: replace coverage.exclude(...) with coverage.exclude_with_reason(pattern: \"test/coverage_fixtures/nested/**\", reason: \"...\").\n"
+          <> "\n"
+          <> "Tests: 1 passed. Exit status 1, because coverage was requested and did not complete.\n",
+      ))
+      |> or_fail_with("expected the reason failure and exit status 1")
+    }),
   ])
 }

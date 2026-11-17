@@ -39,6 +39,19 @@
 //// src/app/cart.gleam        18/20  90.0%  12-13
 //// ```
 ////
+//// When a pattern excludes a file or a marker ignores a line, an `Excluded:`
+//// line after the total counts them. With `coverage.show_excluded()`, an
+//// `Excluded` column lists the ignored lines with their reasons, and a row
+//// names each excluded file with its pattern and reason:
+////
+//// ```text
+//// File                        Lines  Cover  Excluded
+//// src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71
+//// src/app/generated/db.gleam  excluded: matches src/app/generated/**
+//// Total                       18/20  90.0%
+//// Excluded: 1 file, 6 lines in 1 file
+//// ```
+////
 //// When coverage fails, `render_failure` prints a `Coverage failed` block
 //// instead. The runner writes it to the error output.
 ////
@@ -50,7 +63,8 @@ import dream_test/coverage.{
   type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
   BadBeamFile, BelowMinimumPercent, CoverAlreadyRunning, CoverDidNotStart,
   CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  ExcludeMatchedNothing, ExcludeWithoutReason, IgnoreEndWithoutStart,
+  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
   IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
   LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
   ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
@@ -60,13 +74,15 @@ import dream_test/coverage.{
   UnknownInstrumentError,
 }
 import dream_test/coverage/report.{
-  type CoverageReport, type FileCoverage, type LineCoverage,
+  type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
+  type LineCoverage,
 }
 import dream_test/file.{type FileError}
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 /// How the test run ended, for the last line of a coverage failure.
@@ -78,27 +94,50 @@ pub type RunOutcome {
   RunOutcome(passed: Int, failed: Int, exit_on_failure: Bool)
 }
 
+/// One row of the table. A row can take more than one line of output when
+/// its `Missing` or `Excluded` cell wraps.
 type CoverageRow {
-  CoverageRow(
+  CountsRow(
     label: String,
     lines: String,
     percent: String,
     missing: List(String),
+    excluded: List(String),
   )
+  /// A file that an exclude pattern left out. Its text starts in the
+  /// `Lines` column.
+  ExcludedFileRow(label: String, text: String)
+}
+
+/// Which of the optional columns the table shows.
+type Columns {
+  Columns(show_missing: Bool, show_excluded: Bool)
 }
 
 type ColumnWidths {
-  ColumnWidths(label: Int, lines: Int, percent: Int)
+  ColumnWidths(label: Int, lines: Int, percent: Int, missing: Int)
 }
 
-/// The widest the `Missing` column gets before it wraps onto another line.
+/// The cells of one column of a row, one per output line, and the width
+/// they are padded to.
+type Cells {
+  Cells(lines: List(String), width: Int)
+}
+
+/// The widest the `Missing` and `Excluded` columns get before they wrap onto
+/// another line.
 const missing_column_width = 60
 
 /// Render a coverage report as a table.
 ///
-/// The settings decide two things: `coverage.show_missing` adds the
-/// `Missing` column, and the LCOV path (`coverage.lcov_file`) is printed on
-/// the last line when there is one.
+/// The settings decide three things: `coverage.show_missing` adds the
+/// `Missing` column, `coverage.show_excluded` adds the `Excluded` column and
+/// a row for each excluded file, and the LCOV path (`coverage.lcov_file`) is
+/// printed on the last line when there is one.
+///
+/// When the report holds excluded files or ignored lines, an `Excluded:`
+/// line after the total counts them, whether `coverage.show_excluded` is on
+/// or off.
 ///
 /// ## Parameters
 ///
@@ -130,54 +169,80 @@ pub fn render(
   report coverage_report: CoverageReport,
   config config: CoverageConfig,
 ) -> String {
-  let show_missing = coverage.shows_missing(config)
+  let columns =
+    Columns(
+      show_missing: coverage.shows_missing(config),
+      show_excluded: coverage.shows_excluded(config),
+    )
   let file_rows = list.map(report.files(coverage_report), file_row)
+  let excluded_file_rows =
+    excluded_file_rows(columns, report.excluded_files(coverage_report))
   let total_row =
     row_from_counts(
       "Total",
       report.total_hit_line_count(coverage_report),
       report.total_executable_line_count(coverage_report),
-      [],
     )
-  let header_row = header_row(show_missing)
-  let rows = list.flatten([[header_row], file_rows, [total_row]])
+  let rows =
+    list.flatten([
+      [header_row()],
+      file_rows,
+      excluded_file_rows,
+      [total_row],
+    ])
   let widths =
-    list.fold(rows, ColumnWidths(label: 0, lines: 0, percent: 0), widen_columns)
+    list.fold(
+      rows,
+      ColumnWidths(label: 0, lines: 0, percent: 0, missing: 0),
+      widen_columns,
+    )
 
   "\nCoverage\n"
-  <> render_rows(rows, widths, show_missing, "")
+  <> render_rows(rows, widths, columns, "")
+  <> render_excluded_summary(coverage_report)
   <> render_lcov_line(coverage.lcov_file(config))
 }
 
-fn header_row(show_missing: Bool) -> CoverageRow {
-  let missing = case show_missing {
-    True -> ["Missing"]
-    False -> []
-  }
-  CoverageRow(label: "File", lines: "Lines", percent: "Cover", missing: missing)
+/// The header names every column. `row_cells` leaves out the columns that
+/// the table does not show.
+fn header_row() -> CoverageRow {
+  CountsRow(
+    label: "File",
+    lines: "Lines",
+    percent: "Cover",
+    missing: ["Missing"],
+    excluded: ["Excluded"],
+  )
 }
 
 fn file_row(file: FileCoverage) -> CoverageRow {
-  row_from_counts(
-    report.source_path(file),
-    report.hit_line_count(file),
-    report.executable_line_count(file),
-    wrap_ranges(missing_line_ranges(report.lines(file)), "", []),
+  let hit = report.hit_line_count(file)
+  let total = report.executable_line_count(file)
+  CountsRow(
+    label: report.source_path(file),
+    lines: counts_text(hit, total),
+    percent: format_percent(hit, total),
+    missing: wrap_ranges(missing_line_ranges(report.lines(file)), "", []),
+    excluded: wrap_ranges(
+      list.map(report.ignored_ranges(file), ignored_range_text),
+      "",
+      [],
+    ),
   )
 }
 
-fn row_from_counts(
-  label: String,
-  hit: Int,
-  total: Int,
-  missing: List(String),
-) -> CoverageRow {
-  CoverageRow(
+fn row_from_counts(label: String, hit: Int, total: Int) -> CoverageRow {
+  CountsRow(
     label: label,
-    lines: int.to_string(hit) <> "/" <> int.to_string(total),
+    lines: counts_text(hit, total),
     percent: format_percent(hit, total),
-    missing: missing,
+    missing: [],
+    excluded: [],
   )
+}
+
+fn counts_text(hit: Int, total: Int) -> String {
+  int.to_string(hit) <> "/" <> int.to_string(total)
 }
 
 /// Format `hit / total` as a percent with one decimal place, rounded down,
@@ -236,6 +301,38 @@ fn range_text(range: #(Int, Int)) -> String {
   }
 }
 
+/// `40-44 (debug only)`, or `71` when the marker has no text.
+fn ignored_range_text(range: IgnoredRange) -> String {
+  range_text(#(range.first_line, range.last_line))
+  <> reason_suffix(range.reason)
+}
+
+fn reason_suffix(reason: Option(String)) -> String {
+  case reason {
+    Some(text) -> " (" <> text <> ")"
+    None -> ""
+  }
+}
+
+fn excluded_file_rows(
+  columns: Columns,
+  excluded_files: List(ExcludedFile),
+) -> List(CoverageRow) {
+  case columns.show_excluded {
+    True -> list.map(excluded_files, excluded_file_row)
+    False -> []
+  }
+}
+
+fn excluded_file_row(excluded: ExcludedFile) -> CoverageRow {
+  ExcludedFileRow(
+    label: excluded.source_path,
+    text: "excluded: matches "
+      <> excluded.pattern
+      <> reason_suffix(excluded.reason),
+  )
+}
+
 /// Join ranges with ", " into lines no wider than `missing_column_width`.
 /// Every line but the last ends with a comma, which counts toward the width.
 fn wrap_ranges(
@@ -265,17 +362,27 @@ fn add_range(
 }
 
 fn widen_columns(widths: ColumnWidths, row: CoverageRow) -> ColumnWidths {
-  ColumnWidths(
-    label: int.max(widths.label, string.length(row.label)),
-    lines: int.max(widths.lines, string.length(row.lines)),
-    percent: int.max(widths.percent, string.length(row.percent)),
-  )
+  case row {
+    CountsRow(label:, lines:, percent:, missing:, ..) ->
+      ColumnWidths(
+        label: int.max(widths.label, string.length(label)),
+        lines: int.max(widths.lines, string.length(lines)),
+        percent: int.max(widths.percent, string.length(percent)),
+        missing: list.fold(missing, widths.missing, widen_to_text),
+      )
+    ExcludedFileRow(label:, ..) ->
+      ColumnWidths(..widths, label: int.max(widths.label, string.length(label)))
+  }
+}
+
+fn widen_to_text(width: Int, text: String) -> Int {
+  int.max(width, string.length(text))
 }
 
 fn render_rows(
   rows: List(CoverageRow),
   widths: ColumnWidths,
-  show_missing: Bool,
+  columns: Columns,
   rendered: String,
 ) -> String {
   case rows {
@@ -284,49 +391,119 @@ fn render_rows(
       render_rows(
         rest,
         widths,
-        show_missing,
-        rendered <> render_row(row, widths, show_missing),
+        columns,
+        rendered <> render_cells(row_cells(row, widths, columns), ""),
       )
   }
 }
 
-fn render_row(
+/// The columns of a row. Every column is padded two spaces past its width;
+/// `render_cells` removes the spaces at the end of each output line.
+fn row_cells(
   row: CoverageRow,
   widths: ColumnWidths,
-  show_missing: Bool,
-) -> String {
-  let counts =
-    string.pad_end(row.label, widths.label + 2, " ")
-    <> string.pad_end(row.lines, widths.lines + 2, " ")
-  case show_missing, row.missing {
-    False, _ -> counts <> row.percent <> "\n"
-    True, [] -> counts <> row.percent <> "\n"
-    True, [first, ..rest] ->
-      counts
-      <> string.pad_end(row.percent, widths.percent + 2, " ")
-      <> first
-      <> "\n"
-      <> render_continuation_lines(
-        rest,
-        string.repeat(" ", widths.label + widths.lines + widths.percent + 6),
-        "",
+  columns: Columns,
+) -> List(Cells) {
+  case row {
+    CountsRow(label:, lines:, percent:, missing:, excluded:) ->
+      list.flatten([
+        [
+          Cells(lines: [label], width: widths.label),
+          Cells(lines: [lines], width: widths.lines),
+          Cells(lines: [percent], width: widths.percent),
+        ],
+        optional_cells(columns.show_missing, missing, widths.missing),
+        optional_cells(columns.show_excluded, excluded, 0),
+      ])
+    ExcludedFileRow(label:, text:) -> [
+      Cells(lines: [label], width: widths.label),
+      Cells(lines: [text], width: 0),
+    ]
+  }
+}
+
+fn optional_cells(shown: Bool, lines: List(String), width: Int) -> List(Cells) {
+  case shown {
+    True -> [Cells(lines: lines, width: width)]
+    False -> []
+  }
+}
+
+/// Render the first cell of each column as one output line, then go on with
+/// the cells after them until every column is empty.
+fn render_cells(cells: List(Cells), rendered: String) -> String {
+  case list.all(cells, has_no_lines) {
+    True -> rendered
+    False ->
+      render_cells(
+        list.map(cells, without_first_line),
+        rendered
+          <> string.trim_end(string.concat(list.map(cells, first_line_padded)))
+          <> "\n",
       )
   }
 }
 
-fn render_continuation_lines(
-  lines: List(String),
-  indent: String,
-  rendered: String,
-) -> String {
-  case lines {
-    [] -> rendered
-    [line, ..rest] ->
-      render_continuation_lines(
-        rest,
-        indent,
-        rendered <> indent <> line <> "\n",
-      )
+fn has_no_lines(cells: Cells) -> Bool {
+  list.is_empty(cells.lines)
+}
+
+fn without_first_line(cells: Cells) -> Cells {
+  Cells(..cells, lines: list.drop(cells.lines, 1))
+}
+
+fn first_line_padded(cells: Cells) -> String {
+  string.pad_end(
+    result.unwrap(list.first(cells.lines), ""),
+    cells.width + 2,
+    " ",
+  )
+}
+
+/// `Excluded: 1 file, 6 lines in 1 file`, or nothing when nothing is
+/// excluded.
+fn render_excluded_summary(coverage_report: CoverageReport) -> String {
+  let file_count = list.length(report.excluded_files(coverage_report))
+  let files_with_ranges =
+    list.filter(report.files(coverage_report), has_ignored_ranges)
+  let line_count = list.fold(files_with_ranges, 0, add_ignored_line_count)
+  case file_count, line_count {
+    0, 0 -> ""
+    _, 0 -> "Excluded: " <> count_text(file_count, "file") <> "\n"
+    0, _ ->
+      "Excluded: "
+      <> lines_in_files_text(line_count, list.length(files_with_ranges))
+      <> "\n"
+    _, _ ->
+      "Excluded: "
+      <> count_text(file_count, "file")
+      <> ", "
+      <> lines_in_files_text(line_count, list.length(files_with_ranges))
+      <> "\n"
+  }
+}
+
+fn has_ignored_ranges(file: FileCoverage) -> Bool {
+  !list.is_empty(report.ignored_ranges(file))
+}
+
+fn add_ignored_line_count(total: Int, file: FileCoverage) -> Int {
+  list.fold(report.ignored_ranges(file), total, add_range_line_count)
+}
+
+fn add_range_line_count(total: Int, range: IgnoredRange) -> Int {
+  total + range.last_line - range.first_line + 1
+}
+
+fn lines_in_files_text(line_count: Int, file_count: Int) -> String {
+  count_text(line_count, "line") <> " in " <> count_text(file_count, "file")
+}
+
+/// `1 file`, `2 files`.
+fn count_text(count: Int, noun: String) -> String {
+  case count {
+    1 -> "1 " <> noun
+    _ -> int.to_string(count) <> " " <> noun <> "s"
   }
 }
 
@@ -579,6 +756,26 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> " is not followed by a complete function.",
         reason: "a coverage:ignore-function marker ignores the whole function after it, but the code after this marker is not a function, or the file ends before the function ends.",
         fix: "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
+      )
+    ExcludeWithoutReason(pattern) ->
+      ErrorMessage(
+        what: "The exclude pattern \"" <> pattern <> "\" has no reason.",
+        reason: "coverage.require_exclusion_reasons() is on, so every exclude pattern must say why its files are left out of coverage.",
+        fix: "replace coverage.exclude(...) with coverage.exclude_with_reason(pattern: \""
+          <> pattern
+          <> "\", reason: \"...\").",
+      )
+    IgnoreMarkerWithoutReason(source_path, line_number, marker) ->
+      ErrorMessage(
+        what: "The "
+          <> marker
+          <> " marker at "
+          <> source_location(source_path, line_number)
+          <> " has no reason.",
+        reason: "coverage.require_exclusion_reasons() is on, so every coverage:ignore marker must say why its lines are left out of coverage.",
+        fix: "write the reason after the marker on the same line, for example \""
+          <> marker
+          <> " debug only\".",
       )
   }
 }

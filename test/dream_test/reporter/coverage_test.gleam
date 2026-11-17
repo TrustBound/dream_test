@@ -4,15 +4,18 @@ import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction, IgnoreStartWithoutEnd,
-  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
-  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  ExcludeWithoutReason, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidMinimumPercent, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
+  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
-import dream_test/coverage/report.{type LineCoverage, LineCoverage}
+import dream_test/coverage/report.{
+  type LineCoverage, ExcludedFile, IgnoredRange, LineCoverage,
+}
 import dream_test/file.{
   FileSystemError, IsDirectory, NoSpace, NotFound, PermissionDenied,
 }
@@ -20,6 +23,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/coverage.{RunOutcome} as coverage_reporter
 import dream_test/unit.{describe, group, it}
 import gleam/list
+import gleam/option.{None, Some}
 
 fn cart_and_types_report() {
   report.new([
@@ -32,6 +36,42 @@ fn cart_and_types_report() {
     ]),
     report.file("src/app/types.gleam", []),
   ])
+}
+
+/// The cart and types report, with ignored lines 40-44 and 71 in the cart
+/// file, and one excluded file.
+fn excluded_report() {
+  report.new([
+    report.file("src/app/cart.gleam", [
+      LineCoverage(line: 3, calls: 2),
+      LineCoverage(line: 4, calls: 0),
+      LineCoverage(line: 5, calls: 0),
+      LineCoverage(line: 9, calls: 1),
+      LineCoverage(line: 12, calls: 0),
+    ])
+      |> report.add_ignored_ranges([
+        IgnoredRange(first_line: 40, last_line: 44, reason: Some("debug only")),
+        IgnoredRange(first_line: 71, last_line: 71, reason: None),
+      ]),
+    report.file("src/app/types.gleam", []),
+  ])
+  |> report.add_excluded_files([
+    ExcludedFile(
+      source_path: "src/app/generated/db.gleam",
+      pattern: "src/app/generated/**",
+      reason: Some("generated code"),
+    ),
+  ])
+}
+
+/// A file with one line that ran, and `ranges` ignored.
+fn file_with_ranges(path: String, ranges: List(#(Int, Int))) {
+  report.file(path, [LineCoverage(line: 1, calls: 1)])
+  |> report.add_ignored_ranges(list.map(ranges, range_without_reason))
+}
+
+fn range_without_reason(range: #(Int, Int)) {
+  IgnoredRange(first_line: range.0, last_line: range.1, reason: None)
 }
 
 /// Lines from..to where odd lines never ran and even lines ran once.
@@ -150,6 +190,132 @@ pub fn tests() {
           <> "Total               24/48  50.0%\n",
         )
         |> or_fail_with("expected the table with a Missing column")
+      }),
+    ]),
+
+    group("render excluded", [
+      it("show_excluded adds an Excluded column and excluded file rows", fn() {
+        coverage_reporter.render(
+          report: excluded_report(),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_excluded(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File                        Lines  Cover  Excluded\n"
+          <> "src/app/cart.gleam          2/5    40.0%  40-44 (debug only), 71\n"
+          <> "src/app/types.gleam         0/0    -\n"
+          <> "src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)\n"
+          <> "Total                       2/5    40.0%\n"
+          <> "Excluded: 1 file, 6 lines in 1 file\n",
+        )
+        |> or_fail_with("expected the Excluded column and the excluded file")
+      }),
+      it("prints the Excluded count line without show_excluded", fn() {
+        coverage_reporter.render(
+          report: excluded_report(),
+          config: coverage.new(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File                 Lines  Cover\n"
+          <> "src/app/cart.gleam   2/5    40.0%\n"
+          <> "src/app/types.gleam  0/0    -\n"
+          <> "Total                2/5    40.0%\n"
+          <> "Excluded: 1 file, 6 lines in 1 file\n"
+          <> "LCOV: build/coverage/lcov.info\n",
+        )
+        |> or_fail_with("expected the count line before the LCOV line")
+      }),
+      it("pads the Missing column when the Excluded column follows", fn() {
+        coverage_reporter.render(
+          report: excluded_report(),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_missing()
+            |> coverage.show_excluded(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File                        Lines  Cover  Missing  Excluded\n"
+          <> "src/app/cart.gleam          2/5    40.0%  4-5, 12  40-44 (debug only), 71\n"
+          <> "src/app/types.gleam         0/0    -\n"
+          <> "src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)\n"
+          <> "Total                       2/5    40.0%\n"
+          <> "Excluded: 1 file, 6 lines in 1 file\n",
+        )
+        |> or_fail_with("expected the Missing and Excluded columns")
+      }),
+      it("counts excluded files only, and shows a file without a reason", fn() {
+        coverage_reporter.render(
+          report: report.new([file_with_ranges("src/a.gleam", [])])
+            |> report.add_excluded_files([
+              ExcludedFile(
+                source_path: "src/b_ffi.erl",
+                pattern: "src/*_ffi.erl",
+                reason: None,
+              ),
+              ExcludedFile(
+                source_path: "src/c_ffi.erl",
+                pattern: "src/*_ffi.erl",
+                reason: None,
+              ),
+            ]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_excluded(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File           Lines  Cover   Excluded\n"
+          <> "src/a.gleam    1/1    100.0%\n"
+          <> "src/b_ffi.erl  excluded: matches src/*_ffi.erl\n"
+          <> "src/c_ffi.erl  excluded: matches src/*_ffi.erl\n"
+          <> "Total          1/1    100.0%\n"
+          <> "Excluded: 2 files\n",
+        )
+        |> or_fail_with("expected two excluded files")
+      }),
+      it("counts one ignored line in one file", fn() {
+        coverage_reporter.render(
+          report: report.new([file_with_ranges("src/a.gleam", [#(5, 5)])]),
+          config: coverage.new() |> coverage.no_lcov(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File         Lines  Cover\n"
+          <> "src/a.gleam  1/1    100.0%\n"
+          <> "Total        1/1    100.0%\n"
+          <> "Excluded: 1 line in 1 file\n",
+        )
+        |> or_fail_with("expected 1 line in 1 file")
+      }),
+      it("counts ignored lines over several files", fn() {
+        coverage_reporter.render(
+          report: report.new([
+            file_with_ranges("src/a.gleam", [#(5, 7), #(9, 9)]),
+            file_with_ranges("src/b.gleam", []),
+            file_with_ranges("src/c.gleam", [#(2, 4)]),
+          ]),
+          config: coverage.new() |> coverage.no_lcov(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File         Lines  Cover\n"
+          <> "src/a.gleam  1/1    100.0%\n"
+          <> "src/b.gleam  1/1    100.0%\n"
+          <> "src/c.gleam  1/1    100.0%\n"
+          <> "Total        3/3    100.0%\n"
+          <> "Excluded: 7 lines in 2 files\n",
+        )
+        |> or_fail_with("expected 7 lines in 2 files")
       }),
     ]),
 
@@ -400,6 +566,30 @@ pub fn tests() {
           "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
         ))
         |> or_fail_with("expected the IgnoreFunctionWithoutFunction message")
+      }),
+      it("describes ExcludeWithoutReason", fn() {
+        render_failure_for(ExcludeWithoutReason("src/app/generated/**"))
+        |> should
+        |> be_equal(failure_block(
+          "The exclude pattern \"src/app/generated/**\" has no reason.",
+          "coverage.require_exclusion_reasons() is on, so every exclude pattern must say why its files are left out of coverage.",
+          "replace coverage.exclude(...) with coverage.exclude_with_reason(pattern: \"src/app/generated/**\", reason: \"...\").",
+        ))
+        |> or_fail_with("expected the ExcludeWithoutReason message")
+      }),
+      it("describes IgnoreMarkerWithoutReason", fn() {
+        render_failure_for(IgnoreMarkerWithoutReason(
+          "src/app/cart.gleam",
+          40,
+          "coverage:ignore-start",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore-start marker at src/app/cart.gleam:40 has no reason.",
+          "coverage.require_exclusion_reasons() is on, so every coverage:ignore marker must say why its lines are left out of coverage.",
+          "write the reason after the marker on the same line, for example \"coverage:ignore-start debug only\".",
+        ))
+        |> or_fail_with("expected the IgnoreMarkerWithoutReason message")
       }),
       it("describes ModuleNotInstrumented with NoDebugInfo", fn() {
         render_failure_for(ModuleNotInstrumented(

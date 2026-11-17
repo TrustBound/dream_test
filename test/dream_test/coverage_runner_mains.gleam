@@ -64,3 +64,33 @@ pub fn missing_source_directory_with_exit_on_failure() -> Nil {
     |> runner.run()
   Nil
 }
+
+pub fn excluded_summary_without_show_excluded() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(
+      coverage.new()
+      |> coverage.source_directory("test/coverage_ignore_fixtures")
+      |> coverage.exclude_with_reason(
+        pattern: "test/coverage_ignore_fixtures/ignored_function.gleam",
+        reason: "only old callers use it",
+      )
+      |> coverage.no_lcov(),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+pub fn exclusion_without_reason_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(
+      fixture_coverage()
+      |> coverage.exclude("test/coverage_fixtures/nested/**")
+      |> coverage.require_exclusion_reasons(),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}

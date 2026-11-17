@@ -91,7 +91,8 @@
 ////   clause up to the dot that ends the function is ignored.
 //// - In `.erl` files, write the markers after `%` or `%%`, for example
 ////   `%% coverage:ignore`.
-//// - Text after a marker is a note for the people who read the code.
+//// - Text after a marker is its reason. `coverage.show_excluded` prints it,
+////   and `coverage.require_exclusion_reasons` makes it required.
 ////
 //// An ignored line is not in the table, the Missing column, the LCOV file or
 //// the minimum. Line counts on it from `coverage.merge_lcov` are dropped too.
@@ -105,6 +106,30 @@
 ////
 //// Markers match exact source lines only on Gleam 1.19 and later. See
 //// "Line accuracy".
+////
+//// ## Showing what is excluded
+////
+//// An exclusion is never silent. When a pattern excludes a file or a marker
+//// ignores a line, a count line follows the total:
+////
+//// ```text
+//// Excluded: 1 file, 6 lines in 1 file
+//// ```
+////
+//// `coverage.show_excluded` adds an `Excluded` column with the ignored lines
+//// and their reasons, and a row for each excluded file:
+////
+//// ```text
+//// File                        Lines  Cover  Excluded
+//// src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71
+//// src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)
+//// Total                       18/20  90.0%
+//// Excluded: 1 file, 6 lines in 1 file
+//// ```
+////
+//// Give a pattern a reason with `coverage.exclude_with_reason`. Give a
+//// marker a reason with text after it. `coverage.require_exclusion_reasons`
+//// fails the run when a pattern or a marker has no reason.
 ////
 //// ## Line accuracy
 ////
@@ -131,8 +156,9 @@
 //// |--------------|-----------------------------------------------------------|
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
 //// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
-//// |              | `exclude`                                                 |
-//// | **Read**     | `shows_missing`, `lcov_file`                              |
+//// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
+//// |              | `require_exclusion_reasons`                               |
+//// | **Read**     | `shows_missing`, `shows_excluded`, `lcov_file`            |
 //// | **Run**      | `start`, `finish`, `check_minimum`                        |
 ////
 //// ## Import Style
@@ -142,7 +168,8 @@
 //// ```
 
 import dream_test/coverage/report.{
-  type CoverageReport, type FileCoverage, type LineCoverage, LineCoverage,
+  type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
+  type LineCoverage, ExcludedFile, IgnoredRange, LineCoverage,
 }
 import dream_test/file.{type FileError}
 import gleam/dict.{type Dict}
@@ -169,8 +196,15 @@ pub opaque type CoverageConfig {
     show_missing: Bool,
     minimum_percent: Option(Float),
     merge_lcov_patterns: List(String),
-    exclude_patterns: List(String),
+    exclude_patterns: List(ExcludePattern),
+    show_excluded: Bool,
+    require_exclusion_reasons: Bool,
   )
+}
+
+/// A pattern given to `coverage.exclude` or `coverage.exclude_with_reason`.
+type ExcludePattern {
+  ExcludePattern(pattern: String, reason: Option(String))
 }
 
 /// A coverage run that has started.
@@ -180,7 +214,7 @@ pub opaque type CoverageSession {
   CoverageSession(
     config: CoverageConfig,
     modules: List(CoveredModule),
-    excluded_paths: List(String),
+    excluded_files: List(ExcludedFile),
     ignored_lines: IgnoredLines,
   )
 }
@@ -290,6 +324,19 @@ pub type CoverageError {
   ///
   /// - `line_number`: the 1-based line of the marker
   IgnoreFunctionWithoutFunction(source_path: String, line_number: Int)
+  /// `coverage.require_exclusion_reasons` is on, and a pattern was given to
+  /// `coverage.exclude`, which gives no reason.
+  ExcludeWithoutReason(pattern: String)
+  /// `coverage.require_exclusion_reasons` is on, and an ignore marker has no
+  /// text after it.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  /// - `marker`: the marker, for example `coverage:ignore-start`
+  IgnoreMarkerWithoutReason(
+    source_path: String,
+    line_number: Int,
+    marker: String,
+  )
 }
 
 /// Why the `cover` tool did not start.
@@ -345,6 +392,8 @@ pub type AnalysisCause {
 /// - Source directory: `src`
 /// - LCOV file: `build/coverage/lcov.info`
 /// - Missing lines: not shown
+/// - Excluded files and ignored lines: not listed, only counted
+/// - Exclusion reasons: not required
 /// - Minimum: none
 ///
 /// ## Example
@@ -362,6 +411,8 @@ pub fn new() -> CoverageConfig {
     minimum_percent: None,
     merge_lcov_patterns: [],
     exclude_patterns: [],
+    show_excluded: False,
+    require_exclusion_reasons: False,
   )
 }
 
@@ -551,6 +602,8 @@ pub fn merge_lcov(
 /// `src/app/cart.gleam`. `*` matches inside one folder, and `**` matches any
 /// number of folders.
 ///
+/// To say why the files are left out, use `coverage.exclude_with_reason`.
+///
 /// Call it more than once to exclude more than one pattern. Each pattern must
 /// match at least one source file, and at least one source file must be left
 /// to measure. Otherwise `coverage.start` returns an error, so a pattern with
@@ -578,10 +631,138 @@ pub fn exclude(
   config config: CoverageConfig,
   pattern pattern: String,
 ) -> CoverageConfig {
+  add_exclude_pattern(config, ExcludePattern(pattern: pattern, reason: None))
+}
+
+/// Leave the source files that match a pattern out of coverage, and say why.
+///
+/// The same as `coverage.exclude`, with a reason. `coverage.show_excluded`
+/// prints the reason next to each excluded file, and
+/// `dream_test/coverage/report.excluded_files` gives it to your own reporter.
+/// With `coverage.require_exclusion_reasons`, every pattern must come from
+/// this function.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `pattern`: a wildcard pattern for the source files, the same as for
+///   `coverage.exclude`
+/// - `reason`: why the files are left out, for example `"generated code"`.
+///   Spaces at the start and the end are removed. A reason that is empty
+///   after that counts as no reason.
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude_with_reason(
+///   pattern: "src/app/generated/**",
+///   reason: "generated from the database schema",
+/// )
+/// ```
+pub fn exclude_with_reason(
+  config config: CoverageConfig,
+  pattern pattern: String,
+  reason reason: String,
+) -> CoverageConfig {
+  add_exclude_pattern(
+    config,
+    ExcludePattern(pattern: pattern, reason: non_empty_text(reason)),
+  )
+}
+
+fn add_exclude_pattern(
+  config: CoverageConfig,
+  exclude_pattern: ExcludePattern,
+) -> CoverageConfig {
   CoverageConfig(
     ..config,
-    exclude_patterns: list.append(config.exclude_patterns, [pattern]),
+    exclude_patterns: list.append(config.exclude_patterns, [exclude_pattern]),
   )
+}
+
+/// The trimmed text, or `None` when nothing is left.
+fn non_empty_text(text: String) -> Option(String) {
+  case string.trim(text) {
+    "" -> None
+    trimmed -> Some(trimmed)
+  }
+}
+
+/// List what coverage left out, and why, in the table.
+///
+/// Adds an `Excluded` column with the lines that ignore markers left out of
+/// each file, as ranges with the text after the marker in brackets, for
+/// example `40-44 (debug only), 71`. Adds a row for each file that an exclude
+/// pattern left out, for example
+/// `src/app/generated/db.gleam  excluded: matches src/app/generated/**`.
+/// Off by default.
+///
+/// The `Excluded:` count line under the total is printed whether this is on
+/// or off, so an exclusion is never silent.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_excluded()
+/// ```
+pub fn show_excluded(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, show_excluded: True)
+}
+
+/// Fail the run when an exclusion does not say why.
+///
+/// When this is on:
+///
+/// - every pattern must come from `coverage.exclude_with_reason`. A pattern
+///   from `coverage.exclude` makes `coverage.start` return
+///   `ExcludeWithoutReason`.
+/// - every `coverage:ignore`, `coverage:ignore-start` and
+///   `coverage:ignore-function` marker must have text after it, for example
+///   `// coverage:ignore-start debug only`. A marker without text gives
+///   `IgnoreMarkerWithoutReason` with the file and the line. A
+///   `coverage:ignore-end` marker needs no text, because the start marker
+///   holds the reason.
+///
+/// Markers of measured files are checked by `coverage.start`. Markers of
+/// files that only `coverage.merge_lcov` covers are checked by
+/// `coverage.finish`. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude_with_reason(
+///   pattern: "src/app/generated/**",
+///   reason: "generated code",
+/// )
+/// |> coverage.require_exclusion_reasons()
+/// ```
+pub fn require_exclusion_reasons(
+  config config: CoverageConfig,
+) -> CoverageConfig {
+  CoverageConfig(..config, require_exclusion_reasons: True)
 }
 
 // =============================================================================
@@ -602,6 +783,22 @@ pub fn exclude(
 /// ```
 pub fn shows_missing(config config: CoverageConfig) -> Bool {
   config.show_missing
+}
+
+/// Whether `coverage.show_excluded` is on.
+///
+/// Reporters read this to decide whether to list what coverage left out.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_excluded()
+/// |> coverage.shows_excluded()
+/// // -> True
+/// ```
+pub fn shows_excluded(config config: CoverageConfig) -> Bool {
+  config.show_excluded
 }
 
 /// The LCOV file that `coverage.finish` writes, if any.
@@ -636,7 +833,8 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 /// - `Ok(CoverageSession)` when every module is instrumented
 /// - `Error(CoverageError)` for the first step that failed. Exclude patterns
 ///   and the ignore markers of the measured files are checked before `cover`
-///   starts.
+///   starts. With `coverage.require_exclusion_reasons`, a pattern or a marker
+///   without a reason is an error too.
 ///
 /// ## Example
 ///
@@ -669,6 +867,27 @@ fn validate_minimum_percent(
 fn start_with_valid_minimum(
   config: CoverageConfig,
 ) -> Result(CoverageSession, CoverageError) {
+  case config.require_exclusion_reasons {
+    True -> start_if_every_pattern_has_reason(config, config.exclude_patterns)
+    False -> start_with_valid_settings(config)
+  }
+}
+
+fn start_if_every_pattern_has_reason(
+  config: CoverageConfig,
+  patterns: List(ExcludePattern),
+) -> Result(CoverageSession, CoverageError) {
+  case patterns {
+    [] -> start_with_valid_settings(config)
+    [ExcludePattern(pattern: pattern, reason: None), ..] ->
+      Error(ExcludeWithoutReason(pattern: pattern))
+    [_, ..rest] -> start_if_every_pattern_has_reason(config, rest)
+  }
+}
+
+fn start_with_valid_settings(
+  config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError) {
   case list_source_files(config.source_directory) {
     Ok(source_files) -> start_with_source_files(config, source_files)
     Error(error) -> Error(error)
@@ -695,11 +914,15 @@ fn start_with_all_modules(
   modules: List(CoveredModule),
 ) -> Result(CoverageSession, CoverageError) {
   let source_paths = set.from_list(list.map(modules, module_source_path))
-  case excluded_source_paths(config, source_paths, set.new()) {
+  case excluded_source_paths(config, source_paths, dict.new()) {
     Ok(excluded) -> start_with_kept_modules(config, modules, excluded)
     Error(error) -> Error(error)
   }
 }
+
+/// Excluded source paths, each with the first pattern that matches it.
+type Excluded =
+  Dict(String, ExcludePattern)
 
 fn module_source_path(module: CoveredModule) -> String {
   module.source_path
@@ -710,14 +933,14 @@ fn module_source_path(module: CoveredModule) -> String {
 fn excluded_source_paths(
   config: CoverageConfig,
   source_paths: Set(String),
-  excluded: Set(String),
-) -> Result(Set(String), CoverageError) {
+  excluded: Excluded,
+) -> Result(Excluded, CoverageError) {
   case config.exclude_patterns {
     [] -> Ok(excluded)
-    [pattern, ..rest] ->
+    [exclude_pattern, ..rest] ->
       exclude_pattern_then_continue(
         CoverageConfig(..config, exclude_patterns: rest),
-        pattern,
+        exclude_pattern,
         source_paths,
         excluded,
       )
@@ -726,23 +949,55 @@ fn excluded_source_paths(
 
 fn exclude_pattern_then_continue(
   config: CoverageConfig,
-  pattern: String,
+  exclude_pattern: ExcludePattern,
   source_paths: Set(String),
-  excluded: Set(String),
-) -> Result(Set(String), CoverageError) {
+  excluded: Excluded,
+) -> Result(Excluded, CoverageError) {
   let matched =
-    match_files(pattern)
+    match_files(exclude_pattern.pattern)
     |> list.map(normalise_path)
     |> set.from_list()
     |> set.intersection(source_paths)
   case set.is_empty(matched) {
     True ->
       Error(ExcludeMatchedNothing(
-        pattern: pattern,
+        pattern: exclude_pattern.pattern,
         source_directory: config.source_directory,
       ))
     False ->
-      excluded_source_paths(config, source_paths, set.union(excluded, matched))
+      excluded_source_paths(
+        config,
+        source_paths,
+        add_matched_paths(set.to_list(matched), exclude_pattern, excluded),
+      )
+  }
+}
+
+/// Record the pattern for each matched path that no earlier pattern matched.
+fn add_matched_paths(
+  paths: List(String),
+  exclude_pattern: ExcludePattern,
+  excluded: Excluded,
+) -> Excluded {
+  case paths {
+    [] -> excluded
+    [path, ..rest] ->
+      add_matched_paths(
+        rest,
+        exclude_pattern,
+        add_matched_path(excluded, path, exclude_pattern),
+      )
+  }
+}
+
+fn add_matched_path(
+  excluded: Excluded,
+  path: String,
+  exclude_pattern: ExcludePattern,
+) -> Excluded {
+  case dict.has_key(excluded, path) {
+    True -> excluded
+    False -> dict.insert(excluded, path, exclude_pattern)
   }
 }
 
@@ -754,7 +1009,7 @@ fn normalise_path(path: String) -> String {
 fn start_with_kept_modules(
   config: CoverageConfig,
   modules: List(CoveredModule),
-  excluded: Set(String),
+  excluded: Excluded,
 ) -> Result(CoverageSession, CoverageError) {
   case kept_modules(modules, excluded, []) {
     [] ->
@@ -763,9 +1018,28 @@ fn start_with_kept_modules(
       start_with_ignored_lines(
         config,
         kept,
-        list.sort(set.to_list(excluded), string.compare),
+        excluded
+          |> dict.to_list()
+          |> list.sort(compare_excluded_paths)
+          |> list.map(excluded_file),
       )
   }
+}
+
+fn compare_excluded_paths(
+  left: #(String, ExcludePattern),
+  right: #(String, ExcludePattern),
+) -> Order {
+  string.compare(left.0, right.0)
+}
+
+fn excluded_file(entry: #(String, ExcludePattern)) -> ExcludedFile {
+  let #(source_path, exclude_pattern) = entry
+  ExcludedFile(
+    source_path: source_path,
+    pattern: exclude_pattern.pattern,
+    reason: exclude_pattern.reason,
+  )
 }
 
 /// Read the ignore markers of every kept module before `cover` starts, so a
@@ -773,14 +1047,21 @@ fn start_with_kept_modules(
 fn start_with_ignored_lines(
   config: CoverageConfig,
   modules: List(CoveredModule),
-  excluded_paths: List(String),
+  excluded_files: List(ExcludedFile),
 ) -> Result(CoverageSession, CoverageError) {
-  case add_ignored_lines(dict.new(), list.map(modules, module_source_path)) {
+  let source_paths = list.map(modules, module_source_path)
+  case
+    add_ignored_lines(
+      dict.new(),
+      source_paths,
+      config.require_exclusion_reasons,
+    )
+  {
     Ok(ignored_lines) ->
       start_with_modules(CoverageSession(
         config: config,
         modules: modules,
-        excluded_paths: excluded_paths,
+        excluded_files: excluded_files,
         ignored_lines: ignored_lines,
       ))
     Error(error) -> Error(error)
@@ -789,7 +1070,7 @@ fn start_with_ignored_lines(
 
 fn kept_modules(
   modules: List(CoveredModule),
-  excluded: Set(String),
+  excluded: Excluded,
   accumulated_reversed: List(CoveredModule),
 ) -> List(CoveredModule) {
   case modules {
@@ -805,10 +1086,10 @@ fn kept_modules(
 
 fn keep_unless_excluded(
   module: CoveredModule,
-  excluded: Set(String),
+  excluded: Excluded,
   accumulated_reversed: List(CoveredModule),
 ) -> List(CoveredModule) {
-  case set.contains(excluded, module.source_path) {
+  case dict.has_key(excluded, module.source_path) {
     True -> accumulated_reversed
     False -> [module, ..accumulated_reversed]
   }
@@ -933,10 +1214,14 @@ fn erlang_module_name(relative_path: String) -> String {
 /// ## Returns
 ///
 /// - `Ok(CoverageReport)` with one file per measured module (plus any file
-///   from `coverage.merge_lcov` that is not excluded), sorted by path
+///   from `coverage.merge_lcov` that is not excluded), sorted by path. Each
+///   file holds its ignored line ranges with their reasons, and the report
+///   holds the excluded files with their patterns and reasons
+///   (`report.ignored_ranges`, `report.excluded_files`).
 /// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
 ///   merge cannot be read, a file that only merged LCOV covers has a bad
-///   ignore marker, or the LCOV file cannot be written
+///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
+///   without a reason), or the LCOV file cannot be written
 ///
 /// ## Example
 ///
@@ -962,10 +1247,14 @@ fn merge_then_write(
   case merge_patterns(session.config.merge_lcov_patterns, counts) {
     Ok(merged) ->
       merged
-      |> dict.drop(session.excluded_paths)
+      |> dict.drop(list.map(session.excluded_files, excluded_file_path))
       |> ignore_then_write(session)
     Error(error) -> Error(error)
   }
+}
+
+fn excluded_file_path(excluded: ExcludedFile) -> String {
+  excluded.source_path
 }
 
 /// Drop the ignored lines, then build the report and write the LCOV file.
@@ -974,12 +1263,19 @@ fn ignore_then_write(
   counts: Counts,
   session: CoverageSession,
 ) -> Result(CoverageReport, CoverageError) {
-  case add_ignored_lines(session.ignored_lines, dict.keys(counts)) {
+  case
+    add_ignored_lines(
+      session.ignored_lines,
+      dict.keys(counts),
+      session.config.require_exclusion_reasons,
+    )
+  {
     Ok(ignored_lines) ->
       counts
       |> dict.to_list()
       |> without_ignored_lines(ignored_lines, dict.new())
-      |> report_from_counts()
+      |> report_from_counts(ignored_lines)
+      |> report.add_excluded_files(session.excluded_files)
       |> write_report(session.config.lcov_path)
     Error(error) -> Error(error)
   }
@@ -1068,7 +1364,7 @@ type CommentSyntax {
 
 /// What one line of a source file is, for the ignore markers.
 type SourceLine {
-  Marker(kind: MarkerKind, text: String)
+  Marker(kind: MarkerKind, name: String, text: String)
   CodeLine
   OtherLine
 }
@@ -1094,67 +1390,85 @@ type MarkerScan {
     ignored: Dict(Int, String),
     open_block: Option(OpenBlock),
     pending_text: Option(String),
+    require_reasons: Bool,
   )
 }
 
 /// Read the markers of each path that `ignored_lines` does not hold yet.
+/// With `require_reasons`, a marker without text is an error.
 fn add_ignored_lines(
   ignored_lines: IgnoredLines,
   source_paths: List(String),
+  require_reasons: Bool,
 ) -> Result(IgnoredLines, CoverageError) {
   case source_paths {
     [] -> Ok(ignored_lines)
     [source_path, ..rest] ->
-      add_file_ignored_lines(ignored_lines, source_path, rest)
+      add_file_ignored_lines(
+        ignored_lines,
+        MarkerRead(source_path: source_path, require_reasons: require_reasons),
+        rest,
+      )
   }
+}
+
+/// One source file whose markers are read.
+type MarkerRead {
+  MarkerRead(source_path: String, require_reasons: Bool)
 }
 
 fn add_file_ignored_lines(
   ignored_lines: IgnoredLines,
-  source_path: String,
+  marker_read: MarkerRead,
   rest: List(String),
 ) -> Result(IgnoredLines, CoverageError) {
-  case dict.has_key(ignored_lines, source_path) {
-    True -> add_ignored_lines(ignored_lines, rest)
-    False -> read_file_ignored_lines(ignored_lines, source_path, rest)
+  case dict.has_key(ignored_lines, marker_read.source_path) {
+    True -> add_ignored_lines(ignored_lines, rest, marker_read.require_reasons)
+    False -> read_file_ignored_lines(ignored_lines, marker_read, rest)
   }
 }
 
 fn read_file_ignored_lines(
   ignored_lines: IgnoredLines,
-  source_path: String,
+  marker_read: MarkerRead,
   rest: List(String),
 ) -> Result(IgnoredLines, CoverageError) {
-  case file.read(source_path) {
+  case file.read(marker_read.source_path) {
     Ok(text) ->
       scan_then_continue(
         ignored_lines,
-        source_path,
+        marker_read,
         string.split(text, "\n"),
         rest,
       )
-    Error(error) -> Error(SourceReadFailed(path: source_path, error: error))
+    Error(error) ->
+      Error(SourceReadFailed(path: marker_read.source_path, error: error))
   }
 }
 
 fn scan_then_continue(
   ignored_lines: IgnoredLines,
-  source_path: String,
+  marker_read: MarkerRead,
   lines: List(String),
   rest: List(String),
 ) -> Result(IgnoredLines, CoverageError) {
   let scan =
     MarkerScan(
-      source_path: source_path,
-      syntax: comment_syntax(source_path),
+      source_path: marker_read.source_path,
+      syntax: comment_syntax(marker_read.source_path),
       line_number: 1,
       ignored: dict.new(),
       open_block: None,
       pending_text: None,
+      require_reasons: marker_read.require_reasons,
     )
   case scan_lines(scan, lines) {
     Ok(ignored) ->
-      add_ignored_lines(dict.insert(ignored_lines, source_path, ignored), rest)
+      add_ignored_lines(
+        dict.insert(ignored_lines, marker_read.source_path, ignored),
+        rest,
+        marker_read.require_reasons,
+      )
     Error(error) -> Error(error)
   }
 }
@@ -1182,37 +1496,57 @@ fn scan_lines(
   }
 }
 
+/// With `require_reasons`, every marker but an end marker needs text. An end
+/// marker uses the text of its start marker.
 fn scan_line_then_continue(
   scan: MarkerScan,
   line: String,
   rest: List(String),
 ) -> Result(Dict(Int, String), CoverageError) {
-  case classify_line(scan.syntax, line), scan.open_block, scan.pending_text {
-    Marker(IgnoreStart, _), Some(open), _ ->
+  let source_line = classify_line(scan.syntax, line)
+  case source_line, scan.require_reasons {
+    Marker(kind: IgnoreEnd, ..), _ -> scan_source_line(scan, source_line, rest)
+    Marker(name: name, text: "", ..), True ->
+      Error(IgnoreMarkerWithoutReason(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+        marker: name,
+      ))
+    _, _ -> scan_source_line(scan, source_line, rest)
+  }
+}
+
+fn scan_source_line(
+  scan: MarkerScan,
+  source_line: SourceLine,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  case source_line, scan.open_block, scan.pending_text {
+    Marker(IgnoreStart, _, _), Some(open), _ ->
       Error(NestedIgnoreStart(
         source_path: scan.source_path,
         line_number: scan.line_number,
         open_line_number: open.line_number,
       ))
-    Marker(IgnoreStart, text), None, _ ->
+    Marker(IgnoreStart, _, text), None, _ ->
       MarkerScan(
         ..ignore_line(scan, text),
         open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
         pending_text: None,
       )
       |> next_line(rest)
-    Marker(IgnoreEnd, _), None, _ ->
+    Marker(IgnoreEnd, _, _), None, _ ->
       Error(IgnoreEndWithoutStart(
         source_path: scan.source_path,
         line_number: scan.line_number,
       ))
-    Marker(IgnoreEnd, _), Some(open), _ ->
+    Marker(IgnoreEnd, _, _), Some(open), _ ->
       MarkerScan(..ignore_line(scan, open.text), open_block: None)
       |> next_line(rest)
     _, Some(open), _ -> next_line(ignore_line(scan, open.text), rest)
-    Marker(IgnoreFunction, text), None, _ ->
+    Marker(IgnoreFunction, _, text), None, _ ->
       ignore_function_then_continue(scan, text, rest)
-    Marker(IgnoreLine, text), None, _ ->
+    Marker(IgnoreLine, _, text), None, _ ->
       next_line(MarkerScan(..scan, pending_text: Some(text)), rest)
     CodeLine, None, Some(text) ->
       MarkerScan(..ignore_line(scan, text), pending_text: None)
@@ -1266,10 +1600,11 @@ fn comment_line(body: String) -> SourceLine {
 
 fn marker_line(word: String, text: String) -> SourceLine {
   case word {
-    "coverage:ignore" -> Marker(kind: IgnoreLine, text: text)
-    "coverage:ignore-start" -> Marker(kind: IgnoreStart, text: text)
-    "coverage:ignore-end" -> Marker(kind: IgnoreEnd, text: text)
-    "coverage:ignore-function" -> Marker(kind: IgnoreFunction, text: text)
+    "coverage:ignore" -> Marker(kind: IgnoreLine, name: word, text: text)
+    "coverage:ignore-start" -> Marker(kind: IgnoreStart, name: word, text: text)
+    "coverage:ignore-end" -> Marker(kind: IgnoreEnd, name: word, text: text)
+    "coverage:ignore-function" ->
+      Marker(kind: IgnoreFunction, name: word, text: text)
     _ -> OtherLine
   }
 }
@@ -1632,12 +1967,76 @@ fn add_line_count(file_counts: Dict(Int, Int), line: #(Int, Int)) {
   dict.insert(file_counts, line_number, existing + calls)
 }
 
-fn report_from_counts(counts: Counts) -> CoverageReport {
+fn report_from_counts(
+  counts: Counts,
+  ignored_lines: IgnoredLines,
+) -> CoverageReport {
   counts
   |> dict.to_list()
   |> list.sort(compare_paths)
-  |> list.map(file_from_counts)
+  |> files_from_counts(ignored_lines, [])
   |> report.new()
+}
+
+fn files_from_counts(
+  entries: List(#(String, Dict(Int, Int))),
+  ignored_lines: IgnoredLines,
+  accumulated_reversed: List(FileCoverage),
+) -> List(FileCoverage) {
+  case entries {
+    [] -> list.reverse(accumulated_reversed)
+    [entry, ..rest] ->
+      files_from_counts(rest, ignored_lines, [
+        file_from_counts(entry)
+          |> report.add_ignored_ranges(
+            ignored_ranges(dict.get(ignored_lines, entry.0)),
+          ),
+        ..accumulated_reversed
+      ])
+  }
+}
+
+/// Consecutive ignored lines with the same marker text, as ranges.
+fn ignored_ranges(
+  file_ignored_lines: Result(Dict(Int, String), Nil),
+) -> List(IgnoredRange) {
+  file_ignored_lines
+  |> result.unwrap(dict.new())
+  |> dict.to_list()
+  |> list.sort(compare_line_entries)
+  |> merge_ignored_lines(None, [])
+}
+
+fn compare_line_entries(left: #(Int, String), right: #(Int, String)) -> Order {
+  int.compare(left.0, right.0)
+}
+
+/// `open_range` is the first line, the last line and the text of the range
+/// that the next line can extend.
+fn merge_ignored_lines(
+  lines: List(#(Int, String)),
+  open_range: Option(#(Int, Int, String)),
+  ranges_reversed: List(IgnoredRange),
+) -> List(IgnoredRange) {
+  case lines, open_range {
+    [], None -> list.reverse(ranges_reversed)
+    [], Some(range) -> list.reverse([ignored_range(range), ..ranges_reversed])
+    [#(line, text), ..rest], None ->
+      merge_ignored_lines(rest, Some(#(line, line, text)), ranges_reversed)
+    [#(line, text), ..rest], Some(#(first, last, open_text))
+      if line == last + 1 && text == open_text
+    -> merge_ignored_lines(rest, Some(#(first, line, text)), ranges_reversed)
+    [#(line, text), ..rest], Some(range) ->
+      merge_ignored_lines(rest, Some(#(line, line, text)), [
+        ignored_range(range),
+        ..ranges_reversed
+      ])
+  }
+}
+
+fn ignored_range(range: #(Int, Int, String)) -> IgnoredRange {
+  let #(first, last, text) = range
+  IgnoredRange(first_line: first, last_line: last, reason: non_empty_text(text))
 }
 
 fn compare_paths(
