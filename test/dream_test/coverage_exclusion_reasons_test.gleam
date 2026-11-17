@@ -5,9 +5,7 @@ import dream_test/coverage.{
   type CoverageConfig, type CoverageError, ExcludeWithoutReason,
   IgnoreMarkerWithoutReason,
 }
-import dream_test/coverage/report.{
-  type CoverageReport, ExcludedFile, IgnoredRange,
-}
+import dream_test/coverage/report.{type CoverageReport}
 import dream_test/coverage_child_support.{
   add_source, child_project, compile_source, measure, run_in_child,
 }
@@ -174,8 +172,8 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok([
-            IgnoredRange(first_line: 7, last_line: 7, reason: None),
-            IgnoredRange(
+            report.ignored_range(first_line: 7, last_line: 7, reason: None),
+            report.ignored_range(
               first_line: 8,
               last_line: 10,
               reason: Some("debug only"),
@@ -194,7 +192,7 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok([
-            IgnoredRange(
+            report.ignored_range(
               first_line: 3,
               last_line: 3,
               reason: Some("merged only"),
@@ -215,7 +213,7 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok([
-            ExcludedFile(
+            report.excluded_file(
               source_path: "src/generated.erl",
               pattern: generated_pattern(),
               reason: Some("generated code"),
@@ -235,7 +233,7 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok([
-            ExcludedFile(
+            report.excluded_file(
               source_path: "src/generated.erl",
               pattern: "src/generated.erl",
               reason: None,
@@ -288,12 +286,12 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok([
-            IgnoredRange(
+            report.ignored_range(
               first_line: 7,
               last_line: 7,
               reason: Some("old callers"),
             ),
-            IgnoredRange(
+            report.ignored_range(
               first_line: 8,
               last_line: 10,
               reason: Some("debug only"),

@@ -13,9 +13,7 @@ import dream_test/coverage.{
   SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
   UnknownInstrumentError,
 }
-import dream_test/coverage/report.{
-  type LineCoverage, ExcludedFile, IgnoredRange, LineCoverage,
-}
+import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
   FileSystemError, IsDirectory, NoSpace, NotFound, PermissionDenied,
 }
@@ -50,13 +48,17 @@ fn excluded_report() {
       LineCoverage(line: 12, calls: 0),
     ])
       |> report.add_ignored_ranges([
-        IgnoredRange(first_line: 40, last_line: 44, reason: Some("debug only")),
-        IgnoredRange(first_line: 71, last_line: 71, reason: None),
+        report.ignored_range(
+          first_line: 40,
+          last_line: 44,
+          reason: Some("debug only"),
+        ),
+        report.ignored_range(first_line: 71, last_line: 71, reason: None),
       ]),
     report.file("src/app/types.gleam", []),
   ])
   |> report.add_excluded_files([
-    ExcludedFile(
+    report.excluded_file(
       source_path: "src/app/generated/db.gleam",
       pattern: "src/app/generated/**",
       reason: Some("generated code"),
@@ -71,7 +73,7 @@ fn file_with_ranges(path: String, ranges: List(#(Int, Int))) {
 }
 
 fn range_without_reason(range: #(Int, Int)) {
-  IgnoredRange(first_line: range.0, last_line: range.1, reason: None)
+  report.ignored_range(first_line: range.0, last_line: range.1, reason: None)
 }
 
 /// Lines from..to where odd lines never ran and even lines ran once.
@@ -254,12 +256,12 @@ pub fn tests() {
         coverage_reporter.render(
           report: report.new([file_with_ranges("src/a.gleam", [])])
             |> report.add_excluded_files([
-              ExcludedFile(
+              report.excluded_file(
                 source_path: "src/b_ffi.erl",
                 pattern: "src/*_ffi.erl",
                 reason: None,
               ),
-              ExcludedFile(
+              report.excluded_file(
                 source_path: "src/c_ffi.erl",
                 pattern: "src/*_ffi.erl",
                 reason: None,

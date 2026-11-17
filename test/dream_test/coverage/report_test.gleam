@@ -1,4 +1,4 @@
-import dream_test/coverage/report.{ExcludedFile, IgnoredRange, LineCoverage}
+import dream_test/coverage/report.{LineCoverage}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
 import gleam/option.{None, Some}
@@ -16,15 +16,19 @@ fn types_file() {
 }
 
 fn debug_range() {
-  IgnoredRange(first_line: 40, last_line: 44, reason: Some("debug only"))
+  report.ignored_range(
+    first_line: 40,
+    last_line: 44,
+    reason: Some("debug only"),
+  )
 }
 
 fn single_range() {
-  IgnoredRange(first_line: 71, last_line: 71, reason: None)
+  report.ignored_range(first_line: 71, last_line: 71, reason: None)
 }
 
 fn generated_file() {
-  ExcludedFile(
+  report.excluded_file(
     source_path: "src/app/generated/db.gleam",
     pattern: "src/app/generated/**",
     reason: Some("generated code"),
@@ -32,7 +36,7 @@ fn generated_file() {
 }
 
 fn ffi_file() {
-  ExcludedFile(
+  report.excluded_file(
     source_path: "src/app_ffi.erl",
     pattern: "src/**/*_ffi.erl",
     reason: None,
@@ -128,6 +132,54 @@ pub fn tests() {
       |> should
       |> be_equal([generated_file(), ffi_file()])
       |> or_fail_with("expected the generated file, then the FFI file")
+    }),
+    it("ignored_first_line returns the first line given", fn() {
+      report.ignored_first_line(debug_range())
+      |> should
+      |> be_equal(40)
+      |> or_fail_with("expected first line 40")
+    }),
+    it("ignored_last_line returns the last line given", fn() {
+      report.ignored_last_line(debug_range())
+      |> should
+      |> be_equal(44)
+      |> or_fail_with("expected last line 44")
+    }),
+    it("ignored_reason returns the reason given", fn() {
+      report.ignored_reason(debug_range())
+      |> should
+      |> be_equal(Some("debug only"))
+      |> or_fail_with("expected Some(\"debug only\")")
+    }),
+    it("ignored_reason returns None for a marker with no text", fn() {
+      report.ignored_reason(single_range())
+      |> should
+      |> be_equal(None)
+      |> or_fail_with("expected None")
+    }),
+    it("excluded_source_path returns the path given", fn() {
+      report.excluded_source_path(generated_file())
+      |> should
+      |> be_equal("src/app/generated/db.gleam")
+      |> or_fail_with("expected src/app/generated/db.gleam")
+    }),
+    it("excluded_pattern returns the pattern given", fn() {
+      report.excluded_pattern(generated_file())
+      |> should
+      |> be_equal("src/app/generated/**")
+      |> or_fail_with("expected src/app/generated/**")
+    }),
+    it("excluded_reason returns the reason given", fn() {
+      report.excluded_reason(generated_file())
+      |> should
+      |> be_equal(Some("generated code"))
+      |> or_fail_with("expected Some(\"generated code\")")
+    }),
+    it("excluded_reason returns None for a pattern with no reason", fn() {
+      report.excluded_reason(ffi_file())
+      |> should
+      |> be_equal(None)
+      |> or_fail_with("expected None")
     }),
     it("an empty report has no lines", fn() {
       report.new([])

@@ -169,7 +169,7 @@
 
 import dream_test/coverage/report.{
   type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
-  type LineCoverage, ExcludedFile, IgnoredRange, LineCoverage,
+  type LineCoverage, LineCoverage,
 }
 import dream_test/file.{type FileError}
 import gleam/dict.{type Dict}
@@ -1035,7 +1035,7 @@ fn compare_excluded_paths(
 
 fn excluded_file(entry: #(String, ExcludePattern)) -> ExcludedFile {
   let #(source_path, exclude_pattern) = entry
-  ExcludedFile(
+  report.excluded_file(
     source_path: source_path,
     pattern: exclude_pattern.pattern,
     reason: exclude_pattern.reason,
@@ -1254,7 +1254,7 @@ fn merge_then_write(
 }
 
 fn excluded_file_path(excluded: ExcludedFile) -> String {
-  excluded.source_path
+  report.excluded_source_path(excluded)
 }
 
 /// Drop the ignored lines, then build the report and write the LCOV file.
@@ -1981,7 +1981,11 @@ fn merge_ignored_lines(
 
 fn ignored_range(range: #(Int, Int, String)) -> IgnoredRange {
   let #(first, last, text) = range
-  IgnoredRange(first_line: first, last_line: last, reason: non_empty_text(text))
+  report.ignored_range(
+    first_line: first,
+    last_line: last,
+    reason: non_empty_text(text),
+  )
 }
 
 fn compare_paths(

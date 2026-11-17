@@ -42,13 +42,18 @@
 ////
 //// ## Available Functions
 ////
-//// | Category     | Functions                                                   |
-//// |--------------|-------------------------------------------------------------|
-//// | **Build**    | `new`, `file`, `add_ignored_ranges`, `add_excluded_files`   |
-//// | **Files**    | `files`, `source_path`, `lines`                             |
-//// | **Counts**   | `hit_line_count`, `executable_line_count`,                  |
-//// |              | `total_hit_line_count`, `total_executable_line_count`       |
-//// | **Excluded** | `ignored_ranges`, `excluded_files`                          |
+//// | Category           | Functions                                             |
+//// |--------------------|-------------------------------------------------------|
+//// | **Build**          | `new`, `file`, `add_ignored_ranges`,                  |
+//// |                    | `add_excluded_files`                                  |
+//// | **Files**          | `files`, `source_path`, `lines`                       |
+//// | **Counts**         | `hit_line_count`, `executable_line_count`,            |
+//// |                    | `total_hit_line_count`, `total_executable_line_count` |
+//// | **Excluded**       | `ignored_ranges`, `excluded_files`                    |
+//// | **Ignored ranges** | `ignored_range`, `ignored_first_line`,                |
+//// |                    | `ignored_last_line`, `ignored_reason`                 |
+//// | **Excluded files** | `excluded_file`, `excluded_source_path`,              |
+//// |                    | `excluded_pattern`, `excluded_reason`                 |
 ////
 //// ## Import Style
 ////
@@ -82,23 +87,174 @@ pub opaque type FileCoverage {
 /// Consecutive lines of a source file that `coverage:ignore` markers left
 /// out of coverage.
 ///
-/// - `first_line`: the first ignored line, 1-based
-/// - `last_line`: the last ignored line (equal to `first_line` for one line)
-/// - `reason`: the text after the marker, or `None` when the marker has no
-///   text
-pub type IgnoredRange {
+/// Build one with `report.ignored_range`. Read it with `ignored_first_line`,
+/// `ignored_last_line` and `ignored_reason`.
+pub opaque type IgnoredRange {
   IgnoredRange(first_line: Int, last_line: Int, reason: Option(String))
 }
 
 /// A source file that a `coverage.exclude` pattern left out of coverage.
+///
+/// Build one with `report.excluded_file`. Read it with
+/// `excluded_source_path`, `excluded_pattern` and `excluded_reason`.
+pub opaque type ExcludedFile {
+  ExcludedFile(source_path: String, pattern: String, reason: Option(String))
+}
+
+/// Build an ignored line range.
+///
+/// Use it to build a report yourself, for example to test your own output.
+/// `coverage.finish` builds these for you from `coverage:ignore` markers.
+///
+/// ## Parameters
+///
+/// - `first_line`: the first ignored line, 1-based
+/// - `last_line`: the last ignored line (equal to `first_line` for one line)
+/// - `reason`: the text after the marker, or `None` when the marker has no
+///   text
+///
+/// ## Returns
+///
+/// The ignored range.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.ignored_range(first_line: 40, last_line: 44, reason: Some("debug only"))
+/// ```
+pub fn ignored_range(
+  first_line first_line: Int,
+  last_line last_line: Int,
+  reason reason: Option(String),
+) -> IgnoredRange {
+  IgnoredRange(first_line: first_line, last_line: last_line, reason: reason)
+}
+
+/// The first line of an ignored range, 1-based.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.ignored_range(first_line: 40, last_line: 44, reason: None)
+/// |> report.ignored_first_line()
+/// // -> 40
+/// ```
+pub fn ignored_first_line(range range: IgnoredRange) -> Int {
+  range.first_line
+}
+
+/// The last line of an ignored range. It equals the first line when the
+/// range has one line.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.ignored_range(first_line: 40, last_line: 44, reason: None)
+/// |> report.ignored_last_line()
+/// // -> 44
+/// ```
+pub fn ignored_last_line(range range: IgnoredRange) -> Int {
+  range.last_line
+}
+
+/// The text after the marker of an ignored range, or `None` when the marker
+/// has no text.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.ignored_range(first_line: 40, last_line: 44, reason: Some("debug only"))
+/// |> report.ignored_reason()
+/// // -> Some("debug only")
+/// ```
+pub fn ignored_reason(range range: IgnoredRange) -> Option(String) {
+  range.reason
+}
+
+/// Build an excluded file.
+///
+/// Use it to build a report yourself, for example to test your own output.
+/// `coverage.finish` builds these for you from `coverage.exclude` patterns.
+///
+/// ## Parameters
 ///
 /// - `source_path`: the excluded file, for example
 ///   `src/app/generated/db.gleam`
 /// - `pattern`: the first pattern that matches the file
 /// - `reason`: the reason given to `coverage.exclude_with_reason`, or `None`
 ///   for `coverage.exclude`
-pub type ExcludedFile {
-  ExcludedFile(source_path: String, pattern: String, reason: Option(String))
+///
+/// ## Returns
+///
+/// The excluded file.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.excluded_file(
+///   source_path: "src/app/generated/db.gleam",
+///   pattern: "src/app/generated/**",
+///   reason: Some("generated code"),
+/// )
+/// ```
+pub fn excluded_file(
+  source_path source_path: String,
+  pattern pattern: String,
+  reason reason: Option(String),
+) -> ExcludedFile {
+  ExcludedFile(source_path: source_path, pattern: pattern, reason: reason)
+}
+
+/// The path of an excluded file.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.excluded_file(
+///   source_path: "src/app/generated/db.gleam",
+///   pattern: "src/app/generated/**",
+///   reason: None,
+/// )
+/// |> report.excluded_source_path()
+/// // -> "src/app/generated/db.gleam"
+/// ```
+pub fn excluded_source_path(file file: ExcludedFile) -> String {
+  file.source_path
+}
+
+/// The first exclude pattern that matches an excluded file.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.excluded_file(
+///   source_path: "src/app/generated/db.gleam",
+///   pattern: "src/app/generated/**",
+///   reason: None,
+/// )
+/// |> report.excluded_pattern()
+/// // -> "src/app/generated/**"
+/// ```
+pub fn excluded_pattern(file file: ExcludedFile) -> String {
+  file.pattern
+}
+
+/// The reason an excluded file was left out, or `None` when the pattern was
+/// given with `coverage.exclude`.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.excluded_file(
+///   source_path: "src/app/generated/db.gleam",
+///   pattern: "src/app/generated/**",
+///   reason: Some("generated code"),
+/// )
+/// |> report.excluded_reason()
+/// // -> Some("generated code")
+/// ```
+pub fn excluded_reason(file file: ExcludedFile) -> Option(String) {
+  file.reason
 }
 
 /// How many times one executable line ran.
@@ -173,7 +329,11 @@ fn compare_lines(left: LineCoverage, right: LineCoverage) -> Order {
 /// ```gleam
 /// report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
 /// |> report.add_ignored_ranges([
-///   IgnoredRange(first_line: 40, last_line: 44, reason: Some("debug only")),
+///   report.ignored_range(
+///     first_line: 40,
+///     last_line: 44,
+///     reason: Some("debug only"),
+///   ),
 /// ])
 /// ```
 pub fn add_ignored_ranges(
@@ -204,10 +364,10 @@ fn compare_ranges(left: IgnoredRange, right: IgnoredRange) -> Order {
 /// ```gleam
 /// report.file("src/app/cart.gleam", [])
 /// |> report.add_ignored_ranges([
-///   IgnoredRange(first_line: 71, last_line: 71, reason: None),
+///   report.ignored_range(first_line: 71, last_line: 71, reason: None),
 /// ])
 /// |> report.ignored_ranges()
-/// // -> [IgnoredRange(first_line: 71, last_line: 71, reason: None)]
+/// // -> [report.ignored_range(first_line: 71, last_line: 71, reason: None)]
 /// ```
 pub fn ignored_ranges(file file: FileCoverage) -> List(IgnoredRange) {
   file.ignored_ranges
@@ -232,7 +392,7 @@ pub fn ignored_ranges(file file: FileCoverage) -> List(IgnoredRange) {
 /// ```gleam
 /// report.new([cart_file])
 /// |> report.add_excluded_files([
-///   ExcludedFile(
+///   report.excluded_file(
 ///     source_path: "src/app/generated/db.gleam",
 ///     pattern: "src/app/generated/**",
 ///     reason: Some("generated code"),

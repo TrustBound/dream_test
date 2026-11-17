@@ -303,8 +303,11 @@ fn range_text(range: #(Int, Int)) -> String {
 
 /// `40-44 (debug only)`, or `71` when the marker has no text.
 fn ignored_range_text(range: IgnoredRange) -> String {
-  range_text(#(range.first_line, range.last_line))
-  <> reason_suffix(range.reason)
+  range_text(#(
+    report.ignored_first_line(range),
+    report.ignored_last_line(range),
+  ))
+  <> reason_suffix(report.ignored_reason(range))
 }
 
 fn reason_suffix(reason: Option(String)) -> String {
@@ -326,10 +329,10 @@ fn excluded_file_rows(
 
 fn excluded_file_row(excluded: ExcludedFile) -> CoverageRow {
   ExcludedFileRow(
-    label: excluded.source_path,
+    label: report.excluded_source_path(excluded),
     text: "excluded: matches "
-      <> excluded.pattern
-      <> reason_suffix(excluded.reason),
+      <> report.excluded_pattern(excluded)
+      <> reason_suffix(report.excluded_reason(excluded)),
   )
 }
 
@@ -492,7 +495,7 @@ fn add_ignored_line_count(total: Int, file: FileCoverage) -> Int {
 }
 
 fn add_range_line_count(total: Int, range: IgnoredRange) -> Int {
-  total + range.last_line - range.first_line + 1
+  total + report.ignored_last_line(range) - report.ignored_first_line(range) + 1
 }
 
 fn lines_in_files_text(line_count: Int, file_count: Int) -> String {
