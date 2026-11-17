@@ -3,6 +3,7 @@
     project/1,
     add_source/3,
     compile_source/3,
+    compile_outside_source/2,
     add_damaged_beam/2,
     delete_beam/2,
     make_unreadable/2,
@@ -80,6 +81,17 @@ uncompilable_forms() ->
 debug_info(erlang_v1, _Module, Forms, _Options) ->
     {ok, Forms}.
 
+%% Compile the Erlang source Text into the project's ebin/. The source is
+%% kept outside the source directory, so coverage reads only the other
+%% files there, and its module can have the name of a Gleam module. Its
+%% annotations hold lines without columns, as Gleam's do.
+compile_outside_source(SourceDirectory, Text) ->
+    Path = filename:join([SourceDirectory, "..", "outside.erl"]),
+    ok = file:write_file(Path, Text),
+    {ok, Module, Binary} = compile:file(unicode:characters_to_list(Path), [binary, return_errors, debug_info, {error_location, line}]),
+    ok = file:write_file(beam_path(SourceDirectory, atom_to_binary(Module)), Binary),
+    nil.
+
 %% Write a damaged ebin/Module.beam.
 add_damaged_beam(SourceDirectory, Module) ->
     ok = file:write_file(beam_path(SourceDirectory, Module), <<"not a beam file">>),
@@ -150,7 +162,8 @@ start_measuring_for(Supported, CompilerLoaded, OtpRelease, EmulatorFlavor) ->
         compiler_load(CompilerLoaded),
         unicode:characters_to_list(OtpRelease),
         binary_to_atom(EmulatorFlavor),
-        []
+        [],
+        #{}
     ).
 
 compiler_load(true) -> {module, compile};

@@ -72,6 +72,24 @@
 //// JavaScript-only body of a function that has an Erlang `@external`, that
 //// code has no counter and is not in the table.
 ////
+//// The line of a function with an `@external(erlang, ...)` attribute is not
+//// counted either. Gleam compiles such a function to a wrapper that calls
+//// the Erlang function, but Gleam code never calls the wrapper: the
+//// compiler calls the Erlang function directly. Coverage finds these
+//// functions in two steps, so a line that can run is never left out:
+////
+//// 1. It reads the name and line of each function that the Gleam source
+////    declares with an `@external(erlang, ...)` attribute.
+//// 2. When it adds the line counters, it takes the function with that name
+////    and line from the `.beam` file. Only when that function has exactly
+////    the wrapper shape of Gleam 1.19 does it get no counter: one clause,
+////    and a body that is one call to another module with the same
+////    parameters in the same order, all on the function's line.
+////
+//// A function written on one line whose body only calls an external
+//// compiles to the same code as a wrapper, but it has no `@external`
+//// attribute, so its line is counted.
+////
 //// ## Ignoring lines
 ////
 //// Comment markers leave lines of a source file out of coverage. Put each
@@ -376,7 +394,7 @@ pub opaque type CoverageSession {
     measurement: Measurement,
     modules: List(CoveredModule),
     excluded_files: List(ExcludedFile),
-    ignored_lines: IgnoredLines,
+    source_marks: SourceMarks,
     inexact_line_files: List(String),
   )
 }
@@ -391,7 +409,7 @@ type PreparedRun {
     config: CoverageConfig,
     modules: List(CoveredModule),
     excluded_files: List(ExcludedFile),
-    ignored_lines: IgnoredLines,
+    source_marks: SourceMarks,
   )
 }
 
@@ -1690,18 +1708,14 @@ fn start_with_ignored_lines(
 ) -> Result(CoverageSession, CoverageError) {
   let source_paths = list.map(modules, module_source_path)
   case
-    add_ignored_lines(
-      dict.new(),
-      source_paths,
-      config.require_exclusion_reasons,
-    )
+    add_source_marks(dict.new(), source_paths, config.require_exclusion_reasons)
   {
-    Ok(ignored_lines) ->
+    Ok(source_marks) ->
       start_with_modules(PreparedRun(
         config: config,
         modules: modules,
         excluded_files: excluded_files,
-        ignored_lines: ignored_lines,
+        source_marks: source_marks,
       ))
     Error(error) -> Error(error)
   }
@@ -1759,18 +1773,30 @@ fn is_meaningful_segment(segment: String) -> Bool {
 fn start_with_modules(
   run: PreparedRun,
 ) -> Result(CoverageSession, CoverageError) {
-  case start_measuring(run.modules) {
+  case
+    start_measuring(
+      run.modules,
+      dict.map_values(run.source_marks, file_erlang_externals),
+    )
+  {
     Ok(#(measurement, erlang_source_paths)) ->
       Ok(CoverageSession(
         config: run.config,
         measurement: measurement,
         modules: run.modules,
         excluded_files: run.excluded_files,
-        ignored_lines: run.ignored_lines,
+        source_marks: run.source_marks,
         inexact_line_files: inexact_line_files(erlang_source_paths),
       ))
     Error(error) -> Error(error)
   }
+}
+
+fn file_erlang_externals(
+  _source_path: String,
+  marks: FileMarks,
+) -> List(#(String, Int)) {
+  marks.erlang_externals
 }
 
 /// The `.gleam` files among the files built from Erlang source (Gleam before
@@ -1901,17 +1927,17 @@ fn ignore_then_write(
   session: CoverageSession,
 ) -> Result(CoverageReport, CoverageError) {
   case
-    add_ignored_lines(
-      session.ignored_lines,
+    add_source_marks(
+      session.source_marks,
       dict.keys(counts),
       session.config.require_exclusion_reasons,
     )
   {
-    Ok(ignored_lines) ->
+    Ok(source_marks) ->
       counts
       |> dict.to_list()
-      |> without_ignored_lines(ignored_lines, dict.new())
-      |> report_from_counts(ignored_lines)
+      |> without_ignored_lines(source_marks, dict.new())
+      |> report_from_counts(source_marks)
       |> report.add_excluded_files(session.excluded_files)
       |> report.add_inexact_line_files(session.inexact_line_files)
       |> write_report(session.config)
@@ -1921,22 +1947,34 @@ fn ignore_then_write(
 
 fn without_ignored_lines(
   entries: List(#(String, Dict(Int, Int))),
-  ignored_lines: IgnoredLines,
+  source_marks: SourceMarks,
   accumulated: Counts,
 ) -> Counts {
   case entries {
     [] -> accumulated
     [#(source_path, file_counts), ..rest] -> {
       let file_ignored_lines =
-        result.unwrap(dict.get(ignored_lines, source_path), dict.new())
+        file_ignored_lines(dict.get(source_marks, source_path))
       let kept_counts = dict.drop(file_counts, dict.keys(file_ignored_lines))
       without_ignored_lines(
         rest,
-        ignored_lines,
+        source_marks,
         dict.insert(accumulated, source_path, kept_counts),
       )
     }
   }
+}
+
+/// The ignored lines of one file. A file that the source reader did not
+/// read has none.
+fn file_ignored_lines(file_marks: Result(FileMarks, Nil)) -> Dict(Int, String) {
+  file_marks
+  |> result.map(marks_ignored_lines)
+  |> result.unwrap(dict.new())
+}
+
+fn marks_ignored_lines(marks: FileMarks) -> Dict(Int, String) {
+  marks.ignored_lines
 }
 
 fn file_coverage(file: #(String, List(LineCoverage))) -> FileCoverage {
@@ -2220,11 +2258,24 @@ fn write_error(
 // Ignore markers
 // =============================================================================
 
-/// The lines that ignore markers leave out of coverage, per source path.
-/// Each line maps to the text written after its marker (empty when there is
-/// none).
-type IgnoredLines =
-  Dict(String, Dict(Int, String))
+/// What the source reader finds in each source file, per source path.
+type SourceMarks =
+  Dict(String, FileMarks)
+
+/// What the source reader finds in one source file.
+///
+/// - `ignored_lines`: the lines that ignore markers leave out of coverage.
+///   Each line maps to the text written after its marker (empty when there
+///   is none).
+/// - `erlang_externals`: the name and line of each function that a Gleam
+///   file declares with an `@external(erlang, ...)` attribute. Always empty
+///   for an `.erl` file.
+type FileMarks {
+  FileMarks(
+    ignored_lines: Dict(Int, String),
+    erlang_externals: List(#(String, Int)),
+  )
+}
 
 /// How comments start in a source file.
 type CommentSyntax {
@@ -2264,18 +2315,18 @@ type MarkerScan {
   )
 }
 
-/// Read the markers of each path that `ignored_lines` does not hold yet.
+/// Read the markers of each path that `source_marks` does not hold yet.
 /// With `require_reasons`, a marker without text is an error.
-fn add_ignored_lines(
-  ignored_lines: IgnoredLines,
+fn add_source_marks(
+  source_marks: SourceMarks,
   source_paths: List(String),
   require_reasons: Bool,
-) -> Result(IgnoredLines, CoverageError) {
+) -> Result(SourceMarks, CoverageError) {
   case source_paths {
-    [] -> Ok(ignored_lines)
+    [] -> Ok(source_marks)
     [source_path, ..rest] ->
-      add_file_ignored_lines(
-        ignored_lines,
+      add_file_source_marks(
+        source_marks,
         MarkerRead(source_path: source_path, require_reasons: require_reasons),
         rest,
       )
@@ -2287,55 +2338,57 @@ type MarkerRead {
   MarkerRead(source_path: String, require_reasons: Bool)
 }
 
-fn add_file_ignored_lines(
-  ignored_lines: IgnoredLines,
+fn add_file_source_marks(
+  source_marks: SourceMarks,
   marker_read: MarkerRead,
   rest: List(String),
-) -> Result(IgnoredLines, CoverageError) {
-  case dict.has_key(ignored_lines, marker_read.source_path) {
-    True -> add_ignored_lines(ignored_lines, rest, marker_read.require_reasons)
-    False -> read_file_ignored_lines(ignored_lines, marker_read, rest)
+) -> Result(SourceMarks, CoverageError) {
+  case dict.has_key(source_marks, marker_read.source_path) {
+    True -> add_source_marks(source_marks, rest, marker_read.require_reasons)
+    False -> read_file_source_marks(source_marks, marker_read, rest)
   }
 }
 
-fn read_file_ignored_lines(
-  ignored_lines: IgnoredLines,
+fn read_file_source_marks(
+  source_marks: SourceMarks,
   marker_read: MarkerRead,
   rest: List(String),
-) -> Result(IgnoredLines, CoverageError) {
+) -> Result(SourceMarks, CoverageError) {
   case file.read(marker_read.source_path) {
-    Ok(text) ->
-      scan_then_continue(
-        ignored_lines,
-        marker_read,
-        string.split(text, "\n"),
-        rest,
-      )
+    Ok(text) -> scan_then_continue(source_marks, marker_read, text, rest)
     Error(error) ->
       Error(SourceReadFailed(path: marker_read.source_path, error: error))
   }
 }
 
 fn scan_then_continue(
-  ignored_lines: IgnoredLines,
+  source_marks: SourceMarks,
   marker_read: MarkerRead,
-  lines: List(String),
+  text: String,
   rest: List(String),
-) -> Result(IgnoredLines, CoverageError) {
+) -> Result(SourceMarks, CoverageError) {
+  let syntax = comment_syntax(marker_read.source_path)
   let scan =
     MarkerScan(
       source_path: marker_read.source_path,
-      syntax: comment_syntax(marker_read.source_path),
+      syntax: syntax,
       line_number: 1,
       ignored: dict.new(),
       open_block: None,
       pending_text: None,
       require_reasons: marker_read.require_reasons,
     )
-  case scan_lines(scan, lines) {
+  case scan_lines(scan, string.split(text, "\n")) {
     Ok(ignored) ->
-      add_ignored_lines(
-        dict.insert(ignored_lines, marker_read.source_path, ignored),
+      add_source_marks(
+        dict.insert(
+          source_marks,
+          marker_read.source_path,
+          FileMarks(
+            ignored_lines: ignored,
+            erlang_externals: erlang_externals(syntax, text),
+          ),
+        ),
         rest,
         marker_read.require_reasons,
       )
@@ -2722,6 +2775,91 @@ fn is_word_character(character: String) -> Bool {
 }
 
 // =============================================================================
+// Erlang externals
+// =============================================================================
+
+/// Where the reader of `@external(erlang, ...)` functions is in a Gleam
+/// file. `erlang_external` is True after an `@external(erlang, ...)`
+/// attribute, until the first token that is not part of an attribute.
+type ExternalScan {
+  ExternalScan(
+    cursor: Cursor,
+    erlang_external: Bool,
+    found_reversed: List(#(String, Int)),
+  )
+}
+
+/// The name and line of each function that a Gleam file declares with an
+/// `@external(erlang, ...)` attribute. The line is the line of the `pub` or
+/// `fn` keyword that starts the declaration, which is the line the compiler
+/// gives the function. An `.erl` file has none.
+fn erlang_externals(
+  syntax: CommentSyntax,
+  text: String,
+) -> List(#(String, Int)) {
+  case syntax {
+    GleamComments ->
+      scan_externals(
+        ExternalScan(
+          cursor: Cursor(text: string.replace(text, "\r", ""), line: 1),
+          erlang_external: False,
+          found_reversed: [],
+        ),
+      )
+    ErlangComments -> []
+  }
+}
+
+fn scan_externals(scan: ExternalScan) -> List(#(String, Int)) {
+  let #(first, after_first) = next_token(scan.cursor)
+  let #(second, after_second) = next_token(after_first)
+  let #(third, after_third) = next_token(after_second)
+  case first.kind, second.kind, third.kind {
+    EndOfText, _, _ -> list.reverse(scan.found_reversed)
+    Symbol("@"), Word("external"), Symbol("(") ->
+      scan_externals(after_external_attribute(scan, after_third))
+    Symbol("@"), Word(_), _ ->
+      scan_externals(
+        ExternalScan(..scan, cursor: after_attribute_arguments(after_second)),
+      )
+    Word("pub"), Word("fn"), Word(name) if scan.erlang_external ->
+      scan_externals(add_external(scan, #(name, first.line), after_third))
+    Word("fn"), Word(name), _ if scan.erlang_external ->
+      scan_externals(add_external(scan, #(name, first.line), after_second))
+    _, _, _ ->
+      scan_externals(
+        ExternalScan(..scan, cursor: after_first, erlang_external: False),
+      )
+  }
+}
+
+/// Read the arguments of an `@external` attribute. `cursor` is after its
+/// `(`. The first argument names the target.
+fn after_external_attribute(
+  scan: ExternalScan,
+  cursor: Cursor,
+) -> ExternalScan {
+  let #(target, _) = next_token(cursor)
+  let after_arguments = read_to_close(cursor, "(", ")", 0).1
+  case target.kind {
+    Word("erlang") ->
+      ExternalScan(..scan, cursor: after_arguments, erlang_external: True)
+    _ -> ExternalScan(..scan, cursor: after_arguments)
+  }
+}
+
+fn add_external(
+  scan: ExternalScan,
+  external: #(String, Int),
+  cursor: Cursor,
+) -> ExternalScan {
+  ExternalScan(cursor: cursor, erlang_external: False, found_reversed: [
+    external,
+    ..scan.found_reversed
+  ])
+}
+
+// =============================================================================
 // Merging LCOV
 // =============================================================================
 
@@ -2784,27 +2922,27 @@ fn add_line_count(file_counts: Dict(Int, Int), line: #(Int, Int)) {
 
 fn report_from_counts(
   counts: Counts,
-  ignored_lines: IgnoredLines,
+  source_marks: SourceMarks,
 ) -> CoverageReport {
   counts
   |> dict.to_list()
   |> list.sort(compare_paths)
-  |> files_from_counts(ignored_lines, [])
+  |> files_from_counts(source_marks, [])
   |> report.new()
 }
 
 fn files_from_counts(
   entries: List(#(String, Dict(Int, Int))),
-  ignored_lines: IgnoredLines,
+  source_marks: SourceMarks,
   accumulated_reversed: List(FileCoverage),
 ) -> List(FileCoverage) {
   case entries {
     [] -> list.reverse(accumulated_reversed)
     [entry, ..rest] ->
-      files_from_counts(rest, ignored_lines, [
+      files_from_counts(rest, source_marks, [
         file_from_counts(entry)
           |> report.add_ignored_ranges(
-            ignored_ranges(dict.get(ignored_lines, entry.0)),
+            ignored_ranges(file_ignored_lines(dict.get(source_marks, entry.0))),
           ),
         ..accumulated_reversed
       ])
@@ -2812,11 +2950,8 @@ fn files_from_counts(
 }
 
 /// Consecutive ignored lines with the same marker text, as ranges.
-fn ignored_ranges(
-  file_ignored_lines: Result(Dict(Int, String), Nil),
-) -> List(IgnoredRange) {
+fn ignored_ranges(file_ignored_lines: Dict(Int, String)) -> List(IgnoredRange) {
   file_ignored_lines
-  |> result.unwrap(dict.new())
   |> dict.to_list()
   |> list.sort(compare_line_entries)
   |> merge_ignored_lines(None, [])
@@ -3478,11 +3613,14 @@ fn system_time_ms() -> Int
 fn list_source_files(directory: String) -> Result(List(String), CoverageError)
 
 /// Check that this BEAM can count lines natively, then give every module
-/// line counters. Returns the measurement and the source paths of the
-/// modules built from Erlang source.
+/// line counters. `erlang_externals` holds the `@external(erlang, ...)`
+/// functions of each source path, whose wrappers get no counters. Returns
+/// the measurement and the source paths of the modules built from Erlang
+/// source.
 @external(erlang, "dream_test_coverage_ffi", "start_measuring")
 fn start_measuring(
   modules: List(CoveredModule),
+  erlang_externals: Dict(String, List(#(String, Int))),
 ) -> Result(#(Measurement, List(String)), CoverageError)
 
 /// Read the line counts of every module, as `#(source_path, lines)`.

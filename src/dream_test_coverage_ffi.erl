@@ -1,8 +1,8 @@
 -module(dream_test_coverage_ffi).
 -export([
-    start_if_supported/5,
+    start_if_supported/6,
     list_source_files/1,
-    start_measuring/1,
+    start_measuring/2,
     stop_measuring/2,
     match_files/1,
     is_regular_file/1,
@@ -45,7 +45,10 @@ source_files_in(Directory) ->
     lists:sort([unicode:characters_to_binary(Path) || Path <- Gleam ++ Erlang]).
 
 %% Start counting the lines of every module in `Modules`, a list of Gleam
-%% `CoveredModule` records.
+%% `CoveredModule` records. `ErlangExternals` maps the source path of each
+%% module to the `{Name, Line}` of each function that its Gleam source
+%% declares with an `@external(erlang, ...)` attribute (see
+%% `without_external_wrappers/2`).
 %%
 %% Native line counters need Erlang/OTP 27 or later with the JIT, and the
 %% compiler application, which recompiles each measured module. Both are
@@ -61,34 +64,35 @@ source_files_in(Directory) ->
 %% Returns `{Measurement, SourcePaths}`: the measurement to pass to
 %% `stop_measuring/2`, and the source paths of the modules that were built
 %% from an Erlang source file. On an error, the claims are given back.
-start_measuring(Modules) ->
+start_measuring(Modules, ErlangExternals) ->
     start_if_supported(
         erlang:function_exported(code, coverage_support, 0) andalso code:coverage_support(),
         code:ensure_loaded(compile),
         erlang:system_info(otp_release),
         erlang:system_info(emu_flavor),
-        Modules
+        Modules,
+        ErlangExternals
     ).
 
-%% `start_measuring/1` for the facts it reads about the runtime. The tests
+%% `start_measuring/2` for the facts it reads about the runtime. The tests
 %% call it with the facts of a runtime that cannot count lines.
-start_if_supported(false, _CompilerLoad, OtpRelease, EmulatorFlavor, _Modules) ->
+start_if_supported(false, _CompilerLoad, OtpRelease, EmulatorFlavor, _Modules, _ErlangExternals) ->
     {error, {native_coverage_unsupported, unicode:characters_to_binary(OtpRelease), atom_to_binary(EmulatorFlavor)}};
-start_if_supported(true, {error, Reason}, _OtpRelease, _EmulatorFlavor, _Modules) ->
+start_if_supported(true, {error, Reason}, _OtpRelease, _EmulatorFlavor, _Modules, _ErlangExternals) ->
     {error, {compiler_not_loaded, load_cause(Reason), format_reason(Reason)}};
-start_if_supported(true, {module, compile}, _OtpRelease, _EmulatorFlavor, Modules) ->
+start_if_supported(true, {module, compile}, _OtpRelease, _EmulatorFlavor, Modules, ErlangExternals) ->
     Measurement = make_ref(),
     case with_claims_lock(fun claim/2, [Measurement, Modules]) of
-        ok -> measure_each(Measurement, Modules, []);
+        ok -> measure_each(Measurement, Modules, ErlangExternals, []);
         {error, _} = Error -> Error
     end.
 
-measure_each(Measurement, [], ErlangSourcePaths) ->
+measure_each(Measurement, [], _ErlangExternals, ErlangSourcePaths) ->
     {ok, {Measurement, lists:reverse(ErlangSourcePaths)}};
-measure_each(Measurement, [{covered_module, _ModuleName, SourcePath} = Covered | Rest], ErlangSourcePaths) ->
-    case measure_module(Covered) of
-        {ok, true} -> measure_each(Measurement, Rest, [SourcePath | ErlangSourcePaths]);
-        {ok, false} -> measure_each(Measurement, Rest, ErlangSourcePaths);
+measure_each(Measurement, [{covered_module, _ModuleName, SourcePath} = Covered | Rest], ErlangExternals, ErlangSourcePaths) ->
+    case measure_module(Covered, maps:get(SourcePath, ErlangExternals)) of
+        {ok, true} -> measure_each(Measurement, Rest, ErlangExternals, [SourcePath | ErlangSourcePaths]);
+        {ok, false} -> measure_each(Measurement, Rest, ErlangExternals, ErlangSourcePaths);
         {error, _} = Error -> give_back(Measurement, Error)
     end.
 
@@ -133,26 +137,26 @@ add_count({Line, Calls}, Counts) ->
 %% ---------------------------------------------------------------------------
 
 %% Make one module count its lines. Returns `{ok, BuiltFromErlangSource}`.
-measure_module({covered_module, ModuleName, SourcePath}) ->
+measure_module({covered_module, ModuleName, SourcePath}, Externals) ->
     Module = binary_to_atom(ModuleName, utf8),
     case code:ensure_loaded(Module) of
-        {module, Module} -> measure_loaded(Module, ModuleName, SourcePath);
+        {module, Module} -> measure_loaded({Module, ModuleName, SourcePath}, Externals);
         {error, Reason} -> {error, {module_not_loaded, ModuleName, SourcePath, load_cause(Reason), format_reason(Reason)}}
     end.
 
 %% A module that this file recompiled has the `?MARKER` compile option. A
 %% module with line counters but no marker was recompiled by another tool,
 %% such as `cover`, and that tool owns its counters.
-measure_loaded(Module, ModuleName, SourcePath) ->
+measure_loaded({Module, ModuleName, SourcePath} = Names, Externals) ->
     case {is_measured(Module), code:get_coverage_mode(Module)} of
-        {true, _Mode} -> with_abstract_code(fun restart_counters/4, Module, ModuleName, SourcePath);
-        {false, none} -> with_abstract_code(fun add_counters/4, Module, ModuleName, SourcePath);
+        {true, _Mode} -> with_abstract_code(fun restart_counters/2, Names, Externals);
+        {false, none} -> with_abstract_code(fun add_counters/2, Names, Externals);
         {false, Mode} -> instrument_error(ModuleName, SourcePath, already_instrumented, {coverage_mode, Mode})
     end.
 
-with_abstract_code(Next, Module, ModuleName, SourcePath) ->
+with_abstract_code(Next, {Module, ModuleName, SourcePath} = Names, Externals) ->
     case abstract_code(beam_lib:chunks(code:which(Module), [abstract_code])) of
-        {ok, Forms} -> Next(Module, ModuleName, SourcePath, Forms);
+        {ok, Forms} -> Next(Names, without_external_wrappers(Forms, Externals));
         {error, Cause, Reason} -> instrument_error(ModuleName, SourcePath, Cause, Reason)
     end.
 
@@ -167,11 +171,11 @@ abstract_code({error, beam_lib, {key_missing_or_invalid, _BeamFile, abstract_cod
 abstract_code(Reason) ->
     {error, debug_info_unreadable, Reason}.
 
-restart_counters(Module, _ModuleName, _SourcePath, Forms) ->
+restart_counters({Module, _ModuleName, _SourcePath}, Forms) ->
     ok = code:reset_coverage(Module),
     {ok, built_from_erlang_source(Forms)}.
 
-add_counters(Module, ModuleName, SourcePath, Forms) ->
+add_counters({Module, ModuleName, SourcePath}, Forms) ->
     case compile:forms(Forms, [binary, return_errors, line_coverage, force_line_counters, ?MARKER]) of
         {ok, Module, Binary} -> load_counters(Module, ModuleName, SourcePath, Binary, Forms);
         Reason -> instrument_error(ModuleName, SourcePath, recompile_failed, Reason)
@@ -193,6 +197,45 @@ processes_running_old_code(Module) ->
 
 instrument_error(ModuleName, SourcePath, Cause, Reason) ->
     {error, {module_not_instrumented, ModuleName, SourcePath, Cause, format_reason(Reason)}}.
+
+%% Gleam compiles a function with an `@external(erlang, Module, Function)`
+%% attribute to a wrapper that calls `Module:Function` with its own
+%% parameters. Gleam code never calls the wrapper: the Gleam compiler calls
+%% `Module:Function` directly, also for a reference to the function. So the
+%% wrapper's line cannot run from Gleam, and the wrapper gets no counter:
+%% every annotation in it is set to line 0, the line of code with no source
+%% line (see `line_coverage/1`).
+%%
+%% A function form is a wrapper when both are true:
+%%
+%% - Its name and line are in `Externals`, the `{Name, Line}` of each
+%%   function that the Gleam source declares with an `@external(erlang, ...)`
+%%   attribute. The abstract code alone cannot tell the wrapper from a
+%%   function written on one line whose body calls the external with the same
+%%   parameters: Gleam compiles both to the same forms.
+%% - It has exactly the shape that Gleam 1.19 gives the wrapper: one clause
+%%   without guards, whose body is one remote call that passes the clause's
+%%   parameters in the same order, with every part on the function's line.
+%%
+%% Every other form keeps its counters.
+without_external_wrappers(Forms, Externals) ->
+    [without_wrapper_lines(Form, Externals) || Form <- Forms].
+
+without_wrapper_lines({function, Line, Name, _Arity, Clauses} = Form, Externals) ->
+    case lists:member({atom_to_binary(Name), Line}, Externals) andalso is_wrapper(Line, Clauses) of
+        true -> erl_parse:map_anno(fun no_source_line/1, Form);
+        false -> Form
+    end;
+without_wrapper_lines(Form, _Externals) ->
+    Form.
+
+is_wrapper(Line, [{clause, Line, Parameters, [], [{call, Line, {remote, Line, {atom, _, _}, {atom, _, _}}, Parameters}]}]) ->
+    true;
+is_wrapper(_Line, _Clauses) ->
+    false.
+
+no_source_line(_Annotation) ->
+    erl_anno:new(0).
 
 is_measured(Module) ->
     erlang:module_loaded(Module)

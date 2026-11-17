@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Coverage no longer counts the line of a function with an
+  `@external(erlang, ...)` attribute. Gleam code never calls the wrapper
+  that Gleam compiles for such a function, so the line was always shown as
+  missing. A function without the attribute whose body only calls an
+  external is still counted.
 - `match_snapshot` and `match_snapshot_inspect` now ignore a CRLF (`\r\n`)
   line end at the end of a snapshot file, as they already did for `\n` and
   `\r`. Before, a snapshot file saved with Windows line ends did not match

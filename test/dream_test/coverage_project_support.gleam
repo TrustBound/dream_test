@@ -30,6 +30,12 @@ pub fn compile_source(
   kind: String,
 ) -> Nil
 
+/// Compile the Erlang source `text` into the project's ebin/. The source
+/// is kept outside the source directory, so its module can have the name
+/// of a Gleam module in the source directory.
+@external(erlang, "dream_test_coverage_project_ffi", "compile_outside_source")
+pub fn compile_outside_source(source_directory: String, text: String) -> Nil
+
 /// Write a damaged .beam file for `module`.
 @external(erlang, "dream_test_coverage_project_ffi", "add_damaged_beam")
 pub fn add_damaged_beam(source_directory: String, module: String) -> Nil
