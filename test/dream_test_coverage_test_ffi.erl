@@ -1,6 +1,8 @@
 -module(dream_test_coverage_test_ffi).
 -export([
     unique_name/0,
+    add_broken_beam_first_in_path/2,
+    remove_from_path/1,
     run_in_peer/1,
     run_in_embedded_peer/1,
     run_main_in_new_vm/2,
@@ -250,3 +252,17 @@ unique_name() ->
     Time = integer_to_binary(os:system_time(nanosecond)),
     Counter = integer_to_binary(erlang:unique_integer([positive])),
     <<Time/binary, "_", Counter/binary>>.
+
+%% Put Directory first in the code path, with a broken beam file named
+%% `<Module>.beam` in it. Returns nil.
+add_broken_beam_first_in_path(Directory, Module) ->
+    ok = filelib:ensure_path(Directory),
+    Path = filename:join(Directory, <<Module/binary, ".beam">>),
+    ok = file:write_file(Path, <<"not a beam file">>),
+    true = code:add_patha(unicode:characters_to_list(Directory)),
+    nil.
+
+%% Remove Directory from the code path. Returns nil.
+remove_from_path(Directory) ->
+    _ = code:del_path(unicode:characters_to_list(Directory)),
+    nil.
