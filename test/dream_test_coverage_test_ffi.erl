@@ -10,6 +10,8 @@
     child_project/1,
     add_source/2,
     compile_source/2,
+    compile_like_old_gleam/2,
+    compile_like_new_gleam/3,
     add_damaged_beam/1,
     make_unreadable/1,
     stub_cover/1,
@@ -173,6 +175,31 @@ compile_source(File, Kind) ->
     {ok, Module, Binary} = compile:file(Source, [binary, return_errors | debug_options(Kind)]),
     ok = file:write_file(filename:join("ebin", atom_to_list(Module) ++ ".beam"), Binary),
     nil.
+
+%% Build ebin/Module.beam the way Gleam before 1.19 does: write the
+%% generated Erlang source to _gleam_artefacts/Module.erl, then compile that
+%% file. ErlangSource names the `.gleam` file with `-file` attributes.
+compile_like_old_gleam(Module, ErlangSource) ->
+    ok = filelib:ensure_path("_gleam_artefacts"),
+    Source = unicode:characters_to_list(filename:join("_gleam_artefacts", <<Module/binary, ".erl">>)),
+    ok = file:write_file(Source, ErlangSource),
+    {ok, _, Binary} = compile:file(Source, [binary, return_errors, debug_info]),
+    ok = file:write_file(filename:join("ebin", <<Module/binary, ".beam">>), Binary),
+    nil.
+
+%% Build ebin/Module.beam the way Gleam 1.19 does: compile abstract code
+%% directly, with one `-file` attribute that names the `.gleam` file.
+compile_like_new_gleam(Module, ErlangSource, GleamPath) ->
+    {ok, Tokens, _} = erl_scan:string(unicode:characters_to_list(ErlangSource)),
+    Forms = [Form || FormTokens <- split_forms(Tokens, []), {ok, Form} <- [erl_parse:parse_form(FormTokens)]],
+    FileAttribute = {attribute, 0, file, {unicode:characters_to_list(GleamPath), 0}},
+    {ok, _, Binary} = compile:forms([FileAttribute | Forms], [binary, return_errors, debug_info]),
+    ok = file:write_file(filename:join("ebin", <<Module/binary, ".beam">>), Binary),
+    nil.
+
+split_forms([], []) -> [];
+split_forms([{dot, _} = Dot | Rest], Current) -> [lists:reverse([Dot | Current]) | split_forms(Rest, [])];
+split_forms([Token | Rest], Current) -> split_forms(Rest, [Token | Current]).
 
 debug_options(<<"debug_info">>) -> [debug_info];
 debug_options(<<"no_debug_info">>) -> [];

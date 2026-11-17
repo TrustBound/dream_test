@@ -50,6 +50,7 @@
 //// | **Counts**         | `hit_line_count`, `executable_line_count`,            |
 //// |                    | `total_hit_line_count`, `total_executable_line_count` |
 //// | **Excluded**       | `ignored_ranges`, `excluded_files`                    |
+//// | **Line accuracy**  | `add_inexact_line_files`, `inexact_line_files`       |
 //// | **Ignored ranges** | `ignored_range`, `ignored_first_line`,                |
 //// |                    | `ignored_last_line`, `ignored_reason`                 |
 //// | **Excluded files** | `excluded_file`, `excluded_source_path`,              |
@@ -70,7 +71,11 @@ import gleam/order.{type Order}
 ///
 /// Build one with `report.new`, or get one from `coverage.finish`.
 pub opaque type CoverageReport {
-  CoverageReport(files: List(FileCoverage), excluded_files: List(ExcludedFile))
+  CoverageReport(
+    files: List(FileCoverage),
+    excluded_files: List(ExcludedFile),
+    inexact_line_files: List(String),
+  )
 }
 
 /// The coverage of one source file.
@@ -277,7 +282,7 @@ pub type LineCoverage {
 /// ])
 /// ```
 pub fn new(files files: List(FileCoverage)) -> CoverageReport {
-  CoverageReport(files: files, excluded_files: [])
+  CoverageReport(files: files, excluded_files: [], inexact_line_files: [])
 }
 
 /// Build the coverage of one source file.
@@ -423,6 +428,57 @@ pub fn add_excluded_files(
 /// ```
 pub fn excluded_files(report report: CoverageReport) -> List(ExcludedFile) {
   report.excluded_files
+}
+
+/// Mark source files whose line numbers may be off.
+///
+/// `coverage.finish` adds every measured `.gleam` file that a Gleam version
+/// before 1.19 built. Those versions map only the first line of each function
+/// to its Gleam source line, so the other lines of a function can have the
+/// wrong number. Call it yourself when you build a report from other data.
+///
+/// ## Parameters
+///
+/// - `report`: the report to add to
+/// - `source_paths`: the source files, added after the files already marked
+///
+/// ## Returns
+///
+/// The report with the files marked.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.new([cart_file])
+/// |> report.add_inexact_line_files(["src/app/cart.gleam"])
+/// ```
+pub fn add_inexact_line_files(
+  report report: CoverageReport,
+  source_paths source_paths: List(String),
+) -> CoverageReport {
+  CoverageReport(
+    ..report,
+    inexact_line_files: list.append(report.inexact_line_files, source_paths),
+  )
+}
+
+/// The source files whose line numbers may be off, because a Gleam version
+/// before 1.19 built them.
+///
+/// `coverage.finish` gives them sorted by path. The list is empty when every
+/// measured file has exact line numbers. Use it to warn in your own output,
+/// as the coverage table does.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.new([])
+/// |> report.add_inexact_line_files(["src/app/cart.gleam"])
+/// |> report.inexact_line_files()
+/// // -> ["src/app/cart.gleam"]
+/// ```
+pub fn inexact_line_files(report report: CoverageReport) -> List(String) {
+  report.inexact_line_files
 }
 
 /// The files of a report, in the order they were given.

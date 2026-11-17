@@ -153,6 +153,22 @@ pub fn tests() {
       |> be_equal([generated_file(), ffi_file()])
       |> or_fail_with("expected the generated file, then the FFI file")
     }),
+    it("a report built with new has no inexact line files", fn() {
+      report.new([cart_file()])
+      |> report.inexact_line_files()
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected no inexact line files")
+    }),
+    it("add_inexact_line_files adds files in the order given", fn() {
+      report.new([cart_file()])
+      |> report.add_inexact_line_files(["src/app/cart.gleam"])
+      |> report.add_inexact_line_files(["src/app/a.gleam", "src/app/b.gleam"])
+      |> report.inexact_line_files()
+      |> should
+      |> be_equal(["src/app/cart.gleam", "src/app/a.gleam", "src/app/b.gleam"])
+      |> or_fail_with("expected the cart file, then a, then b")
+    }),
     it("ignored_first_line returns the first line given", fn() {
       report.ignored_first_line(debug_range())
       |> should

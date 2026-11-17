@@ -188,6 +188,11 @@
 //// every line to its Gleam source line. Older Gleam versions map only the first
 //// line of each function, so lines inside a function can drift.
 ////
+//// Coverage finds the files that an older Gleam version built: their
+//// `.beam` file was compiled from generated Erlang source, and a 1.19 build
+//// is not. `report.inexact_line_files` lists them, and the coverage table
+//// prints a warning that names them.
+////
 //// ## Limits
 ////
 //// - One coverage run per BEAM instance. A second `start` fails with
@@ -283,6 +288,7 @@ pub opaque type CoverageSession {
     modules: List(CoveredModule),
     excluded_files: List(ExcludedFile),
     ignored_lines: IgnoredLines,
+    inexact_line_files: List(String),
   )
 }
 
@@ -1422,12 +1428,15 @@ fn start_with_ignored_lines(
     )
   {
     Ok(ignored_lines) ->
-      start_with_modules(CoverageSession(
-        config: config,
-        modules: modules,
-        excluded_files: excluded_files,
-        ignored_lines: ignored_lines,
-      ))
+      start_with_modules(
+        CoverageSession(
+          config: config,
+          modules: modules,
+          excluded_files: excluded_files,
+          ignored_lines: ignored_lines,
+          inexact_line_files: [],
+        ),
+      )
     Error(error) -> Error(error)
   }
 }
@@ -1494,26 +1503,61 @@ fn start_with_modules(
 fn compile_session(
   session: CoverageSession,
 ) -> Result(CoverageSession, CoverageError) {
-  case compile_modules(session.modules) {
-    Ok(Nil) -> Ok(session)
+  case compile_modules(session.modules, []) {
+    Ok(inexact_line_files) ->
+      Ok(
+        CoverageSession(
+          ..session,
+          inexact_line_files: list.sort(inexact_line_files, string.compare),
+        ),
+      )
     Error(error) -> Error(error)
   }
 }
 
-fn compile_modules(modules: List(CoveredModule)) -> Result(Nil, CoverageError) {
+/// Instrument every module. Returns the `.gleam` source files that were
+/// built from generated Erlang source (Gleam before 1.19), whose line
+/// numbers may be off.
+fn compile_modules(
+  modules: List(CoveredModule),
+  inexact_line_files: List(String),
+) -> Result(List(String), CoverageError) {
   case modules {
-    [] -> Ok(Nil)
-    [module, ..rest] -> compile_then_continue(module, rest)
+    [] -> Ok(inexact_line_files)
+    [module, ..rest] -> compile_then_continue(module, rest, inexact_line_files)
   }
 }
 
 fn compile_then_continue(
   module: CoveredModule,
   rest: List(CoveredModule),
-) -> Result(Nil, CoverageError) {
+  inexact_line_files: List(String),
+) -> Result(List(String), CoverageError) {
   case compile_module(module.module_name, module.source_path) {
-    Ok(Nil) -> compile_modules(rest)
+    Ok(built_from_erlang_source) ->
+      compile_modules(
+        rest,
+        add_inexact_line_file(
+          inexact_line_files,
+          module.source_path,
+          built_from_erlang_source,
+        ),
+      )
     Error(error) -> Error(error)
+  }
+}
+
+/// A `.gleam` file built from generated Erlang source has inexact line
+/// numbers. An `.erl` file is always built from Erlang source, and its line
+/// numbers are exact.
+fn add_inexact_line_file(
+  inexact_line_files: List(String),
+  source_path: String,
+  built_from_erlang_source: Bool,
+) -> List(String) {
+  case built_from_erlang_source && string.ends_with(source_path, ".gleam") {
+    True -> [source_path, ..inexact_line_files]
+    False -> inexact_line_files
   }
 }
 
@@ -1643,6 +1687,7 @@ fn ignore_then_write(
       |> without_ignored_lines(ignored_lines, dict.new())
       |> report_from_counts(ignored_lines)
       |> report.add_excluded_files(session.excluded_files)
+      |> report.add_inexact_line_files(session.inexact_line_files)
       |> write_report(session.config)
     Error(error) -> Error(error)
   }
@@ -2896,7 +2941,7 @@ fn list_source_files(directory: String) -> Result(List(String), CoverageError)
 fn compile_module(
   module_name: String,
   source_path: String,
-) -> Result(Nil, CoverageError)
+) -> Result(Bool, CoverageError)
 
 @external(erlang, "dream_test_coverage_ffi", "analyse_module")
 fn analyse_module(

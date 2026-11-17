@@ -67,15 +67,38 @@ compile_module(ModuleName, SourcePath) ->
     end.
 
 compile_loaded_module(ModuleName, SourcePath, Module) ->
+    BuiltFromErlangSource = built_from_erlang_source(Module),
     try cover:compile_beam(Module) of
         {ok, Module} ->
-            {ok, nil};
+            {ok, BuiltFromErlangSource};
         {error, Reason} ->
             {error, {module_not_instrumented, ModuleName, SourcePath, instrument_cause(Reason), format_reason(Reason)}}
     catch
         Class:Reason ->
             {error, {module_not_instrumented, ModuleName, SourcePath, unknown_instrument_error, format_reason({Class, Reason})}}
     end.
+
+%% True when the module's abstract code was compiled from an Erlang source
+%% file. The Erlang preprocessor puts a `-file` attribute that names the
+%% `.erl` file first. Gleam before 1.19 writes `.erl` files and compiles them,
+%% so its line numbers inside functions can drift. Gleam 1.19 and later
+%% compile abstract code directly, and every `-file` attribute names the
+%% `.gleam` file.
+%%
+%% When the abstract code cannot be read, `cover:compile_beam/1` fails on the
+%% same file and returns the error, so `false` here is never used.
+built_from_erlang_source(Module) ->
+    case beam_lib:chunks(code:which(Module), [abstract_code]) of
+        {ok, {Module, [{abstract_code, {raw_abstract_v1, Forms}}]}} ->
+            lists:any(fun is_erlang_file_attribute/1, Forms);
+        _NoAbstractCode ->
+            false
+    end.
+
+is_erlang_file_attribute({attribute, _, file, {File, _}}) ->
+    filename:extension(File) =:= ".erl";
+is_erlang_file_attribute(_Form) ->
+    false.
 
 %% `code:ensure_loaded/1` returns exactly these four errors.
 load_cause(nofile) -> module_not_built;

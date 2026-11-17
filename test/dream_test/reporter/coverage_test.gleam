@@ -189,6 +189,27 @@ pub fn tests() {
         )
         |> or_fail_with("expected the coverage table")
       }),
+      it("warns about files with inexact line numbers after the table", fn() {
+        coverage_reporter.render(
+          report: report.new([report.file("a.gleam", [LineCoverage(1, 1)])])
+            |> report.add_inexact_line_files(["a.gleam", "b/c.gleam"]),
+          config: coverage.new(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File     Lines  Cover\n"
+          <> "a.gleam  1/1    100.0%\n"
+          <> "Total    1/1    100.0%\n"
+          <> "LCOV: build/coverage/lcov.info\n"
+          <> "\nWarning: coverage line numbers may be off in files that a Gleam version before 1.19 built:\n"
+          <> "  a.gleam\n"
+          <> "  b/c.gleam\n"
+          <> "  Reason: before 1.19, Gleam maps only the first line of each function to its source line, so other lines in a function can show the wrong number in the Missing column, the LCOV file and coverage:ignore markers.\n"
+          <> "  Fix: build and test with Gleam 1.19 or later (`gleam --version` shows the version).\n",
+        )
+        |> or_fail_with("expected the table, then the warning")
+      }),
       it("leaves out the LCOV line with no_lcov", fn() {
         coverage_reporter.render(
           report: report.new([report.file("a.gleam", [LineCoverage(1, 1)])]),

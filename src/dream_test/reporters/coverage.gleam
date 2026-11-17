@@ -68,6 +68,17 @@
 //// column red. With no minimum, or an invalid one, the `Cover` cell is
 //// yellow from `50.0%` and red below `50.0%`.
 ////
+//// When a Gleam version before 1.19 built a measured file, a warning after
+//// the table names the file, because its line numbers may be off. The
+//// warning does not fail the run:
+////
+//// ```text
+//// Warning: coverage line numbers may be off in files that a Gleam version before 1.19 built:
+////   src/app/cart.gleam
+////   Reason: before 1.19, Gleam maps only the first line of each function ...
+////   Fix: build and test with Gleam 1.19 or later (`gleam --version` shows the version).
+//// ```
+////
 //// When coverage fails, `render_failure` prints a `Coverage failed` block
 //// instead. The runner writes it to the error output.
 ////
@@ -254,6 +265,7 @@ pub fn render(
   <> render_excluded_summary(coverage_report)
   <> render_hidden_summary(list.length(all_files) - list.length(shown_files))
   <> render_lcov_line(coverage.lcov_file(config))
+  <> render_inexact_line_warning(report.inexact_line_files(coverage_report))
 }
 
 /// The header names every column. `row_cells` leaves out the columns that
@@ -604,6 +616,19 @@ fn render_lcov_line(lcov_path: option.Option(String)) -> String {
   case lcov_path {
     None -> ""
     Some(path) -> "LCOV: " <> path <> "\n"
+  }
+}
+
+/// The warning for files that a Gleam version before 1.19 built. It is not a
+/// failure: the counts are right, only line numbers can be off.
+fn render_inexact_line_warning(source_paths: List(String)) -> String {
+  case source_paths {
+    [] -> ""
+    _ ->
+      "\nWarning: coverage line numbers may be off in files that a Gleam version before 1.19 built:\n"
+      <> string.concat(list.map(source_paths, indent_line))
+      <> "  Reason: before 1.19, Gleam maps only the first line of each function to its source line, so other lines in a function can show the wrong number in the Missing column, the LCOV file and coverage:ignore markers.\n"
+      <> "  Fix: build and test with Gleam 1.19 or later (`gleam --version` shows the version).\n"
   }
 }
 

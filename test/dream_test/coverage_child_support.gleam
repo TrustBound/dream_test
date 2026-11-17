@@ -30,6 +30,20 @@ pub fn add_source(file: String, text: String) -> Nil
 @external(erlang, "dream_test_coverage_test_ffi", "compile_source")
 pub fn compile_source(file: String, kind: String) -> Nil
 
+/// In a child: build ebin/<module>.beam as Gleam before 1.19 does, by
+/// compiling generated Erlang source from a `.erl` file.
+@external(erlang, "dream_test_coverage_test_ffi", "compile_like_old_gleam")
+pub fn compile_like_old_gleam(module: String, erlang_source: String) -> Nil
+
+/// In a child: build ebin/<module>.beam as Gleam 1.19 does, by compiling
+/// abstract code directly with a `-file` attribute for `gleam_path`.
+@external(erlang, "dream_test_coverage_test_ffi", "compile_like_new_gleam")
+pub fn compile_like_new_gleam(
+  module: String,
+  erlang_source: String,
+  gleam_path: String,
+) -> Nil
+
 /// In a child: take away every permission on src/<file>, so reading it fails.
 @external(erlang, "dream_test_coverage_test_ffi", "make_unreadable")
 pub fn make_unreadable(file: String) -> Nil
