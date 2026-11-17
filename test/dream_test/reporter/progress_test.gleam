@@ -198,6 +198,45 @@ pub fn tests() {
       }),
     ]),
 
+    group("line", [
+      it("gives an empty bar when the run starts", fn() {
+        with_terminal_columns(30, fn() {
+          progress.line(progress.new(), progress.RunStartedProgress(total: 4))
+        })
+        |> should
+        |> be_equal("\r0/4 [░░░░░░░░░░░░░░░░░░░░] 0% ")
+        |> or_fail_with("the first line should show 0 of 4")
+      }),
+
+      it("names the test that finished", fn() {
+        with_terminal_columns(30, fn() {
+          progress.line(
+            progress.new(),
+            progress.TestFinishedProgress(
+              completed: 1,
+              total: 2,
+              result: passed(["root", "test"]),
+            ),
+          )
+        })
+        |> should
+        |> be_equal("\r1/2 [█████░░░░░] 50% root › te")
+        |> or_fail_with("a test line should name the test")
+      }),
+
+      it("ends the last line with a new line", fn() {
+        with_terminal_columns(30, fn() {
+          progress.line(
+            progress.new(),
+            progress.RunFinishedProgress(completed: 2, total: 2),
+          )
+        })
+        |> should
+        |> be_equal("\r2/2 [█████████████] 100% done \n")
+        |> or_fail_with("the last line should end with a new line")
+      }),
+    ]),
+
     group("handle_event", [
       it("gives no line for a hook start", fn() {
         progress.handle_event(

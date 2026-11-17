@@ -49,6 +49,61 @@ pub fn new() -> ProgressReporter {
   ProgressReporter
 }
 
+/// The three points of a run that change the progress bar.
+///
+/// The runner gives one to `progress.line` for each point. Unlike
+/// `ReporterEvent`, it has no hook events, so each one gives a line.
+///
+/// - `RunStartedProgress`: the run starts. `total` is the number of tests.
+/// - `TestFinishedProgress`: one more test finished. `completed` counts the
+///   finished tests, this one included.
+/// - `RunFinishedProgress`: the run finished.
+pub type ProgressEvent {
+  RunStartedProgress(total: Int)
+  TestFinishedProgress(completed: Int, total: Int, result: TestResult)
+  RunFinishedProgress(completed: Int, total: Int)
+}
+
+/// The text that updates the progress bar for one point of a run.
+///
+/// The text starts with a carriage return (`\r`), so it writes over the
+/// previous bar. The bar is as wide as the terminal (at least 20 columns).
+/// The text for `RunFinishedProgress` ends with a newline.
+///
+/// ## Parameters
+///
+/// - `reporter`: the reporter from `progress.new()`
+/// - `event`: the point of the run
+///
+/// ## Returns
+///
+/// The text to write, without any other change.
+///
+/// ## Example
+///
+/// ```gleam
+/// progress.line(progress.new(), progress.RunStartedProgress(total: 4))
+/// |> string.starts_with("\r0/4 [")
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("expected an empty bar for 4 tests")
+/// ```
+pub fn line(
+  reporter reporter: ProgressReporter,
+  event event: ProgressEvent,
+) -> String {
+  let _ = reporter
+  let columns = clamp_min(terminal_columns(), 20)
+  case event {
+    RunStartedProgress(total: total) ->
+      "\r" <> render_line(columns, 0, total, "")
+    TestFinishedProgress(completed: completed, total: total, result: result) ->
+      "\r" <> render_line(columns, completed, total, format_result_name(result))
+    RunFinishedProgress(completed: completed, total: total) ->
+      "\r" <> render_line(columns, completed, total, "done") <> "\n"
+  }
+}
+
 /// Handle a single reporter event by writing an in-place progress bar line.
 ///
 /// - For `RunStarted`, prints an initial 0% bar.
@@ -94,15 +149,24 @@ pub fn handle_event(
   reporter reporter: ProgressReporter,
   event event: reporter_types.ReporterEvent,
 ) -> Option(String) {
-  let _ = reporter
-  let cols = terminal_columns()
-  let line = render(cols, event)
-
   case event {
-    reporter_types.HookStarted(..) -> None
-    reporter_types.HookFinished(..) -> None
-    reporter_types.RunFinished(..) -> Some("\r" <> line <> "\n")
-    _ -> Some("\r" <> line)
+    reporter_types.HookStarted(..) | reporter_types.HookFinished(..) -> None
+    reporter_types.RunStarted(total: total) ->
+      Some(line(reporter, RunStartedProgress(total: total)))
+    reporter_types.TestFinished(
+      completed: completed,
+      total: total,
+      result: result,
+    ) ->
+      Some(line(
+        reporter,
+        TestFinishedProgress(completed: completed, total: total, result: result),
+      ))
+    reporter_types.RunFinished(completed: completed, total: total, results: _) ->
+      Some(line(
+        reporter,
+        RunFinishedProgress(completed: completed, total: total),
+      ))
   }
 }
 

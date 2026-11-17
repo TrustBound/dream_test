@@ -36,7 +36,6 @@
 //// ```
 
 import dream_test/reporters/progress
-import dream_test/reporters/types as reporter_types
 import dream_test/sandbox
 import dream_test/timing
 import dream_test/types.{
@@ -141,12 +140,28 @@ type ExecuteNodeConfig(context) {
     ),
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
     node: Node(context),
-    progress_reporter: Option(progress.ProgressReporter),
-    write: fn(String) -> Nil,
+    progress_output: Option(ProgressOutput),
     total: Int,
     completed: Int,
     results_rev: List(TestResult),
   )
+}
+
+/// Where the progress lines of a run go: the progress reporter, and the
+/// function that writes its text.
+type ProgressOutput {
+  ProgressOutput(reporter: progress.ProgressReporter, write: fn(String) -> Nil)
+}
+
+/// The progress output of a run that has a progress reporter.
+fn progress_output(
+  progress_reporter: Option(progress.ProgressReporter),
+  write: fn(String) -> Nil,
+) -> Option(ProgressOutput) {
+  case progress_reporter {
+    Some(reporter) -> Some(ProgressOutput(reporter: reporter, write: write))
+    None -> None
+  }
 }
 
 type IndexedResult {
@@ -184,8 +199,7 @@ type RunParallelLoopConfig(context) {
     pending_emit: List(IndexedResult),
     emitted_rev: List(TestResult),
     next_emit_index: Int,
-    progress_reporter: Option(progress.ProgressReporter),
-    write: fn(String) -> Nil,
+    progress_output: Option(ProgressOutput),
     total: Int,
     completed: Int,
     max_concurrency: Int,
@@ -220,8 +234,7 @@ type WaitForEventOrTimeoutConfig(context) {
     pending: List(#(Int, Node(context))),
     running: List(RunningTest),
     pending_emit: List(IndexedResult),
-    progress_reporter: Option(progress.ProgressReporter),
-    write: fn(String) -> Nil,
+    progress_output: Option(ProgressOutput),
     total: Int,
     completed: Int,
   )
@@ -329,8 +342,7 @@ pub fn run_root_parallel(
       runner_before_each_test: [],
       runner_after_each_test: [],
       node: tree,
-      progress_reporter: None,
-      write: discard_write,
+      progress_output: None,
       total: 0,
       completed: 0,
       results_rev: [],
@@ -338,10 +350,6 @@ pub fn run_root_parallel(
 
   let #(results_rev, _completed) = execute_node(executor_input)
   list.reverse(results_rev)
-}
-
-fn discard_write(_text: String) -> Nil {
-  Nil
 }
 
 /// Run a single suite while driving a reporter.
@@ -434,8 +442,7 @@ pub fn run_root_parallel_with_reporter(
       runner_before_each_test: runner_before_each_test,
       runner_after_each_test: runner_after_each_test,
       node: tree,
-      progress_reporter: progress_reporter,
-      write: write,
+      progress_output: progress_output(progress_reporter, write),
       total: total,
       completed: completed,
       results_rev: [],
@@ -466,8 +473,7 @@ fn execute_node(
     runner_before_each_test: runner_before_each_test,
     runner_after_each_test: runner_after_each_test,
     node: node,
-    progress_reporter: progress_reporter,
-    write: write,
+    progress_output: progress_output,
     total: total,
     completed: completed,
     results_rev: base_results_rev,
@@ -515,8 +521,7 @@ fn execute_node(
           // `total`.
           let completed_after_failures =
             emit_test_finished_progress_results(
-              progress_reporter,
-              write,
+              progress_output,
               completed,
               total,
               list.reverse(group_results_rev),
@@ -552,8 +557,7 @@ fn execute_node(
               combined_after_each,
               tests,
               failures_rev,
-              progress_reporter,
-              write,
+              progress_output,
               total,
               completed,
             )
@@ -569,8 +573,7 @@ fn execute_node(
               combined_before_each,
               combined_after_each,
               groups,
-              progress_reporter,
-              write,
+              progress_output,
               total,
               completed_after_tests,
               group_results_rev,
@@ -804,8 +807,7 @@ fn run_tests_in_group(
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
   failures_rev: List(AssertionFailure),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
 ) -> #(List(TestResult), Int) {
@@ -824,8 +826,7 @@ fn run_tests_in_group(
         after_each_hooks,
         tests,
         failures_rev,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         completed,
         [],
@@ -842,8 +843,7 @@ fn run_tests_in_group(
         after_each_hooks,
         tests,
         failures_rev,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         completed,
       )
@@ -863,8 +863,7 @@ fn run_tests_parallel(
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
   failures_rev: List(AssertionFailure),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
 ) -> #(List(TestResult), Int) {
@@ -889,8 +888,7 @@ fn run_tests_parallel(
     pending_emit: [],
     emitted_rev: [],
     next_emit_index: 0,
-    progress_reporter: progress_reporter,
-    write: write,
+    progress_output: progress_output,
     total: total,
     completed: completed,
     max_concurrency: max_concurrency,
@@ -929,8 +927,7 @@ fn run_parallel_loop(
     pending_emit: pending_emit,
     emitted_rev: emitted_rev,
     next_emit_index: next_emit_index,
-    progress_reporter: progress_reporter,
-    write: write,
+    progress_output: progress_output,
     total: total,
     completed: completed,
     max_concurrency: max_concurrency,
@@ -970,8 +967,7 @@ fn run_parallel_loop(
           pending: pending2,
           running: running2,
           pending_emit: pending_emit,
-          progress_reporter: progress_reporter,
-          write: write,
+          progress_output: progress_output,
           total: total,
           completed: completed,
         ))
@@ -1164,8 +1160,7 @@ fn wait_for_event_or_timeout(
     pending: pending,
     running: running,
     pending_emit: pending_emit,
-    progress_reporter: progress_reporter,
-    write: write,
+    progress_output: progress_output,
     total: total,
     completed: completed,
   ) = input
@@ -1182,8 +1177,7 @@ fn wait_for_event_or_timeout(
         pending,
         running,
         pending_emit,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         completed,
       )
@@ -1193,8 +1187,7 @@ fn wait_for_event_or_timeout(
         pending,
         running,
         pending_emit,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         completed,
       )
@@ -1207,21 +1200,14 @@ fn handle_worker_message(
   pending: List(#(Int, Node(context))),
   running: List(RunningTest),
   pending_emit: List(IndexedResult),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
 ) -> #(List(#(Int, Node(context))), List(RunningTest), List(IndexedResult), Int) {
   case message {
     WorkerCompleted(index, result) -> {
       let next_completed =
-        emit_test_finished_progress(
-          progress_reporter,
-          write,
-          completed,
-          total,
-          result,
-        )
+        emit_test_finished_progress(progress_output, completed, total, result)
       #(
         pending,
         remove_running_by_index(running, index),
@@ -1252,13 +1238,7 @@ fn handle_worker_message(
           kind: kind,
         )
       let next_completed =
-        emit_test_finished_progress(
-          progress_reporter,
-          write,
-          completed,
-          total,
-          result,
-        )
+        emit_test_finished_progress(progress_output, completed, total, result)
       #(
         pending,
         remove_running_by_index(running, index),
@@ -1288,8 +1268,7 @@ fn handle_timeouts(
   pending: List(#(Int, Node(context))),
   running: List(RunningTest),
   pending_emit: List(IndexedResult),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
 ) -> #(List(#(Int, Node(context))), List(RunningTest), List(IndexedResult), Int) {
@@ -1299,8 +1278,7 @@ fn handle_timeouts(
   let timeout_results = list.map(timed_out, fn(r) { timeout_result(r) })
   let next_completed =
     emit_test_finished_progress_list(
-      progress_reporter,
-      write,
+      progress_output,
       completed,
       total,
       timeout_results,
@@ -1338,37 +1316,30 @@ fn timeout_result(running: RunningTest) -> IndexedResult {
 }
 
 fn emit_test_finished_progress(
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   completed: Int,
   total: Int,
   result: TestResult,
 ) -> Int {
   let next_completed = completed + 1
-  case progress_reporter {
+  case progress_output {
     None -> next_completed
-    Some(reporter) -> {
-      case
-        progress.handle_event(
-          reporter,
-          reporter_types.TestFinished(
-            completed: next_completed,
-            total: total,
-            result: result,
-          ),
-        )
-      {
-        None -> Nil
-        Some(text) -> write(text)
-      }
+    Some(ProgressOutput(reporter: reporter, write: write)) -> {
+      write(progress.line(
+        reporter,
+        progress.TestFinishedProgress(
+          completed: next_completed,
+          total: total,
+          result: result,
+        ),
+      ))
       next_completed
     }
   }
 }
 
 fn emit_test_finished_progress_list(
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   completed: Int,
   total: Int,
   results: List(IndexedResult),
@@ -1377,16 +1348,9 @@ fn emit_test_finished_progress_list(
     [] -> completed
     [IndexedResult(index: _index, result: result), ..rest] -> {
       let next_completed =
-        emit_test_finished_progress(
-          progress_reporter,
-          write,
-          completed,
-          total,
-          result,
-        )
+        emit_test_finished_progress(progress_output, completed, total, result)
       emit_test_finished_progress_list(
-        progress_reporter,
-        write,
+        progress_output,
         next_completed,
         total,
         rest,
@@ -1396,8 +1360,7 @@ fn emit_test_finished_progress_list(
 }
 
 fn emit_test_finished_progress_results(
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   completed: Int,
   total: Int,
   results: List(TestResult),
@@ -1406,16 +1369,9 @@ fn emit_test_finished_progress_results(
     [] -> completed
     [result, ..rest] -> {
       let next_completed =
-        emit_test_finished_progress(
-          progress_reporter,
-          write,
-          completed,
-          total,
-          result,
-        )
+        emit_test_finished_progress(progress_output, completed, total, result)
       emit_test_finished_progress_results(
-        progress_reporter,
-        write,
+        progress_output,
         next_completed,
         total,
         rest,
@@ -1631,8 +1587,7 @@ fn run_tests_sequentially(
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   tests: List(Node(context)),
   failures_rev: List(AssertionFailure),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
   acc_rev: List(TestResult),
@@ -1735,13 +1690,7 @@ fn run_tests_sequentially(
         )
 
       let next_completed =
-        emit_test_finished_progress(
-          progress_reporter,
-          write,
-          completed,
-          total,
-          result,
-        )
+        emit_test_finished_progress(progress_output, completed, total, result)
 
       run_tests_sequentially(
         config,
@@ -1754,8 +1703,7 @@ fn run_tests_sequentially(
         after_each_hooks,
         rest,
         failures_rev,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         next_completed,
         [result, ..acc_rev],
@@ -1774,8 +1722,7 @@ fn run_tests_sequentially(
         after_each_hooks,
         rest,
         failures_rev,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         completed,
         acc_rev,
@@ -1795,8 +1742,7 @@ fn run_child_groups_sequentially(
   before_each_hooks: List(fn(context) -> Result(context, String)),
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   groups: List(Node(context)),
-  progress_reporter: Option(progress.ProgressReporter),
-  write: fn(String) -> Nil,
+  progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
   acc_rev: List(TestResult),
@@ -1815,8 +1761,7 @@ fn run_child_groups_sequentially(
           runner_before_each_test: runner_before_each_test,
           runner_after_each_test: runner_after_each_test,
           node: group_node,
-          progress_reporter: progress_reporter,
-          write: write,
+          progress_output: progress_output,
           total: total,
           completed: completed,
           results_rev: acc_rev,
@@ -1831,8 +1776,7 @@ fn run_child_groups_sequentially(
         before_each_hooks,
         after_each_hooks,
         rest,
-        progress_reporter,
-        write,
+        progress_output,
         total,
         next_completed,
         next_rev,

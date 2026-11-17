@@ -821,7 +821,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
     Some(progress_reporter) -> {
       write_progress_event(
         progress_reporter,
-        reporter_types.RunStarted(total: total),
+        progress.RunStartedProgress(total: total),
         output,
       )
       completed0
@@ -886,11 +886,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
     Some(progress_reporter) ->
       write_progress_event(
         progress_reporter,
-        reporter_types.RunFinished(
-          completed: completed2,
-          total: total,
-          results: final_results,
-        ),
+        progress.RunFinishedProgress(completed: completed2, total: total),
         output,
       )
   }
@@ -1370,7 +1366,7 @@ fn emit_test_finished_progress(
     Some(reporter) -> {
       write_progress_event(
         reporter,
-        reporter_types.TestFinished(
+        progress.TestFinishedProgress(
           completed: next_completed,
           total: total,
           result: result,
@@ -1740,13 +1736,10 @@ fn is_failure(result: TestResult) -> Bool {
 
 fn write_progress_event(
   reporter: progress.ProgressReporter,
-  event: reporter_types.ReporterEvent,
+  event: progress.ProgressEvent,
   output: Output,
 ) -> Nil {
-  case progress.handle_event(reporter, event) {
-    None -> Nil
-    Some(text) -> output_out(output)(text)
-  }
+  output_out(output)(progress.line(reporter, event))
 }
 
 fn write_results_reporters(

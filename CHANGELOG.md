@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `progress.line` and `progress.ProgressEvent`. `progress.line` gives the
+  text of the progress bar for the start of a run, a finished test, or the
+  end of a run. It always gives a line, because `ProgressEvent` has no hook
+  events. The runner now uses it in place of `progress.handle_event`.
+
 ### Fixed
 
 - Coverage no longer counts the line of a function with an
