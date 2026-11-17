@@ -1225,16 +1225,18 @@ fn files_below_minimum_message(
 
 /// `  src/app/cart.gleam 30.0%, 3 of 10 lines ran (needs 2 more lines)`
 fn file_below_minimum_line(file: FileBelowMinimum) -> String {
+  let hit = coverage.below_minimum_hit(file)
+  let total = coverage.below_minimum_total(file)
   "  "
-  <> file.source_path
+  <> coverage.below_minimum_source_path(file)
   <> " "
-  <> format.percent(hit: file.hit, total: file.total)
+  <> format.percent(hit: hit, total: total)
   <> ", "
-  <> int.to_string(file.hit)
+  <> int.to_string(hit)
   <> " of "
-  <> int.to_string(file.total)
+  <> int.to_string(total)
   <> " lines ran (needs "
-  <> more_lines(file.lines_needed - file.hit)
+  <> more_lines(coverage.below_minimum_lines_needed(file) - hit)
   <> ")"
 }
 

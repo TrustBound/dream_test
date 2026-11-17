@@ -506,11 +506,10 @@ pub type CoverageError {
 /// A file below the minimum from `coverage.minimum_percent_per_file`, in
 /// `FilesBelowMinimumPercent`.
 ///
-/// - `source_path`: the source file, as in the report
-/// - `hit`: executable lines that ran
-/// - `total`: executable lines
-/// - `lines_needed`: how many lines must run to reach the minimum
-pub type FileBelowMinimum {
+/// Build one with `coverage.file_below_minimum`. Read it with
+/// `below_minimum_source_path`, `below_minimum_hit`, `below_minimum_total`
+/// and `below_minimum_lines_needed`.
+pub opaque type FileBelowMinimum {
   FileBelowMinimum(source_path: String, hit: Int, total: Int, lines_needed: Int)
 }
 
@@ -3119,8 +3118,8 @@ fn check_counts_against_minimum(
 /// |> coverage.minimum_percent_per_file(50.0)
 /// |> coverage.check_minimum_per_file(coverage_report)
 /// // -> Error(FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
-/// //      FileBelowMinimum(source_path: "src/app/cart.gleam", hit: 3,
-/// //        total: 10, lines_needed: 5),
+/// //      coverage.file_below_minimum(source_path: "src/app/cart.gleam",
+/// //        hit: 3, total: 10, lines_needed: 5),
 /// //    ]))
 /// ```
 pub fn check_minimum_per_file(
@@ -3189,6 +3188,126 @@ fn compare_file_paths(
   right: FileBelowMinimum,
 ) -> Order {
   string.compare(left.source_path, right.source_path)
+}
+
+// =============================================================================
+// Files below the per-file minimum
+// =============================================================================
+
+/// Build a file below the per-file minimum.
+///
+/// Use it to build an expected `FilesBelowMinimumPercent` error yourself, for
+/// example to test your own output. `coverage.check_minimum_per_file` builds
+/// these for you.
+///
+/// ## Parameters
+///
+/// - `source_path`: the source file, as in the report
+/// - `hit`: executable lines that ran
+/// - `total`: executable lines
+/// - `lines_needed`: how many lines must run to reach the minimum
+///
+/// ## Returns
+///
+/// The file below the minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// ```
+pub fn file_below_minimum(
+  source_path source_path: String,
+  hit hit: Int,
+  total total: Int,
+  lines_needed lines_needed: Int,
+) -> FileBelowMinimum {
+  FileBelowMinimum(
+    source_path: source_path,
+    hit: hit,
+    total: total,
+    lines_needed: lines_needed,
+  )
+}
+
+/// The source file of a file below the per-file minimum, as in the report.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_source_path()
+/// // -> "src/app/cart.gleam"
+/// ```
+pub fn below_minimum_source_path(file file: FileBelowMinimum) -> String {
+  file.source_path
+}
+
+/// The executable lines that ran in a file below the per-file minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_hit()
+/// // -> 3
+/// ```
+pub fn below_minimum_hit(file file: FileBelowMinimum) -> Int {
+  file.hit
+}
+
+/// The executable lines of a file below the per-file minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_total()
+/// // -> 10
+/// ```
+pub fn below_minimum_total(file file: FileBelowMinimum) -> Int {
+  file.total
+}
+
+/// How many lines must run in a file below the per-file minimum to reach it.
+///
+/// This is the full count, not the count of more lines: subtract
+/// `below_minimum_hit` to get the lines still to cover.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_lines_needed()
+/// // -> 5
+/// ```
+pub fn below_minimum_lines_needed(file file: FileBelowMinimum) -> Int {
+  file.lines_needed
 }
 
 // =============================================================================

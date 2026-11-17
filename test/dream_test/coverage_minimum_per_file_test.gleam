@@ -4,8 +4,8 @@
 
 import coverage_fixtures/sample
 import dream_test/coverage.{
-  type CoverageError, type CoverageSession, FileBelowMinimum,
-  FilesBelowMinimumPercent, InvalidMinimumPercentPerFile,
+  type CoverageError, type CoverageSession, FilesBelowMinimumPercent,
+  InvalidMinimumPercentPerFile,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/coverage_child_support.{run_in_child}
@@ -98,6 +98,15 @@ fn check_fixtures_in_child() -> Result(Nil, CoverageError) {
   coverage.check_minimum_per_file(config: config, report: coverage_report)
 }
 
+fn cart_below_minimum() -> coverage.FileBelowMinimum {
+  coverage.file_below_minimum(
+    source_path: "src/app/cart.gleam",
+    hit: 3,
+    total: 10,
+    lines_needed: 5,
+  )
+}
+
 pub fn tests() {
   describe("coverage.minimum_percent_per_file", [
     group("settings", [
@@ -139,6 +148,36 @@ pub fn tests() {
         |> should
         |> be_equal(Ok(InvalidMinimumPercentPerFile(100.1)))
         |> or_fail_with("expected InvalidMinimumPercentPerFile for 100.1")
+      }),
+    ]),
+    group("file_below_minimum", [
+      it("below_minimum_source_path returns the source path", fn() {
+        cart_below_minimum()
+        |> coverage.below_minimum_source_path()
+        |> should
+        |> be_equal("src/app/cart.gleam")
+        |> or_fail_with("expected the source path")
+      }),
+      it("below_minimum_hit returns the lines that ran", fn() {
+        cart_below_minimum()
+        |> coverage.below_minimum_hit()
+        |> should
+        |> be_equal(3)
+        |> or_fail_with("expected 3 lines that ran")
+      }),
+      it("below_minimum_total returns the executable lines", fn() {
+        cart_below_minimum()
+        |> coverage.below_minimum_total()
+        |> should
+        |> be_equal(10)
+        |> or_fail_with("expected 10 executable lines")
+      }),
+      it("below_minimum_lines_needed returns the lines needed", fn() {
+        cart_below_minimum()
+        |> coverage.below_minimum_lines_needed()
+        |> should
+        |> be_equal(5)
+        |> or_fail_with("expected 5 lines needed")
       }),
     ]),
     group("check_minimum_per_file", [
@@ -185,13 +224,13 @@ pub fn tests() {
         |> be_equal(
           Error(
             FilesBelowMinimumPercent(minimum_percent: 80.0, files: [
-              FileBelowMinimum(
+              coverage.file_below_minimum(
                 source_path: "src/a.gleam",
                 hit: 0,
                 total: 3,
                 lines_needed: 3,
               ),
-              FileBelowMinimum(
+              coverage.file_below_minimum(
                 source_path: "src/z.gleam",
                 hit: 1999,
                 total: 2500,
@@ -211,7 +250,7 @@ pub fn tests() {
         |> be_equal(
           Error(
             FilesBelowMinimumPercent(minimum_percent: 72.6, files: [
-              FileBelowMinimum(
+              coverage.file_below_minimum(
                 source_path: "src/a.gleam",
                 hit: 725,
                 total: 1000,
@@ -238,13 +277,13 @@ pub fn tests() {
           Ok(
             Error(
               FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
-                FileBelowMinimum(
+                coverage.file_below_minimum(
                   source_path: "test/coverage_fixtures/coverage_fixture_ffi.erl",
                   hit: 0,
                   total: 1,
                   lines_needed: 1,
                 ),
-                FileBelowMinimum(
+                coverage.file_below_minimum(
                   source_path: "test/coverage_fixtures/nested/deep.gleam",
                   hit: 0,
                   total: 1,
@@ -336,13 +375,13 @@ pub fn tests() {
       it("lists every file of FilesBelowMinimumPercent", fn() {
         render_failure_for(
           FilesBelowMinimumPercent(minimum_percent: 80.0, files: [
-            FileBelowMinimum(
+            coverage.file_below_minimum(
               source_path: "src/a.gleam",
               hit: 0,
               total: 3,
               lines_needed: 3,
             ),
-            FileBelowMinimum(
+            coverage.file_below_minimum(
               source_path: "src/z.gleam",
               hit: 1999,
               total: 2500,
@@ -365,7 +404,7 @@ pub fn tests() {
       it("says 1 file for one file below the minimum", fn() {
         render_failure_for(
           FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
-            FileBelowMinimum(
+            coverage.file_below_minimum(
               source_path: "src/a.gleam",
               hit: 0,
               total: 1,
