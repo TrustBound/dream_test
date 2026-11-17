@@ -145,7 +145,9 @@ pub fn tests() {
       |> list.wrap()
       |> runner.new()
       |> runner.run()
-      |> list.map(fn(result) { #(result.full_name, result.status) })
+      |> list.map(fn(result) {
+        #(types.full_name(result.groups, result.name), result.status)
+      })
       |> should
       |> be_equal([
         #(
@@ -204,5 +206,5 @@ fn remove_from_path(directory: String) -> Nil
 fn summary(
   result: TestResult,
 ) -> #(List(String), Status, List(AssertionFailure)) {
-  #(result.full_name, result.status, result.failures)
+  #(types.full_name(result.groups, result.name), result.status, result.failures)
 }

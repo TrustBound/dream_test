@@ -295,7 +295,10 @@ fn build_summary_json(results: List(TestResult)) -> Json {
 fn build_test_json(result: TestResult) -> Json {
   json.object([
     #("name", json.string(result.name)),
-    #("full_name", json.array(result.full_name, json.string)),
+    #(
+      "full_name",
+      json.array(types.full_name(result.groups, result.name), json.string),
+    ),
     #("status", json.string(status_to_string(result.status))),
     #("duration_ms", json.int(result.duration_ms)),
     #("tags", json.array(result.tags, json.string)),

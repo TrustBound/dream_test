@@ -12,7 +12,7 @@ fn sample_results() -> List(types.TestResult) {
   [
     types.TestResult(
       name: "t1",
-      full_name: ["suite", "t1"],
+      groups: ["suite"],
       status: types.Passed,
       duration_ms: 1,
       tags: [],
@@ -21,7 +21,7 @@ fn sample_results() -> List(types.TestResult) {
     ),
     types.TestResult(
       name: "t2",
-      full_name: ["suite", "t2"],
+      groups: ["suite"],
       status: types.Failed,
       duration_ms: 1,
       tags: [],
@@ -34,14 +34,15 @@ fn sample_results() -> List(types.TestResult) {
 }
 
 fn result_of(
-  full_name: List(String),
+  groups: List(String),
+  name: String,
   status: types.Status,
   failures: List(types.AssertionFailure),
   kind: types.TestKind,
 ) -> types.TestResult {
   types.TestResult(
-    name: "fallback",
-    full_name: full_name,
+    name: name,
+    groups: groups,
     status: status,
     duration_ms: 0,
     tags: [],
@@ -72,23 +73,26 @@ fn timeout_failure() -> types.AssertionFailure {
 /// One test of each status, in one group.
 fn every_status() -> List(types.TestResult) {
   [
-    result_of(["s", "passes"], types.Passed, [], types.Unit),
+    result_of(["s"], "passes", types.Passed, [], types.Unit),
     result_of(
-      ["s", "fails"],
+      ["s"],
+      "fails",
       types.Failed,
       [failure("bad", types.EqualityFailure(actual: "1", expected: "2"))],
       types.Unit,
     ),
-    result_of(["s", "skips"], types.Skipped, [], types.Unit),
-    result_of(["s", "waits"], types.Pending, [], types.Unit),
+    result_of(["s"], "skips", types.Skipped, [], types.Unit),
+    result_of(["s"], "waits", types.Pending, [], types.Unit),
     result_of(
-      ["s", "times out"],
+      ["s"],
+      "times out",
       types.TimedOut,
       [timeout_failure()],
       types.Unit,
     ),
     result_of(
-      ["s", "has no setup"],
+      ["s"],
+      "has no setup",
       types.SetupFailed,
       [
         types.AssertionFailure(
@@ -159,9 +163,10 @@ fn config(color: Bool, mode: reporter_types.BddOutputMode) {
 
 fn gherkin_results() -> List(types.TestResult) {
   [
-    result_of(["Cart", "adds"], types.Passed, [], types.GherkinScenario("c1")),
+    result_of(["Cart"], "adds", types.Passed, [], types.GherkinScenario("c1")),
     result_of(
-      ["Cart", "removes"],
+      ["Cart"],
+      "removes",
       types.Failed,
       [failure("gone", types.EqualityFailure(actual: "1", expected: "0"))],
       types.GherkinScenario("c2"),
@@ -191,7 +196,7 @@ pub fn tests() {
         let passing =
           types.TestResult(
             name: "adds numbers",
-            full_name: ["Math", "adds numbers"],
+            groups: ["Math"],
             status: types.Passed,
             duration_ms: 0,
             tags: [],
@@ -209,7 +214,7 @@ pub fn tests() {
         let failing =
           types.TestResult(
             name: "adds numbers incorrectly",
-            full_name: ["Math", "adds numbers incorrectly"],
+            groups: ["Math"],
             status: types.Failed,
             duration_ms: 0,
             tags: [],
@@ -416,7 +421,8 @@ pub fn tests() {
       it("writes every failure payload", fn() {
         bdd.format([
           result_of(
-            ["p", "payloads"],
+            ["p"],
+            "payloads",
             types.Failed,
             every_payload(),
             types.Unit,
@@ -474,7 +480,8 @@ pub fn tests() {
       it("writes every failure payload with colour", fn() {
         bdd.render(config(True, reporter_types.BddFailuresOnly), [
           result_of(
-            ["p", "payloads"],
+            ["p"],
+            "payloads",
             types.Failed,
             every_payload(),
             types.Unit,
@@ -529,23 +536,18 @@ pub fn tests() {
         |> or_fail_with("each payload should have its own colours")
       }),
 
-      it("writes a test with no full name or one name at the top level", fn() {
-        bdd.format([
-          result_of([], types.Passed, [], types.Unit),
-          result_of(["alone"], types.Passed, [], types.Unit),
-        ])
+      it("writes a test with no group at the top level", fn() {
+        bdd.format([result_of([], "alone", types.Passed, [], types.Unit)])
         |> should
-        |> be_equal(
-          "✓ \n✓ alone\n\nSummary: 2 run, 0 failed, 2 passed in 0ms\n",
-        )
-        |> or_fail_with("tests with no group should have no indent")
+        |> be_equal("✓ alone\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n")
+        |> or_fail_with("a test with no group should have no indent")
       }),
 
       it("sorts a group before the tests of a longer path", fn() {
         bdd.format([
-          result_of(["a", "b", "c"], types.Passed, [], types.Unit),
-          result_of(["a", "b"], types.Passed, [], types.Unit),
-          result_of(["a", "b"], types.Skipped, [], types.Unit),
+          result_of(["a", "b"], "c", types.Passed, [], types.Unit),
+          result_of(["a"], "b", types.Passed, [], types.Unit),
+          result_of(["a"], "b", types.Skipped, [], types.Unit),
         ])
         |> should
         |> be_equal(
@@ -579,7 +581,7 @@ pub fn tests() {
 
       it("writes unit and Gherkin results together", fn() {
         bdd.format([
-          result_of(["Math", "adds"], types.Passed, [], types.Unit),
+          result_of(["Math"], "adds", types.Passed, [], types.Unit),
           ..gherkin_results()
         ])
         |> should
@@ -602,7 +604,7 @@ pub fn tests() {
       it("shows the duration of a slow test", fn() {
         bdd.format([
           types.TestResult(
-            ..result_of(["s", "slow"], types.Passed, [], types.Unit),
+            ..result_of(["s"], "slow", types.Passed, [], types.Unit),
             duration_ms: 1500,
           ),
         ])
@@ -618,7 +620,7 @@ pub fn tests() {
       bdd.format_summary_only([
         types.TestResult(
           name: "later",
-          full_name: ["suite", "later"],
+          groups: ["suite"],
           status: types.Skipped,
           duration_ms: 0,
           tags: [],

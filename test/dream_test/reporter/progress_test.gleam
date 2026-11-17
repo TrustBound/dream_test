@@ -16,10 +16,10 @@ fn without_terminal(function: fn() -> a) -> a
 @external(erlang, "dream_test_reporter_test_ffi", "with_columns_variable")
 fn with_columns_variable(value: Option(String), function: fn() -> a) -> a
 
-fn passed(full_name: List(String)) -> types.TestResult {
+fn passed(groups: List(String), name: String) -> types.TestResult {
   types.TestResult(
-    name: "fallback",
-    full_name: full_name,
+    name: name,
+    groups: groups,
     status: types.Passed,
     duration_ms: 0,
     tags: [],
@@ -45,7 +45,7 @@ pub fn tests() {
       let result =
         types.TestResult(
           name: "t",
-          full_name: ["suite", "t"],
+          groups: ["suite"],
           status: types.Passed,
           duration_ms: 1,
           tags: [],
@@ -81,7 +81,7 @@ pub fn tests() {
         let result =
           types.TestResult(
             name: "t",
-            full_name: ["suite", "t"],
+            groups: ["suite"],
             status: types.Passed,
             duration_ms: 1,
             tags: [],
@@ -109,7 +109,7 @@ pub fn tests() {
           reporter_types.TestFinished(
             completed: 1,
             total: 2,
-            result: passed(["root", "group", "leaf"]),
+            result: passed(["root", "group"], "leaf"),
           ),
         )
         |> should
@@ -123,26 +123,12 @@ pub fn tests() {
           reporter_types.TestFinished(
             completed: 1,
             total: 2,
-            result: passed(["leaf"]),
+            result: passed([], "leaf"),
           ),
         )
         |> should
         |> be_equal("1/2 [████████████░░░░░░░░░░░░] 50% leaf ")
         |> or_fail_with("the label should be the leaf")
-      }),
-
-      it("gives the test name for a test with no full name", fn() {
-        progress.render(
-          40,
-          reporter_types.TestFinished(
-            completed: 1,
-            total: 2,
-            result: passed([]),
-          ),
-        )
-        |> should
-        |> be_equal("1/2 [██████████░░░░░░░░░░] 50% fallback ")
-        |> or_fail_with("the label should be the name of the test")
       }),
 
       it("uses 20 columns when it gets fewer", fn() {
@@ -175,7 +161,7 @@ pub fn tests() {
           reporter_types.TestFinished(
             completed: 1,
             total: 1,
-            result: passed(["a very long group name", "a very long test name"]),
+            result: passed(["a very long group name"], "a very long test name"),
           ),
         )
         |> should
@@ -215,7 +201,7 @@ pub fn tests() {
             progress.TestFinishedProgress(
               completed: 1,
               total: 2,
-              result: passed(["root", "test"]),
+              result: passed(["root"], "test"),
             ),
           )
         })
@@ -274,7 +260,7 @@ pub fn tests() {
             reporter_types.TestFinished(
               completed: 1,
               total: 2,
-              result: passed(["root", "test"]),
+              result: passed(["root"], "test"),
             ),
           )
         })

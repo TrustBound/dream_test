@@ -34,7 +34,9 @@ fn before_each_suite_hook(suite: SuiteInfo) -> Result(Nil, String) {
 }
 
 fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
-  io.println("test: " <> string.join(info.full_name, " > "))
+  io.println(
+    "test: " <> string.join(types.full_name(info.groups, info.name), " > "),
+  )
   Ok(ctx)
 }
 

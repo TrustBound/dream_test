@@ -41,6 +41,20 @@ pub fn tests() {
       |> or_fail_with("expected the name r, no tags and no children")
     }),
 
+    it("full_name gives the group names, then the test name", fn() {
+      types.full_name(["Cart", "totals"], "adds tax")
+      |> should
+      |> be_equal(["Cart", "totals", "adds tax"])
+      |> or_fail_with("full_name should end with the test name")
+    }),
+
+    it("full_name gives the test name alone for no groups", fn() {
+      types.full_name([], "adds tax")
+      |> should
+      |> be_equal(["adds tax"])
+      |> or_fail_with("full_name should hold only the test name")
+    }),
+
     it("status_from_failures returns Passed for empty failures", fn() {
       types.status_from_failures([])
       |> should

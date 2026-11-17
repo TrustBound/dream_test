@@ -74,7 +74,7 @@ pub fn tests() {
       let assert [r1, r2] = results
 
       use _ <- result.try(
-        r1.full_name
+        types.full_name(r1.groups, r1.name)
         |> should
         |> be_equal(["ok", "passes"])
         |> or_fail_with("expected first suite to run first"),

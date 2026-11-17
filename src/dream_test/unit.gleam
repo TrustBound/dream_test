@@ -182,7 +182,7 @@ pub fn describe(
 ///
 /// ## Parameters
 ///
-/// - `name`: the group name (shown in reports and in `runner.TestInfo.full_name`)
+/// - `name`: the group name (shown in reports and in `types.TestInfo.groups`)
 /// - `children`: nested tests/groups/hooks under this group
 ///
 /// ## Returns

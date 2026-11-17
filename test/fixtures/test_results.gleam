@@ -6,7 +6,7 @@ import dream_test/types.{type Status, type TestResult, TestResult, Unit}
 pub fn make_test(name: String, status: Status) -> TestResult {
   TestResult(
     name: name,
-    full_name: [name],
+    groups: [],
     status: status,
     duration_ms: 0,
     tags: [],
@@ -23,7 +23,7 @@ pub fn make_test_with_duration(
 ) -> TestResult {
   TestResult(
     name: name,
-    full_name: [name],
+    groups: [],
     status: status,
     duration_ms: duration_ms,
     tags: [],

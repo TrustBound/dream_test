@@ -390,5 +390,5 @@ fn statuses(results: List(TestResult)) -> List(Status) {
 }
 
 fn full_names(results: List(TestResult)) -> List(List(String)) {
-  list.map(results, fn(result) { result.full_name })
+  list.map(results, fn(result) { types.full_name(result.groups, result.name) })
 }

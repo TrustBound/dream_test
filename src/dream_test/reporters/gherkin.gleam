@@ -77,7 +77,7 @@ pub fn format(results results: List(TestResult)) -> String {
 ///       let result =
 ///         TestResult(
 ///           name: "Adding items",
-///           full_name: ["Shopping Cart", "Adding items"],
+///           groups: ["Shopping Cart"],
 ///           status: Passed,
 ///           duration_ms: 0,
 ///           tags: [],
@@ -173,7 +173,7 @@ fn format_all_results(
   case results {
     [] -> accumulated
     [result, ..rest] -> {
-      let feature_name = extract_feature_name(result.full_name)
+      let feature_name = extract_feature_name(result.groups)
       let feature_header =
         format_feature_header_if_new(feature_name, previous_feature)
       let scenario_text = format_scenario(result)
@@ -183,8 +183,8 @@ fn format_all_results(
   }
 }
 
-fn extract_feature_name(full_name: List(String)) -> String {
-  case full_name {
+fn extract_feature_name(groups: List(String)) -> String {
+  case groups {
     [] -> "Unknown Feature"
     [feature, ..] -> feature
   }
@@ -198,7 +198,7 @@ fn format_feature_header_if_new(current: String, previous: String) -> String {
 }
 
 fn format_scenario(result: TestResult) -> String {
-  let scenario_name = extract_scenario_name(result.full_name)
+  let scenario_name = result.name
   let marker = status_marker(result.status)
   let duration = format_duration(result.duration_ms)
   let scenario_line =
@@ -212,13 +212,6 @@ fn format_duration(duration_ms: Int) -> String {
     // Don't show timing for very fast tests (< 1ms)
     ms if ms <= 0 -> ""
     ms -> " (" <> timing.format_duration_ms(ms) <> ")"
-  }
-}
-
-fn extract_scenario_name(full_name: List(String)) -> String {
-  case list.reverse(full_name) {
-    [] -> "Unknown Scenario"
-    [name, ..] -> name
   }
 }
 

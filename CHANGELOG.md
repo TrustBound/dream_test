@@ -41,6 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tree was a single `Test` never ran, and no error said so. Now a suite is
   always a group. Code that builds suites with `describe`, `feature`,
   `types.root` or discovery does not change.
+- BREAKING: `types.TestResult` and `types.TestInfo` now hold
+  `groups: List(String)` (the names of the groups around the test) in place
+  of `full_name: List(String)`. The test name is the `name` field, so a
+  full name can no longer be empty or end with a name other than the test
+  name. Before, `full_name: []` was possible, and the BDD reporter wrote
+  `✓ ` and the Gherkin reporter `Unknown Scenario` for it. The new function
+  `types.full_name(groups, name)` gives the old list. Code that builds or
+  reads these records by hand must change, for example
+  `TestResult(name: "adds", full_name: ["Cart", "adds"], ..)` becomes
+  `TestResult(name: "adds", groups: ["Cart"], ..)`, and
+  `info.full_name` becomes `types.full_name(info.groups, info.name)`. The
+  JSON report still writes `full_name` as the full list.
 - BREAKING: The summary line of the BDD and Gherkin reporters now lists the
   extra counts in the order skipped, pending, timed out, setup failed.
   Before, the order was the reverse: `1 setup failed, 1 timed out,

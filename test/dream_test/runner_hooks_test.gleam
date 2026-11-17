@@ -62,7 +62,8 @@ pub fn tests() {
         |> runner.before_each_test(fn(info, ctx: Nil) {
           case
             info.name == "leaf"
-            && info.full_name == ["root", "group", "leaf"]
+            && types.full_name(info.groups, info.name)
+            == ["root", "group", "leaf"]
             && info.tags == ["group", "leaf"]
             && info.kind == Unit
           {

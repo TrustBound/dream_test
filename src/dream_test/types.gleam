@@ -62,6 +62,7 @@
 //// - `Node(context)` represents groups, tests, and lifecycle hooks.
 ////
 
+import gleam/list
 import gleam/option.{type Option}
 
 /// Error type for test execution.
@@ -298,7 +299,9 @@ pub type CoverageSummary {
 /// ## Fields
 ///
 /// - `name` - The test's own name (from `it`)
-/// - `full_name` - Complete path including `describe` ancestors
+/// - `groups` - The names of the `describe` groups around the test, from
+///   the outermost group in. Use `full_name(groups, name)` for the
+///   complete path.
 /// - `status` - Whether the test passed, failed, etc.
 /// - `duration_ms` - How long the test took in milliseconds
 /// - `tags` - Test tags for filtering
@@ -316,7 +319,7 @@ pub type CoverageSummary {
 pub type TestResult {
   TestResult(
     name: String,
-    full_name: List(String),
+    groups: List(String),
     status: Status,
     duration_ms: Int,
     tags: List(String),
@@ -332,7 +335,9 @@ pub type TestResult {
 /// ## Fields
 ///
 /// - `name`: the leaf test name (the `it("...")` label)
-/// - `full_name`: group path + test name (deterministic, good for identifiers)
+/// - `groups`: the names of the groups around the test, from the outermost
+///   group in. Use `full_name(groups, name)` for the group path and the
+///   test name together (deterministic, good for identifiers).
 /// - `tags`: effective tags (includes inherited group tags)
 /// - `kind`: `TestKind` (Unit, Integration, or GherkinScenario(id))
 /// - `source`: best-effort origin string (module name or `.feature` path)
@@ -345,7 +350,7 @@ pub type TestResult {
 pub type TestInfo {
   TestInfo(
     name: String,
-    full_name: List(String),
+    groups: List(String),
     tags: List(String),
     kind: TestKind,
     source: Option(String),
@@ -446,6 +451,39 @@ pub fn root(
   children children: List(Node(context)),
 ) -> Root(context) {
   Root(seed: seed, name: name, tags: [], children: children)
+}
+
+/// The complete name of a test: its group names, then its own name.
+///
+/// `TestResult` and `TestInfo` keep the group names and the test name in
+/// two fields, so a full name always has the test name as its last item
+/// and is never empty. Use `full_name` when you need the full name as one
+/// list, for example to show it, to make an identifier, or to compare two
+/// tests. The JSON reporter writes this list as `full_name`.
+///
+/// ## Parameters
+///
+/// - `groups`: the names of the groups around the test, from the outermost
+///   group in (the `groups` field)
+/// - `name`: the test's own name (the `name` field)
+///
+/// ## Returns
+///
+/// The group names followed by the test name.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.full_name(["Cart", "totals"], "adds tax")
+/// |> should
+/// |> be_equal(["Cart", "totals", "adds tax"])
+/// |> or_fail_with("expected the group names, then the test name")
+/// ```
+pub fn full_name(
+  groups groups: List(String),
+  name name: String,
+) -> List(String) {
+  list.append(groups, [name])
 }
 
 /// Derive a Status from a list of failures.

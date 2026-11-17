@@ -5,13 +5,14 @@ import dream_test/unit.{describe, group, it}
 import gleam/option.{type Option, None, Some}
 
 fn scenario(
-  full_name: List(String),
+  groups: List(String),
+  name: String,
   status: types.Status,
   failures: List(types.AssertionFailure),
 ) -> types.TestResult {
   types.TestResult(
-    name: "fallback",
-    full_name: full_name,
+    name: name,
+    groups: groups,
     status: status,
     duration_ms: 0,
     tags: [],
@@ -30,18 +31,18 @@ fn failure(
 /// Two features, one scenario of each status.
 fn every_status() -> List(types.TestResult) {
   [
-    scenario(["Cart", "adds"], types.Passed, []),
-    scenario(["Cart", "removes"], types.Failed, [
+    scenario(["Cart"], "adds", types.Passed, []),
+    scenario(["Cart"], "removes", types.Failed, [
       failure("bad", Some(types.EqualityFailure(actual: "1", expected: "2"))),
       failure("", Some(types.BooleanFailure(actual: True, expected: False))),
       failure("", None),
     ]),
-    scenario(["Cart", "empties"], types.Skipped, []),
-    scenario(["Checkout", "pays"], types.Pending, []),
-    scenario(["Checkout", "waits"], types.TimedOut, [
+    scenario(["Cart"], "empties", types.Skipped, []),
+    scenario(["Checkout"], "pays", types.Pending, []),
+    scenario(["Checkout"], "waits", types.TimedOut, [
       failure("too slow", None),
     ]),
-    scenario(["Checkout", "ships"], types.SetupFailed, [
+    scenario(["Checkout"], "ships", types.SetupFailed, [
       failure("no db", None),
     ]),
   ]
@@ -53,7 +54,7 @@ pub fn tests() {
       let result =
         types.TestResult(
           name: "t",
-          full_name: ["suite", "t"],
+          groups: ["suite"],
           status: types.Passed,
           duration_ms: 1,
           tags: [],
@@ -95,7 +96,7 @@ pub fn tests() {
     }),
 
     it("is_gherkin_result is true for a Gherkin scenario", fn() {
-      gherkin.is_gherkin_result(scenario(["F", "s"], types.Passed, []))
+      gherkin.is_gherkin_result(scenario(["F"], "s", types.Passed, []))
       |> should
       |> be_equal(True)
       |> or_fail_with("a GherkinScenario result is a Gherkin result")
@@ -130,24 +131,22 @@ pub fn tests() {
         |> or_fail_with("each status should have its marker")
       }),
 
-      it("writes a placeholder for a result with no full name", fn() {
-        gherkin.format([scenario([], types.Passed, [])])
+      it("writes a placeholder feature for a result with no group", fn() {
+        gherkin.format([scenario([], "alone", types.Passed, [])])
         |> should
         |> be_equal(
           "Feature: Unknown Feature\n"
-          <> "  Scenario: Unknown Scenario ✓\n"
+          <> "  Scenario: alone ✓\n"
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed in 0ms\n",
         )
-        |> or_fail_with(
-          "the feature and scenario should have placeholder names",
-        )
+        |> or_fail_with("the feature should have a placeholder name")
       }),
 
       it("format_scenarios writes the scenarios without a summary", fn() {
         gherkin.format_scenarios([
-          scenario(["Cart", "adds"], types.Passed, []),
-          scenario(["Cart", "removes"], types.Failed, [failure("bad", None)]),
+          scenario(["Cart"], "adds", types.Passed, []),
+          scenario(["Cart"], "removes", types.Failed, [failure("bad", None)]),
         ])
         |> should
         |> be_equal(
@@ -170,7 +169,7 @@ pub fn tests() {
       it("shows the duration of a slow scenario", fn() {
         gherkin.format([
           types.TestResult(
-            ..scenario(["F", "slow"], types.Passed, []),
+            ..scenario(["F"], "slow", types.Passed, []),
             duration_ms: 1500,
           ),
         ])

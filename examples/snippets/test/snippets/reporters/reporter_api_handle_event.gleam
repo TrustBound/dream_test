@@ -27,7 +27,7 @@ pub fn tests() {
       let result =
         types.TestResult(
           name: "passes",
-          full_name: ["suite", "passes"],
+          groups: ["suite"],
           status: types.Passed,
           duration_ms: 0,
           tags: [],

@@ -636,7 +636,7 @@ fn fail_test_nodes(
       let result =
         TestResult(
           name: test_case.name,
-          full_name: list.append(scope, [test_case.name]),
+          groups: scope,
           status: SetupFailed,
           duration_ms: 0,
           tags: list.append(inherited_tags, test_case.tags),
@@ -1120,7 +1120,7 @@ fn worker_crash_result(
 ) -> TestResult {
   TestResult(
     name: test_case.name,
-    full_name: list.append(scope, [test_case.name]),
+    groups: scope,
     status: Failed,
     duration_ms: 0,
     tags: list.append(inherited_tags, test_case.tags),
@@ -1313,12 +1313,11 @@ fn execute_one_test_node(
     timeout_ms: timeout_ms,
     source: source,
   ) = test_case
-  let full_name = list.append(scope, [name])
   let all_tags = list.append(inherited_tags, tags)
   let info =
     types.TestInfo(
       name: name,
-      full_name: full_name,
+      groups: scope,
       tags: all_tags,
       kind: kind,
       source: source,
@@ -1388,7 +1387,7 @@ fn execute_one_test_node(
 
   TestResult(
     name: name,
-    full_name: full_name,
+    groups: scope,
     status: final_status,
     duration_ms: duration,
     tags: all_tags,
@@ -1526,7 +1525,7 @@ fn run_after_all_chain(
           let result =
             TestResult(
               name: "<after_all>",
-              full_name: list.append(scope, ["<after_all>"]),
+              groups: scope,
               status: Failed,
               duration_ms: 0,
               tags: [],

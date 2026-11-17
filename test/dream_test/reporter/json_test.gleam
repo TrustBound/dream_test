@@ -18,7 +18,7 @@ fn result_of(
 ) -> types.TestResult {
   types.TestResult(
     name: name,
-    full_name: ["s", name],
+    groups: ["s"],
     status: status,
     duration_ms: 2,
     tags: [],
@@ -101,7 +101,7 @@ fn sample_results() -> List(types.TestResult) {
   [
     types.TestResult(
       name: "t1",
-      full_name: ["suite", "t1"],
+      groups: ["suite"],
       status: types.Passed,
       duration_ms: 1,
       tags: ["tag"],

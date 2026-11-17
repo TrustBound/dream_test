@@ -669,7 +669,7 @@ pub fn filter_tests(
 /// import dream_test/types.{type TestInfo}
 ///
 /// fn log_test(info: TestInfo, ctx: Nil) {
-///   io.println("starting " <> string.join(info.full_name, " > "))
+///   io.println("starting " <> string.join(types.full_name(info.groups, info.name), " > "))
 ///   Ok(ctx)
 /// }
 ///
@@ -955,12 +955,11 @@ fn collect_test_infos(
       timeout_ms: _timeout_ms,
       source: source,
     ) -> {
-      let full_name = list.append(scope, [name])
       let effective_tags = list.append(inherited_tags, tags)
       let info =
         types.TestInfo(
           name: name,
-          full_name: full_name,
+          groups: scope,
           tags: effective_tags,
           kind: kind,
           source: source,
@@ -1001,7 +1000,7 @@ fn suite_source_from_tests(tests: List(types.TestInfo)) -> Option(String) {
       types.TestInfo(
         source: source,
         name: _name,
-        full_name: _full_name,
+        groups: _groups,
         tags: _tags,
         kind: _kind,
       ),
@@ -1031,7 +1030,7 @@ fn all_sources_match(value: String, rest: List(types.TestInfo)) -> Bool {
       types.TestInfo(
         source: source,
         name: _name,
-        full_name: _full_name,
+        groups: _groups,
         tags: _tags,
         kind: _kind,
       ),
@@ -1295,14 +1294,14 @@ fn failed_result_for_test_info(
 ) -> TestResult {
   let types.TestInfo(
     name: name,
-    full_name: full_name,
+    groups: groups,
     tags: tags,
     kind: kind,
     source: _source,
   ) = info
   types.TestResult(
     name: name,
-    full_name: full_name,
+    groups: groups,
     status: Failed,
     duration_ms: 0,
     tags: tags,
@@ -1314,7 +1313,7 @@ fn failed_result_for_test_info(
 fn after_all_suites_failure_result(message: String) -> TestResult {
   types.TestResult(
     name: "<after_all_suites>",
-    full_name: ["<after_all_suites>"],
+    groups: [],
     status: Failed,
     duration_ms: 0,
     tags: [],
@@ -1330,7 +1329,7 @@ fn after_each_suite_failure_result(
   let types.SuiteInfo(name: name, tests: _tests, source: _source) = suite_info
   types.TestResult(
     name: "<after_each_suite>",
-    full_name: [name, "<after_each_suite>"],
+    groups: [name],
     status: Failed,
     duration_ms: 0,
     tags: [],
@@ -1489,12 +1488,11 @@ fn filter_node(
       timeout_ms: timeout_ms,
       source: source,
     ) -> {
-      let full_name = list.append(scope, [name])
       let effective_tags = list.append(inherited_tags, tags)
       let info =
         types.TestInfo(
           name: name,
-          full_name: full_name,
+          groups: scope,
           tags: effective_tags,
           kind: kind,
           source: source,

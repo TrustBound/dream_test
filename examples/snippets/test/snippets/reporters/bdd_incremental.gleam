@@ -6,7 +6,7 @@ import dream_test/unit.{describe, it}
 fn passing_result() -> types.TestResult {
   types.TestResult(
     name: "passes",
-    full_name: ["Example Suite", "passes"],
+    groups: ["Example Suite"],
     status: types.Passed,
     duration_ms: 0,
     tags: [],

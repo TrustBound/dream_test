@@ -7,7 +7,7 @@ fn sample_results() -> List(types.TestResult) {
   [
     types.TestResult(
       name: "Scenario A",
-      full_name: ["Example Feature", "Scenario A"],
+      groups: ["Example Feature"],
       status: types.Passed,
       duration_ms: 0,
       tags: [],

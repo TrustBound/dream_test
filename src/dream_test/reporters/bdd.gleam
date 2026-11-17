@@ -244,7 +244,10 @@ fn format_unit_results(color: Bool, results: List(TestResult)) -> String {
 }
 
 fn compare_by_full_name(a: TestResult, b: TestResult) -> order.Order {
-  compare_string_lists(a.full_name, b.full_name)
+  compare_string_lists(
+    types.full_name(a.groups, a.name),
+    types.full_name(b.groups, b.name),
+  )
 }
 
 fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
@@ -323,7 +326,7 @@ pub fn format_incremental(
   previous_path previous_path: List(String),
 ) -> FormatIncrementalResult {
   let text = format_one_result_with_test_indent(False, result, previous_path, 0)
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalResult(text: text, new_path: new_path)
 }
 
@@ -365,7 +368,7 @@ pub fn format_incremental_with_test_indent(
       previous_path,
       extra_test_indent,
     )
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalResult(text: text, new_path: new_path)
 }
 
@@ -414,7 +417,7 @@ pub fn format_incremental_parts_with_test_indent(
       previous_path,
       extra_test_indent,
     )
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalPartsResult(
     headers: headers,
     test_line: test_line,
@@ -471,7 +474,7 @@ fn format_all_results(
     [result, ..rest] -> {
       let formatted = format_one_result(color, result, previous_path)
       let updated = string.concat([accumulated, formatted])
-      let new_path = extract_describe_segments(result.full_name)
+      let new_path = result.groups
       format_all_results(color, rest, new_path, updated)
     }
   }
@@ -507,7 +510,7 @@ fn format_one_result_parts_with_test_indent(
   previous_path: List(String),
   extra_test_indent: Int,
 ) -> #(String, String) {
-  let current_path = extract_describe_segments(result.full_name)
+  let current_path = result.groups
   let common_depth = count_common_prefix(previous_path, current_path, 0)
   let new_segments = list.drop(current_path, common_depth)
   let is_gherkin = gherkin_reporter.is_gherkin_result(result)
@@ -589,26 +592,18 @@ fn count_common_prefix_check(
   }
 }
 
-fn extract_describe_segments(full_name: List(String)) -> List(String) {
-  case list.reverse(full_name) {
-    [] -> []
-    [_] -> []
-    [_, ..rest] -> list.reverse(rest)
-  }
-}
-
 fn format_test_line_with_indent_for_kind(
   color: Bool,
   result: TestResult,
   extra_indent: Int,
   is_gherkin: Bool,
 ) -> String {
-  let depth = calculate_test_depth(result.full_name)
+  let depth = list.length(result.groups)
   let indent = build_indent(depth + extra_indent)
   let marker = status_marker(color, result.status)
   let name = case is_gherkin {
-    True -> "Scenario: " <> extract_test_name(result.full_name)
-    False -> extract_test_name(result.full_name)
+    True -> "Scenario: " <> result.name
+    False -> result.name
   }
   let duration = format_duration(result.duration_ms)
   let colored_name = case result.status {
@@ -633,14 +628,6 @@ fn format_duration(duration_ms: Int) -> String {
   }
 }
 
-fn calculate_test_depth(full_name: List(String)) -> Int {
-  case full_name {
-    [] -> 0
-    [_] -> 0
-    _ -> list.length(full_name) - 1
-  }
-}
-
 fn build_indent(level: Int) -> String {
   build_indent_recursive(level, "")
 }
@@ -649,13 +636,6 @@ fn build_indent_recursive(level: Int, accumulated: String) -> String {
   case level {
     0 -> accumulated
     n -> build_indent_recursive(n - 1, string.concat([accumulated, "  "]))
-  }
-}
-
-fn extract_test_name(full_name: List(String)) -> String {
-  case list.reverse(full_name) {
-    [last, ..] -> last
-    [] -> ""
   }
 }
 

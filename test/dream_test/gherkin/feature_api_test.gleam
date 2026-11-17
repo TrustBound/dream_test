@@ -34,7 +34,7 @@ pub fn tests() {
         [
           test_types.TestResult(
             name: "Scenario 1",
-            full_name: _,
+            groups: _,
             status: test_types.Passed,
             duration_ms: _,
             tags: _,
@@ -66,7 +66,7 @@ pub fn tests() {
         [
           test_types.TestResult(
             name: _,
-            full_name: _,
+            groups: _,
             status: _,
             duration_ms: _,
             tags: tags,

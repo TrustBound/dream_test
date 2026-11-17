@@ -23,7 +23,14 @@ pub fn tests() {
       let results = runner.new([suite]) |> runner.run()
       let assert [r] = results
 
-      #(r.name, r.full_name, r.status, r.tags, r.failures, r.kind)
+      #(
+        r.name,
+        types.full_name(r.groups, r.name),
+        r.status,
+        r.tags,
+        r.failures,
+        r.kind,
+      )
       |> should
       |> be_equal(#("passes", ["inner", "passes"], Passed, ["smoke"], [], Unit))
       |> or_fail_with("runner should execute a unit suite deterministically")

@@ -461,7 +461,11 @@ fn summaries(
   results: List(TestResult),
 ) -> List(#(List(String), Status, List(AssertionFailure))) {
   list.map(results, fn(result) {
-    #(result.full_name, result.status, result.failures)
+    #(
+      types.full_name(result.groups, result.name),
+      result.status,
+      result.failures,
+    )
   })
 }
 

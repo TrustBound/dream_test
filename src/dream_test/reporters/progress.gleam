@@ -277,11 +277,10 @@ fn render_bar(width: Int, percent: Int) -> String {
 }
 
 fn format_result_name(result: TestResult) -> String {
-  // Prefer the leaf name, but include some path if available.
-  case list.reverse(result.full_name) {
+  // Show the test name after the name of the group around it, if any.
+  case list.reverse(result.groups) {
     [] -> result.name
-    [leaf] -> leaf
-    [leaf, parent, ..] -> parent <> " › " <> leaf
+    [parent, ..] -> parent <> " › " <> result.name
   }
 }
 

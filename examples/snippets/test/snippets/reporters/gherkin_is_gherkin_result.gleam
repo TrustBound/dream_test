@@ -6,7 +6,7 @@ import dream_test/unit.{describe, it}
 fn gherkin_result() -> types.TestResult {
   types.TestResult(
     name: "Scenario A",
-    full_name: ["Example Feature", "Scenario A"],
+    groups: ["Example Feature"],
     status: types.Passed,
     duration_ms: 0,
     tags: [],
@@ -18,7 +18,7 @@ fn gherkin_result() -> types.TestResult {
 fn unit_result() -> types.TestResult {
   types.TestResult(
     name: "passes",
-    full_name: ["Example Suite", "passes"],
+    groups: ["Example Suite"],
     status: types.Passed,
     duration_ms: 0,
     tags: [],
