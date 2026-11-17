@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Line coverage** (`dream_test/coverage`, `runner.coverage`)
+
+  - Opt-in line coverage with the BEAM `cover` tool. The runner prints a
+    coverage table after the results and writes an LCOV file to
+    `build/coverage/lcov.info` (`coverage.lcov_path`, `coverage.no_lcov`)
+  - `coverage.source_directory` measures one folder in place of `src`
+  - `coverage.show_missing` adds a `Missing` column with the line ranges that
+    did not run
+  - `coverage.minimum_percent` and `coverage.minimum_percent_per_file` fail
+    the run when the total or one file is below the minimum
+  - `runner.coverage_from_environment` turns coverage on only when
+    `DREAM_TEST_COVERAGE` is `1` or `true`
+  - Every coverage error fails the run with a `Coverage failed` message that
+    gives what failed, the reason and the fix
+
+- **Coverage exclusions** (`dream_test/coverage`)
+
+  - `coverage.exclude` and `coverage.exclude_with_reason` remove files that
+    match a pattern
+  - `coverage:ignore`, `coverage:ignore-start` / `coverage:ignore-end` and
+    `coverage:ignore-function` comment markers ignore lines, blocks and whole
+    functions in `.gleam` and `.erl` files. Text after a marker is its reason
+  - A count line after the total shows what was excluded.
+    `coverage.show_excluded` adds an `Excluded` column with the reasons, and
+    `coverage.require_exclusion_reasons` fails the run when a reason is missing
+
+- **Coverage table options** (`dream_test/reporters/coverage`)
+
+  - `coverage.color`, `coverage.sort_by_coverage` and `coverage.hide_complete`
+  - `dream_test/reporters/ansi` holds the ANSI colour helpers
+
+- **Coverage output formats** (`dream_test/coverage/*`)
+
+  - JSON (`coverage.json_path`), Cobertura XML (`coverage.cobertura_path`),
+    Markdown (`coverage.markdown_path`) and HTML with annotated source
+    (`coverage.html_path`)
+
+- **Coverage from other BEAM instances** (`coverage.merge_lcov`)
+
+  - Merges LCOV files that match a pattern into the report, for example the
+    file that a separately run application server writes with
+    `coverage.start` and `coverage.finish`
+
+- **Coverage without the runner** (`coverage.start`, `coverage.finish`,
+  `coverage.check_minimum`, `coverage.check_minimum_per_file`,
+  `dream_test/coverage/report`)
+
+- **Line accuracy warning**
+
+  - The coverage table warns when a Gleam version before 1.19 built a
+    measured file, because older versions map only the first line of each
+    function to its source line. The warning does not fail the run
+
 ## [2.1.3] - 2026-07-06
 
 ### Fixed
