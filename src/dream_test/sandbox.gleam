@@ -271,8 +271,11 @@ fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
   WorkerDown(reason: reason)
 }
 
-/// Format an exit reason as a string for error reporting.
-fn format_exit_reason(reason: process.ExitReason) -> String {
+/// Format an exit reason as a string for error reporting. The parallel
+/// executor uses it too, for a test worker that exits before it sends its
+/// result.
+@internal
+pub fn format_exit_reason(reason: process.ExitReason) -> String {
   case reason {
     process.Normal -> "normal"
     process.Killed -> "killed"

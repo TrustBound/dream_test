@@ -5,6 +5,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/parallel
 import dream_test/reporters/progress
 import dream_test/runner
+import dream_test/sandbox
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Node, type Status,
   type TestResult, AssertionFailure, AssertionOk, Failed, Passed, SetupFailed,
@@ -360,6 +361,25 @@ pub fn tests() {
       |> or_fail_with("the slow test should time out after the slow write")
     }),
 
+    it("a worker killed from outside fails its test", fn() {
+      // The first test kills its own worker. The parallel run must give a
+      // failed result for it and go on, so the sandbox deadline is never met.
+      sandbox.run_isolated(
+        sandbox.SandboxConfig(timeout_ms: 2000, show_crash_reports: False),
+        run_suite_that_kills_a_worker,
+      )
+      |> should
+      |> be_equal(
+        sandbox.SandboxCompleted([
+          #(["root", "kills its worker"], Failed, [
+            failure("crash", "worker crashed in root: killed"),
+          ]),
+          #(["root", "passes"], Passed, []),
+        ]),
+      )
+      |> or_fail_with("a killed worker should fail its test, not hang")
+    }),
+
     it("a test with its own timeout runs in sequence", fn() {
       describe("root", [timed_test("own", Some(1000), 0)])
       |> run_sequential
@@ -389,6 +409,25 @@ fn timed_test(
 
 fn sleep_then_pass(sleep_ms: Int) -> Result(AssertionResult, String) {
   process.sleep(sleep_ms)
+  Ok(AssertionOk)
+}
+
+fn run_suite_that_kills_a_worker() -> List(
+  #(List(String), Status, List(AssertionFailure)),
+) {
+  describe("root", [
+    it("kills its worker", kill_worker_then_pass),
+    timed_test("passes", None, 50),
+  ])
+  |> run_default
+  |> summaries
+}
+
+/// The body runs in a sandbox process that the worker started, so the
+/// parent of the body process is the worker.
+fn kill_worker_then_pass() -> Result(AssertionResult, String) {
+  let #(_parent, worker) = process_info(process.self(), atom.create("parent"))
+  process.kill(worker)
   Ok(AssertionOk)
 }
 
@@ -428,3 +467,6 @@ fn summaries(
 
 @external(erlang, "erlang", "error")
 fn erlang_error(reason: Atom) -> a
+
+@external(erlang, "erlang", "process_info")
+fn process_info(pid: process.Pid, item: Atom) -> #(Atom, process.Pid)

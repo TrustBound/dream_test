@@ -46,8 +46,9 @@ import dream_test/types.{
   TestResult, TimedOut, Unit,
 }
 import gleam/erlang/process.{
-  type Subject, new_selector, new_subject, select, selector_receive_forever,
-  send, spawn_unlinked,
+  type Down, type Monitor, type Pid, type Selector, type Subject,
+  demonitor_process, monitor, new_selector, new_subject, select,
+  select_specific_monitor, selector_receive_forever, send, spawn_unlinked,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -168,6 +169,13 @@ type IndexedResult {
   IndexedResult(index: Int, result: TestResult)
 }
 
+/// A worker that the loop started and that has not given a result yet. The
+/// loop monitors it, so a worker that exits before it sends its result
+/// still gives a result.
+type RunningWorker(context) {
+  RunningWorker(monitor: Monitor, index: Int, test_case: TestCase(context))
+}
+
 /// One test of a group, taken from its `Test` node.
 type TestCase(context) {
   TestCase(
@@ -195,7 +203,7 @@ type RunParallelLoopConfig(context) {
     after_each_hooks: List(fn(context) -> Result(Nil, String)),
     failures_rev: List(AssertionFailure),
     pending: List(#(Int, TestCase(context))),
-    running: Int,
+    running: List(RunningWorker(context)),
     pending_emit: List(IndexedResult),
     emitted_rev: List(TestResult),
     next_emit_index: Int,
@@ -221,15 +229,17 @@ type StartWorkersUpToLimitConfig(context) {
     after_each_hooks: List(fn(context) -> Result(Nil, String)),
     failures_rev: List(AssertionFailure),
     pending: List(#(Int, TestCase(context))),
-    running: Int,
+    running: List(RunningWorker(context)),
     max_concurrency: Int,
   )
 }
 
-type WaitForResultConfig {
+type WaitForResultConfig(context) {
   WaitForResultConfig(
     subject: Subject(WorkerMessage),
-    running: Int,
+    scope: List(String),
+    inherited_tags: List(String),
+    running: List(RunningWorker(context)),
     pending_emit: List(IndexedResult),
     progress_output: Option(ProgressOutput),
     total: Int,
@@ -237,10 +247,14 @@ type WaitForResultConfig {
   )
 }
 
-/// The result that a test worker sends when its test finished. A test that
-/// timed out or crashed has a result too, so every worker sends one.
+/// A message to the loop about one worker. A worker sends `WorkerFinished`
+/// when its test finished; a test that timed out or crashed has a result
+/// too. `WorkerDown` comes from the monitor of a worker, for a worker that
+/// exited before it sent its result, for example when a process outside
+/// dream_test killed it.
 type WorkerMessage {
   WorkerFinished(index: Int, result: TestResult)
+  WorkerDown(down: Down)
 }
 
 @external(erlang, "sandbox_ffi", "run_catching")
@@ -883,7 +897,7 @@ fn run_tests_parallel(
     after_each_hooks: after_each_hooks,
     failures_rev: failures_rev,
     pending: indexed,
-    running: 0,
+    running: [],
     pending_emit: [],
     emitted_rev: [],
     next_emit_index: 0,
@@ -948,7 +962,7 @@ fn run_parallel_loop(
       max_concurrency: max_concurrency,
     ))
 
-  case list.is_empty(pending2) && running2 == 0 {
+  case list.is_empty(pending2) && list.is_empty(running2) {
     True -> #(
       list.append(
         list.reverse(emit_all_results(pending_emit, next_emit_index, [])),
@@ -960,6 +974,8 @@ fn run_parallel_loop(
       let #(running3, pending_emit2, completed2) =
         wait_for_result(WaitForResultConfig(
           subject: subject,
+          scope: scope,
+          inherited_tags: inherited_tags,
           running: running2,
           pending_emit: pending_emit,
           progress_output: progress_output,
@@ -1014,19 +1030,24 @@ fn emit_all_results(
 
 fn start_workers_up_to_limit(
   input: StartWorkersUpToLimitConfig(context),
-) -> #(List(#(Int, TestCase(context))), Int) {
-  case input.pending {
-    [#(index, test_case), ..rest] if input.running < input.max_concurrency -> {
-      spawn_test_worker(input, index, test_case)
+) -> #(List(#(Int, TestCase(context))), List(RunningWorker(context))) {
+  case input.pending, list.length(input.running) < input.max_concurrency {
+    [#(index, test_case), ..rest], True -> {
+      let worker = spawn_test_worker(input, index, test_case)
+      let running_worker =
+        RunningWorker(
+          monitor: monitor(worker),
+          index: index,
+          test_case: test_case,
+        )
       start_workers_up_to_limit(
-        StartWorkersUpToLimitConfig(
-          ..input,
-          pending: rest,
-          running: input.running + 1,
-        ),
+        StartWorkersUpToLimitConfig(..input, pending: rest, running: [
+          running_worker,
+          ..input.running
+        ]),
       )
     }
-    _ -> #(input.pending, input.running)
+    _, _ -> #(input.pending, input.running)
   }
 }
 
@@ -1034,12 +1055,13 @@ fn start_workers_up_to_limit(
 /// test can time out or crash only in its sandbox, so the worker always
 /// sends a result. A crash of the worker itself is a bug in this module:
 /// `run_catching` turns it into a failed result, so the loop never waits
-/// for a result that does not come.
+/// for a result that does not come. The caller monitors the worker, for a
+/// worker that something outside this module stops.
 fn spawn_test_worker(
   input: StartWorkersUpToLimitConfig(context),
   index: Int,
   test_case: TestCase(context),
-) -> Nil {
+) -> Pid {
   let StartWorkersUpToLimitConfig(
     config: config,
     subject: subject,
@@ -1088,7 +1110,6 @@ fn spawn_test_worker(
         )
     }
   })
-  Nil
 }
 
 fn worker_crash_result(
@@ -1115,26 +1136,100 @@ fn worker_crash_result(
 
 /// Wait for the next result of a worker. There is no deadline here: each
 /// test body and hook has its own deadline in its sandbox, so every worker
-/// sends a result.
+/// sends a result or, if something stops it first, a down message.
 fn wait_for_result(
-  input: WaitForResultConfig,
-) -> #(Int, List(IndexedResult), Int) {
-  let WorkerFinished(index: index, result: result) =
+  input: WaitForResultConfig(context),
+) -> #(List(RunningWorker(context)), List(IndexedResult), Int) {
+  let message =
     new_selector()
     |> select(input.subject)
+    |> select_worker_monitors(input.running)
     |> selector_receive_forever()
+  let #(still_running, new_results) = case message {
+    WorkerFinished(index: index, result: result) -> #(
+      remove_finished_worker(input.running, index, []),
+      [IndexedResult(index: index, result: result)],
+    )
+    WorkerDown(down: down) ->
+      remove_down_worker(input, input.running, down, [], [])
+  }
   let next_completed =
-    emit_test_finished_progress(
+    emit_test_finished_progress_results(
       input.progress_output,
       input.completed,
       input.total,
-      result,
+      list.map(new_results, indexed_result_value),
     )
-  #(
-    input.running - 1,
-    [IndexedResult(index: index, result: result), ..input.pending_emit],
-    next_completed,
-  )
+  #(still_running, list.append(new_results, input.pending_emit), next_completed)
+}
+
+/// Select the down message of each running worker. Only these monitors are
+/// selected, so other down messages of the calling process stay in its
+/// mailbox.
+fn select_worker_monitors(
+  selector: Selector(WorkerMessage),
+  running: List(RunningWorker(context)),
+) -> Selector(WorkerMessage) {
+  case running {
+    [] -> selector
+    [worker, ..rest] ->
+      selector
+      |> select_specific_monitor(worker.monitor, WorkerDown)
+      |> select_worker_monitors(rest)
+  }
+}
+
+/// Remove the worker that sent the result for `index`. A worker sends its
+/// result before it exits, so the result comes before the down message;
+/// `demonitor_process` also removes a down message that is already in the
+/// mailbox.
+fn remove_finished_worker(
+  running: List(RunningWorker(context)),
+  index: Int,
+  kept_rev: List(RunningWorker(context)),
+) -> List(RunningWorker(context)) {
+  case running {
+    [] -> list.reverse(kept_rev)
+    [worker, ..rest] if worker.index == index -> {
+      demonitor_process(worker.monitor)
+      remove_finished_worker(rest, index, kept_rev)
+    }
+    [worker, ..rest] ->
+      remove_finished_worker(rest, index, [worker, ..kept_rev])
+  }
+}
+
+/// Remove the worker of the monitor that sent a down message, and give a
+/// failed result for its test: the worker exited before it sent its result.
+fn remove_down_worker(
+  input: WaitForResultConfig(context),
+  running: List(RunningWorker(context)),
+  down: Down,
+  kept_rev: List(RunningWorker(context)),
+  results: List(IndexedResult),
+) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+  case running {
+    [] -> #(list.reverse(kept_rev), results)
+    [worker, ..rest] if worker.monitor == down.monitor ->
+      remove_down_worker(input, rest, down, kept_rev, [
+        IndexedResult(
+          index: worker.index,
+          result: worker_crash_result(
+            input.scope,
+            input.inherited_tags,
+            worker.test_case,
+            sandbox.format_exit_reason(down.reason),
+          ),
+        ),
+        ..results
+      ])
+    [worker, ..rest] ->
+      remove_down_worker(input, rest, down, [worker, ..kept_rev], results)
+  }
+}
+
+fn indexed_result_value(indexed_result: IndexedResult) -> TestResult {
+  indexed_result.result
 }
 
 fn emit_test_finished_progress(
