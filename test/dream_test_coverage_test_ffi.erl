@@ -27,7 +27,7 @@
 
 %% Helpers for the coverage tests that need a child node or a new `erl`
 %% process: tests that change the code server mode, the working directory
-%% or an environment variable, and tests whose main halts its BEAM.
+%% or an environment variable, and tests whose main stops its BEAM.
 
 -define(PROJECTS_DIRECTORY, "build/coverage/child_projects").
 
@@ -145,22 +145,25 @@ delete_directory(Directory) ->
 %% Running a main in a new `erl` process
 %% ---------------------------------------------------------------------------
 
-%% Run `Module:Function()` in a new `erl` process, then halt with status 0.
+%% Run `Module:Function()` in a new `erl` process, then stop it with status
+%% 0, the same way as Gleam's own wrapper of a main: `init:stop(0)` after
+%% the main returns. A main that already asked for `init:stop(1)` keeps
+%% status 1, because the first stop request wins.
 %% Returns {ExitStatus, Output}, with stdout and stderr together.
 run_main_in_new_vm(Module, Function) ->
-    Eval = io_lib:format("'~ts':'~ts'(), erlang:halt(0).", [Module, Function]),
+    Eval = io_lib:format("'~ts':'~ts'(), init:stop(0).", [Module, Function]),
     run_in_new_vm(Eval, []).
 
-%% The same, but the process measures dream_test's own `src` around the
-%% call, and writes an LCOV part that the test run merges (see
-%% test/dream_test/coverage_child_measure.gleam). Use it only for a main
+%% The same, but the process measures dream_test's own `src` from before
+%% the call until the BEAM stops, and writes an LCOV part that the test run
+%% merges (see test/dream_test/coverage_child_measure.gleam). Use it only for a main
 %% that runs runner lines that no other test reaches, because each measured
 %% process adds about 1.4 seconds.
 %% Environment is a Gleam list of #(Name, Option(Value)): `Some(Value)` sets
 %% the variable and `None` removes it.
 run_measured_main_in_new_vm(Module, Function, Environment) ->
     Eval = io_lib:format(
-        "'dream_test@coverage_child_measure':run_measured(<<\"~ts\">>, <<\"~ts\">>), erlang:halt(0).",
+        "'dream_test@coverage_child_measure':run_measured(<<\"~ts\">>, <<\"~ts\">>), init:stop(0).",
         [Module, Function]
     ),
     run_in_new_vm(Eval, Environment).

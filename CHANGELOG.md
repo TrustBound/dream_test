@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `runner.exit_on_failure` now stops the BEAM with `init:stop(1)` in place
+  of `erlang:halt(1)`. This is how Gleam itself stops a `main` that
+  crashes. The BEAM shuts down cleanly: the output is written and
+  applications stop. The exit status is still 1. Code after `runner.run`
+  can still run until `main` returns or the shutdown stops it; before, the
+  BEAM stopped inside `runner.run`.
 - BREAKING: A test body that runs past its timeout is now always
   `TimedOut`. Before, a sequential run (`max_concurrency` 1) gave
   `Failed`, and a parallel run gave `TimedOut` or `Failed`, by which of two

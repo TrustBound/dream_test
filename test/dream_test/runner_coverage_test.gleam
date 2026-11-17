@@ -1,7 +1,7 @@
 //// Black-box tests of `runner.coverage`.
 ////
 //// Each test runs a main from test/dream_test/coverage_runner_mains.gleam in
-//// a new `erl` process, because the main ends by halting its BEAM, then
+//// a new `erl` process, because the main ends by stopping its BEAM, then
 //// checks the exact output (stdout and stderr together) and the exit status.
 //// The tests that change DREAM_TEST_COVERAGE do it in a child node, because
 //// environment variables belong to the whole BEAM.

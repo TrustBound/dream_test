@@ -398,9 +398,15 @@ pub fn default_timeout_ms(
   )
 }
 
-/// Exit the BEAM with a non-zero code if any tests fail.
+/// Exit the BEAM with status 1 if any tests fail.
 ///
 /// Useful for CI pipelines.
+///
+/// `runner.run` asks the BEAM to stop with status 1 (`init:stop(1)`), the
+/// same way that Gleam stops a `main` that crashes. The BEAM then shuts
+/// down cleanly: the output is written, and applications stop. Code after
+/// `runner.run` can still run until the shutdown stops it, and the exit
+/// status stays 1 when `main` returns.
 ///
 /// ## Example
 ///
@@ -1410,10 +1416,13 @@ fn maybe_exit_on_failure(
   results: List(TestResult),
   coverage_succeeded: Bool,
 ) -> Nil {
-  let should_halt =
+  let should_stop =
     should_exit && { has_failures(results) || !coverage_succeeded }
-  case should_halt {
-    True -> halt(1)
+  case should_stop {
+    True -> {
+      let _ = stop_with_status(1)
+      Nil
+    }
     False -> Nil
   }
 }
@@ -1920,5 +1929,13 @@ pub fn has_failures(results results: List(TestResult)) -> Bool {
   }
 }
 
-@external(erlang, "erlang", "halt")
-fn halt(exit_code: Int) -> Nil
+/// What `init:stop/1` gives back: the atom `ok`. The BEAM stops after the
+/// call returns, when the init process shuts it down.
+type StopRequested
+
+/// Ask the BEAM to shut down and then exit with `status`. Gleam stops a
+/// program in the same way: `init:stop(0)` when `main` returns, and
+/// `init:stop(1)` when it crashes. The first request wins, so the status
+/// stays the same when `main` returns after this call.
+@external(erlang, "init", "stop")
+fn stop_with_status(status: Int) -> StopRequested

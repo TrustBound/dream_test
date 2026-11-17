@@ -3,15 +3,18 @@
 //// test/dream_test_coverage_test_ffi.erl).
 ////
 //// Some runner lines run only in such a process: the values of
-//// `DREAM_TEST_COVERAGE`. Only these processes measure `src`, because each
-//// measured process adds about 1.4 seconds to the test run. The process measures `src` around the test main
+//// `DREAM_TEST_COVERAGE`, and the stop of the BEAM by
+//// `runner.exit_on_failure`. Only these processes measure `src`, because
+//// each measured process adds about 1.4 seconds to the test run. The
+//// process measures `src` from before the test main until the BEAM stops,
 //// and writes LCOV to `build/coverage/parts/<unique>.info`. The test run
 //// (test/dream_test_test.gleam) deletes the old parts before it starts, and
 //// merges the new parts with `coverage.merge_lcov`.
 ////
-//// A main that halts its BEAM (`runner.exit_on_failure` with a failure)
-//// writes no part, because `erlang:halt` stops the BEAM before `finish`
-//// can run. The lines that run only before such a halt are not measured.
+//// The part is written when the BEAM stops, by the application in
+//// test/dream_test_coverage_part_application.erl. So a main that stops the
+//// BEAM with `init:stop(1)` (`runner.exit_on_failure` with a failure) is
+//// measured to its last line, the same as a main that returns.
 
 import dream_test/coverage
 import gleam/int
@@ -22,19 +25,31 @@ pub const parts_directory = "build/coverage/parts"
 /// The pattern that matches every LCOV part, for `coverage.merge_lcov`.
 pub const parts_pattern = "build/coverage/parts/*.info"
 
-/// Measure `src`, call `module.function()`, then write the LCOV part.
-/// Crashes when coverage cannot start or finish, so the test that started
-/// the process sees the failure in its output and exit status.
+/// Measure `src`, then call `module.function()`. The LCOV part is written
+/// when the BEAM stops, after the main. Crashes when coverage cannot start,
+/// so the test that started the process sees the failure in its output and
+/// exit status.
 pub fn run_measured(module: String, function: String) -> Nil {
   let assert Ok(session) =
     coverage.new()
     |> coverage.source_directory("src")
     |> coverage.lcov_path(part_path())
     |> coverage.start()
+  hold_until_stop(session)
   call_main(module, function)
+}
+
+/// Write the LCOV part of `session`. The application in
+/// test/dream_test_coverage_part_application.erl calls it when the BEAM
+/// stops. A failure is written to the output of the process, so the test
+/// that started it sees the failure.
+pub fn finish(session: coverage.CoverageSession) -> Nil {
   let assert Ok(_) = coverage.finish(session)
   Nil
 }
+
+@external(erlang, "dream_test_coverage_part_application", "hold_until_stop")
+fn hold_until_stop(session: coverage.CoverageSession) -> Nil
 
 fn part_path() -> String {
   parts_directory
