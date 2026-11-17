@@ -126,7 +126,7 @@ pub fn describe(
   name name: String,
   children children: List(UnitNode),
 ) -> TestSuite(Nil) {
-  Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
+  Root(seed: Nil, name: name, tags: [], children: children)
 }
 
 /// Create a nested group inside a suite.

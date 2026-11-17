@@ -117,7 +117,7 @@ pub fn describe(
   seed seed: context,
   children children: List(ContextNode(context)),
 ) -> TestSuite(context) {
-  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
+  Root(seed: seed, name: name, tags: [], children: children)
 }
 
 /// Create a nested group inside a context-aware suite.

@@ -214,11 +214,9 @@ pub fn to_suite(
   let error_nodes = errors_to_nodes(load_result.errors, [])
   Root(
     seed: Nil,
-    tree: Group(
-      name: suite_name,
-      tags: [],
-      children: list.append(children, error_nodes),
-    ),
+    name: suite_name,
+    tags: [],
+    children: list.append(children, error_nodes),
   )
 }
 
@@ -381,8 +379,7 @@ fn errors_to_nodes(
 }
 
 fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  let Root(_seed, tree) = suite
-  tree
+  Group(name: suite.name, tags: suite.tags, children: suite.children)
 }
 
 // ============================================================================

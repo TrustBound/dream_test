@@ -7,7 +7,20 @@ import dream_test/types.{
 }
 import dream_test/unit.{describe, it}
 import gleam/list
-import gleam/option.{None}
+import gleam/option.{type Option, None, Some}
+
+fn suite_test_sources(suite: types.TestSuite(Nil)) -> List(Option(String)) {
+  list.flat_map(suite.children, node_test_sources)
+}
+
+fn node_test_sources(node: types.Node(Nil)) -> List(Option(String)) {
+  case node {
+    types.Test(source: source, ..) -> [source]
+    types.Group(children: children, ..) ->
+      list.flat_map(children, node_test_sources)
+    _ -> []
+  }
+}
 
 pub fn tests() {
   describe("dream_test/discover", [
@@ -143,8 +156,22 @@ pub fn tests() {
           Failed,
         ),
         #(["all", "hooked_suite", "passes"], Passed),
+        #(["all", "hooked_suite", "nested", "passes too"], Passed),
       ])
       |> or_fail_with("to_suite should hold the error test and the suite")
+    }),
+
+    it("gives the module as the source of tests in nested groups", fn() {
+      discover.new()
+      |> from_path("discovery_fixtures/hooked_suite.gleam")
+      |> discover.to_suites()
+      |> list.flat_map(suite_test_sources)
+      |> should
+      |> be_equal([
+        Some("discovery_fixtures@hooked_suite"),
+        Some("discovery_fixtures@hooked_suite"),
+      ])
+      |> or_fail_with("every test should have the module as its source")
     }),
 
     it("skips a module whose beam file cannot be loaded", fn() {

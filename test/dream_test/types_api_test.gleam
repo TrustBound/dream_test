@@ -24,7 +24,7 @@ pub fn tests() {
 
     it("root builds a Root with a top-level Group", fn() {
       let suite = types.root("r", Nil, [])
-      let types.Root(seed: seed, tree: _tree) = suite
+      let types.Root(seed: seed, name: _, tags: _, children: _) = suite
 
       seed
       |> should
@@ -32,16 +32,13 @@ pub fn tests() {
       |> or_fail_with("seed should be preserved")
     }),
 
-    it("root creates a top-level Group node", fn() {
+    it("root keeps the name, no tags and the children", fn() {
       let suite = types.root("r", Nil, [])
-      let types.Root(seed: _, tree: tree) = suite
 
-      tree
+      #(suite.name, suite.tags, suite.children)
       |> should
-      |> be_equal(types.Group(name: "r", tags: [], children: []))
-      |> or_fail_with(
-        "expected Root(tree: Group(name: \"r\", tags: [], children: []))",
-      )
+      |> be_equal(#("r", [], []))
+      |> or_fail_with("expected the name r, no tags and no children")
     }),
 
     it("status_from_failures returns Passed for empty failures", fn() {

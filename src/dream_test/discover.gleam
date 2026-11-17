@@ -369,11 +369,9 @@ pub fn to_suite(
 
   Root(
     seed: Nil,
-    tree: Group(
-      name: suite_name,
-      tags: [],
-      children: list.append(suite_nodes, error_nodes),
-    ),
+    name: suite_name,
+    tags: [],
+    children: list.append(suite_nodes, error_nodes),
   )
 }
 
@@ -540,22 +538,18 @@ fn errors_to_nodes(
 fn errors_suite(errors: List(String)) -> TestSuite(Nil) {
   Root(
     seed: Nil,
-    tree: Group(
-      name: "Discovery Errors",
-      tags: ["discovery-error"],
-      children: errors_to_nodes(errors, []),
-    ),
+    name: "Discovery Errors",
+    tags: ["discovery-error"],
+    children: errors_to_nodes(errors, []),
   )
 }
 
 fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  let Root(_seed, tree) = suite
-  tree
+  Group(name: suite.name, tags: suite.tags, children: suite.children)
 }
 
 fn suite_with_source(suite: TestSuite(Nil), source: String) -> TestSuite(Nil) {
-  let Root(seed, tree) = suite
-  Root(seed: seed, tree: node_with_source(tree, source))
+  Root(..suite, children: children_with_source(suite.children, source, []))
 }
 
 fn node_with_source(node: Node(Nil), source: String) -> Node(Nil) {

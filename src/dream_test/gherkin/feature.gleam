@@ -65,7 +65,7 @@ import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
+  AssertionFailure, AssertionOk, GherkinScenario, Root, Test,
 }
 import gleam/dict.{type Dict}
 import gleam/int
@@ -144,10 +144,7 @@ pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
   let feature = config.feature
   let children = build_suite_items(feature, config)
 
-  Root(
-    seed: Nil,
-    tree: Group(name: feature.name, tags: feature.tags, children: children),
-  )
+  Root(seed: Nil, name: feature.name, tags: feature.tags, children: children)
 }
 
 fn build_suite_items(

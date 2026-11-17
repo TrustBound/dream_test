@@ -8,8 +8,8 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/types.{
-  type Status, type TestResult, AssertionOk, Failed, Group, Passed, Root,
-  SetupFailed, Skipped, Test, TimedOut, Unit,
+  type Status, type TestResult, AssertionOk, Failed, Passed, Root, SetupFailed,
+  Skipped, Test, TimedOut, Unit,
 }
 import dream_test/unit.{describe, it}
 import fixtures/test_results.{make_test}
@@ -80,6 +80,24 @@ pub fn tests() {
       |> or_fail_with("only the kept suite should run")
     }),
 
+    it("filter_tests keeps a selected test in a nested group", fn() {
+      runner.new([
+        describe("root", [
+          unit.group("inner", [
+            it("keep", fn() { Ok(AssertionOk) }),
+            it("drop", fn() { Ok(AssertionOk) }),
+          ]),
+        ]),
+      ])
+      |> runner.filter_tests(fn(info) { info.name == "keep" })
+      |> runner.silent()
+      |> runner.run()
+      |> full_names
+      |> should
+      |> be_equal([["root", "inner", "keep"]])
+      |> or_fail_with("only the kept test of the nested group should run")
+    }),
+
     it("filter_tests keeps the hooks of a selected group", fn() {
       let suite =
         describe("root", [
@@ -129,32 +147,6 @@ pub fn tests() {
       |> should
       |> be_equal(["first", "second"])
       |> or_fail_with("both after_all_suites hooks should run in order")
-    }),
-
-    it("names a suite whose tree is not a group <unknown-suite>", fn() {
-      let suite =
-        Root(
-          seed: Nil,
-          tree: Test(
-            name: "lone",
-            tags: [],
-            kind: Unit,
-            run: fn(_nil) { Ok(AssertionOk) },
-            timeout_ms: None,
-            source: None,
-          ),
-        )
-      let names = process.new_subject()
-      let _ =
-        runner.new([suite])
-        |> runner.before_each_suite(fn(info) { record(names, info.name) })
-        |> runner.silent()
-        |> runner.run()
-
-      received(names)
-      |> should
-      |> be_equal(["<unknown-suite>"])
-      |> or_fail_with("a suite without a group should be <unknown-suite>")
     }),
 
     it("gives no suite source for a suite without tests", fn() {
@@ -355,7 +347,7 @@ fn suite_source(sources: List(Option(String))) -> String {
   let seen = process.new_subject()
   let _ =
     runner.new([
-      Root(seed: Nil, tree: Group(name: "s", tags: [], children: tests)),
+      Root(seed: Nil, name: "s", tags: [], children: tests),
     ])
     |> runner.before_each_suite(fn(info) {
       record(seen, string.inspect(info.source))

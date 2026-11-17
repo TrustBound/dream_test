@@ -57,7 +57,8 @@
 //// Dream Test compiles all unit/context/gherkin tests into a single tree model
 //// that the executor runs.
 ////
-//// - `Root(context)` holds the initial seed value and a single root `Node`.
+//// - `Root(context)` holds the initial seed value and the top-level group:
+////   its name, tags and children. The top level is always a group.
 //// - `Node(context)` represents groups, tests, and lifecycle hooks.
 ////
 
@@ -364,10 +365,32 @@ pub type SuiteInfo {
 
 /// A complete test suite in the unified execution model.
 ///
-/// A `Root(context)` stores the initial `seed` context value and the top-level
-/// `tree` (`Node(context)`) containing groups, tests, and hooks.
+/// A `Root(context)` stores the initial `seed` context value and the
+/// top-level group of the suite: its `name`, its `tags`, and its `children`
+/// (groups, tests and hooks). The top level is always a group, so a suite
+/// cannot be a single test.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.Root(seed: Nil, name: "math", tags: [], children: [
+///   types.Test(
+///     name: "adds",
+///     tags: [],
+///     kind: types.Unit,
+///     run: fn(_context) { Ok(types.AssertionOk) },
+///     timeout_ms: None,
+///     source: None,
+///   ),
+/// ])
+/// ```
 pub type Root(context) {
-  Root(seed: context, tree: Node(context))
+  Root(
+    seed: context,
+    name: String,
+    tags: List(String),
+    children: List(Node(context)),
+  )
 }
 
 /// A node in the unified test tree: groups, tests, and hooks.
@@ -416,13 +439,13 @@ pub type TestSuiteItem(context) =
 ///
 /// ## Returns
 ///
-/// A `Root(context)` containing a `Group(name: name, ...)` at the top.
+/// A `Root(context)` with the name, no tags, and the children.
 pub fn root(
   name name: String,
   seed seed: context,
   children children: List(Node(context)),
 ) -> Root(context) {
-  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
+  Root(seed: seed, name: name, tags: [], children: children)
 }
 
 /// Derive a Status from a list of failures.

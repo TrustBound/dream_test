@@ -934,22 +934,10 @@ fn suite_info_of_pair(
 }
 
 fn suite_info_from_suite(suite: TestSuite(ctx)) -> types.SuiteInfo {
-  let Root(seed: _seed, tree: tree) = suite
-  let tests_rev = collect_test_infos(tree, [], [], [])
+  let tests_rev = collect_test_infos(root_group(suite), [], [], [])
   let tests = list.reverse(tests_rev)
   let source = suite_source_from_tests(tests)
-  types.SuiteInfo(
-    name: suite_name_from_tree(tree),
-    tests: tests,
-    source: source,
-  )
-}
-
-fn suite_name_from_tree(tree: Node(ctx)) -> String {
-  case tree {
-    Group(name: name, tags: _tags, children: _children) -> name
-    _ -> "<unknown-suite>"
-  }
+  types.SuiteInfo(name: suite.name, tests: tests, source: source)
 }
 
 fn collect_test_infos(
@@ -1466,12 +1454,24 @@ fn filter_root(
   suite: TestSuite(ctx),
   predicate: fn(TestInfo) -> Bool,
 ) -> #(Option(TestSuite(ctx)), Bool) {
-  let Root(seed: seed, tree: tree) = suite
-  let #(maybe_tree, has_tests) = filter_node(tree, [], [], predicate)
-  case maybe_tree {
-    None -> #(None, has_tests)
-    Some(next_tree) -> #(Some(Root(seed: seed, tree: next_tree)), has_tests)
+  let #(children, has_tests) =
+    filter_children(
+      suite.children,
+      [suite.name],
+      suite.tags,
+      predicate,
+      [],
+      False,
+    )
+  case has_tests {
+    True -> #(Some(Root(..suite, children: children)), True)
+    False -> #(None, False)
   }
+}
+
+/// The top-level group of a suite, as a node.
+fn root_group(suite: TestSuite(ctx)) -> Node(ctx) {
+  Group(name: suite.name, tags: suite.tags, children: suite.children)
 }
 
 fn filter_node(
@@ -1792,7 +1792,10 @@ fn count_total_tests_from_list(
   case suite_runs {
     [] -> acc
     [SuiteRun(suite: suite, config_override: _), ..rest] ->
-      count_total_tests_from_list(rest, acc + count_tests_in_suite(suite.tree))
+      count_total_tests_from_list(
+        rest,
+        acc + count_tests_in_suite(root_group(suite)),
+      )
   }
 }
 

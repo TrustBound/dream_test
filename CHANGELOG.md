@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of its group and of every group inside it are now `SetupFailed`, as the
   docs of `types.Status` say. Before, they were `Failed`. The failure is
   still `before_all` with the hook's message.
+- BREAKING: `types.Root` now holds the top-level group itself:
+  `Root(seed:, name:, tags:, children:)` in place of
+  `Root(seed:, tree: Group(name:, tags:, children:))`. Before, a root whose
+  tree was a single `Test` never ran, and no error said so. Now a suite is
+  always a group. Code that builds suites with `describe`, `feature`,
+  `types.root` or discovery does not change.
 
 ### Fixed
 

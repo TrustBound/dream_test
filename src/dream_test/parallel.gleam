@@ -328,7 +328,7 @@ pub fn run_root_parallel(
   config config: ParallelConfig,
   suite suite: TestSuite(context),
 ) -> List(TestResult) {
-  let Root(seed, tree) = suite
+  let Root(seed: seed, name: name, tags: tags, children: children) = suite
   let executor_input =
     ExecuteNodeConfig(
       config: config,
@@ -339,7 +339,7 @@ pub fn run_root_parallel(
       inherited_after_each: [],
       runner_before_each_test: [],
       runner_after_each_test: [],
-      node: tree,
+      node: Group(name: name, tags: tags, children: children),
       progress_output: None,
       total: 0,
       completed: 0,
@@ -428,7 +428,7 @@ pub fn run_root_parallel_with_reporter(
     runner_after_each_test: runner_after_each_test,
   ) = config
 
-  let Root(seed, tree) = suite
+  let Root(seed: seed, name: name, tags: tags, children: children) = suite
   let executor_input =
     ExecuteNodeConfig(
       config: executor_config,
@@ -439,7 +439,7 @@ pub fn run_root_parallel_with_reporter(
       inherited_after_each: [],
       runner_before_each_test: runner_before_each_test,
       runner_after_each_test: runner_after_each_test,
-      node: tree,
+      node: Group(name: name, tags: tags, children: children),
       progress_output: progress_output(progress_reporter, write),
       total: total,
       completed: completed,
