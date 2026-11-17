@@ -271,10 +271,48 @@ fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
   WorkerDown(reason: reason)
 }
 
-/// Format an exit reason as a string for error reporting. The parallel
-/// executor uses it too, for a test worker that exits before it sends its
-/// result.
-@internal
+/// Render a process exit reason as text, the same way dream_test does.
+///
+/// `run_isolated` puts this text in `SandboxCrashed` when a worker exits
+/// before it sends a result, and the parallel executor puts it in the
+/// failure message of a test whose worker stops. Use it in a custom runner,
+/// or with your own process monitors, to show a crash reason in the same
+/// form as dream_test.
+///
+/// - `Normal` gives `"normal"`.
+/// - `Killed` gives `"killed"`.
+/// - `Abnormal(reason)` gives `string.inspect(reason)`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/unit.{describe, it}
+/// import gleam/dynamic
+/// import gleam/erlang/process
+///
+/// pub fn tests() {
+///   describe("Exit reasons", [
+///     it("format_exit_reason shows an abnormal reason as Gleam text", fn() {
+///       process.Abnormal(dynamic.string("boom"))
+///       |> sandbox.format_exit_reason
+///       |> should
+///       |> be_equal("\"boom\"")
+///       |> or_fail_with("expected the quoted reason")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `reason`: the exit reason from a `process.Down` message or an exit
+///   signal
+///
+/// ## Returns
+///
+/// The exit reason as text.
 pub fn format_exit_reason(reason: process.ExitReason) -> String {
   case reason {
     process.Normal -> "normal"

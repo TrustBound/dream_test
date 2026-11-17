@@ -2,6 +2,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox
 import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
 import dream_test/unit.{describe, it}
+import gleam/dynamic
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process
 import gleam/option.{None}
@@ -126,6 +127,30 @@ pub fn tests() {
       |> should
       |> be_equal(sandbox.SandboxCrashed("normal"))
       |> or_fail_with("a normal exit before a result should give normal")
+    }),
+
+    it("format_exit_reason shows a normal exit as normal", fn() {
+      process.Normal
+      |> sandbox.format_exit_reason
+      |> should
+      |> be_equal("normal")
+      |> or_fail_with("a normal exit should give normal")
+    }),
+
+    it("format_exit_reason shows a killed process as killed", fn() {
+      process.Killed
+      |> sandbox.format_exit_reason
+      |> should
+      |> be_equal("killed")
+      |> or_fail_with("a killed process should give killed")
+    }),
+
+    it("format_exit_reason shows an abnormal reason as Gleam text", fn() {
+      process.Abnormal(dynamic.string("boom"))
+      |> sandbox.format_exit_reason
+      |> should
+      |> be_equal("\"boom\"")
+      |> or_fail_with("an abnormal exit should give the quoted reason")
     }),
   ])
 }

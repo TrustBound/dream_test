@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text of the progress bar for the start of a run, a finished test, or the
   end of a run. It always gives a line, because `ProgressEvent` has no hook
   events. The runner now uses it in place of `progress.handle_event`.
+- `sandbox.format_exit_reason` gives the text of a process exit reason, in
+  the same form that `run_isolated` and the parallel runner use for a crash
+  (`"normal"`, `"killed"`, or the inspected reason). Use it in a custom
+  runner to show a crash reason the same way as dream_test.
 
 ### Changed
 
