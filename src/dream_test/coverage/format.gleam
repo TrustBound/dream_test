@@ -1,7 +1,8 @@
 //// Text for the parts of a coverage report.
 ////
-//// The coverage table and the Markdown summary use these functions, so both
-//// write percents, line ranges and exclusions the same way. A custom
+//// The coverage table, the Markdown summary and the HTML report use these
+//// functions, so they write percents, line ranges and exclusions the same
+//// way. A custom
 //// reporter can use them to match that text.
 ////
 //// ```gleam
@@ -20,6 +21,7 @@
 //// | **Counts**     | `percent`, `line_counts`, `file_count`            |
 //// | **Lines**      | `line_range`, `missed_lines`                      |
 //// | **Exclusions** | `ignored_range`, `excluded_file`, `excluded_summary` |
+//// | **Markup**     | `escape_markup`                                   |
 ////
 //// ## Import Style
 ////
@@ -33,6 +35,7 @@ import dream_test/coverage/report.{
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 
 /// Write `hit / total` as a percent with one decimal place.
 ///
@@ -277,4 +280,34 @@ fn count_text(count: Int, noun: String) -> String {
     1 -> "1 " <> noun
     _ -> int.to_string(count) <> " " <> noun <> "s"
   }
+}
+
+/// Escape the five characters that HTML and XML give a meaning to.
+///
+/// `&` becomes `&amp;`, `<` becomes `&lt;`, `>` becomes `&gt;`, `"`
+/// becomes `&quot;` and `'` becomes `&apos;`. The result is safe in element
+/// text and in quoted attribute values. The Cobertura XML and the HTML report
+/// escape every path, reason and source line with it.
+///
+/// ## Parameters
+///
+/// - `text`: the text to escape
+///
+/// ## Returns
+///
+/// The escaped text.
+///
+/// ## Example
+///
+/// ```gleam
+/// format.escape_markup("a < b && c")
+/// // -> "a &lt; b &amp;&amp; c"
+/// ```
+pub fn escape_markup(text text: String) -> String {
+  text
+  |> string.replace("&", "&amp;")
+  |> string.replace("<", "&lt;")
+  |> string.replace(">", "&gt;")
+  |> string.replace("\"", "&quot;")
+  |> string.replace("'", "&apos;")
 }

@@ -33,6 +33,7 @@
 //// import dream_test/coverage/cobertura
 //// ```
 
+import dream_test/coverage/format
 import dream_test/coverage/report.{
   type CoverageReport, type FileCoverage, type LineCoverage,
 }
@@ -161,7 +162,7 @@ fn render_package(files: List(FileCoverage)) -> String {
     |> string.replace("/", ".")
   string.concat([
     "    <package name=\"",
-    escape(name),
+    format.escape_markup(name),
     "\" line-rate=\"",
     line_rate(hit, total),
     "\" branch-rate=\"0\" complexity=\"0\">\n",
@@ -177,9 +178,9 @@ fn render_class(file: FileCoverage) -> String {
   let name = file_name(path)
   string.concat([
     "        <class name=\"",
-    escape(name),
+    format.escape_markup(name),
     "\" filename=\"",
-    escape(path),
+    format.escape_markup(path),
     "\" line-rate=\"",
     line_rate(report.hit_line_count(file), report.executable_line_count(file)),
     "\" branch-rate=\"0\" complexity=\"0\">\n",
@@ -212,14 +213,4 @@ fn ten_thousandths_text(value: Int) -> String {
   int.to_string(value / 10_000)
   <> "."
   <> string.pad_start(int.to_string(value % 10_000), to: 4, with: "0")
-}
-
-/// Escape the five characters that XML gives a meaning to.
-fn escape(text: String) -> String {
-  text
-  |> string.replace("&", "&amp;")
-  |> string.replace("<", "&lt;")
-  |> string.replace(">", "&gt;")
-  |> string.replace("\"", "&quot;")
-  |> string.replace("'", "&apos;")
 }

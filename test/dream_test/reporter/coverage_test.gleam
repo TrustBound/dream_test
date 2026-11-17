@@ -4,13 +4,13 @@ import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoberturaWriteFailed, CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed,
   EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, ExcludeWithoutReason, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
-  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
-  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
-  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  ExcludeMatchedNothing, ExcludeWithoutReason, HtmlSourceReadFailed,
+  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
+  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
   SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
   UnknownAnalysisError, UnknownInstrumentError,
 }
@@ -979,6 +979,45 @@ pub fn tests() {
           "check the path given to coverage.markdown_path(...).",
         ))
         |> or_fail_with("expected the MarkdownWriteFailed message")
+      }),
+      it("describes HtmlWriteFailed", fn() {
+        render_failure_for(HtmlWriteFailed(
+          "html/index.html",
+          NotFound("html/index.html"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the HTML coverage page \"html/index.html\".",
+          "a folder in the path does not exist and could not be created (File not found: html/index.html).",
+          "check the path given to coverage.html_path(...).",
+        ))
+        |> or_fail_with("expected the HtmlWriteFailed message")
+      }),
+      it("describes HtmlWriteFailed with IsDirectory", fn() {
+        render_failure_for(HtmlWriteFailed(
+          "html/index.html",
+          IsDirectory("html/index.html"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the HTML coverage page \"html/index.html\".",
+          "the path is a directory, not a file (Is a directory: html/index.html).",
+          "delete the folder at this path, or give another directory to coverage.html_path(...).",
+        ))
+        |> or_fail_with("expected the HtmlWriteFailed IsDirectory message")
+      }),
+      it("describes HtmlSourceReadFailed", fn() {
+        render_failure_for(HtmlSourceReadFailed(
+          "src/a.gleam",
+          PermissionDenied("src/a.gleam"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not read the source file \"src/a.gleam\" to show it in the HTML coverage report.",
+          "the HTML report shows the source of each measured file, but this file cannot be read (Permission denied: src/a.gleam).",
+          "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
+        ))
+        |> or_fail_with("expected the HtmlSourceReadFailed message")
       }),
       it("describes LcovWriteFailed with PermissionDenied", fn() {
         render_failure_for(LcovWriteFailed(

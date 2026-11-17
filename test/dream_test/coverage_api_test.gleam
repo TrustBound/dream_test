@@ -8,13 +8,17 @@ import coverage_fixtures/sample
 import dream_test/coverage.{
   type CoverageError, type CoverageSession, type StartCause, BelowMinimumPercent,
   CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed,
-  InvalidMinimumPercent, JsonWriteFailed, LcovWriteFailed, MarkdownWriteFailed,
-  NoSourceFiles, SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
+  HtmlSourceReadFailed, HtmlWriteFailed, InvalidMinimumPercent, JsonWriteFailed,
+  LcovWriteFailed, MarkdownWriteFailed, NoSourceFiles, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot,
 }
 import dream_test/coverage/report.{
   type CoverageReport, type LineCoverage, LineCoverage,
 }
-import dream_test/file.{IsDirectory, read, write}
+import dream_test/coverage_child_support.{
+  add_source, child_project, compile_source, make_unreadable, run_in_child,
+}
+import dream_test/file.{IsDirectory, PermissionDenied, read, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, group, it}
@@ -159,6 +163,38 @@ fn fixture_markdown() {
     "| test/coverage\\_fixtures/sample.gleam | 2/4 | 50.0% | 9, 14 |  |\n",
     "| Total | 2/6 | 33.3% |  |  |\n",
   ])
+}
+
+/// The text after `<body>` of an HTML page.
+fn html_body(page: String) -> String {
+  case string.split_once(page, "<body>\n") {
+    Ok(#(_, rest)) -> rest
+    Error(Nil) -> page
+  }
+}
+
+fn fixture_deep_page_body() {
+  string.concat([
+    "<p><a href=\"../../../../index.html\">All files</a></p>\n",
+    "<h1>test/coverage_fixtures/nested/deep.gleam</h1>\n",
+    "<p>Lines: 0/1. Cover: <span class=\"low\">0.0%</span>.</p>\n",
+    "<table class=\"source\">\n",
+    "<thead><tr><th class=\"number\">Line</th><th class=\"number\">Hits</th><th>Source</th></tr></thead>\n",
+    "<tbody>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">1</td><td class=\"number\"></td><td>//// Fixture for the coverage tests: a nested module (`nested@deep`).</td></tr>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">2</td><td class=\"number\"></td><td></td></tr>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">3</td><td class=\"number\"></td><td>pub fn answer() -&gt; Int {</td></tr>\n",
+    "<tr class=\"missed\"><td class=\"number\">4</td><td class=\"number\">0</td><td>  42</td></tr>\n",
+    "<tr class=\"not-executable\"><td class=\"number\">5</td><td class=\"number\"></td><td>}</td></tr>\n",
+    "</tbody>\n",
+    "</table>\n",
+    "</body>\n",
+    "</html>\n",
+  ])
+}
+
+fn is_ok(value: Result(a, b)) -> Bool {
+  result.is_ok(value)
 }
 
 fn output_path(name: String) -> String {
@@ -496,6 +532,88 @@ pub fn tests() {
             Ok(Error(MarkdownWriteFailed("test", IsDirectory("test")))),
           )
           |> or_fail_with("expected MarkdownWriteFailed")
+        },
+      ),
+      it("write the HTML index and a page per file", fn() {
+        let directory = output_path("html")
+        let _ =
+          measure_classify(fixture_config() |> coverage.html_path(directory))
+        #(
+          is_ok(read(directory <> "/index.html")),
+          is_ok(read(
+            directory <> "/files/test/coverage_fixtures/sample.gleam.html",
+          )),
+          is_ok(read(
+            directory
+            <> "/files/test/coverage_fixtures/coverage_fixture_ffi.erl.html",
+          )),
+          result.map(
+            read(
+              directory
+              <> "/files/test/coverage_fixtures/nested/deep.gleam.html",
+            ),
+            html_body,
+          ),
+        )
+        |> should
+        |> be_equal(#(True, True, True, Ok(fixture_deep_page_body())))
+        |> or_fail_with("expected the index and three pages")
+      }),
+      it("return HtmlWriteFailed when a page path is a directory", fn() {
+        let directory = output_path("html_blocked")
+        let index_path = directory <> "/index.html"
+        let _ = write(index_path <> "/blocker", "")
+        measure_classify(fixture_config() |> coverage.html_path(directory))
+        |> should
+        |> be_equal(
+          Ok(Error(HtmlWriteFailed(index_path, IsDirectory(index_path)))),
+        )
+        |> or_fail_with("expected HtmlWriteFailed")
+      }),
+      it("return HtmlWriteFailed when a source page path is a directory", fn() {
+        let directory = output_path("html_page_blocked")
+        let page_path =
+          directory <> "/files/test/coverage_fixtures/sample.gleam.html"
+        let _ = write(page_path <> "/blocker", "")
+        measure_classify(fixture_config() |> coverage.html_path(directory))
+        |> should
+        |> be_equal(
+          Ok(Error(HtmlWriteFailed(page_path, IsDirectory(page_path)))),
+        )
+        |> or_fail_with("expected HtmlWriteFailed for the page")
+      }),
+      it(
+        "return HtmlSourceReadFailed when a source file cannot be read at finish",
+        fn() {
+          run_in_child(fn() {
+            let _ = child_project("html_unreadable")
+            add_source(
+              "plain.erl",
+              "-module(plain).\n-export([one/0]).\none() -> 1.\n",
+            )
+            compile_source("plain.erl", "debug_info")
+            let config =
+              coverage.new()
+              |> coverage.no_lcov()
+              |> coverage.html_path("build/html")
+            case coverage.start(config) {
+              Ok(session) -> {
+                make_unreadable("plain.erl")
+                coverage.finish(session)
+              }
+              Error(error) -> Error(error)
+            }
+          })
+          |> should
+          |> be_equal(
+            Ok(
+              Error(HtmlSourceReadFailed(
+                "src/plain.erl",
+                PermissionDenied("src/plain.erl"),
+              )),
+            ),
+          )
+          |> or_fail_with("expected HtmlSourceReadFailed")
         },
       ),
     ]),

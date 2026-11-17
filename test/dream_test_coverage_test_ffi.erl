@@ -41,6 +41,7 @@ self_modules() ->
         {'dream_test@coverage@json_summary', "src/dream_test/coverage/json_summary.gleam"},
         {'dream_test@coverage@cobertura', "src/dream_test/coverage/cobertura.gleam"},
         {'dream_test@coverage@markdown', "src/dream_test/coverage/markdown.gleam"},
+        {'dream_test@coverage@html', "src/dream_test/coverage/html.gleam"},
         {'dream_test@reporters@coverage', "src/dream_test/reporters/coverage.gleam"},
         {dream_test_coverage_ffi, "src/dream_test_coverage_ffi.erl"}
     ].

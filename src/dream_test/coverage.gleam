@@ -158,6 +158,7 @@
 //// |> coverage.json_path("build/coverage/coverage.json")
 //// |> coverage.cobertura_path("build/coverage/cobertura.xml")
 //// |> coverage.markdown_path("build/coverage/coverage.md")
+//// |> coverage.html_path("build/coverage/html")
 //// ```
 ////
 //// - JSON: a summary per file, with missing lines, ignored lines and
@@ -166,6 +167,8 @@
 ////   (`dream_test/coverage/cobertura`).
 //// - Markdown: a table for `$GITHUB_STEP_SUMMARY` or a pull request comment
 ////   (`dream_test/coverage/markdown`).
+//// - HTML: an index page and a page per source file that shows each line
+////   with its hit count (`dream_test/coverage/html`).
 ////
 //// A file that cannot be written fails coverage with a `Coverage failed`
 //// message that names the format and the path.
@@ -195,6 +198,7 @@
 //// |--------------|-----------------------------------------------------------|
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
 //// |              | `json_path`, `cobertura_path`, `markdown_path`,           |
+//// |              | `html_path`,                                              |
 //// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
 //// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
 //// |              | `require_exclusion_reasons`                               |
@@ -211,6 +215,7 @@
 //// ```
 
 import dream_test/coverage/cobertura
+import dream_test/coverage/html
 import dream_test/coverage/json_summary
 import dream_test/coverage/markdown
 import dream_test/coverage/report.{
@@ -251,6 +256,7 @@ pub opaque type CoverageConfig {
     json_path: Option(String),
     cobertura_path: Option(String),
     markdown_path: Option(String),
+    html_path: Option(String),
   )
 }
 
@@ -322,6 +328,12 @@ pub type CoverageError {
   CoberturaWriteFailed(path: String, error: FileError)
   /// The Markdown summary from `coverage.markdown_path` could not be written.
   MarkdownWriteFailed(path: String, error: FileError)
+  /// A page of the HTML report from `coverage.html_path` could not be
+  /// written. `path` is the page, inside the HTML directory.
+  HtmlWriteFailed(path: String, error: FileError)
+  /// A source file could not be read to show it in the HTML report from
+  /// `coverage.html_path`.
+  HtmlSourceReadFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
   /// Total coverage is below the value given to `coverage.minimum_percent`.
@@ -450,7 +462,7 @@ pub type AnalysisCause {
 ///
 /// - Source directory: `src`
 /// - LCOV file: `build/coverage/lcov.info`
-/// - JSON, Cobertura and Markdown files: not written
+/// - JSON, Cobertura, Markdown and HTML files: not written
 /// - Missing lines: not shown
 /// - Excluded files and ignored lines: not listed, only counted
 /// - Exclusion reasons: not required
@@ -479,6 +491,7 @@ pub fn new() -> CoverageConfig {
     json_path: None,
     cobertura_path: None,
     markdown_path: None,
+    html_path: None,
   )
 }
 
@@ -620,6 +633,38 @@ pub fn markdown_path(
   path path: String,
 ) -> CoverageConfig {
   CoverageConfig(..config, markdown_path: Some(path))
+}
+
+/// Write an HTML report to this directory when coverage finishes.
+///
+/// The directory gets an `index.html` with a row per file, and a page per
+/// source file that shows each line with its hit count. Open `index.html`
+/// in a browser. See `dream_test/coverage/html` for the pages and their
+/// paths. The pages hold the same files and lines as the LCOV file:
+/// excluded files and ignored lines are left out of the counts. Folders are
+/// created when needed, and pages from an earlier run are written over. Off
+/// by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `directory`: the directory to write the pages to
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.html_path("build/coverage/html")
+/// ```
+pub fn html_path(
+  config config: CoverageConfig,
+  directory directory: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, html_path: Some(directory))
 }
 
 /// Do not write an LCOV file. The table is still printed.
@@ -1527,9 +1572,10 @@ fn erlang_module_name(relative_path: String) -> String {
 /// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
 ///   merge cannot be read, a file that only merged LCOV covers has a bad
 ///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
-///   without a reason), or the LCOV, JSON, Cobertura or Markdown file cannot
-///   be written. The files are written in that order, and the first failure
-///   stops the run.
+///   without a reason), the LCOV, JSON, Cobertura or Markdown file cannot
+///   be written, or a source file or a page of the HTML report cannot be
+///   read or written. The files are written in that order, and the first
+///   failure stops the run.
 ///
 /// ## Example
 ///
@@ -1635,7 +1681,7 @@ fn analyse_then_continue(
 }
 
 /// Write every file the settings ask for, in this order: LCOV, JSON,
-/// Cobertura, Markdown. The first write that fails stops the run.
+/// Cobertura, Markdown, HTML. The first write that fails stops the run.
 fn write_report(
   coverage_report: CoverageReport,
   config: CoverageConfig,
@@ -1647,8 +1693,80 @@ fn write_report(
     #(config.markdown_path, MarkdownOutput),
   ]
   case write_outputs(outputs, coverage_report, config) {
-    Ok(Nil) -> Ok(coverage_report)
+    Ok(Nil) -> write_html(config.html_path, coverage_report)
     Error(error) -> Error(error)
+  }
+}
+
+/// Write a page per file, then the index. A source file that cannot be read
+/// stops the run before its page is written.
+fn write_html(
+  directory: Option(String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case directory {
+    None -> Ok(coverage_report)
+    Some(path) ->
+      write_html_pages(path, report.files(coverage_report), coverage_report)
+  }
+}
+
+fn write_html_pages(
+  directory: String,
+  files: List(FileCoverage),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case files {
+    [] -> write_html_index(directory, coverage_report)
+    [file_coverage, ..rest] ->
+      write_source_page_then_continue(
+        HtmlRun(directory: directory, report: coverage_report),
+        file_coverage,
+        rest,
+      )
+  }
+}
+
+/// The HTML directory and the report that its pages show.
+type HtmlRun {
+  HtmlRun(directory: String, report: CoverageReport)
+}
+
+fn write_html_index(
+  directory: String,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  let path = directory <> "/index.html"
+  case file.write(path, html.index(report: coverage_report)) {
+    Ok(Nil) -> Ok(coverage_report)
+    Error(error) -> Error(HtmlWriteFailed(path: path, error: error))
+  }
+}
+
+fn write_source_page_then_continue(
+  run: HtmlRun,
+  file_coverage: FileCoverage,
+  rest: List(FileCoverage),
+) -> Result(CoverageReport, CoverageError) {
+  let source_path = report.source_path(file_coverage)
+  case file.read(source_path) {
+    Ok(source) -> write_source_page(run, file_coverage, source, rest)
+    Error(error) -> Error(HtmlSourceReadFailed(path: source_path, error: error))
+  }
+}
+
+fn write_source_page(
+  run: HtmlRun,
+  file_coverage: FileCoverage,
+  source: String,
+  rest: List(FileCoverage),
+) -> Result(CoverageReport, CoverageError) {
+  let path =
+    run.directory <> "/" <> html.page_path(report.source_path(file_coverage))
+  let page = html.source_page(file: file_coverage, source: source)
+  case file.write(path, page) {
+    Ok(Nil) -> write_html_pages(run.directory, rest, run.report)
+    Error(error) -> Error(HtmlWriteFailed(path: path, error: error))
   }
 }
 

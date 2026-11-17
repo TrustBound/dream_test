@@ -149,5 +149,13 @@ pub fn tests() {
       |> be_equal(Some("Excluded: 1 file, 6 lines in 1 file"))
       |> or_fail_with("expected 1 file and 6 lines")
     }),
+    it("escape_markup escapes the five markup characters", fn() {
+      format.escape_markup("<a href=\"x\">Tom & Jerry's</a>")
+      |> should
+      |> be_equal(
+        "&lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&apos;s&lt;/a&gt;",
+      )
+      |> or_fail_with("expected the escaped text")
+    }),
   ])
 }

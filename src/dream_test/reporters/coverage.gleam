@@ -80,12 +80,13 @@ import dream_test/coverage.{
   BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed, CoverAlreadyRunning,
   CoverDidNotStart, CoverStartFailed, EmbeddedMode, EncryptedDebugInfo,
   EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
-  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
-  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
-  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
+  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
+  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
+  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
   SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
   UnknownAnalysisError, UnknownInstrumentError,
 }
@@ -744,6 +745,17 @@ fn error_message(error: CoverageError) -> ErrorMessage {
       write_message(cobertura_output(), path, error)
     MarkdownWriteFailed(path, error) ->
       write_message(markdown_output(), path, error)
+    HtmlWriteFailed(path, error) -> write_message(html_output(), path, error)
+    HtmlSourceReadFailed(path, error) ->
+      ErrorMessage(
+        what: "Could not read the source file \""
+          <> path
+          <> "\" to show it in the HTML coverage report.",
+        reason: "the HTML report shows the source of each measured file, but this file cannot be read ("
+          <> file.error_to_string(error)
+          <> ").",
+        fix: "make the file readable by the user that runs the tests, or remove coverage.html_path(...).",
+      )
     InvalidMinimumPercent(value) ->
       ErrorMessage(
         what: "The coverage minimum "
@@ -1010,16 +1022,16 @@ fn analysis_message(
 }
 
 /// A file that `coverage.finish` writes: what to call it in a message, the
-/// setting that names its path, and an example path.
+/// setting that names its path, and the fix when its path is a directory.
 type OutputFile {
-  OutputFile(name: String, setting: String, example_path: String)
+  OutputFile(name: String, setting: String, directory_fix: String)
 }
 
 fn lcov_output() -> OutputFile {
   OutputFile(
     name: "LCOV file",
     setting: "coverage.lcov_path",
-    example_path: "build/coverage/lcov.info",
+    directory_fix: "give a file name with coverage.lcov_path(...), for example build/coverage/lcov.info.",
   )
 }
 
@@ -1027,7 +1039,7 @@ fn json_output() -> OutputFile {
   OutputFile(
     name: "JSON summary",
     setting: "coverage.json_path",
-    example_path: "build/coverage/coverage.json",
+    directory_fix: "give a file name with coverage.json_path(...), for example build/coverage/coverage.json.",
   )
 }
 
@@ -1035,7 +1047,7 @@ fn cobertura_output() -> OutputFile {
   OutputFile(
     name: "Cobertura XML file",
     setting: "coverage.cobertura_path",
-    example_path: "build/coverage/cobertura.xml",
+    directory_fix: "give a file name with coverage.cobertura_path(...), for example build/coverage/cobertura.xml.",
   )
 }
 
@@ -1043,7 +1055,15 @@ fn markdown_output() -> OutputFile {
   OutputFile(
     name: "Markdown summary",
     setting: "coverage.markdown_path",
-    example_path: "build/coverage/coverage.md",
+    directory_fix: "give a file name with coverage.markdown_path(...), for example build/coverage/coverage.md.",
+  )
+}
+
+fn html_output() -> OutputFile {
+  OutputFile(
+    name: "HTML coverage page",
+    setting: "coverage.html_path",
+    directory_fix: "delete the folder at this path, or give another directory to coverage.html_path(...).",
   )
 }
 
@@ -1067,11 +1087,7 @@ fn write_message(
       ErrorMessage(
         what: what,
         reason: "the path is a directory, not a file (" <> raw <> ").",
-        fix: "give a file name with "
-          <> output.setting
-          <> "(...), for example "
-          <> output.example_path
-          <> ".",
+        fix: output.directory_fix,
       )
     file.NoSpace(_) ->
       ErrorMessage(
