@@ -3,6 +3,9 @@
     run_in_peer/1,
     run_in_embedded_peer/1,
     run_main_in_new_vm/2,
+    run_main_in_new_vm_with_environment/3,
+    set_environment_variable/2,
+    unset_environment_variable/1,
     reset_child_output/0,
     child_project/1,
     add_source/2,
@@ -230,14 +233,37 @@ stop_cover() ->
 %% Run `Module:Function()` in a new `erl` process, then halt with status 0.
 %% Returns {ExitStatus, Output}, with stdout and stderr together.
 run_main_in_new_vm(Module, Function) ->
+    run_main_in_new_vm_with_environment(Module, Function, []).
+
+%% The same, with environment variables changed for the new process.
+%% Environment is a Gleam list of #(Name, Option(Value)): `Some(Value)` sets
+%% the variable and `None` removes it.
+run_main_in_new_vm_with_environment(Module, Function, Environment) ->
     Erl = os:find_executable("erl"),
     Eval = io_lib:format("'~ts':'~ts'(), erlang:halt(0).", [Module, Function]),
     Port = open_port(
         {spawn_executable, Erl},
         [exit_status, binary, stderr_to_stdout, use_stdio,
+         {env, [environment_entry(Entry) || Entry <- Environment]},
          {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
     ),
     collect_output(Port, <<>>).
+
+environment_entry({Name, {some, Value}}) ->
+    {unicode:characters_to_list(Name), unicode:characters_to_list(Value)};
+environment_entry({Name, none}) ->
+    {unicode:characters_to_list(Name), false}.
+
+%% Set an environment variable of this node. Call it in a child node only,
+%% because the test run shares its own environment with every test.
+set_environment_variable(Name, Value) ->
+    true = os:putenv(unicode:characters_to_list(Name), unicode:characters_to_list(Value)),
+    nil.
+
+%% Remove an environment variable of this node. Call it in a child node only.
+unset_environment_variable(Name) ->
+    true = os:unsetenv(unicode:characters_to_list(Name)),
+    nil.
 
 collect_output(Port, Output) ->
     receive

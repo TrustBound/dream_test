@@ -128,3 +128,12 @@ pub fn table_options() -> Nil {
     |> runner.run()
   Nil
 }
+
+pub fn coverage_from_environment_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage_from_environment(fixture_coverage())
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}

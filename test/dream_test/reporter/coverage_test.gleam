@@ -7,12 +7,13 @@ import dream_test/coverage.{
   ExcludeMatchedNothing, ExcludeWithoutReason, HtmlSourceReadFailed,
   HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
   IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
-  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  InvalidEnvironmentValue, InvalidMinimumPercent, JsonWriteFailed,
+  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
+  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
+  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -1078,6 +1079,19 @@ pub fn tests() {
         |> or_fail_with(
           "expected the LcovWriteFailed with FileSystemError message",
         )
+      }),
+      it("describes InvalidEnvironmentValue", fn() {
+        render_failure_for(InvalidEnvironmentValue(
+          name: "DREAM_TEST_COVERAGE",
+          value: "yes",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "The environment variable DREAM_TEST_COVERAGE has the value \"yes\", which does not turn coverage on or off.",
+          "runner.coverage_from_environment(...) turns coverage on for 1 or true and off for 0 or false, and it does not guess what other values mean.",
+          "set DREAM_TEST_COVERAGE to 1 or true to measure coverage, or set it to 0 or false (or remove it) to run without coverage.",
+        ))
+        |> or_fail_with("expected the InvalidEnvironmentValue message")
       }),
       it("describes InvalidMinimumPercent", fn() {
         render_failure_for(InvalidMinimumPercent(120.0))

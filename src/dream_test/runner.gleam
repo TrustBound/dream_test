@@ -116,7 +116,7 @@ pub opaque type RunBuilder(ctx) {
     progress_reporter: Option(progress.ProgressReporter),
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
-    coverage: Option(CoverageConfig),
+    coverage: CoverageRequest,
     runner_before_each_test: List(
       fn(types.TestInfo, ctx) -> Result(ctx, String),
     ),
@@ -201,7 +201,7 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
     progress_reporter: None,
     results_reporters: [],
     output: None,
-    coverage: None,
+    coverage: NoCoverage,
     runner_before_each_test: [],
     runner_after_each_test: [],
     runner_before_each_suite: [],
@@ -517,7 +517,73 @@ pub fn coverage(
   builder builder: RunBuilder(ctx),
   config config: CoverageConfig,
 ) -> RunBuilder(ctx) {
-  RunBuilder(..builder, coverage: Some(config))
+  RunBuilder(..builder, coverage: AlwaysCoverage(config))
+}
+
+/// Measure line coverage only when the `DREAM_TEST_COVERAGE` environment
+/// variable turns it on.
+///
+/// Use this to measure coverage in some runs (for example in CI) without a
+/// change to your test `main`. The runner reads the variable when
+/// `runner.run` starts:
+///
+/// | `DREAM_TEST_COVERAGE` | Result                         |
+/// |-----------------------|--------------------------------|
+/// | `1` or `true`         | coverage runs with `config`    |
+/// | `0` or `false`        | no coverage                    |
+/// | not set               | no coverage                    |
+/// | any other value       | coverage error                 |
+///
+/// The values are exact and lowercase. Any other value, an empty value
+/// included, is a coverage error (`coverage.InvalidEnvironmentValue`), so a
+/// mistyped value does not turn coverage off silently. The error is written
+/// to the error output, and with `exit_on_failure` the run exits with
+/// status 1.
+///
+/// This call and `runner.coverage` set the same option, so the last call
+/// wins.
+///
+/// ## Parameters
+///
+/// - `builder`: the run to configure
+/// - `config`: the coverage settings to use when the variable turns
+///   coverage on
+///
+/// ## Returns
+///
+/// The builder with coverage that depends on the environment.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/coverage
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.coverage_from_environment(coverage.new())
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// Then, in CI (GitHub Actions):
+///
+/// ```yaml
+/// - run: gleam test
+///   env:
+///     DREAM_TEST_COVERAGE: "1"
+/// ```
+///
+/// A local `gleam test` runs without coverage, and
+/// `DREAM_TEST_COVERAGE=1 gleam test` runs with it.
+pub fn coverage_from_environment(
+  builder builder: RunBuilder(ctx),
+  config config: CoverageConfig,
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, coverage: CoverageFromEnvironment(config))
 }
 
 /// Disable all reporter output (still returns results from `runner.run()`).
@@ -1520,10 +1586,48 @@ type CoverageState {
   CoverageStartFailed(error: coverage.CoverageError)
 }
 
-fn start_coverage(config: Option(CoverageConfig)) -> CoverageState {
-  case config {
-    None -> CoverageOff
-    Some(config) -> coverage_state_from_start(coverage.start(config), config)
+/// How the builder asks for coverage.
+type CoverageRequest {
+  NoCoverage
+  AlwaysCoverage(config: CoverageConfig)
+  CoverageFromEnvironment(config: CoverageConfig)
+}
+
+/// The environment variable read by `coverage_from_environment`.
+const coverage_environment_variable = "DREAM_TEST_COVERAGE"
+
+@external(erlang, "dream_test_coverage_ffi", "environment_variable")
+fn environment_variable(name: String) -> Result(String, Nil)
+
+fn start_coverage(request: CoverageRequest) -> CoverageState {
+  case request {
+    NoCoverage -> CoverageOff
+    AlwaysCoverage(config) -> start_coverage_with(config)
+    CoverageFromEnvironment(config) ->
+      start_coverage_from_environment(
+        environment_variable(coverage_environment_variable),
+        config,
+      )
+  }
+}
+
+fn start_coverage_with(config: CoverageConfig) -> CoverageState {
+  coverage_state_from_start(coverage.start(config), config)
+}
+
+fn start_coverage_from_environment(
+  value: Result(String, Nil),
+  config: CoverageConfig,
+) -> CoverageState {
+  case value {
+    Error(Nil) -> CoverageOff
+    Ok("1") | Ok("true") -> start_coverage_with(config)
+    Ok("0") | Ok("false") -> CoverageOff
+    Ok(other) ->
+      CoverageStartFailed(coverage.InvalidEnvironmentValue(
+        name: coverage_environment_variable,
+        value: other,
+      ))
   }
 }
 

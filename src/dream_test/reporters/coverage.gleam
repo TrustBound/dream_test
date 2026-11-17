@@ -82,11 +82,11 @@ import dream_test/coverage.{
   EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
   HtmlSourceReadFailed, HtmlWriteFailed, IgnoreEndWithoutStart,
   IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
-  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
-  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
-  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidEnvironmentValue,
+  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
+  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
   SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
   UnknownAnalysisError, UnknownInstrumentError,
 }
@@ -763,6 +763,18 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> " is not a percent.",
         reason: "coverage.minimum_percent(...) takes a value from 0.0 to 100.0.",
         fix: "pass a value from 0.0 to 100.0, for example coverage.minimum_percent(80.0).",
+      )
+    InvalidEnvironmentValue(name, value) ->
+      ErrorMessage(
+        what: "The environment variable "
+          <> name
+          <> " has the value \""
+          <> value
+          <> "\", which does not turn coverage on or off.",
+        reason: "runner.coverage_from_environment(...) turns coverage on for 1 or true and off for 0 or false, and it does not guess what other values mean.",
+        fix: "set "
+          <> name
+          <> " to 1 or true to measure coverage, or set it to 0 or false (or remove it) to run without coverage.",
       )
     BelowMinimumPercent(hit, total, minimum, lines_needed) ->
       below_minimum_message(hit, total, minimum, lines_needed)

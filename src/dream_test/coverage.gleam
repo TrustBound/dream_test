@@ -27,6 +27,15 @@
 //// }
 //// ```
 ////
+//// To measure coverage only in some runs (for example in CI), use
+//// `runner.coverage_from_environment` in place of `runner.coverage`. It turns
+//// coverage on only when the `DREAM_TEST_COVERAGE` environment variable is
+//// `1` or `true`:
+////
+//// ```sh
+//// DREAM_TEST_COVERAGE=1 gleam test
+//// ```
+////
 //// ## Without the dream_test runner
 ////
 //// `start`, `finish` and `check_minimum` run coverage around any code, for
@@ -336,6 +345,10 @@ pub type CoverageError {
   HtmlSourceReadFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
+  /// The environment variable read by `runner.coverage_from_environment`
+  /// has a value that does not say if coverage is on or off. `name` is the
+  /// variable and `value` is its value.
+  InvalidEnvironmentValue(name: String, value: String)
   /// Total coverage is below the value given to `coverage.minimum_percent`.
   ///
   /// - `hit`: executable lines that ran

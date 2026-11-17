@@ -7,7 +7,8 @@
     match_files/1,
     is_regular_file/1,
     erlang_function_last_line/1,
-    system_time_ms/0
+    system_time_ms/0,
+    environment_variable/1
 ]).
 
 %% Erlang side of `dream_test/coverage`.
@@ -150,3 +151,11 @@ format_reason(Reason) ->
 %% `timestamp` attribute.
 system_time_ms() ->
     os:system_time(millisecond).
+
+%% The value of an environment variable, for
+%% `runner.coverage_from_environment`. An unset variable is `{error, nil}`.
+environment_variable(Name) ->
+    case os:getenv(unicode:characters_to_list(Name)) of
+        false -> {error, nil};
+        Value -> {ok, unicode:characters_to_binary(Value)}
+    end.
