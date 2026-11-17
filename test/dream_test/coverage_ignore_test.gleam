@@ -407,6 +407,66 @@ pub fn tests() {
         |> be_equal(Ok([1, 10]))
         |> or_fail_with("expected lines 2 to 9 to be ignored")
       }),
+      it(
+        "skips quotes, dots and percents in Erlang triple-quoted strings",
+        fn() {
+          outside_lines_left(outside_erlang_path(), [
+            "-module(outside).",
+            "%% coverage:ignore-function",
+            "quoted() ->",
+            "    \"\"\"",
+            "    He said \"stop. now\" % not a comment {",
+            "    \"\"\".",
+            "after_quoted() -> ok.",
+          ])
+          |> should
+          |> be_equal(Ok([1, 7]))
+          |> or_fail_with("expected lines 2 to 6 to be ignored")
+        },
+      ),
+      it("skips dots and quotes in Erlang sigils", fn() {
+        outside_lines_left(outside_erlang_path(), [
+          "-module(outside).",
+          "%% coverage:ignore-function",
+          "sigils() ->",
+          "    {~\"a. \\\" b\", ~s(c. d), ~B\"\"\"",
+          "     x \"\". y",
+          "     \"\"\"}.",
+          "after_sigils() -> ok.",
+        ])
+        |> should
+        |> be_equal(Ok([1, 7]))
+        |> or_fail_with("expected lines 2 to 6 to be ignored")
+      }),
+      it(
+        "ignores an Erlang function that ends the file without a newline",
+        fn() {
+          outside_lines_left(outside_erlang_path(), [
+            "-module(outside).",
+            "first() -> ok.",
+            "%% coverage:ignore-function",
+            "last() -> ok.",
+          ])
+          |> should
+          |> be_equal(Ok([1, 2]))
+          |> or_fail_with("expected lines 3 and 4 to be ignored")
+        },
+      ),
+      it("skips braces and backslashes in Gleam strings", fn() {
+        outside_lines_left(outside_path(), [
+          "// coverage:ignore-function",
+          "pub fn slash() -> String {",
+          "  \"\\\\\" <> \"{\"",
+          "}",
+          "",
+          "pub fn after_slash() {",
+          "  1",
+          "}",
+        ])
+        |> should
+        |> be_equal(Ok([5, 6, 7, 8]))
+        |> or_fail_with("expected lines 1 to 4 to be ignored")
+      }),
     ]),
     group("merged LCOV and output", [
       it("drops merged counts on an ignored line", fn() {
@@ -610,6 +670,24 @@ pub fn tests() {
             "%% coverage:ignore-function",
             "broken() ->",
             "    ok",
+          ])
+          |> should
+          |> be_equal(
+            Ok(IgnoreFunctionWithoutFunction(outside_erlang_path(), 2)),
+          )
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 2")
+        },
+      ),
+      it(
+        "returns IgnoreFunctionWithoutFunction when an Erlang triple-quoted string never closes",
+        fn() {
+          outside_error(outside_erlang_path(), [
+            "-module(outside).",
+            "%% coverage:ignore-function",
+            "broken() ->",
+            "    \"\"\"",
+            "    text.",
+            "    \"\".",
           ])
           |> should
           |> be_equal(

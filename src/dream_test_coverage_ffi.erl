@@ -5,7 +5,8 @@
     compile_module/2,
     analyse_module/2,
     match_files/1,
-    is_regular_file/1
+    is_regular_file/1,
+    erlang_function_last_line/1
 ]).
 
 %% Erlang side of `dream_test/coverage`.
@@ -117,6 +118,29 @@ match_files(Pattern) ->
 
 is_regular_file(Path) ->
     filelib:is_regular(Path).
+
+%% The line, counted from 1 at the start of `Source`, of the dot that ends
+%% the first function in `Source`, after any attributes such as `-spec` and
+%% `-doc`. `erl_scan` reads one form at a time by the rules of the running
+%% OTP, so strings, triple-quoted strings, sigils, quoted atoms, character
+%% literals and comments never hide or fake the end of a form. Returns
+%% `{error, nil}` when the first form that is not an attribute is not a
+%% function, or when the source ends or cannot be scanned before its dot.
+erlang_function_last_line(Source) ->
+    Chars = unicode:characters_to_list(Source),
+    function_form(erl_scan:tokens([], Chars, 1)).
+
+function_form({more, Continuation}) ->
+    function_form(erl_scan:tokens(Continuation, eof, 1));
+function_form({done, {ok, [{'-', _} | _], EndLine}, Rest}) ->
+    function_form(erl_scan:tokens([], Rest, EndLine));
+function_form({done, {ok, [{atom, _, _}, {'(', _} | _] = Tokens, _}, _Rest}) ->
+    form_end(lists:last(Tokens));
+function_form(_NotAFunction) ->
+    {error, nil}.
+
+form_end({dot, Line}) -> {ok, Line};
+form_end(_LastToken) -> {error, nil}.
 
 format_reason(Reason) ->
     unicode:characters_to_binary(io_lib:format("~tp", [Reason])).

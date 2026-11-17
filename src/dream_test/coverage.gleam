@@ -1619,9 +1619,8 @@ type Cursor {
   Cursor(text: String, line: Int)
 }
 
-/// One token of source code. The reader skips white space, comments, strings
-/// and Erlang character literals, so a brace or a dot in them is never a
-/// token.
+/// One token of Gleam source code. The reader skips white space, comments
+/// and strings, so a brace or a bracket in them is never a token.
 type Token {
   Token(kind: TokenKind, line: Int)
 }
@@ -1629,9 +1628,6 @@ type Token {
 type TokenKind {
   Word(String)
   Symbol(String)
-  /// The Erlang `.` that ends a form: a dot before white space, a comment or
-  /// the end of the text.
-  FormEnd
   EndOfText
 }
 
@@ -1646,7 +1642,7 @@ fn ignore_function_then_continue(
     rest
     |> string.join("\n")
     |> string.replace("\r", "")
-  case function_last_line(scan.syntax, Cursor(text: source, line: 1)) {
+  case function_last_line(scan.syntax, source) {
     Ok(offset) ->
       MarkerScan(..scan, pending_text: None)
       |> ignore_range(scan.line_number + offset, text)
@@ -1674,24 +1670,24 @@ fn ignore_range(scan: MarkerScan, last_line: Int, text: String) -> MarkerScan {
   }
 }
 
-/// The line, counted from the cursor, where the function after a
-/// `coverage:ignore-function` marker ends. `Error(Nil)` when the code after
-/// the marker is not a complete function.
+/// The line, counted from 1 at the start of `source`, where the function
+/// after a `coverage:ignore-function` marker ends. `Error(Nil)` when the code
+/// after the marker is not a complete function.
 fn function_last_line(
   syntax: CommentSyntax,
-  cursor: Cursor,
+  source: String,
 ) -> Result(Int, Nil) {
   case syntax {
-    GleamComments -> gleam_function_last_line(cursor)
-    ErlangComments -> erlang_function_last_line(cursor)
+    GleamComments -> gleam_function_last_line(Cursor(text: source, line: 1))
+    ErlangComments -> erlang_function_last_line(source)
   }
 }
 
 /// Skip attributes such as `@external(...)` and `@deprecated(...)`, then
 /// read a `fn` or `pub fn` up to its parameters.
 fn gleam_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
-  let #(first, after_first) = next_token(GleamComments, cursor)
-  let #(second, after_second) = next_token(GleamComments, after_first)
+  let #(first, after_first) = next_token(cursor)
+  let #(second, after_second) = next_token(after_first)
   case first.kind, second.kind {
     Symbol("@"), Word(_) ->
       gleam_function_last_line(after_attribute_arguments(after_second))
@@ -1704,7 +1700,7 @@ fn gleam_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
 }
 
 fn after_attribute_arguments(cursor: Cursor) -> Cursor {
-  let #(token, after) = next_token(GleamComments, cursor)
+  let #(token, after) = next_token(cursor)
   case token.kind {
     Symbol("(") -> read_to_close(after, "(", ")", 0).1
     _ -> cursor
@@ -1721,7 +1717,7 @@ fn read_to_close(
   close: String,
   depth: Int,
 ) -> #(Token, Cursor) {
-  let #(token, after) = next_token(GleamComments, cursor)
+  let #(token, after) = next_token(cursor)
   case token.kind {
     EndOfText -> #(token, after)
     Symbol(symbol) if symbol == close && depth == 0 -> #(token, after)
@@ -1747,8 +1743,8 @@ fn gleam_return_type_last_line(
   cursor: Cursor,
   last_line: Int,
 ) -> Result(Int, Nil) {
-  let #(token, after) = next_token(GleamComments, cursor)
-  let #(following, _) = next_token(GleamComments, after)
+  let #(token, after) = next_token(cursor)
+  let #(following, _) = next_token(after)
   case token.kind, following.kind {
     Symbol("{"), _ -> closing_line(read_to_close(after, "{", "}", 0))
     Word("fn"), Symbol("(") -> gleam_return_type_last_line(after, token.line)
@@ -1778,59 +1774,25 @@ fn closing_line(close: #(Token, Cursor)) -> Result(Int, Nil) {
 }
 
 /// Skip attributes such as `-spec` and `-doc`, then read the function to the
-/// dot that ends its last clause.
-fn erlang_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
-  let #(first, after_first) = next_token(ErlangComments, cursor)
-  let #(second, _) = next_token(ErlangComments, after_first)
-  case first.kind, second.kind {
-    Symbol("-"), _ -> erlang_function_last_line(read_form(after_first).1)
-    Word(_), Symbol("(") -> erlang_form_last_line(read_form(after_first))
-    _, _ -> Error(Nil)
-  }
-}
+/// dot that ends its last clause. The Erlang scanner (`erl_scan`) of the
+/// running OTP reads the source, so every string, sigil, triple-quoted
+/// string, quoted atom, character literal and comment is read by the same
+/// rules as the compiler uses.
+@external(erlang, "dream_test_coverage_ffi", "erlang_function_last_line")
+fn erlang_function_last_line(source: String) -> Result(Int, Nil)
 
-/// Read tokens up to the end of the form, or to the end of the text.
-fn read_form(cursor: Cursor) -> #(Token, Cursor) {
-  let #(token, after) = next_token(ErlangComments, cursor)
-  case token.kind {
-    FormEnd | EndOfText -> #(token, after)
-    _ -> read_form(after)
-  }
-}
-
-fn erlang_form_last_line(form_end: #(Token, Cursor)) -> Result(Int, Nil) {
-  case form_end.0.kind {
-    FormEnd -> Ok(form_end.0.line)
-    _ -> Error(Nil)
-  }
-}
-
-fn next_token(syntax: CommentSyntax, cursor: Cursor) -> #(Token, Cursor) {
-  case syntax, cursor.text {
-    _, "" -> #(Token(kind: EndOfText, line: cursor.line), cursor)
-    _, "\n" <> rest ->
-      next_token(syntax, Cursor(text: rest, line: cursor.line + 1))
-    _, " " <> rest | _, "\t" <> rest ->
-      next_token(syntax, Cursor(..cursor, text: rest))
-    GleamComments, "//" <> rest | ErlangComments, "%" <> rest ->
-      next_token(syntax, after_comment(Cursor(..cursor, text: rest)))
-    _, "\"" <> rest ->
-      next_token(syntax, after_quoted(Cursor(..cursor, text: rest), "\""))
-    ErlangComments, "'" <> rest -> #(
-      Token(kind: Word("'"), line: cursor.line),
-      after_quoted(Cursor(..cursor, text: rest), "'"),
-    )
-    ErlangComments, "$\\" <> rest | ErlangComments, "$" <> rest ->
-      next_token(syntax, after_character(Cursor(..cursor, text: rest)))
-    ErlangComments, "." <> rest -> #(
-      Token(kind: erlang_dot(rest), line: cursor.line),
-      Cursor(..cursor, text: rest),
-    )
-    GleamComments, "->" <> rest -> #(
+fn next_token(cursor: Cursor) -> #(Token, Cursor) {
+  case cursor.text {
+    "" -> #(Token(kind: EndOfText, line: cursor.line), cursor)
+    "\n" <> rest -> next_token(Cursor(text: rest, line: cursor.line + 1))
+    " " <> rest | "\t" <> rest -> next_token(Cursor(..cursor, text: rest))
+    "//" <> rest -> next_token(after_comment(Cursor(..cursor, text: rest)))
+    "\"" <> rest -> next_token(after_quoted(Cursor(..cursor, text: rest)))
+    "->" <> rest -> #(
       Token(kind: Symbol("->"), line: cursor.line),
       Cursor(..cursor, text: rest),
     )
-    _, text -> word_or_symbol(cursor, take_word(syntax, text, ""))
+    text -> word_or_symbol(cursor, take_word(text, ""))
   }
 }
 
@@ -1841,15 +1803,14 @@ fn after_comment(cursor: Cursor) -> Cursor {
   }
 }
 
-/// Skip to the character after the closing `quote`. A backslash escapes the
+/// Skip to the character after the closing `"`. A backslash escapes the
 /// character after it.
-fn after_quoted(cursor: Cursor, quote: String) -> Cursor {
-  case cursor.text, string.starts_with(cursor.text, quote) {
-    _, True -> Cursor(..cursor, text: string.drop_start(cursor.text, 1))
-    "", False -> cursor
-    "\\" <> rest, False ->
-      after_quoted(after_character(Cursor(..cursor, text: rest)), quote)
-    _, False -> after_quoted(after_character(cursor), quote)
+fn after_quoted(cursor: Cursor) -> Cursor {
+  case cursor.text {
+    "" -> cursor
+    "\"" <> rest -> Cursor(..cursor, text: rest)
+    "\\" <> rest -> after_quoted(after_character(Cursor(..cursor, text: rest)))
+    _ -> after_quoted(after_character(cursor))
   }
 }
 
@@ -1858,15 +1819,6 @@ fn after_character(cursor: Cursor) -> Cursor {
   case cursor.text {
     "\n" <> rest -> Cursor(text: rest, line: cursor.line + 1)
     text -> Cursor(..cursor, text: string.drop_start(text, 1))
-  }
-}
-
-/// A dot ends an Erlang form when white space, a comment or the end of the
-/// text follows it. Other dots are in floats and record fields.
-fn erlang_dot(rest: String) -> TokenKind {
-  case rest {
-    "" | " " <> _ | "\t" <> _ | "\n" <> _ | "%" <> _ -> FormEnd
-    _ -> Symbol(".")
   }
 }
 
@@ -1883,27 +1835,20 @@ fn word_or_symbol(cursor: Cursor, word: #(String, String)) -> #(Token, Cursor) {
   }
 }
 
-/// Split the text into the word at its start (letters, digits and `_`, and
-/// `@` in Erlang) and the text after the word.
-fn take_word(
-  syntax: CommentSyntax,
-  text: String,
-  word: String,
-) -> #(String, String) {
+/// Split the text into the word at its start (letters, digits and `_`) and
+/// the text after the word.
+fn take_word(text: String, word: String) -> #(String, String) {
   let first = string.slice(text, 0, 1)
-  case is_word_character(syntax, first) {
-    True -> take_word(syntax, string.drop_start(text, 1), word <> first)
+  case is_word_character(first) {
+    True -> take_word(string.drop_start(text, 1), word <> first)
     False -> #(word, text)
   }
 }
 
-fn is_word_character(syntax: CommentSyntax, character: String) -> Bool {
-  case syntax, character {
-    _, "_" | ErlangComments, "@" -> True
-    _, _ ->
-      string.lowercase(character) != string.uppercase(character)
-      || result.is_ok(int.parse(character))
-  }
+fn is_word_character(character: String) -> Bool {
+  character == "_"
+  || string.lowercase(character) != string.uppercase(character)
+  || result.is_ok(int.parse(character))
 }
 
 // =============================================================================
