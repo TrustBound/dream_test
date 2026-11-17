@@ -4,7 +4,7 @@
 //// dream_test's own coverage code.
 
 import dream_test/coverage.{
-  type CoverageConfig, type CoverageError, CoverStartFailed, ModuleNotAnalysed,
+  type CoverageConfig, type CoverageError, ModuleNotAnalysed,
   ModuleNotInstrumented, ModuleNotLoaded,
 }
 import dream_test/coverage/report.{type CoverageReport}
@@ -52,14 +52,6 @@ pub fn make_unreadable(file: String) -> Nil
 @external(erlang, "dream_test_coverage_test_ffi", "add_damaged_beam")
 pub fn add_damaged_beam(module: String) -> Nil
 
-/// In a child: replace `cover` with a stub that fails in one way.
-@external(erlang, "dream_test_coverage_test_ffi", "stub_cover")
-pub fn stub_cover(kind: String) -> Nil
-
-/// In a child: stop the real `cover` server.
-@external(erlang, "dream_test_coverage_test_ffi", "stop_cover")
-pub fn stop_cover() -> Nil
-
 /// Start coverage with `config`, run `work`, then finish.
 pub fn measure(
   config: CoverageConfig,
@@ -78,7 +70,6 @@ pub fn measure(
 /// holds an absolute path or a process id.
 pub fn without_raw(error: CoverageError) -> CoverageError {
   case error {
-    CoverStartFailed(cause, _raw) -> CoverStartFailed(cause, "")
     ModuleNotLoaded(module_name, source_path, cause, _raw) ->
       ModuleNotLoaded(module_name, source_path, cause, "")
     ModuleNotInstrumented(module_name, source_path, cause, _raw) ->

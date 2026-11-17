@@ -1,9 +1,14 @@
 //// Line coverage for the code under test.
 ////
-//// Coverage uses the BEAM `cover` tool. When a run starts, every module built
-//// from your source directory is replaced with an instrumented copy. When the
-//// run ends, the runner counts how many times each line ran, prints a table,
-//// and writes an LCOV file that editors and CI services can read.
+//// Coverage uses the native line counters of the BEAM. When a run starts,
+//// every module built from your source directory is loaded again with a
+//// counter on each line. When the run ends, the runner reads how many times
+//// each line ran, prints a table, and writes an LCOV file that editors and CI
+//// services can read.
+////
+//// Native line counters need Erlang/OTP 27 or later with the JIT (the
+//// default on x86-64 and ARM64). On another runtime, `start` fails with
+//// `NativeCoverageUnsupported`.
 ////
 //// ## With the dream_test runner
 ////
@@ -59,8 +64,13 @@
 //// start at those folders: `src/app/cart.gleam` is module `app@cart`.
 ////
 //// `coverage.exclude` removes files from the run, for example generated
-//// code. An excluded module is not instrumented and is not in the table, the
-//// LCOV file or the minimum.
+//// code. An excluded module gets no line counters and is not in the table,
+//// the LCOV file or the minimum.
+////
+//// Only lines that can run are counted. When the compiler proves that code
+//// can never run, for example a private function that nothing calls, or the
+//// JavaScript-only body of a function that has an Erlang `@external`, that
+//// code has no counter and is not in the table.
 ////
 //// ## Ignoring lines
 ////
@@ -257,10 +267,22 @@
 ////
 //// ## Limits
 ////
-//// - One coverage run per BEAM instance. A second `start` fails with
-////   `CoverStartFailed(CoverAlreadyRunning, ..)`.
-//// - Code that was already running when coverage started keeps running the
-////   original module. Calls made after `start` run the instrumented copy.
+//// - More than one run can measure in one BEAM instance at the same time,
+////   but each module can be in only one run. A `start` that includes a
+////   module of a run that has not finished fails with
+////   `ModuleAlreadyMeasured`. After `finish`, a module can be measured again,
+////   and its counts start from zero.
+//// - A process that is already in a function of a module when `start` runs
+////   keeps running the version without counters. Its calls to other
+////   functions in the same module are not counted. A call made with the
+////   module name (`module.function` in Gleam, `module:function` in Erlang),
+////   by that process or any other, runs the version with counters.
+//// - `start` never stops a process. When a process still runs an older
+////   version of a module, from a code reload before the run, `start` fails
+////   with `OldCodeInUse`.
+//// - After `finish`, the modules keep their counters until they are loaded
+////   again. The counters cost a little time on each line, and nothing reads
+////   them.
 ////
 //// ## Errors and versions
 ////
@@ -351,6 +373,7 @@ type ExcludePattern {
 pub opaque type CoverageSession {
   CoverageSession(
     config: CoverageConfig,
+    measurement: Measurement,
     modules: List(CoveredModule),
     excluded_files: List(ExcludedFile),
     ignored_lines: IgnoredLines,
@@ -361,6 +384,20 @@ pub opaque type CoverageSession {
 type CoveredModule {
   CoveredModule(module_name: String, source_path: String)
 }
+
+/// The settings and files of a run, before its modules get line counters.
+type PreparedRun {
+  PreparedRun(
+    config: CoverageConfig,
+    modules: List(CoveredModule),
+    excluded_files: List(ExcludedFile),
+    ignored_lines: IgnoredLines,
+  )
+}
+
+/// The Erlang reference that names one measurement. The line counters of
+/// its modules belong to it until `coverage.finish`.
+type Measurement
 
 /// Everything that can go wrong during a coverage run.
 ///
@@ -377,8 +414,15 @@ pub type CoverageError {
   SourceDirectoryOutsideSourceRoot(path: String)
   /// The source directory holds no `.gleam` or `.erl` files.
   NoSourceFiles(path: String)
-  /// The BEAM `cover` tool did not start.
-  CoverStartFailed(cause: StartCause, raw: String)
+  /// This Erlang runtime cannot count lines natively. Native line counters
+  /// need Erlang/OTP 27 or later with the JIT.
+  NativeCoverageUnsupported(otp_release: String, emulator_flavor: String)
+  /// The Erlang compiler, which coverage uses to add line counters to each
+  /// module, could not be loaded.
+  CompilerNotLoaded(cause: LoadCause, raw: String)
+  /// Another coverage run in this BEAM already measures a module of the
+  /// source directory.
+  ModuleAlreadyMeasured(module_name: String, source_path: String)
   /// A module built from the source directory could not be loaded.
   ModuleNotLoaded(
     module_name: String,
@@ -386,20 +430,22 @@ pub type CoverageError {
     cause: LoadCause,
     raw: String,
   )
-  /// `cover` could not instrument a module.
+  /// A module could not be given line counters.
   ModuleNotInstrumented(
     module_name: String,
     source_path: String,
     cause: InstrumentCause,
     raw: String,
   )
-  /// `cover` could not read the call counts of a module.
+  /// The line counts of a module could not be read.
   ModuleNotAnalysed(
     module_name: String,
     source_path: String,
     cause: AnalysisCause,
     raw: String,
   )
+  /// `coverage.finish` already ran for this session.
+  SessionAlreadyFinished
   /// The LCOV file could not be written.
   LcovWriteFailed(path: String, error: FileError)
   /// The JSON summary from `coverage.json_path` could not be written.
@@ -526,14 +572,6 @@ pub opaque type FileBelowMinimum {
   FileBelowMinimum(source_path: String, hit: Int, total: Int, lines_needed: Int)
 }
 
-/// Why the `cover` tool did not start.
-pub type StartCause {
-  /// `cover` was already running, so another coverage run owns it.
-  CoverAlreadyRunning
-  /// `cover` returned another error.
-  CoverDidNotStart
-}
-
 /// Why a module could not be loaded.
 pub type LoadCause {
   /// No `.beam` file for the module is on the code path.
@@ -547,27 +585,32 @@ pub type LoadCause {
   EmbeddedMode
 }
 
-/// Why `cover` could not instrument a module.
+/// Why a module could not be given line counters.
 pub type InstrumentCause {
   /// The `.beam` file has no debug information.
   NoDebugInfo
   /// The debug information in the `.beam` file is encrypted.
   EncryptedDebugInfo
-  /// Another tool already instrumented the module from source.
+  /// The debug information in the `.beam` file could not be read, for
+  /// example because the file was deleted after the module was loaded.
+  DebugInfoUnreadable
+  /// Another tool, such as `cover`, already gave the module line counters.
   AlreadyInstrumented
-  /// The instrumented module could not be loaded.
+  /// The Erlang compiler could not compile the module again with line
+  /// counters.
+  RecompileFailed
+  /// A process still runs an older version of the module. Loading the
+  /// module with line counters would kill that process, so coverage stops.
+  OldCodeInUse
+  /// The module with line counters could not be loaded.
   InstrumentedLoadFailed
-  /// `cover` returned another error.
-  UnknownInstrumentError
 }
 
-/// Why `cover` could not read the call counts of a module.
+/// Why the line counts of a module could not be read.
 pub type AnalysisCause {
-  /// The module is no longer instrumented (for example, `cover` was stopped
-  /// or reset during the run).
+  /// The module lost its line counters during the run, because it was
+  /// loaded again or deleted.
   NotInstrumented
-  /// `cover` returned another error.
-  UnknownAnalysisError
 }
 
 // =============================================================================
@@ -994,7 +1037,7 @@ pub fn merge_lcov(
 /// Leave the source files that match a pattern out of coverage.
 ///
 /// Use it for code that tests do not need to cover, for example generated
-/// code. An excluded module is not instrumented, and it is not in the table,
+/// code. An excluded module gets no line counters, and it is not in the table,
 /// the LCOV file or `coverage.minimum_percent`. Line counts for it from
 /// `coverage.merge_lcov` are dropped too.
 ///
@@ -1400,8 +1443,8 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 // Run
 // =============================================================================
 
-/// Start the `cover` tool and instrument every module built from the source
-/// directory, except the files that `coverage.exclude` matches.
+/// Give every module built from the source directory line counters, except
+/// the files that `coverage.exclude` matches.
 ///
 /// Call this before the code you want to measure runs. `runner.coverage`
 /// does this for you.
@@ -1412,11 +1455,11 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 ///
 /// ## Returns
 ///
-/// - `Ok(CoverageSession)` when every module is instrumented
+/// - `Ok(CoverageSession)` when every module has line counters
 /// - `Error(CoverageError)` for the first step that failed. Exclude patterns
-///   and the ignore markers of the measured files are checked before `cover`
-///   starts. With `coverage.require_exclusion_reasons`, a pattern or a marker
-///   without a reason is an error too.
+///   and the ignore markers of the measured files are checked before any
+///   module changes. With `coverage.require_exclusion_reasons`, a pattern or
+///   a marker without a reason is an error too.
 ///
 /// ## Example
 ///
@@ -1638,8 +1681,8 @@ fn excluded_file(entry: #(String, ExcludePattern)) -> ExcludedFile {
   )
 }
 
-/// Read the ignore markers of every kept module before `cover` starts, so a
-/// bad marker fails the run before the tests run.
+/// Read the ignore markers of every kept module before any module gets line
+/// counters, so a bad marker fails the run before the tests run.
 fn start_with_ignored_lines(
   config: CoverageConfig,
   modules: List(CoveredModule),
@@ -1654,15 +1697,12 @@ fn start_with_ignored_lines(
     )
   {
     Ok(ignored_lines) ->
-      start_with_modules(
-        CoverageSession(
-          config: config,
-          modules: modules,
-          excluded_files: excluded_files,
-          ignored_lines: ignored_lines,
-          inexact_line_files: [],
-        ),
-      )
+      start_with_modules(PreparedRun(
+        config: config,
+        modules: modules,
+        excluded_files: excluded_files,
+        ignored_lines: ignored_lines,
+      ))
     Error(error) -> Error(error)
   }
 }
@@ -1718,73 +1758,33 @@ fn is_meaningful_segment(segment: String) -> Bool {
 }
 
 fn start_with_modules(
-  session: CoverageSession,
+  run: PreparedRun,
 ) -> Result(CoverageSession, CoverageError) {
-  case start_cover() {
-    Ok(Nil) -> compile_session(session)
+  case start_measuring(run.modules) {
+    Ok(#(measurement, erlang_source_paths)) ->
+      Ok(CoverageSession(
+        config: run.config,
+        measurement: measurement,
+        modules: run.modules,
+        excluded_files: run.excluded_files,
+        ignored_lines: run.ignored_lines,
+        inexact_line_files: inexact_line_files(erlang_source_paths),
+      ))
     Error(error) -> Error(error)
   }
 }
 
-fn compile_session(
-  session: CoverageSession,
-) -> Result(CoverageSession, CoverageError) {
-  case compile_modules(session.modules, []) {
-    Ok(inexact_line_files) ->
-      Ok(
-        CoverageSession(
-          ..session,
-          inexact_line_files: list.sort(inexact_line_files, string.compare),
-        ),
-      )
-    Error(error) -> Error(error)
-  }
+/// The `.gleam` files among the files built from Erlang source (Gleam before
+/// 1.19), whose line numbers may be off. An `.erl` file is always built from
+/// Erlang source, and its line numbers are exact.
+fn inexact_line_files(erlang_source_paths: List(String)) -> List(String) {
+  erlang_source_paths
+  |> list.filter(is_gleam_file)
+  |> list.sort(string.compare)
 }
 
-/// Instrument every module. Returns the `.gleam` source files that were
-/// built from generated Erlang source (Gleam before 1.19), whose line
-/// numbers may be off.
-fn compile_modules(
-  modules: List(CoveredModule),
-  inexact_line_files: List(String),
-) -> Result(List(String), CoverageError) {
-  case modules {
-    [] -> Ok(inexact_line_files)
-    [module, ..rest] -> compile_then_continue(module, rest, inexact_line_files)
-  }
-}
-
-fn compile_then_continue(
-  module: CoveredModule,
-  rest: List(CoveredModule),
-  inexact_line_files: List(String),
-) -> Result(List(String), CoverageError) {
-  case compile_module(module.module_name, module.source_path) {
-    Ok(built_from_erlang_source) ->
-      compile_modules(
-        rest,
-        add_inexact_line_file(
-          inexact_line_files,
-          module.source_path,
-          built_from_erlang_source,
-        ),
-      )
-    Error(error) -> Error(error)
-  }
-}
-
-/// A `.gleam` file built from generated Erlang source has inexact line
-/// numbers. An `.erl` file is always built from Erlang source, and its line
-/// numbers are exact.
-fn add_inexact_line_file(
-  inexact_line_files: List(String),
-  source_path: String,
-  built_from_erlang_source: Bool,
-) -> List(String) {
-  case built_from_erlang_source && string.ends_with(source_path, ".gleam") {
-    True -> [source_path, ..inexact_line_files]
-    False -> inexact_line_files
-  }
+fn is_gleam_file(source_path: String) -> Bool {
+  string.ends_with(source_path, ".gleam")
 }
 
 fn covered_modules(
@@ -1836,7 +1836,7 @@ fn erlang_module_name(relative_path: String) -> String {
   |> string.drop_end(string.length(".erl"))
 }
 
-/// Read the call counts, build the report, and write the LCOV file.
+/// Read the line counts, build the report, and write the LCOV file.
 ///
 /// Call this after the code you want to measure has run. `runner.coverage`
 /// does this for you.
@@ -1852,7 +1852,8 @@ fn erlang_module_name(relative_path: String) -> String {
 ///   file holds its ignored line ranges with their reasons, and the report
 ///   holds the excluded files with their patterns and reasons
 ///   (`report.ignored_ranges`, `report.excluded_files`).
-/// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
+/// - `Error(CoverageError)` when `finish` already ran for this session, a
+///   module lost its line counters during the run, an LCOV file to
 ///   merge cannot be read, a file that only merged LCOV covers has a bad
 ///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
 ///   without a reason), the LCOV, JSON, Cobertura or Markdown file cannot
@@ -1870,8 +1871,8 @@ fn erlang_module_name(relative_path: String) -> String {
 pub fn finish(
   session session: CoverageSession,
 ) -> Result(CoverageReport, CoverageError) {
-  case analyse_modules(session.modules, []) {
-    Ok(files) -> merge_then_write(files, session)
+  case stop_measuring(session.measurement, session.modules) {
+    Ok(files) -> merge_then_write(list.map(files, file_coverage), session)
     Error(error) -> Error(error)
   }
 }
@@ -1939,29 +1940,8 @@ fn without_ignored_lines(
   }
 }
 
-fn analyse_modules(
-  modules: List(CoveredModule),
-  accumulated_reversed: List(FileCoverage),
-) -> Result(List(FileCoverage), CoverageError) {
-  case modules {
-    [] -> Ok(list.reverse(accumulated_reversed))
-    [module, ..rest] ->
-      analyse_then_continue(module, rest, accumulated_reversed)
-  }
-}
-
-fn analyse_then_continue(
-  module: CoveredModule,
-  rest: List(CoveredModule),
-  accumulated_reversed: List(FileCoverage),
-) -> Result(List(FileCoverage), CoverageError) {
-  case analyse_module(module.module_name, module.source_path) {
-    Ok(lines) -> {
-      let file_coverage = report.file(module.source_path, lines)
-      analyse_modules(rest, [file_coverage, ..accumulated_reversed])
-    }
-    Error(error) -> Error(error)
-  }
+fn file_coverage(file: #(String, List(LineCoverage))) -> FileCoverage {
+  report.file(file.0, file.1)
 }
 
 /// Write every file the settings ask for, in this order: LCOV, JSON,
@@ -3495,23 +3475,23 @@ fn round(value: Float) -> Int
 @external(erlang, "dream_test_coverage_ffi", "system_time_ms")
 fn system_time_ms() -> Int
 
-@external(erlang, "dream_test_coverage_ffi", "start_cover")
-fn start_cover() -> Result(Nil, CoverageError)
-
 @external(erlang, "dream_test_coverage_ffi", "list_source_files")
 fn list_source_files(directory: String) -> Result(List(String), CoverageError)
 
-@external(erlang, "dream_test_coverage_ffi", "compile_module")
-fn compile_module(
-  module_name: String,
-  source_path: String,
-) -> Result(Bool, CoverageError)
+/// Check that this BEAM can count lines natively, then give every module
+/// line counters. Returns the measurement and the source paths of the
+/// modules built from Erlang source.
+@external(erlang, "dream_test_coverage_ffi", "start_measuring")
+fn start_measuring(
+  modules: List(CoveredModule),
+) -> Result(#(Measurement, List(String)), CoverageError)
 
-@external(erlang, "dream_test_coverage_ffi", "analyse_module")
-fn analyse_module(
-  module_name: String,
-  source_path: String,
-) -> Result(List(LineCoverage), CoverageError)
+/// Read the line counts of every module, as `#(source_path, lines)`.
+@external(erlang, "dream_test_coverage_ffi", "stop_measuring")
+fn stop_measuring(
+  measurement: Measurement,
+  modules: List(CoveredModule),
+) -> Result(List(#(String, List(LineCoverage))), CoverageError)
 
 /// Delete a folder and everything in it. A folder that does not exist is
 /// fine.

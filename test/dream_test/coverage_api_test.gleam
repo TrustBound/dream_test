@@ -6,11 +6,11 @@
 import coverage_fixtures/nested/deep
 import coverage_fixtures/sample
 import dream_test/coverage.{
-  type CoverageError, type CoverageSession, type StartCause, BelowMinimumPercent,
-  CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed, HtmlDeleteFailed,
-  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
-  HtmlWriteFailed, InvalidMinimumPercent, JsonWriteFailed, LcovWriteFailed,
-  MarkdownWriteFailed, NoSourceFiles, SourceDirectoryNotFound,
+  type CoverageError, type CoverageSession, BelowMinimumPercent,
+  CoberturaWriteFailed, HtmlDeleteFailed, HtmlFileSourceReadFailed,
+  HtmlFileWriteFailed, HtmlSourceReadFailed, HtmlWriteFailed,
+  InvalidMinimumPercent, JsonWriteFailed, LcovWriteFailed, MarkdownWriteFailed,
+  ModuleAlreadyMeasured, NoSourceFiles, SourceDirectoryNotFound,
   SourceDirectoryOutsideSourceRoot,
 }
 import dream_test/coverage/report.{
@@ -19,6 +19,7 @@ import dream_test/coverage/report.{
 import dream_test/coverage_child_support.{
   add_source, child_project, compile_source, make_unreadable, run_in_child,
 }
+import dream_test/coverage_project_support.{with_fixture_lock}
 import dream_test/file.{
   FileSystemError, IsDirectory, NotFound, PermissionDenied, read, write,
 }
@@ -233,13 +234,6 @@ fn measure_classify(
   })
 }
 
-fn start_cause(error: CoverageError) -> Result(StartCause, String) {
-  case error {
-    CoverStartFailed(cause, _raw) -> Ok(cause)
-    _ -> Error("expected CoverStartFailed")
-  }
-}
-
 pub fn tests() {
   describe("dream_test/coverage", [
     group("settings", [
@@ -412,17 +406,21 @@ pub fn tests() {
         |> be_equal(Ok(InvalidMinimumPercent(100.5)))
         |> or_fail_with("expected InvalidMinimumPercent for 100.5")
       }),
-      it("returns CoverAlreadyRunning for a second start", fn() {
-        run_in_peer(fn() {
-          let _ = coverage.start(fixture_config())
-          case coverage.start(fixture_config()) {
-            Error(error) -> start_cause(error)
-            Ok(_) -> Error("expected the second start to fail")
-          }
+      it("returns ModuleAlreadyMeasured for a second start", fn() {
+        with_fixture_lock(fn() {
+          let assert Ok(first) = coverage.start(fixture_config())
+          let second = coverage.start(fixture_config()) |> start_error()
+          let _ = coverage.finish(first)
+          second
         })
         |> should
-        |> be_equal(Ok(Ok(CoverAlreadyRunning)))
-        |> or_fail_with("expected CoverAlreadyRunning")
+        |> be_equal(
+          Ok(ModuleAlreadyMeasured(
+            "coverage_fixture_ffi",
+            "test/coverage_fixtures/coverage_fixture_ffi.erl",
+          )),
+        )
+        |> or_fail_with("expected ModuleAlreadyMeasured")
       }),
     ]),
 

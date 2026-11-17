@@ -18,8 +18,6 @@
     compile_like_new_gleam/3,
     add_damaged_beam/1,
     make_unreadable/1,
-    stub_cover/1,
-    stop_cover/0,
     format/1
 ]).
 %% Called inside the child node only.
@@ -27,14 +25,10 @@
 
 %% Helpers for the coverage tests.
 %%
-%% `cover` runs once per BEAM instance, and this test run already uses it to
-%% measure dream_test itself. So tests that start coverage run in a child
-%% node. Each child starts with native line counters (`+JPcover
-%% line_counters`) and reloads dream_test's own coverage modules with the
-%% `line_coverage` compile option. The child's `cover` then measures only the
-%% test's fixture code, while the native counters measure dream_test's
-%% coverage code, including the lines that run before `cover` starts. After
-%% the test, the child writes those counts as an LCOV file into
+%% Tests that start coverage on the shared fixtures run in a child node.
+%% Each child reloads dream_test's own coverage modules with the
+%% `line_coverage` compile option, so their lines are counted in the child
+%% too. After the test, the child writes those counts as an LCOV file into
 %% build/coverage/parts/, and dream_test's own run merges them with
 %% `coverage.merge_lcov`.
 
@@ -81,7 +75,7 @@ run_in_embedded_peer(Function) ->
     run_in_child(Function, ["-mode", "embedded"]).
 
 run_in_child(Function, ExtraArgs) ->
-    Args = ["+JPcover", "line_counters" | ExtraArgs] ++ code_path_args(),
+    Args = ExtraArgs ++ code_path_args(),
     case peer:start_link(#{connection => standard_io, args => Args}) of
         {ok, Peer, _Node} -> prepare_call_and_stop(Peer, Function);
         {error, Reason} -> {error, format(Reason)}
@@ -113,18 +107,18 @@ prepare_child(Root) ->
     lists:foreach(fun({Module, _Source}) -> load_with_line_counters(Module) end, self_modules()).
 
 %% Embedded mode only loads the modules of the boot script (kernel and
-%% stdlib), so load the build modules, the compiler (for line counters) and
-%% tools (for cover) by hand.
+%% stdlib), so load the build modules and the compiler (for line counters)
+%% by hand.
 preload_build_modules() ->
     BuildPaths = [Path || Path <- code:get_path(), is_build_path(Path)],
-    OtpPaths = filelib:wildcard(filename:join([code:root_dir(), "lib", "{compiler,tools}-*", "ebin"])),
+    OtpPaths = filelib:wildcard(filename:join([code:root_dir(), "lib", "compiler-*", "ebin"])),
     Beams = lists:append([filelib:wildcard(filename:join(Path, "*.beam")) || Path <- BuildPaths ++ OtpPaths]),
     lists:foreach(fun(Beam) -> code:load_abs(filename:rootname(Beam)) end, Beams).
 
 load_with_line_counters(Module) ->
     Beam = code:which(Module),
     {ok, {Module, [{abstract_code, {raw_abstract_v1, Forms}}]}} = beam_lib:chunks(Beam, [abstract_code]),
-    {ok, Module, Binary} = compile:forms(Forms, [binary, debug_info, line_coverage, return_errors]),
+    {ok, Module, Binary} = compile:forms(Forms, [binary, debug_info, line_coverage, force_line_counters, return_errors]),
     {module, Module} = code:load_binary(Module, Beam, Binary),
     line_counters = code:get_coverage_mode(Module),
     ok.
@@ -219,42 +213,6 @@ add_damaged_beam(Module) ->
 %% it fails.
 make_unreadable(File) ->
     ok = file:change_mode(filename:join("src", File), 8#000),
-    nil.
-
-%% Replace `cover` with a stub that behaves in one broken way.
-stub_cover(Kind) ->
-    Forms = [{attribute, 1, module, cover} | stub_functions(Kind)],
-    {ok, cover, Binary} = compile:forms(Forms, [binary, return_errors]),
-    code:unstick_mod(cover),
-    code:purge(cover),
-    {module, cover} = code:load_binary(cover, "stub_cover.beam", Binary),
-    nil.
-
-stub_functions(<<"start_returns_error">>) ->
-    exports([{start, 0}]) ++ [function(start, [], error_tuple())];
-stub_functions(<<"start_raises">>) ->
-    exports([{start, 0}]) ++ [function(start, [], raise())];
-stub_functions(<<"compile_returns_error">>) ->
-    exports([{start, 0}, {compile_beam, 1}])
-        ++ [function(start, [], ok_tuple()), function(compile_beam, [{var, 1, '_'}], error_tuple())];
-stub_functions(<<"compile_raises">>) ->
-    exports([{start, 0}, {compile_beam, 1}])
-        ++ [function(start, [], ok_tuple()), function(compile_beam, [{var, 1, '_'}], raise())];
-stub_functions(<<"analyse_returns_error">>) ->
-    exports([{analyse, 3}]) ++ [function(analyse, [{var, 1, '_'}, {var, 1, '_'}, {var, 1, '_'}], error_tuple())];
-stub_functions(<<"analyse_raises">>) ->
-    exports([{analyse, 3}]) ++ [function(analyse, [{var, 1, '_'}, {var, 1, '_'}, {var, 1, '_'}], raise())].
-
-exports(Functions) -> [{attribute, 1, export, Functions}].
-function(Name, Arguments, Body) ->
-    {function, 1, Name, length(Arguments), [{clause, 1, Arguments, [], [Body]}]}.
-error_tuple() -> {tuple, 1, [{atom, 1, error}, {atom, 1, boom}]}.
-ok_tuple() -> {tuple, 1, [{atom, 1, ok}, {call, 1, {atom, 1, self}, []}]}.
-raise() -> {call, 1, {atom, 1, error}, [{atom, 1, boom}]}.
-
-%% Stop the real `cover` server.
-stop_cover() ->
-    cover:stop(),
     nil.
 
 %% ---------------------------------------------------------------------------

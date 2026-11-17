@@ -2,19 +2,20 @@
 
 import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
-  CoberturaWriteFailed, CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed,
-  EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, ExcludeWithoutReason, HtmlDeleteFailed,
-  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
-  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  CoberturaWriteFailed, CompilerNotLoaded, DebugInfoUnreadable, EmbeddedMode,
+  EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
+  ExcludeWithoutReason, HtmlDeleteFailed, HtmlFileSourceReadFailed,
+  HtmlFileWriteFailed, HtmlSourceReadFailed, HtmlWriteFailed,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
   IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
   InvalidEnvironmentValue, InvalidMinimumPercent, JsonWriteFailed,
   LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
-  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  MarkdownWriteFailed, ModuleAlreadyMeasured, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NativeCoverageUnsupported,
+  NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched, NoSourceFiles,
+  NotInstrumented, OldCodeInUse, OnLoadFailed, RecompileFailed,
+  SessionAlreadyFinished, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -610,32 +611,38 @@ pub fn tests() {
         ))
         |> or_fail_with("expected the NoSourceFiles message")
       }),
-      it("describes CoverStartFailed with CoverAlreadyRunning", fn() {
-        render_failure_for(CoverStartFailed(
-          CoverAlreadyRunning,
-          "{already_started,<0.90.0>}",
-        ))
+      it("describes NativeCoverageUnsupported", fn() {
+        render_failure_for(NativeCoverageUnsupported("26", "emu"))
         |> should
         |> be_equal(failure_block(
-          "Could not start the BEAM cover tool.",
-          "cover is already running, so another coverage run owns it ({already_started,<0.90.0>}).",
-          "turn coverage on once with runner.coverage, and do not start cover from a test or another tool in the same run.",
+          "Could not count lines in this Erlang runtime (Erlang/OTP 26, emu emulator).",
+          "coverage uses the native line counters of the BEAM, which need Erlang/OTP 27 or later with the JIT.",
+          "run the tests on Erlang/OTP 27 or later, on a platform where the JIT is on (x86-64 or ARM64).",
         ))
-        |> or_fail_with(
-          "expected the CoverStartFailed with CoverAlreadyRunning message",
-        )
+        |> or_fail_with("expected the NativeCoverageUnsupported message")
       }),
-      it("describes CoverStartFailed with CoverDidNotStart", fn() {
-        render_failure_for(CoverStartFailed(CoverDidNotStart, "timeout"))
+      it("describes CompilerNotLoaded", fn() {
+        render_failure_for(CompilerNotLoaded(EmbeddedMode, "embedded"))
         |> should
         |> be_equal(failure_block(
-          "Could not start the BEAM cover tool.",
-          "cover returned an error (timeout).",
-          "check that the Erlang tools application is installed; some minimal Erlang packages leave it out.",
+          "Could not load the Erlang compiler.",
+          "coverage compiles each module again with line counters, and the compile module did not load (embedded).",
+          "install the Erlang compiler application. In embedded mode, load it when the BEAM starts.",
         ))
-        |> or_fail_with(
-          "expected the CoverStartFailed with CoverDidNotStart message",
-        )
+        |> or_fail_with("expected the CompilerNotLoaded message")
+      }),
+      it("describes ModuleAlreadyMeasured", fn() {
+        render_failure_for(ModuleAlreadyMeasured(
+          "app@cart",
+          "src/app/cart.gleam",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not measure module app@cart (src/app/cart.gleam).",
+          "another coverage run in this BEAM already measures this module, and two runs cannot share its line counters.",
+          "finish the other run with coverage.finish first, or give each run a source directory that the other does not measure.",
+        ))
+        |> or_fail_with("expected the ModuleAlreadyMeasured message")
       }),
       it("describes ModuleNotLoaded with ModuleNotBuilt", fn() {
         render_failure_for(ModuleNotLoaded(
@@ -856,12 +863,12 @@ pub fn tests() {
           "app@cart",
           "src/app/cart.gleam",
           NoDebugInfo,
-          "{no_abstract_code,\"app@cart.beam\"}",
+          "{ok,{app@cart,[{abstract_code,no_abstract_code}]}}",
         ))
         |> should
         |> be_equal(failure_block(
-          "Could not instrument module app@cart (src/app/cart.gleam) for coverage.",
-          "the .beam file has no debug information, so cover cannot read the module's code ({no_abstract_code,\"app@cart.beam\"}).",
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "the .beam file has no debug information, so coverage cannot read the module's code ({ok,{app@cart,[{abstract_code,no_abstract_code}]}}).",
           "build with `gleam test` or `gleam build`, which keep debug information, and do not strip the .beam files.",
         ))
         |> or_fail_with(
@@ -873,16 +880,33 @@ pub fn tests() {
           "app@cart",
           "src/app/cart.gleam",
           EncryptedDebugInfo,
-          "{encrypted_abstract_code,\"app@cart.beam\"}",
+          "{error,beam_lib,{key_missing_or_invalid,\"app@cart.beam\",abstract_code}}",
         ))
         |> should
         |> be_equal(failure_block(
-          "Could not instrument module app@cart (src/app/cart.gleam) for coverage.",
-          "the debug information in the .beam file is encrypted ({encrypted_abstract_code,\"app@cart.beam\"}).",
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "the debug information in the .beam file is encrypted ({error,beam_lib,{key_missing_or_invalid,\"app@cart.beam\",abstract_code}}).",
           "build this module without encrypted debug information.",
         ))
         |> or_fail_with(
           "expected the ModuleNotInstrumented with EncryptedDebugInfo message",
+        )
+      }),
+      it("describes ModuleNotInstrumented with DebugInfoUnreadable", fn() {
+        render_failure_for(ModuleNotInstrumented(
+          "app@cart",
+          "src/app/cart.gleam",
+          DebugInfoUnreadable,
+          "{error,beam_lib,{file_error,\"app@cart.beam\",enoent}}",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "the debug information in the .beam file could not be read ({error,beam_lib,{file_error,\"app@cart.beam\",enoent}}).",
+          "run `gleam test` again, and do not delete or change .beam files while the tests run.",
+        ))
+        |> or_fail_with(
+          "expected the ModuleNotInstrumented with DebugInfoUnreadable message",
         )
       }),
       it("describes ModuleNotInstrumented with AlreadyInstrumented", fn() {
@@ -890,16 +914,50 @@ pub fn tests() {
           "app@cart",
           "src/app/cart.gleam",
           AlreadyInstrumented,
-          "{already_cover_compiled,no_beam_found,'app@cart'}",
+          "{coverage_mode,line_counters}",
         ))
         |> should
         |> be_equal(failure_block(
-          "Could not instrument module app@cart (src/app/cart.gleam) for coverage.",
-          "another tool already instrumented this module from source ({already_cover_compiled,no_beam_found,'app@cart'}).",
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "another tool, such as cover, already gave this module line counters ({coverage_mode,line_counters}).",
           "do not run another coverage tool, or call cover yourself, in the same test run.",
         ))
         |> or_fail_with(
           "expected the ModuleNotInstrumented with AlreadyInstrumented message",
+        )
+      }),
+      it("describes ModuleNotInstrumented with RecompileFailed", fn() {
+        render_failure_for(ModuleNotInstrumented(
+          "app@cart",
+          "src/app/cart.gleam",
+          RecompileFailed,
+          "{error,[],[]}",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "the Erlang compiler could not compile the module again with line counters ({error,[],[]}).",
+          "run the tests without coverage to check that the module builds. If it does, report the error with the text in brackets.",
+        ))
+        |> or_fail_with(
+          "expected the ModuleNotInstrumented with RecompileFailed message",
+        )
+      }),
+      it("describes ModuleNotInstrumented with OldCodeInUse", fn() {
+        render_failure_for(ModuleNotInstrumented(
+          "app@cart",
+          "src/app/cart.gleam",
+          OldCodeInUse,
+          "{old_code_in_use,[<0.90.0>]}",
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "a process still runs an older version of this module, and loading the module with line counters would kill that process ({old_code_in_use,[<0.90.0>]}).",
+          "start coverage before code loads a new version of this module, or stop the processes that run the older version.",
+        ))
+        |> or_fail_with(
+          "expected the ModuleNotInstrumented with OldCodeInUse message",
         )
       }),
       it("describes ModuleNotInstrumented with InstrumentedLoadFailed", fn() {
@@ -907,33 +965,16 @@ pub fn tests() {
           "app@cart",
           "src/app/cart.gleam",
           InstrumentedLoadFailed,
-          "\"app@cart.beam\"",
+          "on_load_failure",
         ))
         |> should
         |> be_equal(failure_block(
-          "Could not instrument module app@cart (src/app/cart.gleam) for coverage.",
-          "cover instrumented the module but could not load the result (\"app@cart.beam\").",
+          "Could not add line counters to module app@cart (src/app/cart.gleam).",
+          "the module with line counters could not be loaded (on_load_failure).",
           "run the tests without coverage to check that the module loads, then try again.",
         ))
         |> or_fail_with(
           "expected the ModuleNotInstrumented with InstrumentedLoadFailed message",
-        )
-      }),
-      it("describes ModuleNotInstrumented with UnknownInstrumentError", fn() {
-        render_failure_for(ModuleNotInstrumented(
-          "app@cart",
-          "src/app/cart.gleam",
-          UnknownInstrumentError,
-          "non_existing",
-        ))
-        |> should
-        |> be_equal(failure_block(
-          "Could not instrument module app@cart (src/app/cart.gleam) for coverage.",
-          "cover returned an error (non_existing).",
-          "run the tests without coverage to check that the module builds and loads.",
-        ))
-        |> or_fail_with(
-          "expected the ModuleNotInstrumented with UnknownInstrumentError message",
         )
       }),
       it("describes ModuleNotAnalysed with NotInstrumented", fn() {
@@ -941,34 +982,27 @@ pub fn tests() {
           "app@cart",
           "src/app/cart.gleam",
           NotInstrumented,
-          "{not_cover_compiled,'app@cart'}",
+          "\"app@cart.beam\"",
         ))
         |> should
         |> be_equal(failure_block(
           "Could not read coverage for module app@cart (src/app/cart.gleam).",
-          "the module was no longer instrumented at the end of the run, so something stopped or reset cover during the tests ({not_cover_compiled,'app@cart'}).",
-          "do not call cover:stop, cover:reset or cover:compile from tests.",
+          "the module lost its line counters during the run, because it was loaded again or deleted (\"app@cart.beam\").",
+          "do not load new versions of measured modules, or call cover, from the tests.",
         ))
         |> or_fail_with(
           "expected the ModuleNotAnalysed with NotInstrumented message",
         )
       }),
-      it("describes ModuleNotAnalysed with UnknownAnalysisError", fn() {
-        render_failure_for(ModuleNotAnalysed(
-          "app@cart",
-          "src/app/cart.gleam",
-          UnknownAnalysisError,
-          "timeout",
-        ))
+      it("describes SessionAlreadyFinished", fn() {
+        render_failure_for(SessionAlreadyFinished)
         |> should
         |> be_equal(failure_block(
-          "Could not read coverage for module app@cart (src/app/cart.gleam).",
-          "cover returned an error (timeout).",
-          "run the tests again. If the error repeats, report it with the text in brackets.",
+          "Could not finish the coverage session.",
+          "coverage.finish already ran for this session, so the session no longer owns any line counters.",
+          "call coverage.finish once for each session that coverage.start returns.",
         ))
-        |> or_fail_with(
-          "expected the ModuleNotAnalysed with UnknownAnalysisError message",
-        )
+        |> or_fail_with("expected the SessionAlreadyFinished message")
       }),
       it("describes JsonWriteFailed", fn() {
         render_failure_for(JsonWriteFailed("out", IsDirectory("out")))

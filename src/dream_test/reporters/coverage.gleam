@@ -87,21 +87,22 @@
 
 import dream_test/coverage.{
   type AnalysisCause, type CoverageConfig, type CoverageError,
-  type FileBelowMinimum, type InstrumentCause, type LoadCause, type StartCause,
+  type FileBelowMinimum, type InstrumentCause, type LoadCause,
   AlreadyInstrumented, BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed,
-  CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
-  EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  ExcludeWithoutReason, FilesBelowMinimumPercent, HtmlDeleteFailed,
-  HtmlFileSourceReadFailed, HtmlFileWriteFailed, HtmlSourceReadFailed,
-  HtmlWriteFailed, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  CompilerNotLoaded, DebugInfoUnreadable, EmbeddedMode, EncryptedDebugInfo,
+  EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
+  FilesBelowMinimumPercent, HtmlDeleteFailed, HtmlFileSourceReadFailed,
+  HtmlFileWriteFailed, HtmlSourceReadFailed, HtmlWriteFailed,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
   IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
   InvalidEnvironmentValue, InvalidMinimumPercent, InvalidMinimumPercentPerFile,
   JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
-  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
-  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  MalformedLcov, MarkdownWriteFailed, ModuleAlreadyMeasured, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
+  NativeCoverageUnsupported, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OldCodeInUse, OnLoadFailed, RecompileFailed,
+  SessionAlreadyFinished, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed,
 }
 import dream_test/coverage/format
 import dream_test/coverage/report.{
@@ -780,13 +781,44 @@ fn error_message(error: CoverageError) -> ErrorMessage {
         reason: "the directory exists, but coverage has nothing in it to measure.",
         fix: "set the directory that holds your code with coverage.source_directory(...).",
       )
-    CoverStartFailed(cause, raw) -> start_message(cause, raw)
+    NativeCoverageUnsupported(otp_release, emulator_flavor) ->
+      ErrorMessage(
+        what: "Could not count lines in this Erlang runtime (Erlang/OTP "
+          <> otp_release
+          <> ", "
+          <> emulator_flavor
+          <> " emulator).",
+        reason: "coverage uses the native line counters of the BEAM, which need Erlang/OTP 27 or later with the JIT.",
+        fix: "run the tests on Erlang/OTP 27 or later, on a platform where the JIT is on (x86-64 or ARM64).",
+      )
+    CompilerNotLoaded(_cause, raw) ->
+      ErrorMessage(
+        what: "Could not load the Erlang compiler.",
+        reason: "coverage compiles each module again with line counters, and the compile module did not load ("
+          <> raw
+          <> ").",
+        fix: "install the Erlang compiler application. In embedded mode, load it when the BEAM starts.",
+      )
+    ModuleAlreadyMeasured(module_name, source_path) ->
+      ErrorMessage(
+        what: "Could not measure module "
+          <> describe_module(module_name, source_path)
+          <> ".",
+        reason: "another coverage run in this BEAM already measures this module, and two runs cannot share its line counters.",
+        fix: "finish the other run with coverage.finish first, or give each run a source directory that the other does not measure.",
+      )
     ModuleNotLoaded(module_name, source_path, cause, raw) ->
       load_message(describe_module(module_name, source_path), cause, raw)
     ModuleNotInstrumented(module_name, source_path, cause, raw) ->
       instrument_message(describe_module(module_name, source_path), cause, raw)
     ModuleNotAnalysed(module_name, source_path, cause, raw) ->
       analysis_message(describe_module(module_name, source_path), cause, raw)
+    SessionAlreadyFinished ->
+      ErrorMessage(
+        what: "Could not finish the coverage session.",
+        reason: "coverage.finish already ran for this session, so the session no longer owns any line counters.",
+        fix: "call coverage.finish once for each session that coverage.start returns.",
+      )
     LcovWriteFailed(path, error) -> write_message(lcov_output(), path, error)
     JsonWriteFailed(path, error) -> write_message(json_output(), path, error)
     CoberturaWriteFailed(path, error) ->
@@ -985,26 +1017,6 @@ fn source_location(source_path: String, line_number: Int) -> String {
   source_path <> ":" <> int.to_string(line_number)
 }
 
-fn start_message(cause: StartCause, raw: String) -> ErrorMessage {
-  let what = "Could not start the BEAM cover tool."
-  case cause {
-    CoverAlreadyRunning ->
-      ErrorMessage(
-        what: what,
-        reason: "cover is already running, so another coverage run owns it ("
-          <> raw
-          <> ").",
-        fix: "turn coverage on once with runner.coverage, and do not start cover from a test or another tool in the same run.",
-      )
-    CoverDidNotStart ->
-      ErrorMessage(
-        what: what,
-        reason: "cover returned an error (" <> raw <> ").",
-        fix: "check that the Erlang tools application is installed; some minimal Erlang packages leave it out.",
-      )
-  }
-}
-
 fn load_message(module: String, cause: LoadCause, raw: String) -> ErrorMessage {
   let what = "Could not load module " <> module <> "."
   case cause {
@@ -1046,12 +1058,12 @@ fn instrument_message(
   cause: InstrumentCause,
   raw: String,
 ) -> ErrorMessage {
-  let what = "Could not instrument module " <> module <> " for coverage."
+  let what = "Could not add line counters to module " <> module <> "."
   case cause {
     NoDebugInfo ->
       ErrorMessage(
         what: what,
-        reason: "the .beam file has no debug information, so cover cannot read the module's code ("
+        reason: "the .beam file has no debug information, so coverage cannot read the module's code ("
           <> raw
           <> ").",
         fix: "build with `gleam test` or `gleam build`, which keep debug information, and do not strip the .beam files.",
@@ -1064,27 +1076,45 @@ fn instrument_message(
           <> ").",
         fix: "build this module without encrypted debug information.",
       )
+    DebugInfoUnreadable ->
+      ErrorMessage(
+        what: what,
+        reason: "the debug information in the .beam file could not be read ("
+          <> raw
+          <> ").",
+        fix: "run `gleam test` again, and do not delete or change .beam files while the tests run.",
+      )
     AlreadyInstrumented ->
       ErrorMessage(
         what: what,
-        reason: "another tool already instrumented this module from source ("
+        reason: "another tool, such as cover, already gave this module line counters ("
           <> raw
           <> ").",
         fix: "do not run another coverage tool, or call cover yourself, in the same test run.",
       )
+    RecompileFailed ->
+      ErrorMessage(
+        what: what,
+        reason: "the Erlang compiler could not compile the module again with line counters ("
+          <> raw
+          <> ").",
+        fix: "run the tests without coverage to check that the module builds. If it does, report the error with the text in brackets.",
+      )
+    OldCodeInUse ->
+      ErrorMessage(
+        what: what,
+        reason: "a process still runs an older version of this module, and loading the module with line counters would kill that process ("
+          <> raw
+          <> ").",
+        fix: "start coverage before code loads a new version of this module, or stop the processes that run the older version.",
+      )
     InstrumentedLoadFailed ->
       ErrorMessage(
         what: what,
-        reason: "cover instrumented the module but could not load the result ("
+        reason: "the module with line counters could not be loaded ("
           <> raw
           <> ").",
         fix: "run the tests without coverage to check that the module loads, then try again.",
-      )
-    UnknownInstrumentError ->
-      ErrorMessage(
-        what: what,
-        reason: "cover returned an error (" <> raw <> ").",
-        fix: "run the tests without coverage to check that the module builds and loads.",
       )
   }
 }
@@ -1099,16 +1129,10 @@ fn analysis_message(
     NotInstrumented ->
       ErrorMessage(
         what: what,
-        reason: "the module was no longer instrumented at the end of the run, so something stopped or reset cover during the tests ("
+        reason: "the module lost its line counters during the run, because it was loaded again or deleted ("
           <> raw
           <> ").",
-        fix: "do not call cover:stop, cover:reset or cover:compile from tests.",
-      )
-    UnknownAnalysisError ->
-      ErrorMessage(
-        what: what,
-        reason: "cover returned an error (" <> raw <> ").",
-        fix: "run the tests again. If the error repeats, report it with the text in brackets.",
+        fix: "do not load new versions of measured modules, or call cover, from the tests.",
       )
   }
 }

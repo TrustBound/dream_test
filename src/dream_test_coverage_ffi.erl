@@ -1,9 +1,9 @@
 -module(dream_test_coverage_ffi).
 -export([
-    start_cover/0,
+    start_if_supported/5,
     list_source_files/1,
-    compile_module/2,
-    analyse_module/2,
+    start_measuring/1,
+    stop_measuring/2,
     match_files/1,
     is_regular_file/1,
     erlang_function_last_line/1,
@@ -16,25 +16,18 @@
 %%
 %% Every function that can fail returns a Gleam `Result`. Error tuples must
 %% match the constructors of `dream_test/coverage.CoverageError` exactly.
-%% Calls into `cover` are wrapped in `try`, because `cover` raises (rather
-%% than returns an error) for some inputs, such as a preloaded module.
-
-%% Start the BEAM `cover` server.
 %%
-%% An already running cover server is an error: another tool owns it, and
-%% sharing it would mix that tool's data into this report.
-start_cover() ->
-    try cover:start() of
-        {ok, _Pid} ->
-            {ok, nil};
-        {error, {already_started, _Pid} = Reason} ->
-            {error, {cover_start_failed, cover_already_running, format_reason(Reason)}};
-        {error, Reason} ->
-            {error, {cover_start_failed, cover_did_not_start, format_reason(Reason)}}
-    catch
-        Class:Reason ->
-            {error, {cover_start_failed, cover_did_not_start, format_reason({Class, Reason})}}
-    end.
+%% Lines are counted with the native line counters of the BEAM (Erlang/OTP
+%% 27 and later, with the JIT): each measured module is recompiled with the
+%% `line_coverage` and `force_line_counters` options and loaded again, and
+%% `code:get_coverage(line, Module)` reads its counts. The counters belong
+%% to each module, so more than one measurement can run in one BEAM, as long
+%% as no module is in two of them.
+
+%% The compile option that marks a module this file recompiled.
+-define(MARKER, {dream_test_coverage, line_counters}).
+%% The persistent term that holds the claims, and the name of their lock.
+-define(CLAIMS, {?MODULE, claims}).
 
 %% List the `.gleam` and `.erl` files under a source directory.
 %%
@@ -51,33 +44,159 @@ source_files_in(Directory) ->
     Erlang = filelib:wildcard("**/*.erl", DirectoryString),
     lists:sort([unicode:characters_to_binary(Path) || Path <- Gleam ++ Erlang]).
 
-%% Load a module and replace it with a cover-compiled version.
+%% Start counting the lines of every module in `Modules`, a list of Gleam
+%% `CoveredModule` records.
 %%
-%% `SourcePath` is only used in errors, so messages can name the source file.
+%% Native line counters need Erlang/OTP 27 or later with the JIT, and the
+%% compiler application, which recompiles each measured module. Both are
+%% checked before any module changes. `code:coverage_support/0` does not
+%% exist before OTP 27.
 %%
-%% `cover:compile_beam/1` reads the abstract code from the loaded module's
-%% `.beam` file, so no source compile happens. Gleam keeps that abstract code
-%% in the `Dbgi` chunk.
-compile_module(ModuleName, SourcePath) ->
-    Module = binary_to_atom(ModuleName, utf8),
-    case code:ensure_loaded(Module) of
-        {module, Module} ->
-            compile_loaded_module(ModuleName, SourcePath, Module);
-        {error, Reason} ->
-            {error, {module_not_loaded, ModuleName, SourcePath, load_cause(Reason), format_reason(Reason)}}
+%% Then each module is claimed for this measurement, so two measurements
+%% in one BEAM never count the same module. Then each module is recompiled
+%% from the abstract code in its `.beam` file with native line counters and
+%% loaded. A module that an earlier measurement already recompiled keeps its
+%% counters, which are set to zero.
+%%
+%% Returns `{Measurement, SourcePaths}`: the measurement to pass to
+%% `stop_measuring/2`, and the source paths of the modules that were built
+%% from an Erlang source file. On an error, the claims are given back.
+start_measuring(Modules) ->
+    start_if_supported(
+        erlang:function_exported(code, coverage_support, 0) andalso code:coverage_support(),
+        code:ensure_loaded(compile),
+        erlang:system_info(otp_release),
+        erlang:system_info(emu_flavor),
+        Modules
+    ).
+
+%% `start_measuring/1` for the facts it reads about the runtime. The tests
+%% call it with the facts of a runtime that cannot count lines.
+start_if_supported(false, _CompilerLoad, OtpRelease, EmulatorFlavor, _Modules) ->
+    {error, {native_coverage_unsupported, unicode:characters_to_binary(OtpRelease), atom_to_binary(EmulatorFlavor)}};
+start_if_supported(true, {error, Reason}, _OtpRelease, _EmulatorFlavor, _Modules) ->
+    {error, {compiler_not_loaded, load_cause(Reason), format_reason(Reason)}};
+start_if_supported(true, {module, compile}, _OtpRelease, _EmulatorFlavor, Modules) ->
+    Measurement = make_ref(),
+    case with_claims_lock(fun claim/2, [Measurement, Modules]) of
+        ok -> measure_each(Measurement, Modules, []);
+        {error, _} = Error -> Error
     end.
 
-compile_loaded_module(ModuleName, SourcePath, Module) ->
-    BuiltFromErlangSource = built_from_erlang_source(Module),
-    try cover:compile_beam(Module) of
-        {ok, Module} ->
-            {ok, BuiltFromErlangSource};
-        {error, Reason} ->
-            {error, {module_not_instrumented, ModuleName, SourcePath, instrument_cause(Reason), format_reason(Reason)}}
-    catch
-        Class:Reason ->
-            {error, {module_not_instrumented, ModuleName, SourcePath, unknown_instrument_error, format_reason({Class, Reason})}}
+measure_each(Measurement, [], ErlangSourcePaths) ->
+    {ok, {Measurement, lists:reverse(ErlangSourcePaths)}};
+measure_each(Measurement, [{covered_module, _ModuleName, SourcePath} = Covered | Rest], ErlangSourcePaths) ->
+    case measure_module(Covered) of
+        {ok, true} -> measure_each(Measurement, Rest, [SourcePath | ErlangSourcePaths]);
+        {ok, false} -> measure_each(Measurement, Rest, ErlangSourcePaths);
+        {error, _} = Error -> give_back(Measurement, Error)
     end.
+
+give_back(Measurement, Error) ->
+    ok = with_claims_lock(fun release/1, [Measurement]),
+    Error.
+
+%% Stop a measurement: give back its claims, then read the line counts of
+%% every module. Returns `{SourcePath, Lines}` for each module, where Lines
+%% holds `{line_coverage, Line, Calls}` for every executable line, sorted.
+%%
+%% The modules keep their counters, so code that still runs them is still
+%% counted, but nothing reads those counts. The next measurement of a
+%% module sets them to zero.
+stop_measuring(Measurement, Modules) ->
+    case with_claims_lock(fun release_owned/2, [Measurement, Modules]) of
+        ok -> read_each(Modules, []);
+        {error, _} = Error -> Error
+    end.
+
+read_each([], Files) ->
+    {ok, lists:reverse(Files)};
+read_each([{covered_module, ModuleName, SourcePath} | Rest], Files) ->
+    Module = binary_to_atom(ModuleName, utf8),
+    case is_measured(Module) of
+        true -> read_each(Rest, [{SourcePath, line_coverage(code:get_coverage(line, Module))} | Files]);
+        false -> {error, {module_not_analysed, ModuleName, SourcePath, not_instrumented, format_reason(code:which(Module))}}
+    end.
+
+%% One entry per line, with the counts of a line added together: the
+%% compiler can copy a line's code, and each copy has its own counter.
+%% Line 0 is code with no source line.
+line_coverage(Entries) ->
+    Counts = lists:foldl(fun add_count/2, #{}, [Entry || {Line, _Calls} = Entry <- Entries, Line > 0]),
+    [{line_coverage, Line, Calls} || {Line, Calls} <- lists:sort(maps:to_list(Counts))].
+
+add_count({Line, Calls}, Counts) ->
+    Counts#{Line => maps:get(Line, Counts, 0) + Calls}.
+
+%% ---------------------------------------------------------------------------
+%% One module
+%% ---------------------------------------------------------------------------
+
+%% Make one module count its lines. Returns `{ok, BuiltFromErlangSource}`.
+measure_module({covered_module, ModuleName, SourcePath}) ->
+    Module = binary_to_atom(ModuleName, utf8),
+    case code:ensure_loaded(Module) of
+        {module, Module} -> measure_loaded(Module, ModuleName, SourcePath);
+        {error, Reason} -> {error, {module_not_loaded, ModuleName, SourcePath, load_cause(Reason), format_reason(Reason)}}
+    end.
+
+%% A module that this file recompiled has the `?MARKER` compile option. A
+%% module with line counters but no marker was recompiled by another tool,
+%% such as `cover`, and that tool owns its counters.
+measure_loaded(Module, ModuleName, SourcePath) ->
+    case {is_measured(Module), code:get_coverage_mode(Module)} of
+        {true, _Mode} -> with_abstract_code(fun restart_counters/4, Module, ModuleName, SourcePath);
+        {false, none} -> with_abstract_code(fun add_counters/4, Module, ModuleName, SourcePath);
+        {false, Mode} -> instrument_error(ModuleName, SourcePath, already_instrumented, {coverage_mode, Mode})
+    end.
+
+with_abstract_code(Next, Module, ModuleName, SourcePath) ->
+    case abstract_code(beam_lib:chunks(code:which(Module), [abstract_code])) of
+        {ok, Forms} -> Next(Module, ModuleName, SourcePath, Forms);
+        {error, Cause, Reason} -> instrument_error(ModuleName, SourcePath, Cause, Reason)
+    end.
+
+abstract_code({ok, {_Module, [{abstract_code, {raw_abstract_v1, Forms}}]}}) ->
+    {ok, Forms};
+abstract_code({ok, {_Module, [{abstract_code, no_abstract_code}]}} = Reason) ->
+    {error, no_debug_info, Reason};
+abstract_code({error, beam_lib, {missing_backend, _BeamFile, _Backend}} = Reason) ->
+    {error, no_debug_info, Reason};
+abstract_code({error, beam_lib, {key_missing_or_invalid, _BeamFile, abstract_code}} = Reason) ->
+    {error, encrypted_debug_info, Reason};
+abstract_code(Reason) ->
+    {error, debug_info_unreadable, Reason}.
+
+restart_counters(Module, _ModuleName, _SourcePath, Forms) ->
+    ok = code:reset_coverage(Module),
+    {ok, built_from_erlang_source(Forms)}.
+
+add_counters(Module, ModuleName, SourcePath, Forms) ->
+    case compile:forms(Forms, [binary, return_errors, line_coverage, force_line_counters, ?MARKER]) of
+        {ok, Module, Binary} -> load_counters(Module, ModuleName, SourcePath, Binary, Forms);
+        Reason -> instrument_error(ModuleName, SourcePath, recompile_failed, Reason)
+    end.
+
+%% Loading new code turns the current code into old code, and a load when
+%% old code already exists kills every process that still runs the old code.
+%% So remove old code first, but only when no process runs it
+%% (`code:soft_purge/1`), and fail when one does.
+load_counters(Module, ModuleName, SourcePath, Binary, Forms) ->
+    case code:soft_purge(Module) andalso code:load_binary(Module, code:which(Module), Binary) of
+        {module, Module} -> {ok, built_from_erlang_source(Forms)};
+        false -> instrument_error(ModuleName, SourcePath, old_code_in_use, {old_code_in_use, processes_running_old_code(Module)});
+        {error, Reason} -> instrument_error(ModuleName, SourcePath, instrumented_load_failed, Reason)
+    end.
+
+processes_running_old_code(Module) ->
+    [Process || Process <- erlang:processes(), erlang:check_process_code(Process, Module)].
+
+instrument_error(ModuleName, SourcePath, Cause, Reason) ->
+    {error, {module_not_instrumented, ModuleName, SourcePath, Cause, format_reason(Reason)}}.
+
+is_measured(Module) ->
+    erlang:module_loaded(Module)
+        andalso lists:member(?MARKER, proplists:get_value(options, erlang:get_module_info(Module, compile), [])).
 
 %% True when the module's abstract code was compiled from an Erlang source
 %% file. The Erlang preprocessor puts a `-file` attribute that names the
@@ -85,16 +204,8 @@ compile_loaded_module(ModuleName, SourcePath, Module) ->
 %% so its line numbers inside functions can drift. Gleam 1.19 and later
 %% compile abstract code directly, and every `-file` attribute names the
 %% `.gleam` file.
-%%
-%% When the abstract code cannot be read, `cover:compile_beam/1` fails on the
-%% same file and returns the error, so `false` here is never used.
-built_from_erlang_source(Module) ->
-    case beam_lib:chunks(code:which(Module), [abstract_code]) of
-        {ok, {Module, [{abstract_code, {raw_abstract_v1, Forms}}]}} ->
-            lists:any(fun is_erlang_file_attribute/1, Forms);
-        _NoAbstractCode ->
-            false
-    end.
+built_from_erlang_source(Forms) ->
+    lists:any(fun is_erlang_file_attribute/1, Forms).
 
 is_erlang_file_attribute({attribute, _, file, {File, _}}) ->
     filename:extension(File) =:= ".erl";
@@ -102,40 +213,44 @@ is_erlang_file_attribute(_Form) ->
     false.
 
 %% `code:ensure_loaded/1` returns exactly these four errors.
-load_cause(nofile) -> module_not_built;
-load_cause(on_load_failure) -> on_load_failed;
-load_cause(badfile) -> bad_beam_file;
-load_cause(embedded) -> embedded_mode.
+load_cause(Reason) ->
+    maps:get(Reason, #{nofile => module_not_built, on_load_failure => on_load_failed, badfile => bad_beam_file, embedded => embedded_mode}).
 
-instrument_cause({no_abstract_code, _BeamFile}) -> no_debug_info;
-instrument_cause({{missing_backend, _Backend}, _BeamFile}) -> no_debug_info;
-instrument_cause({encrypted_abstract_code, _BeamFile}) -> encrypted_debug_info;
-instrument_cause({already_cover_compiled, _NoBeam, _Module}) -> already_instrumented;
-instrument_cause(BeamFile) when is_list(BeamFile) -> instrumented_load_failed;
-instrument_cause(_Other) -> unknown_instrument_error.
+%% ---------------------------------------------------------------------------
+%% Claims
+%% ---------------------------------------------------------------------------
 
-%% Return `{line_coverage, Line, Calls}` for every executable line, sorted by line.
-%%
-%% Line 0 entries are compiler-generated code with no source line; they are
-%% dropped.
-analyse_module(ModuleName, SourcePath) ->
-    Module = binary_to_atom(ModuleName, utf8),
-    try cover:analyse(Module, calls, line) of
-        {ok, Entries} ->
-            {ok, line_coverage(Entries)};
-        {error, Reason} ->
-            {error, {module_not_analysed, ModuleName, SourcePath, analysis_cause(Reason), format_reason(Reason)}}
-    catch
-        Class:Reason ->
-            {error, {module_not_analysed, ModuleName, SourcePath, unknown_analysis_error, format_reason({Class, Reason})}}
+%% The claims map module names to the measurement that counts them. It lives
+%% in a persistent term, and a global lock on this node makes each read and
+%% update of it one step.
+with_claims_lock(Function, Arguments) ->
+    Lock = {?CLAIMS, self()},
+    true = global:set_lock(Lock, [node()]),
+    try
+        apply(Function, Arguments)
+    after
+        global:del_lock(Lock, [node()])
     end.
 
-analysis_cause({not_cover_compiled, _Module}) -> not_instrumented;
-analysis_cause(_Other) -> unknown_analysis_error.
+claim(Measurement, Modules) ->
+    Claims = persistent_term:get(?CLAIMS, #{}),
+    case [Covered || {covered_module, ModuleName, _} = Covered <- Modules, maps:is_key(ModuleName, Claims)] of
+        [] -> persistent_term:put(?CLAIMS, maps:merge(Claims, #{ModuleName => Measurement || {covered_module, ModuleName, _} <- Modules}));
+        [{covered_module, ModuleName, SourcePath} | _] -> {error, {module_already_measured, ModuleName, SourcePath}}
+    end.
 
-line_coverage(Entries) ->
-    Lines = [{line_coverage, Line, Calls} || {{_Module, Line}, Calls} <- Entries, Line > 0],
-    lists:keysort(2, Lines).
+release(Measurement) ->
+    Claims = persistent_term:get(?CLAIMS, #{}),
+    persistent_term:put(?CLAIMS, #{ModuleName => Owner || ModuleName := Owner <- Claims, Owner =/= Measurement}).
+
+%% Give back the claims of a measurement that still owns every one of its
+%% modules. When it does not, `stop_measuring/2` already ran for it.
+release_owned(Measurement, Modules) ->
+    Claims = persistent_term:get(?CLAIMS, #{}),
+    case [ModuleName || {covered_module, ModuleName, _} <- Modules, maps:get(ModuleName, Claims, none) =/= Measurement] of
+        [] -> release(Measurement);
+        _NotOwned -> {error, session_already_finished}
+    end.
 
 %% The regular files that match a wildcard pattern, sorted.
 match_files(Pattern) ->

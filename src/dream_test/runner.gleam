@@ -489,12 +489,13 @@ pub fn output(
 
 /// Measure line coverage of the project's own `src` modules during the run.
 ///
-/// Before any test runs, the runner instruments every module built from the
-/// source directory with the BEAM `cover` tool. After the results reporters,
+/// Before any test runs, the runner gives every module built from the source
+/// directory the native line counters of the BEAM (Erlang/OTP 27 or later
+/// with the JIT). After the results reporters,
 /// it prints a coverage table and writes an LCOV file. See
 /// `dream_test/coverage` for the settings.
 ///
-/// A coverage error (for example, a module that cannot be instrumented) is
+/// A coverage error (for example, a module without debug information) is
 /// written to the error output. With `exit_on_failure`, it also makes the run
 /// exit with status 1, so a broken coverage setup does not pass silently.
 ///
