@@ -257,9 +257,6 @@ type WorkerMessage {
   WorkerDown(down: Down)
 }
 
-@external(erlang, "sandbox_ffi", "run_catching")
-fn run_catching(fn_to_run: fn() -> a) -> Result(a, String)
-
 /// Default executor configuration.
 ///
 /// Prefer configuring these values via `dream_test/runner` unless you are using
@@ -1053,10 +1050,10 @@ fn start_workers_up_to_limit(
 
 /// Run one test in a new process that sends its result to the loop. The
 /// test can time out or crash only in its sandbox, so the worker always
-/// sends a result. A crash of the worker itself is a bug in this module:
-/// `run_catching` turns it into a failed result, so the loop never waits
-/// for a result that does not come. The caller monitors the worker, for a
-/// worker that something outside this module stops.
+/// sends a result. The caller monitors the worker: if the worker exits
+/// before it sends its result, because something outside this module
+/// stopped it or because of a bug in this module, the down message gives
+/// a failed result with the exit reason.
 fn spawn_test_worker(
   input: StartWorkersUpToLimitConfig(context),
   index: Int,
@@ -1078,37 +1075,20 @@ fn spawn_test_worker(
     max_concurrency: _,
   ) = input
   spawn_unlinked(fn() {
-    case
-      run_catching(fn() {
-        execute_one_test_node(
-          config,
-          scope,
-          inherited_tags,
-          context,
-          runner_before_each_test,
-          runner_after_each_test,
-          before_each_hooks,
-          after_each_hooks,
-          failures_rev,
-          test_case,
-        )
-      })
-    {
-      Ok(result) -> send(subject, WorkerFinished(index: index, result: result))
-      Error(reason) ->
-        send(
-          subject,
-          WorkerFinished(
-            index: index,
-            result: worker_crash_result(
-              scope,
-              inherited_tags,
-              test_case,
-              reason,
-            ),
-          ),
-        )
-    }
+    let result =
+      execute_one_test_node(
+        config,
+        scope,
+        inherited_tags,
+        context,
+        runner_before_each_test,
+        runner_after_each_test,
+        before_each_hooks,
+        after_each_hooks,
+        failures_rev,
+        test_case,
+      )
+    send(subject, WorkerFinished(index: index, result: result))
   })
 }
 
