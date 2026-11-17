@@ -9,14 +9,15 @@ import dream_test/coverage/report.{type CoverageReport, LineCoverage}
 import dream_test/coverage_project_support.{measure, with_fixture_lock}
 import dream_test/file.{IsDirectory, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/process.{unique_port}
 import dream_test/unit.{describe, group, it}
-import gleam/int
 
 /// A new, empty directory for one test's LCOV files.
 fn merge_directory() -> String {
-  "build/coverage/merge_tests/" <> int.to_string(unique_port())
+  "build/coverage/merge_tests/" <> unique_name()
 }
+
+@external(erlang, "dream_test_coverage_test_ffi", "unique_name")
+fn unique_name() -> String
 
 /// Measure `classify(1)` on the fixtures, merging `<directory>/*.info`.
 fn measure_with_merge(

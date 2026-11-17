@@ -1,5 +1,6 @@
 -module(dream_test_coverage_test_ffi).
 -export([
+    unique_name/0,
     run_in_peer/1,
     run_in_embedded_peer/1,
     run_main_in_new_vm/2,
@@ -242,3 +243,10 @@ is_build_path(Path) ->
 
 format(Term) ->
     unicode:characters_to_binary(io_lib:format("~tp", [Term])).
+
+%% A name that no other call gives, in this run or an earlier run that left
+%% files in `build`: the time in nanoseconds and a counter of this BEAM.
+unique_name() ->
+    Time = integer_to_binary(os:system_time(nanosecond)),
+    Counter = integer_to_binary(erlang:unique_integer([positive])),
+    <<Time/binary, "_", Counter/binary>>.
