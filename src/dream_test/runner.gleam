@@ -50,6 +50,7 @@
 //// ```
 
 import dream_test/coverage.{type CoverageConfig, type CoverageSession}
+import dream_test/coverage/report.{type CoverageReport}
 import dream_test/parallel
 import dream_test/reporters/bdd
 import dream_test/reporters/coverage as coverage_reporter
@@ -58,8 +59,8 @@ import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
   type AssertionFailure, type Node, type TestResult, type TestSuite, AfterAll,
-  AfterEach, BeforeAll, BeforeEach, Failed, Group, Root, SetupFailed, Test,
-  TimedOut, Unit,
+  AfterEach, BeforeAll, BeforeEach, Failed, Group, Passed, Root, SetupFailed,
+  Test, TimedOut, Unit,
 }
 import gleam/io
 import gleam/list
@@ -829,7 +830,12 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
 
   write_results_reporters(builder.results_reporters, final_results, output)
 
-  let coverage_succeeded = finish_coverage(coverage_state, output)
+  let coverage_succeeded =
+    finish_coverage(
+      coverage_state,
+      output,
+      run_outcome(final_results, builder.should_exit_on_failure),
+    )
 
   maybe_exit_on_failure(
     builder.should_exit_on_failure,
@@ -1510,53 +1516,108 @@ fn suite_run_config(
 
 type CoverageState {
   CoverageOff
-  CoverageRunning(session: CoverageSession)
+  CoverageRunning(session: CoverageSession, config: CoverageConfig)
   CoverageStartFailed(error: coverage.CoverageError)
 }
 
 fn start_coverage(config: Option(CoverageConfig)) -> CoverageState {
   case config {
     None -> CoverageOff
-    Some(config) -> coverage_state_from_start(coverage.start(config))
+    Some(config) -> coverage_state_from_start(coverage.start(config), config)
   }
 }
 
 fn coverage_state_from_start(
   result: Result(CoverageSession, coverage.CoverageError),
+  config: CoverageConfig,
 ) -> CoverageState {
   case result {
-    Ok(session) -> CoverageRunning(session)
+    Ok(session) -> CoverageRunning(session, config)
     Error(error) -> CoverageStartFailed(error)
   }
 }
 
-/// Print the coverage table, or the coverage error. Returns `False` on error.
-fn finish_coverage(state: CoverageState, output: Output) -> Bool {
+/// Print the coverage table to the reporter output, or the coverage failure
+/// block to the error output (once, after the results reporters).
+/// Returns `False` on error.
+fn finish_coverage(
+  state: CoverageState,
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
   case state {
     CoverageOff -> True
-    CoverageRunning(session) ->
-      write_coverage_result(coverage.finish(session), output)
-    CoverageStartFailed(error) -> write_coverage_error(error, output)
+    CoverageRunning(session, config) ->
+      write_coverage_result(coverage.finish(session), config, output, outcome)
+    CoverageStartFailed(error) -> write_coverage_error(error, output, outcome)
   }
 }
 
 fn write_coverage_result(
-  result: Result(coverage.CoverageReport, coverage.CoverageError),
+  result: Result(CoverageReport, coverage.CoverageError),
+  config: CoverageConfig,
   output: Output,
+  outcome: coverage_reporter.RunOutcome,
 ) -> Bool {
   case result {
     Ok(report) -> {
-      output_out(output)(coverage_reporter.render(report))
-      True
+      output_out(output)(coverage_reporter.render(
+        report: report,
+        config: config,
+      ))
+      write_minimum_result(
+        coverage.check_minimum(config: config, report: report),
+        output,
+        outcome,
+      )
     }
-    Error(error) -> write_coverage_error(error, output)
+    Error(error) -> write_coverage_error(error, output, outcome)
   }
 }
 
-fn write_coverage_error(error: coverage.CoverageError, output: Output) -> Bool {
+fn write_minimum_result(
+  result: Result(Nil, coverage.CoverageError),
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
+  case result {
+    Ok(Nil) -> True
+    Error(error) -> write_coverage_error(error, output, outcome)
+  }
+}
+
+fn write_coverage_error(
+  error: coverage.CoverageError,
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
   let Output(out: _out, error: write_error) = output
-  write_error(coverage.error_to_string(error) <> "\n")
+  write_error(coverage_reporter.render_failure(error: error, outcome: outcome))
   False
+}
+
+fn run_outcome(
+  results: List(TestResult),
+  exit_on_failure: Bool,
+) -> coverage_reporter.RunOutcome {
+  coverage_reporter.RunOutcome(
+    passed: list.count(results, is_passed),
+    failed: list.count(results, is_failure),
+    exit_on_failure: exit_on_failure,
+  )
+}
+
+fn is_passed(result: TestResult) -> Bool {
+  result.status == Passed
+}
+
+fn is_failure(result: TestResult) -> Bool {
+  case result.status {
+    Failed -> True
+    SetupFailed -> True
+    TimedOut -> True
+    _ -> False
+  }
 }
 
 fn write_progress_event(

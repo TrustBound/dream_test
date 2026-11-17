@@ -2,23 +2,34 @@
 -export([
     start_cover/0,
     list_source_files/1,
-    compile_module/1,
-    analyse_module/1
+    compile_module/2,
+    analyse_module/2,
+    match_files/1,
+    is_regular_file/1
 ]).
 
 %% Erlang side of `dream_test/coverage`.
 %%
-%% Every function returns a Gleam `Result`. Error tuples must match the
-%% constructors of `dream_test/coverage.CoverageError` exactly.
+%% Every function that can fail returns a Gleam `Result`. Error tuples must
+%% match the constructors of `dream_test/coverage.CoverageError` exactly.
+%% Calls into `cover` are wrapped in `try`, because `cover` raises (rather
+%% than returns an error) for some inputs, such as a preloaded module.
 
 %% Start the BEAM `cover` server.
 %%
 %% An already running cover server is an error: another tool owns it, and
 %% sharing it would mix that tool's data into this report.
 start_cover() ->
-    case cover:start() of
-        {ok, _Pid} -> {ok, nil};
-        {error, Reason} -> {error, {cover_start_failed, format_reason(Reason)}}
+    try cover:start() of
+        {ok, _Pid} ->
+            {ok, nil};
+        {error, {already_started, _Pid} = Reason} ->
+            {error, {cover_start_failed, cover_already_running, format_reason(Reason)}};
+        {error, Reason} ->
+            {error, {cover_start_failed, cover_did_not_start, format_reason(Reason)}}
+    catch
+        Class:Reason ->
+            {error, {cover_start_failed, cover_did_not_start, format_reason({Class, Reason})}}
     end.
 
 %% List the `.gleam` and `.erl` files under a source directory.
@@ -38,36 +49,74 @@ source_files_in(Directory) ->
 
 %% Load a module and replace it with a cover-compiled version.
 %%
+%% `SourcePath` is only used in errors, so messages can name the source file.
+%%
 %% `cover:compile_beam/1` reads the abstract code from the loaded module's
 %% `.beam` file, so no source compile happens. Gleam keeps that abstract code
 %% in the `Dbgi` chunk.
-compile_module(ModuleName) ->
+compile_module(ModuleName, SourcePath) ->
     Module = binary_to_atom(ModuleName, utf8),
     case code:ensure_loaded(Module) of
-        {module, Module} -> compile_loaded_module(ModuleName, Module);
-        {error, Reason} -> {error, {module_not_loaded, ModuleName, format_reason(Reason)}}
+        {module, Module} ->
+            compile_loaded_module(ModuleName, SourcePath, Module);
+        {error, Reason} ->
+            {error, {module_not_loaded, ModuleName, SourcePath, load_cause(Reason), format_reason(Reason)}}
     end.
 
-compile_loaded_module(ModuleName, Module) ->
-    case cover:compile_beam(Module) of
-        {ok, Module} -> {ok, nil};
-        {error, Reason} -> {error, {module_compile_failed, ModuleName, format_reason(Reason)}}
+compile_loaded_module(ModuleName, SourcePath, Module) ->
+    try cover:compile_beam(Module) of
+        {ok, Module} ->
+            {ok, nil};
+        {error, Reason} ->
+            {error, {module_not_instrumented, ModuleName, SourcePath, instrument_cause(Reason), format_reason(Reason)}}
+    catch
+        Class:Reason ->
+            {error, {module_not_instrumented, ModuleName, SourcePath, unknown_instrument_error, format_reason({Class, Reason})}}
     end.
+
+%% `code:ensure_loaded/1` returns exactly these four errors.
+load_cause(nofile) -> module_not_built;
+load_cause(on_load_failure) -> on_load_failed;
+load_cause(badfile) -> bad_beam_file;
+load_cause(embedded) -> embedded_mode.
+
+instrument_cause({no_abstract_code, _BeamFile}) -> no_debug_info;
+instrument_cause({{missing_backend, _Backend}, _BeamFile}) -> no_debug_info;
+instrument_cause({encrypted_abstract_code, _BeamFile}) -> encrypted_debug_info;
+instrument_cause({already_cover_compiled, _NoBeam, _Module}) -> already_instrumented;
+instrument_cause(BeamFile) when is_list(BeamFile) -> instrumented_load_failed;
+instrument_cause(_Other) -> unknown_instrument_error.
 
 %% Return `{line_coverage, Line, Calls}` for every executable line, sorted by line.
 %%
 %% Line 0 entries are compiler-generated code with no source line; they are
 %% dropped.
-analyse_module(ModuleName) ->
+analyse_module(ModuleName, SourcePath) ->
     Module = binary_to_atom(ModuleName, utf8),
-    case cover:analyse(Module, calls, line) of
-        {ok, Entries} -> {ok, line_coverage(Entries)};
-        {error, Reason} -> {error, {analysis_failed, ModuleName, format_reason(Reason)}}
+    try cover:analyse(Module, calls, line) of
+        {ok, Entries} ->
+            {ok, line_coverage(Entries)};
+        {error, Reason} ->
+            {error, {module_not_analysed, ModuleName, SourcePath, analysis_cause(Reason), format_reason(Reason)}}
+    catch
+        Class:Reason ->
+            {error, {module_not_analysed, ModuleName, SourcePath, unknown_analysis_error, format_reason({Class, Reason})}}
     end.
+
+analysis_cause({not_cover_compiled, _Module}) -> not_instrumented;
+analysis_cause(_Other) -> unknown_analysis_error.
 
 line_coverage(Entries) ->
     Lines = [{line_coverage, Line, Calls} || {{_Module, Line}, Calls} <- Entries, Line > 0],
     lists:keysort(2, Lines).
+
+%% The regular files that match a wildcard pattern, sorted.
+match_files(Pattern) ->
+    Paths = filelib:wildcard(unicode:characters_to_list(Pattern)),
+    lists:sort([unicode:characters_to_binary(Path) || Path <- Paths]).
+
+is_regular_file(Path) ->
+    filelib:is_regular(Path).
 
 format_reason(Reason) ->
     unicode:characters_to_binary(io_lib:format("~tp", [Reason])).

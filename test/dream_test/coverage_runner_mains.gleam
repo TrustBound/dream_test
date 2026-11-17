@@ -1,0 +1,66 @@
+//// Test mains for test/dream_test/runner_coverage_test.gleam.
+////
+//// Each function runs the dream_test runner with coverage on the fixture
+//// modules in test/coverage_fixtures. The tests call them in a new `erl`
+//// process, so they can check the real output and exit status.
+
+import coverage_fixtures/sample
+import dream_test/coverage
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/runner
+import dream_test/unit.{describe, it}
+
+fn fixture_tests() {
+  describe("fixture", [
+    it("classifies a positive number", fn() {
+      sample.classify(1)
+      |> should
+      |> be_equal("positive")
+      |> or_fail_with("expected positive")
+    }),
+  ])
+}
+
+fn fixture_coverage() {
+  coverage.new()
+  |> coverage.source_directory("test/coverage_fixtures")
+  |> coverage.no_lcov()
+}
+
+pub fn passing_run_with_missing_lines() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(fixture_coverage() |> coverage.show_missing())
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+pub fn below_minimum_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(fixture_coverage() |> coverage.minimum_percent(50.0))
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+pub fn below_minimum_without_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(fixture_coverage() |> coverage.minimum_percent(50.0))
+    |> runner.run()
+  Nil
+}
+
+pub fn missing_source_directory_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage(
+      coverage.new()
+      |> coverage.source_directory("test/no_such_coverage_directory"),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
