@@ -1,3 +1,4 @@
+import dream_test/coverage
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -12,6 +13,7 @@ pub fn main() {
   runner.new(suites)
   |> runner.progress_reporter(progress.new())
   |> runner.results_reporters([bdd.new() |> bdd.color()])
+  |> runner.coverage(coverage.new())
   |> runner.exit_on_failure()
   |> runner.run()
 }

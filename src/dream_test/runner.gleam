@@ -49,8 +49,10 @@
 //// }
 //// ```
 
+import dream_test/coverage.{type CoverageConfig, type CoverageSession}
 import dream_test/parallel
 import dream_test/reporters/bdd
+import dream_test/reporters/coverage as coverage_reporter
 import dream_test/reporters/json
 import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
@@ -113,6 +115,7 @@ pub opaque type RunBuilder(ctx) {
     progress_reporter: Option(progress.ProgressReporter),
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
+    coverage: Option(CoverageConfig),
     runner_before_each_test: List(
       fn(types.TestInfo, ctx) -> Result(ctx, String),
     ),
@@ -197,6 +200,7 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
     progress_reporter: None,
     results_reporters: [],
     output: None,
+    coverage: None,
     runner_before_each_test: [],
     runner_after_each_test: [],
     runner_before_each_suite: [],
@@ -482,6 +486,39 @@ pub fn output(
   RunBuilder(..builder, output: Some(output))
 }
 
+/// Measure line coverage of the project's own `src` modules during the run.
+///
+/// Before any test runs, the runner instruments every module built from the
+/// source directory with the BEAM `cover` tool. After the results reporters,
+/// it prints a coverage table and writes an LCOV file. See
+/// `dream_test/coverage` for the settings.
+///
+/// A coverage error (for example, a module that cannot be instrumented) is
+/// written to the error output. With `exit_on_failure`, it also makes the run
+/// exit with status 1, so a broken coverage setup does not pass silently.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/coverage
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+///
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.coverage(coverage.new())
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+pub fn coverage(
+  builder builder: RunBuilder(ctx),
+  config config: CoverageConfig,
+) -> RunBuilder(ctx) {
+  RunBuilder(..builder, coverage: Some(config))
+}
+
 /// Disable all reporter output (still returns results from `runner.run()`).
 pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
   RunBuilder(..builder, output: Some(silent_output()))
@@ -706,6 +743,8 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
     None -> default_output()
   }
 
+  let coverage_state = start_coverage(builder.coverage)
+
   let completed0 = 0
   let progress_reporter0 = builder.progress_reporter
   let completed1 = case progress_reporter0 {
@@ -790,7 +829,13 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
 
   write_results_reporters(builder.results_reporters, final_results, output)
 
-  maybe_exit_on_failure(builder.should_exit_on_failure, final_results)
+  let coverage_succeeded = finish_coverage(coverage_state, output)
+
+  maybe_exit_on_failure(
+    builder.should_exit_on_failure,
+    final_results,
+    coverage_succeeded,
+  )
 
   final_results
 }
@@ -1297,8 +1342,13 @@ fn discard_output(_text: String) -> Nil {
   Nil
 }
 
-fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
-  let should_halt = should_exit && has_failures(results)
+fn maybe_exit_on_failure(
+  should_exit: Bool,
+  results: List(TestResult),
+  coverage_succeeded: Bool,
+) -> Nil {
+  let should_halt =
+    should_exit && { has_failures(results) || !coverage_succeeded }
   case should_halt {
     True -> halt(1)
     False -> Nil
@@ -1456,6 +1506,57 @@ fn suite_run_config(
     None -> default_config
     Some(config) -> config
   }
+}
+
+type CoverageState {
+  CoverageOff
+  CoverageRunning(session: CoverageSession)
+  CoverageStartFailed(error: coverage.CoverageError)
+}
+
+fn start_coverage(config: Option(CoverageConfig)) -> CoverageState {
+  case config {
+    None -> CoverageOff
+    Some(config) -> coverage_state_from_start(coverage.start(config))
+  }
+}
+
+fn coverage_state_from_start(
+  result: Result(CoverageSession, coverage.CoverageError),
+) -> CoverageState {
+  case result {
+    Ok(session) -> CoverageRunning(session)
+    Error(error) -> CoverageStartFailed(error)
+  }
+}
+
+/// Print the coverage table, or the coverage error. Returns `False` on error.
+fn finish_coverage(state: CoverageState, output: Output) -> Bool {
+  case state {
+    CoverageOff -> True
+    CoverageRunning(session) ->
+      write_coverage_result(coverage.finish(session), output)
+    CoverageStartFailed(error) -> write_coverage_error(error, output)
+  }
+}
+
+fn write_coverage_result(
+  result: Result(coverage.CoverageReport, coverage.CoverageError),
+  output: Output,
+) -> Bool {
+  case result {
+    Ok(report) -> {
+      output_out(output)(coverage_reporter.render(report))
+      True
+    }
+    Error(error) -> write_coverage_error(error, output)
+  }
+}
+
+fn write_coverage_error(error: coverage.CoverageError, output: Output) -> Bool {
+  let Output(out: _out, error: write_error) = output
+  write_error(coverage.error_to_string(error) <> "\n")
+  False
 }
 
 fn write_progress_event(
