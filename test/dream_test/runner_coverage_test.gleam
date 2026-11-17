@@ -18,8 +18,11 @@ import gleam/option.{type Option, None, Some}
 @external(erlang, "dream_test_coverage_test_ffi", "run_main_in_new_vm")
 fn run_main_in_new_vm(module: String, function: String) -> #(Int, String)
 
-@external(erlang, "dream_test_coverage_test_ffi", "run_main_in_new_vm_with_environment")
-fn run_main_in_new_vm_with_environment(
+/// Like `run_main_in_new_vm`, but the new process also measures `src`. Only
+/// the mains that run the `DREAM_TEST_COVERAGE` value paths use it, because
+/// no other test reaches these runner lines.
+@external(erlang, "dream_test_coverage_test_ffi", "run_measured_main_in_new_vm")
+fn run_measured_main_in_new_vm(
   module: String,
   function: String,
   environment: List(#(String, Option(String))),
@@ -42,7 +45,7 @@ fn run_main(function: String) -> #(Int, String) {
 /// Run the `coverage_from_environment` main with DREAM_TEST_COVERAGE set
 /// to `value`, or removed for `None`.
 fn run_with_coverage_variable(value: Option(String)) -> #(Int, String) {
-  run_main_in_new_vm_with_environment(
+  run_measured_main_in_new_vm(
     "dream_test@coverage_runner_mains",
     "coverage_from_environment_with_exit_on_failure",
     [#("DREAM_TEST_COVERAGE", value)],
@@ -316,7 +319,7 @@ pub fn tests() {
         |> or_fail_with("expected the invalid value failure and exit status 1")
       }),
       it("fails an unknown value and exits 0 without exit_on_failure", fn() {
-        run_main_in_new_vm_with_environment(
+        run_measured_main_in_new_vm(
           "dream_test@coverage_runner_mains",
           "coverage_from_environment_without_exit_on_failure",
           [#("DREAM_TEST_COVERAGE", Some("yes"))],

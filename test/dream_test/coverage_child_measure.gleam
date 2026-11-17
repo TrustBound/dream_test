@@ -1,9 +1,10 @@
 //// Coverage of dream_test's own `src` in the `erl` processes that the
-//// runner tests start (see `run_main_in_new_vm` in
+//// runner tests start with `run_measured_main_in_new_vm` (see
 //// test/dream_test_coverage_test_ffi.erl).
 ////
-//// Some runner lines run only in such a process, for example the values of
-//// `DREAM_TEST_COVERAGE`. The process measures `src` around the test main
+//// Some runner lines run only in such a process: the values of
+//// `DREAM_TEST_COVERAGE`. Only these processes measure `src`, because each
+//// measured process adds about 1.4 seconds to the test run. The process measures `src` around the test main
 //// and writes LCOV to `build/coverage/parts/<unique>.info`. The test run
 //// (test/dream_test_test.gleam) deletes the old parts before it starts, and
 //// merges the new parts with `coverage.merge_lcov`.
