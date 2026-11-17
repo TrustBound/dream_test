@@ -49,12 +49,13 @@ import dream_test/coverage.{
   type AnalysisCause, type CoverageConfig, type CoverageError,
   type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
   BadBeamFile, BelowMinimumPercent, CoverAlreadyRunning, CoverDidNotStart,
-  CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, InstrumentedLoadFailed,
-  InvalidMinimumPercent, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NoDebugInfo, NoLcovFilesMatched, NoSourceFiles,
-  NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, UnknownAnalysisError, UnknownInstrumentError,
+  CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
+  ExcludeMatchedNothing, InstrumentedLoadFailed, InvalidMinimumPercent,
+  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
+  ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/report.{
   type CoverageReport, type FileCoverage, type LineCoverage,
@@ -512,6 +513,24 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> "\", which does not exist.",
         reason: "merged coverage must be for files in this project, and SF paths are read from the directory the tests run in.",
         fix: "write SF paths relative to the project root, or delete LCOV files left from an older version of the code.",
+      )
+    ExcludeMatchedNothing(pattern, source_directory) ->
+      ErrorMessage(
+        what: "No source file matches the exclude pattern \""
+          <> pattern
+          <> "\".",
+        reason: "coverage.exclude(...) leaves files out of coverage, and no .gleam or .erl file in the source directory \""
+          <> source_directory
+          <> "\" matches this pattern.",
+        fix: "write the pattern relative to the directory the tests run in, for example \"src/app/generated/**\", or remove coverage.exclude(...).",
+      )
+    EverySourceFileExcluded(source_directory) ->
+      ErrorMessage(
+        what: "Every .gleam and .erl file in the source directory \""
+          <> source_directory
+          <> "\" is excluded.",
+        reason: "the coverage.exclude(...) patterns match all of the files, so coverage has nothing to measure.",
+        fix: "make the coverage.exclude(...) patterns match fewer files, or set the directory that holds your code with coverage.source_directory(...).",
       )
   }
 }

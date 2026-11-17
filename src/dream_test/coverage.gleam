@@ -49,6 +49,10 @@
 //// inside `src`, `test` or `dev` (for example `src/app`), because module names
 //// start at those folders: `src/app/cart.gleam` is module `app@cart`.
 ////
+//// `coverage.exclude` removes files from the run, for example generated
+//// code. An excluded module is not instrumented and is not in the table, the
+//// LCOV file or the minimum.
+////
 //// ## Line accuracy
 ////
 //// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
@@ -73,7 +77,8 @@
 //// | Category     | Functions                                                 |
 //// |--------------|-----------------------------------------------------------|
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
-//// |              | `show_missing`, `minimum_percent`, `merge_lcov`           |
+//// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
+//// |              | `exclude`                                                 |
 //// | **Read**     | `shows_missing`, `lcov_file`                              |
 //// | **Run**      | `start`, `finish`, `check_minimum`                        |
 ////
@@ -92,6 +97,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order.{type Order}
+import gleam/set.{type Set}
 import gleam/string
 
 // =============================================================================
@@ -109,6 +115,7 @@ pub opaque type CoverageConfig {
     show_missing: Bool,
     minimum_percent: Option(Float),
     merge_lcov_patterns: List(String),
+    exclude_patterns: List(String),
   )
 }
 
@@ -116,7 +123,11 @@ pub opaque type CoverageConfig {
 ///
 /// Only `coverage.start` creates one. Pass it to `coverage.finish`.
 pub opaque type CoverageSession {
-  CoverageSession(config: CoverageConfig, modules: List(CoveredModule))
+  CoverageSession(
+    config: CoverageConfig,
+    modules: List(CoveredModule),
+    excluded_paths: List(String),
+  )
 }
 
 type CoveredModule {
@@ -190,6 +201,12 @@ pub type CoverageError {
   /// A file given to `coverage.merge_lcov` covers a source file that does not
   /// exist in this project.
   LcovSourceNotFound(lcov_path: String, source_path: String)
+  /// A pattern given to `coverage.exclude` matches no `.gleam` or `.erl`
+  /// file in the source directory.
+  ExcludeMatchedNothing(pattern: String, source_directory: String)
+  /// The patterns given to `coverage.exclude` match every `.gleam` and
+  /// `.erl` file in the source directory, so nothing is left to measure.
+  EverySourceFileExcluded(source_directory: String)
 }
 
 /// Why the `cover` tool did not start.
@@ -261,6 +278,7 @@ pub fn new() -> CoverageConfig {
     show_missing: False,
     minimum_percent: None,
     merge_lcov_patterns: [],
+    exclude_patterns: [],
   )
 }
 
@@ -437,6 +455,52 @@ pub fn merge_lcov(
   )
 }
 
+/// Leave the source files that match a pattern out of coverage.
+///
+/// Use it for code that tests do not need to cover, for example generated
+/// code. An excluded module is not instrumented, and it is not in the table,
+/// the LCOV file or `coverage.minimum_percent`. Line counts for it from
+/// `coverage.merge_lcov` are dropped too.
+///
+/// Patterns are wildcards relative to the directory the tests run in, the
+/// same as `coverage.merge_lcov`. They are matched against the paths of the
+/// `.gleam` and `.erl` files in the source directory, for example
+/// `src/app/cart.gleam`. `*` matches inside one folder, and `**` matches any
+/// number of folders.
+///
+/// Call it more than once to exclude more than one pattern. Each pattern must
+/// match at least one source file, and at least one source file must be left
+/// to measure. Otherwise `coverage.start` returns an error, so a pattern with
+/// a typo, or one left behind after the files moved, is reported instead of
+/// hidden.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `pattern`: a wildcard pattern for the source files, for example
+///   `src/app/generated/**` or `src/**/*_ffi.erl`
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude("src/app/generated/**")
+/// |> coverage.exclude("src/**/*_ffi.erl")
+/// ```
+pub fn exclude(
+  config config: CoverageConfig,
+  pattern pattern: String,
+) -> CoverageConfig {
+  CoverageConfig(
+    ..config,
+    exclude_patterns: list.append(config.exclude_patterns, [pattern]),
+  )
+}
+
 // =============================================================================
 // Read settings
 // =============================================================================
@@ -475,7 +539,7 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 // =============================================================================
 
 /// Start the `cover` tool and instrument every module built from the source
-/// directory.
+/// directory, except the files that `coverage.exclude` matches.
 ///
 /// Call this before the code you want to measure runs. `runner.coverage`
 /// does this for you.
@@ -487,7 +551,8 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 /// ## Returns
 ///
 /// - `Ok(CoverageSession)` when every module is instrumented
-/// - `Error(CoverageError)` for the first step that failed
+/// - `Error(CoverageError)` for the first step that failed. Exclude patterns
+///   are checked before `cover` starts.
 ///
 /// ## Example
 ///
@@ -534,10 +599,115 @@ fn start_with_source_files(
     _, Error(error) -> Error(error)
     [], _ -> Error(NoSourceFiles(path: config.source_directory))
     _, Ok(prefix) ->
-      start_with_modules(
+      start_with_all_modules(
         config,
         covered_modules(config.source_directory, prefix, source_files, []),
       )
+  }
+}
+
+fn start_with_all_modules(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+) -> Result(CoverageSession, CoverageError) {
+  let source_paths = set.from_list(list.map(modules, module_source_path))
+  case excluded_source_paths(config, source_paths, set.new()) {
+    Ok(excluded) -> start_with_kept_modules(config, modules, excluded)
+    Error(error) -> Error(error)
+  }
+}
+
+fn module_source_path(module: CoveredModule) -> String {
+  module.source_path
+}
+
+/// The source paths that the exclude patterns match. Fails on the first
+/// pattern that matches no source path.
+fn excluded_source_paths(
+  config: CoverageConfig,
+  source_paths: Set(String),
+  excluded: Set(String),
+) -> Result(Set(String), CoverageError) {
+  case config.exclude_patterns {
+    [] -> Ok(excluded)
+    [pattern, ..rest] ->
+      exclude_pattern_then_continue(
+        CoverageConfig(..config, exclude_patterns: rest),
+        pattern,
+        source_paths,
+        excluded,
+      )
+  }
+}
+
+fn exclude_pattern_then_continue(
+  config: CoverageConfig,
+  pattern: String,
+  source_paths: Set(String),
+  excluded: Set(String),
+) -> Result(Set(String), CoverageError) {
+  let matched =
+    match_files(pattern)
+    |> list.map(normalise_path)
+    |> set.from_list()
+    |> set.intersection(source_paths)
+  case set.is_empty(matched) {
+    True ->
+      Error(ExcludeMatchedNothing(
+        pattern: pattern,
+        source_directory: config.source_directory,
+      ))
+    False ->
+      excluded_source_paths(config, source_paths, set.union(excluded, matched))
+  }
+}
+
+/// A path in the form coverage builds source paths: no `.` or empty parts.
+fn normalise_path(path: String) -> String {
+  string.join(path_segments(path), "/")
+}
+
+fn start_with_kept_modules(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+  excluded: Set(String),
+) -> Result(CoverageSession, CoverageError) {
+  case kept_modules(modules, excluded, []) {
+    [] ->
+      Error(EverySourceFileExcluded(source_directory: config.source_directory))
+    kept ->
+      start_with_modules(
+        config,
+        kept,
+        list.sort(set.to_list(excluded), string.compare),
+      )
+  }
+}
+
+fn kept_modules(
+  modules: List(CoveredModule),
+  excluded: Set(String),
+  accumulated_reversed: List(CoveredModule),
+) -> List(CoveredModule) {
+  case modules {
+    [] -> list.reverse(accumulated_reversed)
+    [module, ..rest] ->
+      kept_modules(
+        rest,
+        excluded,
+        keep_unless_excluded(module, excluded, accumulated_reversed),
+      )
+  }
+}
+
+fn keep_unless_excluded(
+  module: CoveredModule,
+  excluded: Set(String),
+  accumulated_reversed: List(CoveredModule),
+) -> List(CoveredModule) {
+  case set.contains(excluded, module.source_path) {
+    True -> accumulated_reversed
+    False -> [module, ..accumulated_reversed]
   }
 }
 
@@ -567,9 +737,10 @@ fn is_meaningful_segment(segment: String) -> Bool {
 fn start_with_modules(
   config: CoverageConfig,
   modules: List(CoveredModule),
+  excluded_paths: List(String),
 ) -> Result(CoverageSession, CoverageError) {
   case start_cover() {
-    Ok(Nil) -> compile_session(config, modules)
+    Ok(Nil) -> compile_session(config, modules, excluded_paths)
     Error(error) -> Error(error)
   }
 }
@@ -577,9 +748,15 @@ fn start_with_modules(
 fn compile_session(
   config: CoverageConfig,
   modules: List(CoveredModule),
+  excluded_paths: List(String),
 ) -> Result(CoverageSession, CoverageError) {
   case compile_modules(modules) {
-    Ok(Nil) -> Ok(CoverageSession(config: config, modules: modules))
+    Ok(Nil) ->
+      Ok(CoverageSession(
+        config: config,
+        modules: modules,
+        excluded_paths: excluded_paths,
+      ))
     Error(error) -> Error(error)
   }
 }
@@ -662,7 +839,7 @@ fn erlang_module_name(relative_path: String) -> String {
 /// ## Returns
 ///
 /// - `Ok(CoverageReport)` with one file per measured module (plus any file
-///   from `coverage.merge_lcov`), sorted by path
+///   from `coverage.merge_lcov` that is not excluded), sorted by path
 /// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
 ///   merge cannot be read, or the LCOV file cannot be written
 ///
@@ -677,18 +854,22 @@ pub fn finish(
   session session: CoverageSession,
 ) -> Result(CoverageReport, CoverageError) {
   case analyse_modules(session.modules, []) {
-    Ok(files) -> merge_then_write(files, session.config)
+    Ok(files) -> merge_then_write(files, session)
     Error(error) -> Error(error)
   }
 }
 
 fn merge_then_write(
   files: List(FileCoverage),
-  config: CoverageConfig,
+  session: CoverageSession,
 ) -> Result(CoverageReport, CoverageError) {
   let counts = list.fold(files, dict.new(), add_file_counts)
-  case merge_patterns(config.merge_lcov_patterns, counts) {
-    Ok(merged) -> write_report(report_from_counts(merged), config.lcov_path)
+  case merge_patterns(session.config.merge_lcov_patterns, counts) {
+    Ok(merged) ->
+      merged
+      |> dict.drop(session.excluded_paths)
+      |> report_from_counts()
+      |> write_report(session.config.lcov_path)
     Error(error) -> Error(error)
   }
 }

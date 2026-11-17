@@ -3,10 +3,11 @@
 import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
-  EncryptedDebugInfo, InstrumentedLoadFailed, InvalidMinimumPercent,
-  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
+  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
+  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NoDebugInfo,
+  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
   SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
   UnknownAnalysisError, UnknownInstrumentError,
 }
@@ -322,6 +323,26 @@ pub fn tests() {
           "write SF paths relative to the project root, or delete LCOV files left from an older version of the code.",
         ))
         |> or_fail_with("expected the LcovSourceNotFound message")
+      }),
+      it("describes ExcludeMatchedNothing", fn() {
+        render_failure_for(ExcludeMatchedNothing("src/gen/**", "src"))
+        |> should
+        |> be_equal(failure_block(
+          "No source file matches the exclude pattern \"src/gen/**\".",
+          "coverage.exclude(...) leaves files out of coverage, and no .gleam or .erl file in the source directory \"src\" matches this pattern.",
+          "write the pattern relative to the directory the tests run in, for example \"src/app/generated/**\", or remove coverage.exclude(...).",
+        ))
+        |> or_fail_with("expected the ExcludeMatchedNothing message")
+      }),
+      it("describes EverySourceFileExcluded", fn() {
+        render_failure_for(EverySourceFileExcluded("src/app"))
+        |> should
+        |> be_equal(failure_block(
+          "Every .gleam and .erl file in the source directory \"src/app\" is excluded.",
+          "the coverage.exclude(...) patterns match all of the files, so coverage has nothing to measure.",
+          "make the coverage.exclude(...) patterns match fewer files, or set the directory that holds your code with coverage.source_directory(...).",
+        ))
+        |> or_fail_with("expected the EverySourceFileExcluded message")
       }),
       it("describes ModuleNotInstrumented with NoDebugInfo", fn() {
         render_failure_for(ModuleNotInstrumented(
