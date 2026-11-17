@@ -123,7 +123,7 @@ pub fn tests() {
           <> "      ✗ check\n"
           <> "        Message: no db\n"
           <> "\n"
-          <> "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+          <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
         |> or_fail_with("each status should have its marker")
       }),

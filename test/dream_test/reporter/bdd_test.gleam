@@ -306,7 +306,7 @@ pub fn tests() {
           <> "    before_each\n"
           <> "      Message: no db\n"
           <> "\n"
-          <> "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+          <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
         |> or_fail_with("every status should have its marker and failures")
       }),
@@ -345,7 +345,7 @@ pub fn tests() {
           <> "    \u{001B}[1m\u{001B}[35mbefore_each\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mno db\u{001B}[0m\n"
           <> "\n"
-          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m6\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m1\u{001B}[0m passed, \u{001B}[31m1\u{001B}[0m\u{001B}[2m setup failed\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m timed out\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m pending\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m skipped\u{001B}[0m in \u{001B}[36m0ms\u{001B}[0m\n",
+          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m6\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m1\u{001B}[0m passed, \u{001B}[33m1\u{001B}[0m\u{001B}[2m skipped\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m pending\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m timed out\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m setup failed\u{001B}[0m in \u{001B}[36m0ms\u{001B}[0m\n",
         )
         |> or_fail_with("every status should have its colour")
       }),
@@ -370,7 +370,7 @@ pub fn tests() {
           <> "    before_each\n"
           <> "      Message: no db\n"
           <> "\n"
-          <> "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+          <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
         |> or_fail_with("only failed, timed out and setup failed tests")
       }),
@@ -379,7 +379,7 @@ pub fn tests() {
         bdd.render(config(False, reporter_types.BddSummaryOnly), every_status())
         |> should
         |> be_equal(
-          "Summary: 6 run, 1 failed, 1 passed, 1 setup failed, 1 timed out, 1 pending, 1 skipped in 0ms\n",
+          "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
         |> or_fail_with("only the summary line")
       }),

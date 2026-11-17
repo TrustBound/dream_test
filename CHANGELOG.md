@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tree was a single `Test` never ran, and no error said so. Now a suite is
   always a group. Code that builds suites with `describe`, `feature`,
   `types.root` or discovery does not change.
+- BREAKING: The summary line of the BDD and Gherkin reporters now lists the
+  extra counts in the order skipped, pending, timed out, setup failed.
+  Before, the order was the reverse: `1 setup failed, 1 timed out,
+  1 pending, 1 skipped`. Now it is `1 skipped, 1 pending, 1 timed out,
+  1 setup failed`. Update tests or tools that compare the exact summary
+  text.
 
 ### Fixed
 

@@ -952,7 +952,9 @@ fn build_summary_suffix(
 fn format_summary_parts(parts: List(String)) -> String {
   case parts {
     [] -> ""
-    _ -> string.concat([", ", string.join(parts, ", ")])
+    // Each part goes on the front of the list, so the list is in reverse
+    // order: setup failed first, skipped last.
+    _ -> string.concat([", ", string.join(list.reverse(parts), ", ")])
   }
 }
 
