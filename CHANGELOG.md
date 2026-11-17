@@ -13,9 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 
-  - Opt-in line coverage with the BEAM `cover` tool. The runner prints a
-    coverage table after the results and writes an LCOV file to
+  - Opt-in line coverage with the native line counters of the BEAM, which
+    need Erlang/OTP 27 or later with the JIT. The runner prints a coverage
+    table after the results and writes an LCOV file to
     `build/coverage/lcov.info` (`coverage.lcov_path`, `coverage.no_lcov`)
+  - More than one coverage run can measure in one BEAM, as long as no module
+    is in two runs at the same time. Coverage never stops a process that
+    runs old code of a measured module
   - `coverage.source_directory` measures one folder in place of `src`
   - `coverage.show_missing` adds a `Missing` column with the line ranges that
     did not run

@@ -251,7 +251,7 @@ pub fn tests() {
 
 ## Coverage
 
-Dream Test measures line coverage with the BEAM `cover` tool. Coverage is opt-in. Turn it on in your test `main`:
+Dream Test measures line coverage with the native line counters of the BEAM. They need Erlang/OTP 27 or later with the JIT (the default on x86-64 and ARM64). Coverage is opt-in. Turn it on in your test `main`:
 
 ### Turn on coverage <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/coverage/runner_coverage.gleam#L19-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -500,7 +500,7 @@ fn coverage_table() -> String {
 
 ### Errors
 
-Every coverage error fails the run. The runner prints the error under `Coverage failed`, with what failed, the reason and the fix. Coverage measures one run per BEAM instance.
+Every coverage error fails the run. The runner prints the error under `Coverage failed`, with what failed, the reason and the fix. More than one coverage run can measure in one BEAM instance, but a module can be in only one run at a time.
 
 ### Coverage badge
 

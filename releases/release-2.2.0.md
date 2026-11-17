@@ -10,15 +10,17 @@ not. Nothing changes for projects that do not turn it on.
 
 ### 📈 Line coverage
 
-`runner.coverage(coverage.new())` measures the modules in `src` with the BEAM
-`cover` tool. After the test results, the runner prints a table per file and
-writes an LCOV file to `build/coverage/lcov.info`.
+`runner.coverage(coverage.new())` measures the modules in `src` with the
+native line counters of the BEAM. After the test results, the runner prints a
+table per file and writes an LCOV file to `build/coverage/lcov.info`.
 
 - `coverage.show_missing` lists the lines that did not run.
 - `coverage.minimum_percent` and `coverage.minimum_percent_per_file` fail the
   run below a total or per-file percent.
 - `runner.coverage_from_environment` turns coverage on only when
   `DREAM_TEST_COVERAGE` is `1` or `true`, for example only in CI.
+- More than one coverage run can measure in one BEAM, as long as no module is
+  in two runs at the same time.
 
 ### 🙈 Exclusions with reasons
 
@@ -54,8 +56,9 @@ service.
 
 - Gleam 1.19 or later for exact line numbers. Older Gleam versions map only
   the first line of each function, and the coverage table warns about it.
-- Erlang/OTP with the JIT (OTP 27 or later) for the coverage self-tests of
-  this repository.
+- Erlang/OTP 27 or later with the JIT (the default on x86-64 and ARM64) for
+  coverage. On another runtime, `coverage.start` fails with
+  `NativeCoverageUnsupported`.
 
 ## Upgrading
 
