@@ -8,6 +8,7 @@
     add_source/2,
     compile_source/2,
     add_damaged_beam/1,
+    make_unreadable/1,
     stub_cover/1,
     stop_cover/0,
     format/1
@@ -173,6 +174,12 @@ debug_options(<<"missing_debug_info_backend">>) -> [{debug_info, {no_such_backen
 %% Write ebin/Module.beam with bytes that are not a .beam file.
 add_damaged_beam(Module) ->
     ok = file:write_file(filename:join("ebin", <<Module/binary, ".beam">>), <<"not a beam file">>),
+    nil.
+
+%% Take away every permission on src/File in the current project, so reading
+%% it fails.
+make_unreadable(File) ->
+    ok = file:change_mode(filename:join("src", File), 8#000),
     nil.
 
 %% Replace `cover` with a stub that behaves in one broken way.

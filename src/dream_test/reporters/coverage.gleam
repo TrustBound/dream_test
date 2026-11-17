@@ -50,11 +50,12 @@ import dream_test/coverage.{
   type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
   BadBeamFile, BelowMinimumPercent, CoverAlreadyRunning, CoverDidNotStart,
   CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, InstrumentedLoadFailed, InvalidMinimumPercent,
-  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
+  ExcludeMatchedNothing, IgnoreEndWithoutStart, IgnoreStartWithoutEnd,
+  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
+  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
   NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
   UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/report.{
@@ -532,7 +533,49 @@ fn error_message(error: CoverageError) -> ErrorMessage {
         reason: "the coverage.exclude(...) patterns match all of the files, so coverage has nothing to measure.",
         fix: "make the coverage.exclude(...) patterns match fewer files, or set the directory that holds your code with coverage.source_directory(...).",
       )
+    SourceReadFailed(path, error) ->
+      ErrorMessage(
+        what: "Could not read the source file \""
+          <> path
+          <> "\" to find its coverage:ignore markers.",
+        reason: "coverage reads the markers of each measured file and of each file that a merged LCOV file covers, but this file cannot be read ("
+          <> file.error_to_string(error)
+          <> ").",
+        fix: "make the file readable by the user that runs the tests.",
+      )
+    IgnoreStartWithoutEnd(source_path, line_number) ->
+      ErrorMessage(
+        what: "The coverage:ignore-start marker at "
+          <> source_location(source_path, line_number)
+          <> " has no coverage:ignore-end marker after it.",
+        reason: "an ignored block runs from a coverage:ignore-start marker to the next coverage:ignore-end marker, so this block has no last line.",
+        fix: "add a coverage:ignore-end marker on its own line after the last line to ignore.",
+      )
+    IgnoreEndWithoutStart(source_path, line_number) ->
+      ErrorMessage(
+        what: "The coverage:ignore-end marker at "
+          <> source_location(source_path, line_number)
+          <> " has no coverage:ignore-start marker before it.",
+        reason: "a coverage:ignore-end marker closes the block that a coverage:ignore-start marker opened, and no block is open at this line.",
+        fix: "add a coverage:ignore-start marker on its own line before the first line to ignore, or remove this marker.",
+      )
+    NestedIgnoreStart(source_path, line_number, open_line_number) ->
+      ErrorMessage(
+        what: "The coverage:ignore-start marker at "
+          <> source_location(source_path, line_number)
+          <> " is inside the ignored block that starts at line "
+          <> int.to_string(open_line_number)
+          <> ".",
+        reason: "ignored blocks cannot be nested, so each coverage:ignore-start marker needs a coverage:ignore-end marker before the next coverage:ignore-start marker.",
+        fix: "add a coverage:ignore-end marker before line "
+          <> int.to_string(line_number)
+          <> ", or remove one of the two coverage:ignore-start markers.",
+      )
   }
+}
+
+fn source_location(source_path: String, line_number: Int) -> String {
+  source_path <> ":" <> int.to_string(line_number)
 }
 
 fn start_message(cause: StartCause, raw: String) -> ErrorMessage {

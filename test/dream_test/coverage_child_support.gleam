@@ -30,6 +30,10 @@ pub fn add_source(file: String, text: String) -> Nil
 @external(erlang, "dream_test_coverage_test_ffi", "compile_source")
 pub fn compile_source(file: String, kind: String) -> Nil
 
+/// In a child: take away every permission on src/<file>, so reading it fails.
+@external(erlang, "dream_test_coverage_test_ffi", "make_unreadable")
+pub fn make_unreadable(file: String) -> Nil
+
 /// In a child: write a damaged ebin/<module>.beam.
 @external(erlang, "dream_test_coverage_test_ffi", "add_damaged_beam")
 pub fn add_damaged_beam(module: String) -> Nil

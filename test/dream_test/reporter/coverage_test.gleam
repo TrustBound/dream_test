@@ -4,12 +4,13 @@ import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
-  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NoDebugInfo,
-  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
-  UnknownAnalysisError, UnknownInstrumentError,
+  IgnoreEndWithoutStart, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidMinimumPercent, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
+  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
+  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -343,6 +344,49 @@ pub fn tests() {
           "make the coverage.exclude(...) patterns match fewer files, or set the directory that holds your code with coverage.source_directory(...).",
         ))
         |> or_fail_with("expected the EverySourceFileExcluded message")
+      }),
+      it("describes SourceReadFailed", fn() {
+        render_failure_for(SourceReadFailed(
+          "src/app/cart.gleam",
+          PermissionDenied("src/app/cart.gleam"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not read the source file \"src/app/cart.gleam\" to find its coverage:ignore markers.",
+          "coverage reads the markers of each measured file and of each file that a merged LCOV file covers, but this file cannot be read (Permission denied: src/app/cart.gleam).",
+          "make the file readable by the user that runs the tests.",
+        ))
+        |> or_fail_with("expected the SourceReadFailed message")
+      }),
+      it("describes IgnoreStartWithoutEnd", fn() {
+        render_failure_for(IgnoreStartWithoutEnd("src/app/cart.gleam", 12))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore-start marker at src/app/cart.gleam:12 has no coverage:ignore-end marker after it.",
+          "an ignored block runs from a coverage:ignore-start marker to the next coverage:ignore-end marker, so this block has no last line.",
+          "add a coverage:ignore-end marker on its own line after the last line to ignore.",
+        ))
+        |> or_fail_with("expected the IgnoreStartWithoutEnd message")
+      }),
+      it("describes IgnoreEndWithoutStart", fn() {
+        render_failure_for(IgnoreEndWithoutStart("src/app/cart.gleam", 20))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore-end marker at src/app/cart.gleam:20 has no coverage:ignore-start marker before it.",
+          "a coverage:ignore-end marker closes the block that a coverage:ignore-start marker opened, and no block is open at this line.",
+          "add a coverage:ignore-start marker on its own line before the first line to ignore, or remove this marker.",
+        ))
+        |> or_fail_with("expected the IgnoreEndWithoutStart message")
+      }),
+      it("describes NestedIgnoreStart", fn() {
+        render_failure_for(NestedIgnoreStart("src/app/cart.gleam", 15, 9))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore-start marker at src/app/cart.gleam:15 is inside the ignored block that starts at line 9.",
+          "ignored blocks cannot be nested, so each coverage:ignore-start marker needs a coverage:ignore-end marker before the next coverage:ignore-start marker.",
+          "add a coverage:ignore-end marker before line 15, or remove one of the two coverage:ignore-start markers.",
+        ))
+        |> or_fail_with("expected the NestedIgnoreStart message")
       }),
       it("describes ModuleNotInstrumented with NoDebugInfo", fn() {
         render_failure_for(ModuleNotInstrumented(

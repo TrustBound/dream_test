@@ -53,6 +53,45 @@
 //// code. An excluded module is not instrumented and is not in the table, the
 //// LCOV file or the minimum.
 ////
+//// ## Ignoring lines
+////
+//// Comment markers leave lines of a source file out of coverage. Put each
+//// marker on its own line. `gleam format` moves a comment at the end of a
+//// code line to the next line, so a marker after code is not supported.
+////
+//// ```gleam
+//// pub fn log(message: String) -> Nil {
+////   // coverage:ignore
+////   io.println(message)
+//// }
+////
+//// // coverage:ignore-start debug helpers
+//// pub fn dump(value: a) -> a {
+////   echo value
+//// }
+//// // coverage:ignore-end
+//// ```
+////
+//// - `// coverage:ignore` ignores the next line that holds code. Blank lines
+////   and comment lines between the marker and the code are skipped.
+//// - `// coverage:ignore-start` and `// coverage:ignore-end` ignore every
+////   line from the start marker to the end marker.
+//// - In `.erl` files, write the markers after `%` or `%%`, for example
+////   `%% coverage:ignore`.
+//// - Text after a marker is a note for the people who read the code.
+////
+//// An ignored line is not in the table, the Missing column, the LCOV file or
+//// the minimum. Line counts on it from `coverage.merge_lcov` are dropped too.
+//// Markers are read from each measured file, and from each file that a
+//// merged LCOV file covers.
+////
+//// An ignore-start marker without an ignore-end marker, an ignore-end marker
+//// without an ignore-start marker, and an ignore-start marker inside an
+//// ignored block are errors. The error gives the file and the line.
+////
+//// Markers match exact source lines only on Gleam 1.19 and later. See
+//// "Line accuracy".
+////
 //// ## Line accuracy
 ////
 //// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
@@ -97,6 +136,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order.{type Order}
+import gleam/result
 import gleam/set.{type Set}
 import gleam/string
 
@@ -127,6 +167,7 @@ pub opaque type CoverageSession {
     config: CoverageConfig,
     modules: List(CoveredModule),
     excluded_paths: List(String),
+    ignored_lines: IgnoredLines,
   )
 }
 
@@ -207,6 +248,28 @@ pub type CoverageError {
   /// The patterns given to `coverage.exclude` match every `.gleam` and
   /// `.erl` file in the source directory, so nothing is left to measure.
   EverySourceFileExcluded(source_directory: String)
+  /// A source file cannot be read to find its ignore markers.
+  SourceReadFailed(path: String, error: FileError)
+  /// A `coverage:ignore-start` marker has no `coverage:ignore-end` marker
+  /// after it.
+  ///
+  /// - `line_number`: the 1-based line of the start marker
+  IgnoreStartWithoutEnd(source_path: String, line_number: Int)
+  /// A `coverage:ignore-end` marker has no `coverage:ignore-start` marker
+  /// before it.
+  ///
+  /// - `line_number`: the 1-based line of the end marker
+  IgnoreEndWithoutStart(source_path: String, line_number: Int)
+  /// A `coverage:ignore-start` marker is inside a block that an earlier
+  /// start marker opened. Ignored blocks cannot be nested.
+  ///
+  /// - `line_number`: the 1-based line of the inner start marker
+  /// - `open_line_number`: the line of the start marker that opened the block
+  NestedIgnoreStart(
+    source_path: String,
+    line_number: Int,
+    open_line_number: Int,
+  )
 }
 
 /// Why the `cover` tool did not start.
@@ -552,7 +615,8 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 ///
 /// - `Ok(CoverageSession)` when every module is instrumented
 /// - `Error(CoverageError)` for the first step that failed. Exclude patterns
-///   are checked before `cover` starts.
+///   and the ignore markers of the measured files are checked before `cover`
+///   starts.
 ///
 /// ## Example
 ///
@@ -676,11 +740,30 @@ fn start_with_kept_modules(
     [] ->
       Error(EverySourceFileExcluded(source_directory: config.source_directory))
     kept ->
-      start_with_modules(
+      start_with_ignored_lines(
         config,
         kept,
         list.sort(set.to_list(excluded), string.compare),
       )
+  }
+}
+
+/// Read the ignore markers of every kept module before `cover` starts, so a
+/// bad marker fails the run before the tests run.
+fn start_with_ignored_lines(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+  excluded_paths: List(String),
+) -> Result(CoverageSession, CoverageError) {
+  case add_ignored_lines(dict.new(), list.map(modules, module_source_path)) {
+    Ok(ignored_lines) ->
+      start_with_modules(CoverageSession(
+        config: config,
+        modules: modules,
+        excluded_paths: excluded_paths,
+        ignored_lines: ignored_lines,
+      ))
+    Error(error) -> Error(error)
   }
 }
 
@@ -735,28 +818,19 @@ fn is_meaningful_segment(segment: String) -> Bool {
 }
 
 fn start_with_modules(
-  config: CoverageConfig,
-  modules: List(CoveredModule),
-  excluded_paths: List(String),
+  session: CoverageSession,
 ) -> Result(CoverageSession, CoverageError) {
   case start_cover() {
-    Ok(Nil) -> compile_session(config, modules, excluded_paths)
+    Ok(Nil) -> compile_session(session)
     Error(error) -> Error(error)
   }
 }
 
 fn compile_session(
-  config: CoverageConfig,
-  modules: List(CoveredModule),
-  excluded_paths: List(String),
+  session: CoverageSession,
 ) -> Result(CoverageSession, CoverageError) {
-  case compile_modules(modules) {
-    Ok(Nil) ->
-      Ok(CoverageSession(
-        config: config,
-        modules: modules,
-        excluded_paths: excluded_paths,
-      ))
+  case compile_modules(session.modules) {
+    Ok(Nil) -> Ok(session)
     Error(error) -> Error(error)
   }
 }
@@ -841,7 +915,8 @@ fn erlang_module_name(relative_path: String) -> String {
 /// - `Ok(CoverageReport)` with one file per measured module (plus any file
 ///   from `coverage.merge_lcov` that is not excluded), sorted by path
 /// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
-///   merge cannot be read, or the LCOV file cannot be written
+///   merge cannot be read, a file that only merged LCOV covers has a bad
+///   ignore marker, or the LCOV file cannot be written
 ///
 /// ## Example
 ///
@@ -868,9 +943,45 @@ fn merge_then_write(
     Ok(merged) ->
       merged
       |> dict.drop(session.excluded_paths)
+      |> ignore_then_write(session)
+    Error(error) -> Error(error)
+  }
+}
+
+/// Drop the ignored lines, then build the report and write the LCOV file.
+/// Files that only merged LCOV covers have their markers read here.
+fn ignore_then_write(
+  counts: Counts,
+  session: CoverageSession,
+) -> Result(CoverageReport, CoverageError) {
+  case add_ignored_lines(session.ignored_lines, dict.keys(counts)) {
+    Ok(ignored_lines) ->
+      counts
+      |> dict.to_list()
+      |> without_ignored_lines(ignored_lines, dict.new())
       |> report_from_counts()
       |> write_report(session.config.lcov_path)
     Error(error) -> Error(error)
+  }
+}
+
+fn without_ignored_lines(
+  entries: List(#(String, Dict(Int, Int))),
+  ignored_lines: IgnoredLines,
+  accumulated: Counts,
+) -> Counts {
+  case entries {
+    [] -> accumulated
+    [#(source_path, file_counts), ..rest] -> {
+      let file_ignored_lines =
+        result.unwrap(dict.get(ignored_lines, source_path), dict.new())
+      let kept_counts = dict.drop(file_counts, dict.keys(file_ignored_lines))
+      without_ignored_lines(
+        rest,
+        ignored_lines,
+        dict.insert(accumulated, source_path, kept_counts),
+      )
+    }
   }
 }
 
@@ -916,6 +1027,229 @@ fn write_report_to(
   case file.write(path, render_lcov(coverage_report)) {
     Ok(Nil) -> Ok(coverage_report)
     Error(error) -> Error(LcovWriteFailed(path: path, error: error))
+  }
+}
+
+// =============================================================================
+// Ignore markers
+// =============================================================================
+
+/// The lines that ignore markers leave out of coverage, per source path.
+/// Each line maps to the text written after its marker (empty when there is
+/// none).
+type IgnoredLines =
+  Dict(String, Dict(Int, String))
+
+/// How comments start in a source file.
+type CommentSyntax {
+  GleamComments
+  ErlangComments
+}
+
+/// What one line of a source file is, for the ignore markers.
+type SourceLine {
+  Marker(kind: MarkerKind, text: String)
+  CodeLine
+  OtherLine
+}
+
+type MarkerKind {
+  IgnoreLine
+  IgnoreStart
+  IgnoreEnd
+}
+
+/// An ignore-start marker that has no ignore-end marker yet.
+type OpenBlock {
+  OpenBlock(line_number: Int, text: String)
+}
+
+/// Where the marker reader is in one source file, and what it found.
+type MarkerScan {
+  MarkerScan(
+    source_path: String,
+    syntax: CommentSyntax,
+    line_number: Int,
+    ignored: Dict(Int, String),
+    open_block: Option(OpenBlock),
+    pending_text: Option(String),
+  )
+}
+
+/// Read the markers of each path that `ignored_lines` does not hold yet.
+fn add_ignored_lines(
+  ignored_lines: IgnoredLines,
+  source_paths: List(String),
+) -> Result(IgnoredLines, CoverageError) {
+  case source_paths {
+    [] -> Ok(ignored_lines)
+    [source_path, ..rest] ->
+      add_file_ignored_lines(ignored_lines, source_path, rest)
+  }
+}
+
+fn add_file_ignored_lines(
+  ignored_lines: IgnoredLines,
+  source_path: String,
+  rest: List(String),
+) -> Result(IgnoredLines, CoverageError) {
+  case dict.has_key(ignored_lines, source_path) {
+    True -> add_ignored_lines(ignored_lines, rest)
+    False -> read_file_ignored_lines(ignored_lines, source_path, rest)
+  }
+}
+
+fn read_file_ignored_lines(
+  ignored_lines: IgnoredLines,
+  source_path: String,
+  rest: List(String),
+) -> Result(IgnoredLines, CoverageError) {
+  case file.read(source_path) {
+    Ok(text) ->
+      scan_then_continue(
+        ignored_lines,
+        source_path,
+        string.split(text, "\n"),
+        rest,
+      )
+    Error(error) -> Error(SourceReadFailed(path: source_path, error: error))
+  }
+}
+
+fn scan_then_continue(
+  ignored_lines: IgnoredLines,
+  source_path: String,
+  lines: List(String),
+  rest: List(String),
+) -> Result(IgnoredLines, CoverageError) {
+  let scan =
+    MarkerScan(
+      source_path: source_path,
+      syntax: comment_syntax(source_path),
+      line_number: 1,
+      ignored: dict.new(),
+      open_block: None,
+      pending_text: None,
+    )
+  case scan_lines(scan, lines) {
+    Ok(ignored) ->
+      add_ignored_lines(dict.insert(ignored_lines, source_path, ignored), rest)
+    Error(error) -> Error(error)
+  }
+}
+
+/// `.erl` files use `%` comments. Every other file uses `//` comments.
+fn comment_syntax(source_path: String) -> CommentSyntax {
+  case string.ends_with(source_path, ".erl") {
+    True -> ErlangComments
+    False -> GleamComments
+  }
+}
+
+fn scan_lines(
+  scan: MarkerScan,
+  lines: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  case lines, scan.open_block {
+    [], None -> Ok(scan.ignored)
+    [], Some(open) ->
+      Error(IgnoreStartWithoutEnd(
+        source_path: scan.source_path,
+        line_number: open.line_number,
+      ))
+    [line, ..rest], _ -> scan_line_then_continue(scan, line, rest)
+  }
+}
+
+fn scan_line_then_continue(
+  scan: MarkerScan,
+  line: String,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  case scan_line(scan, classify_line(scan.syntax, line)) {
+    Ok(next) ->
+      scan_lines(MarkerScan(..next, line_number: scan.line_number + 1), rest)
+    Error(error) -> Error(error)
+  }
+}
+
+fn scan_line(
+  scan: MarkerScan,
+  source_line: SourceLine,
+) -> Result(MarkerScan, CoverageError) {
+  case source_line, scan.open_block, scan.pending_text {
+    Marker(IgnoreStart, _), Some(open), _ ->
+      Error(NestedIgnoreStart(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+        open_line_number: open.line_number,
+      ))
+    Marker(IgnoreStart, text), None, _ ->
+      Ok(
+        MarkerScan(
+          ..ignore_line(scan, text),
+          open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
+          pending_text: None,
+        ),
+      )
+    Marker(IgnoreEnd, _), None, _ ->
+      Error(IgnoreEndWithoutStart(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+      ))
+    Marker(IgnoreEnd, _), Some(open), _ ->
+      Ok(MarkerScan(..ignore_line(scan, open.text), open_block: None))
+    _, Some(open), _ -> Ok(ignore_line(scan, open.text))
+    Marker(IgnoreLine, text), None, _ ->
+      Ok(MarkerScan(..scan, pending_text: Some(text)))
+    CodeLine, None, Some(text) ->
+      Ok(MarkerScan(..ignore_line(scan, text), pending_text: None))
+    CodeLine, None, None -> Ok(scan)
+    OtherLine, None, _ -> Ok(scan)
+  }
+}
+
+fn ignore_line(scan: MarkerScan, text: String) -> MarkerScan {
+  MarkerScan(..scan, ignored: dict.insert(scan.ignored, scan.line_number, text))
+}
+
+fn classify_line(syntax: CommentSyntax, line: String) -> SourceLine {
+  case syntax, string.trim(line) {
+    _, "" -> OtherLine
+    GleamComments, "///" <> _ -> OtherLine
+    GleamComments, "//" <> body -> comment_line(body)
+    ErlangComments, "%" <> body -> comment_line(without_leading_percents(body))
+    _, _ -> CodeLine
+  }
+}
+
+fn without_leading_percents(text: String) -> String {
+  case text {
+    "%" <> rest -> without_leading_percents(rest)
+    _ -> text
+  }
+}
+
+/// A comment is a marker when its first word is a marker name. The rest of
+/// the comment is the marker's text.
+fn comment_line(body: String) -> SourceLine {
+  let words =
+    body
+    |> string.replace("\t", " ")
+    |> string.trim()
+    |> string.split_once(" ")
+  case words {
+    Ok(#(word, text)) -> marker_line(word, string.trim(text))
+    Error(Nil) -> marker_line(string.trim(body), "")
+  }
+}
+
+fn marker_line(word: String, text: String) -> SourceLine {
+  case word {
+    "coverage:ignore" -> Marker(kind: IgnoreLine, text: text)
+    "coverage:ignore-start" -> Marker(kind: IgnoreStart, text: text)
+    "coverage:ignore-end" -> Marker(kind: IgnoreEnd, text: text)
+    _ -> OtherLine
   }
 }
 
