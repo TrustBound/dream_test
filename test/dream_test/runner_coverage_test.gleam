@@ -83,6 +83,23 @@ pub fn tests() {
       ))
       |> or_fail_with("expected the coverage error and exit status 1")
     }),
+    it("prints the table with colour, coverage order and hidden files", fn() {
+      run_main("table_options")
+      |> should
+      |> be_equal(#(
+        0,
+        "\nCoverage\n"
+          <> "File                                             Lines  Cover  Missing\n"
+          <> "test/coverage_fixtures/coverage_fixture_ffi.erl  0/1    "
+          <> "\u{1b}[31m0.0%\u{1b}[0m   \u{1b}[31m6\u{1b}[0m\n"
+          <> "test/coverage_fixtures/sample.gleam              2/4    "
+          <> "\u{1b}[33m50.0%\u{1b}[0m  \u{1b}[31m9, 14\u{1b}[0m\n"
+          <> "Total                                            3/6    "
+          <> "\u{1b}[33m50.0%\u{1b}[0m\n"
+          <> "Hidden: 1 file at 100.0%\n",
+      ))
+      |> or_fail_with("expected the table options and exit status 0")
+    }),
     it("prints the Excluded count line without show_excluded", fn() {
       run_main("excluded_summary_without_show_excluded")
       |> should

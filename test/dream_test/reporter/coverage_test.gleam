@@ -92,6 +92,63 @@ fn odd_lines_missed(
   }
 }
 
+fn full_file() {
+  report.file("src/a_full.gleam", [
+    LineCoverage(line: 1, calls: 1),
+    LineCoverage(line: 2, calls: 3),
+  ])
+}
+
+fn half_file() {
+  report.file("src/b_half.gleam", [
+    LineCoverage(line: 1, calls: 1),
+    LineCoverage(line: 2, calls: 0),
+  ])
+}
+
+fn low_file() {
+  report.file("src/c_low.gleam", [
+    LineCoverage(line: 1, calls: 1),
+    LineCoverage(line: 2, calls: 0),
+    LineCoverage(line: 3, calls: 0),
+    LineCoverage(line: 4, calls: 0),
+  ])
+}
+
+fn empty_file() {
+  report.file("src/d_empty.gleam", [])
+}
+
+/// 50.0%, like `half_file`, so it ties with it.
+fn other_half_file() {
+  report.file("src/e_half.gleam", [
+    LineCoverage(line: 1, calls: 1),
+    LineCoverage(line: 2, calls: 0),
+    LineCoverage(line: 3, calls: 2),
+    LineCoverage(line: 4, calls: 0),
+  ])
+}
+
+fn other_full_file() {
+  report.file("src/f_full.gleam", [
+    LineCoverage(line: 1, calls: 1),
+    LineCoverage(line: 2, calls: 1),
+    LineCoverage(line: 3, calls: 1),
+  ])
+}
+
+fn red(text: String) -> String {
+  "\u{1b}[31m" <> text <> "\u{1b}[0m"
+}
+
+fn yellow(text: String) -> String {
+  "\u{1b}[33m" <> text <> "\u{1b}[0m"
+}
+
+fn green(text: String) -> String {
+  "\u{1b}[32m" <> text <> "\u{1b}[0m"
+}
+
 fn passing_outcome() {
   RunOutcome(passed: 3, failed: 0, exit_on_failure: True)
 }
@@ -143,6 +200,177 @@ pub fn tests() {
           <> "Total    1/1    100.0%\n",
         )
         |> or_fail_with("expected no LCOV line")
+      }),
+      it("color paints Cover by the minimum and Missing in red", fn() {
+        coverage_reporter.render(
+          report: report.new([
+            full_file(),
+            half_file(),
+            low_file(),
+            empty_file(),
+          ]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_missing()
+            |> coverage.minimum_percent(50.0)
+            |> coverage.color(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File               Lines  Cover   Missing\n"
+          <> "src/a_full.gleam   2/2    "
+          <> green("100.0%")
+          <> "\n"
+          <> "src/b_half.gleam   1/2    "
+          <> yellow("50.0%")
+          <> "   "
+          <> red("2")
+          <> "\n"
+          <> "src/c_low.gleam    1/4    "
+          <> red("25.0%")
+          <> "   "
+          <> red("2-4")
+          <> "\n"
+          <> "src/d_empty.gleam  0/0    -\n"
+          <> "Total              4/8    "
+          <> yellow("50.0%")
+          <> "\n",
+        )
+        |> or_fail_with("expected green, yellow and red cells")
+      }),
+      it("color paints Cover yellow below 100.0% without a minimum", fn() {
+        coverage_reporter.render(
+          report: report.new([half_file()]),
+          config: coverage.new() |> coverage.no_lcov() |> coverage.color(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File              Lines  Cover\n"
+          <> "src/b_half.gleam  1/2    "
+          <> yellow("50.0%")
+          <> "\n"
+          <> "Total             1/2    "
+          <> yellow("50.0%")
+          <> "\n",
+        )
+        |> or_fail_with("expected yellow cells")
+      }),
+      it("color paints Cover red below 100.0% with an invalid minimum", fn() {
+        coverage_reporter.render(
+          report: report.new([full_file(), half_file()]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.minimum_percent(150.0)
+            |> coverage.color(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File              Lines  Cover\n"
+          <> "src/a_full.gleam  2/2    "
+          <> green("100.0%")
+          <> "\n"
+          <> "src/b_half.gleam  1/2    "
+          <> red("50.0%")
+          <> "\n"
+          <> "Total             3/4    "
+          <> red("75.0%")
+          <> "\n",
+        )
+        |> or_fail_with("expected red cells below 100.0%")
+      }),
+      it("sort_by_coverage lists the lowest coverage first, ties by path", fn() {
+        coverage_reporter.render(
+          report: report.new([
+            empty_file(),
+            full_file(),
+            other_half_file(),
+            low_file(),
+            half_file(),
+          ])
+            |> report.add_excluded_files([
+              report.excluded_file(
+                source_path: "src/gen.gleam",
+                pattern: "src/gen.gleam",
+                reason: None,
+              ),
+            ]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_excluded()
+            |> coverage.sort_by_coverage(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File               Lines  Cover   Excluded\n"
+          <> "src/c_low.gleam    1/4    25.0%\n"
+          <> "src/b_half.gleam   1/2    50.0%\n"
+          <> "src/e_half.gleam   2/4    50.0%\n"
+          <> "src/a_full.gleam   2/2    100.0%\n"
+          <> "src/d_empty.gleam  0/0    -\n"
+          <> "src/gen.gleam      excluded: matches src/gen.gleam\n"
+          <> "Total              6/12   50.0%\n"
+          <> "Excluded: 1 file\n",
+        )
+        |> or_fail_with("expected the lowest coverage first")
+      }),
+      it("hide_complete leaves out files at 100.0% and counts them", fn() {
+        coverage_reporter.render(
+          report: report.new([
+            full_file(),
+            half_file(),
+            other_full_file(),
+            empty_file(),
+          ]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.hide_complete(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File               Lines  Cover\n"
+          <> "src/b_half.gleam   1/2    50.0%\n"
+          <> "src/d_empty.gleam  0/0    -\n"
+          <> "Total              6/7    85.7%\n"
+          <> "Hidden: 2 files at 100.0%\n",
+        )
+        |> or_fail_with("expected two hidden files")
+      }),
+      it("hide_complete counts one hidden file before the LCOV line", fn() {
+        coverage_reporter.render(
+          report: report.new([full_file(), half_file()]),
+          config: coverage.new() |> coverage.hide_complete(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File              Lines  Cover\n"
+          <> "src/b_half.gleam  1/2    50.0%\n"
+          <> "Total             3/4    75.0%\n"
+          <> "Hidden: 1 file at 100.0%\n"
+          <> "LCOV: build/coverage/lcov.info\n",
+        )
+        |> or_fail_with("expected one hidden file")
+      }),
+      it("hide_complete prints no Hidden line when no file is complete", fn() {
+        coverage_reporter.render(
+          report: report.new([half_file()]),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.hide_complete(),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage\n"
+          <> "File              Lines  Cover\n"
+          <> "src/b_half.gleam  1/2    50.0%\n"
+          <> "Total             1/2    50.0%\n",
+        )
+        |> or_fail_with("expected no Hidden line")
       }),
       it("rounds down so a file is 100.0% only when every line ran", fn() {
         coverage_reporter.render(

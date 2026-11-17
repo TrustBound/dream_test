@@ -52,6 +52,21 @@
 //// Excluded: 1 file, 6 lines in 1 file
 //// ```
 ////
+//// `coverage.sort_by_coverage()` lists the lowest coverage first.
+//// `coverage.hide_complete()` leaves out the files where every line ran and
+//// says how many it left out:
+////
+//// ```text
+//// File                Lines  Cover
+//// src/app/cart.gleam  18/20  90.0%
+//// Total               58/60  96.6%
+//// Hidden: 2 files at 100.0%
+//// ```
+////
+//// `coverage.color()` prints the `Cover` cell green at `100.0%`, red below
+//// `coverage.minimum_percent` and yellow in between, and the `Missing`
+//// column red.
+////
 //// When coverage fails, `render_failure` prints a `Coverage failed` block
 //// instead. The runner writes it to the error output.
 ////
@@ -78,10 +93,12 @@ import dream_test/coverage/report.{
   type LineCoverage,
 }
 import dream_test/file.{type FileError}
+import dream_test/internal/ansi
 import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/order.{type Order}
 import gleam/result
 import gleam/string
 
@@ -97,7 +114,11 @@ pub type RunOutcome {
 /// One row of the table. A row can take more than one line of output when
 /// its `Missing` or `Excluded` cell wraps.
 type CoverageRow {
+  /// `measured` is the report the counts come from: one file for a file row,
+  /// the whole report for the total, `None` for the header. Colours come
+  /// from it.
   CountsRow(
+    measured: Option(CoverageReport),
     label: String,
     lines: String,
     percent: String,
@@ -111,7 +132,20 @@ type CoverageRow {
 
 /// Which of the optional columns the table shows.
 type Columns {
-  Columns(show_missing: Bool, show_excluded: Bool)
+  Columns(
+    show_missing: Bool,
+    show_excluded: Bool,
+    color: Bool,
+    config: CoverageConfig,
+  )
+}
+
+/// The ANSI colour of a cell.
+type CellColor {
+  Plain
+  Red
+  Yellow
+  Green
 }
 
 type ColumnWidths {
@@ -121,7 +155,7 @@ type ColumnWidths {
 /// The cells of one column of a row, one per output line, and the width
 /// they are padded to.
 type Cells {
-  Cells(lines: List(String), width: Int)
+  Cells(lines: List(String), width: Int, color: CellColor)
 }
 
 /// The widest the `Missing` and `Excluded` columns get before they wrap onto
@@ -130,10 +164,18 @@ const missing_column_width = 60
 
 /// Render a coverage report as a table.
 ///
-/// The settings decide three things: `coverage.show_missing` adds the
-/// `Missing` column, `coverage.show_excluded` adds the `Excluded` column and
-/// a row for each excluded file, and the LCOV path (`coverage.lcov_file`) is
-/// printed on the last line when there is one.
+/// The settings decide:
+///
+/// - `coverage.show_missing` adds the `Missing` column.
+/// - `coverage.show_excluded` adds the `Excluded` column and a row for each
+///   excluded file.
+/// - `coverage.sort_by_coverage` lists the lowest coverage first.
+/// - `coverage.hide_complete` leaves out files where every line ran, and
+///   adds a `Hidden:` line that counts them. The total still counts them.
+/// - `coverage.color` adds ANSI colour codes to the `Cover` and `Missing`
+///   cells.
+/// - The LCOV path (`coverage.lcov_file`) is printed on the last line when
+///   there is one.
 ///
 /// When the report holds excluded files or ignored lines, an `Excluded:`
 /// line after the total counts them, whether `coverage.show_excluded` is on
@@ -173,13 +215,21 @@ pub fn render(
     Columns(
       show_missing: coverage.shows_missing(config),
       show_excluded: coverage.shows_excluded(config),
+      color: coverage.uses_color(config),
+      config: config,
     )
-  let file_rows = list.map(report.files(coverage_report), file_row)
+  let all_files = report.files(coverage_report)
+  let shown_files =
+    all_files
+    |> hide_complete_files(coverage.hides_complete(config))
+    |> sort_files(coverage.sorts_by_coverage(config))
+  let file_rows = list.map(shown_files, file_row)
   let excluded_file_rows =
     excluded_file_rows(columns, report.excluded_files(coverage_report))
   let total_row =
     row_from_counts(
       "Total",
+      coverage_report,
       report.total_hit_line_count(coverage_report),
       report.total_executable_line_count(coverage_report),
     )
@@ -200,6 +250,7 @@ pub fn render(
   "\nCoverage\n"
   <> render_rows(rows, widths, columns, "")
   <> render_excluded_summary(coverage_report)
+  <> render_hidden_summary(list.length(all_files) - list.length(shown_files))
   <> render_lcov_line(coverage.lcov_file(config))
 }
 
@@ -207,6 +258,7 @@ pub fn render(
 /// the table does not show.
 fn header_row() -> CoverageRow {
   CountsRow(
+    measured: None,
     label: "File",
     lines: "Lines",
     percent: "Cover",
@@ -219,6 +271,7 @@ fn file_row(file: FileCoverage) -> CoverageRow {
   let hit = report.hit_line_count(file)
   let total = report.executable_line_count(file)
   CountsRow(
+    measured: Some(report.new([file])),
     label: report.source_path(file),
     lines: counts_text(hit, total),
     percent: format_percent(hit, total),
@@ -231,14 +284,67 @@ fn file_row(file: FileCoverage) -> CoverageRow {
   )
 }
 
-fn row_from_counts(label: String, hit: Int, total: Int) -> CoverageRow {
+fn row_from_counts(
+  label: String,
+  measured: CoverageReport,
+  hit: Int,
+  total: Int,
+) -> CoverageRow {
   CountsRow(
+    measured: Some(measured),
     label: label,
     lines: counts_text(hit, total),
     percent: format_percent(hit, total),
     missing: [],
     excluded: [],
   )
+}
+
+fn hide_complete_files(
+  files: List(FileCoverage),
+  hide_complete: Bool,
+) -> List(FileCoverage) {
+  case hide_complete {
+    True -> list.filter(files, is_incomplete)
+    False -> files
+  }
+}
+
+/// A file shows `100.0%` only when it has executable lines and every one
+/// ran. Files with no executable lines show `-` and are never hidden.
+fn is_incomplete(file: FileCoverage) -> Bool {
+  let total = report.executable_line_count(file)
+  total == 0 || report.hit_line_count(file) < total
+}
+
+fn sort_files(
+  files: List(FileCoverage),
+  by_coverage: Bool,
+) -> List(FileCoverage) {
+  case by_coverage {
+    True -> list.sort(files, compare_coverage)
+    False -> files
+  }
+}
+
+/// Lowest share of lines that ran first, then by path. The shares are
+/// compared as exact fractions. A file with no executable lines counts as
+/// fully covered.
+fn compare_coverage(left: FileCoverage, right: FileCoverage) -> Order {
+  let #(left_hit, left_total) = covered_share(left)
+  let #(right_hit, right_total) = covered_share(right)
+  int.compare(left_hit * right_total, right_hit * left_total)
+  |> order.break_tie(string.compare(
+    report.source_path(left),
+    report.source_path(right),
+  ))
+}
+
+fn covered_share(file: FileCoverage) -> #(Int, Int) {
+  case report.executable_line_count(file) {
+    0 -> #(1, 1)
+    total -> #(report.hit_line_count(file), total)
+  }
 }
 
 fn counts_text(hit: Int, total: Int) -> String {
@@ -408,27 +514,82 @@ fn row_cells(
   columns: Columns,
 ) -> List(Cells) {
   case row {
-    CountsRow(label:, lines:, percent:, missing:, excluded:) ->
+    CountsRow(measured:, label:, lines:, percent:, missing:, excluded:) ->
       list.flatten([
         [
-          Cells(lines: [label], width: widths.label),
-          Cells(lines: [lines], width: widths.lines),
-          Cells(lines: [percent], width: widths.percent),
+          Cells(lines: [label], width: widths.label, color: Plain),
+          Cells(lines: [lines], width: widths.lines, color: Plain),
+          Cells(
+            lines: [percent],
+            width: widths.percent,
+            color: percent_color(columns, measured),
+          ),
         ],
-        optional_cells(columns.show_missing, missing, widths.missing),
-        optional_cells(columns.show_excluded, excluded, 0),
+        optional_cells(
+          columns.show_missing,
+          missing,
+          widths.missing,
+          missing_color(columns, measured),
+        ),
+        optional_cells(columns.show_excluded, excluded, 0, Plain),
       ])
     ExcludedFileRow(label:, text:) -> [
-      Cells(lines: [label], width: widths.label),
-      Cells(lines: [text], width: 0),
+      Cells(lines: [label], width: widths.label, color: Plain),
+      Cells(lines: [text], width: 0, color: Plain),
     ]
   }
 }
 
-fn optional_cells(shown: Bool, lines: List(String), width: Int) -> List(Cells) {
+fn optional_cells(
+  shown: Bool,
+  lines: List(String),
+  width: Int,
+  color: CellColor,
+) -> List(Cells) {
   case shown {
-    True -> [Cells(lines: lines, width: width)]
+    True -> [Cells(lines: lines, width: width, color: color)]
     False -> []
+  }
+}
+
+/// Green at 100.0%, red below the minimum, yellow in between. The header
+/// and a `-` cell stay plain.
+fn percent_color(
+  columns: Columns,
+  measured: Option(CoverageReport),
+) -> CellColor {
+  case columns.color, measured {
+    True, Some(measured_report) ->
+      measured_percent_color(columns.config, measured_report)
+    _, _ -> Plain
+  }
+}
+
+/// `coverage.check_minimum` decides "below the minimum", so the colour
+/// matches the minimum check exactly. An invalid minimum makes every
+/// incomplete row red; the runner reports the invalid minimum as a failure.
+fn measured_percent_color(
+  config: CoverageConfig,
+  measured_report: CoverageReport,
+) -> CellColor {
+  let hit = report.total_hit_line_count(measured_report)
+  let total = report.total_executable_line_count(measured_report)
+  case total, hit == total, coverage.check_minimum(config, measured_report) {
+    0, _, _ -> Plain
+    _, True, _ -> Green
+    _, False, Ok(Nil) -> Yellow
+    _, False, Error(_) -> Red
+  }
+}
+
+/// The lines that did not run are red. The header stays plain.
+fn missing_color(
+  columns: Columns,
+  measured: Option(CoverageReport),
+) -> CellColor {
+  case columns.color, measured {
+    True, Some(_) -> Red
+    _, _ -> Plain
   }
 }
 
@@ -455,12 +616,22 @@ fn without_first_line(cells: Cells) -> Cells {
   Cells(..cells, lines: list.drop(cells.lines, 1))
 }
 
+/// The padding goes after the colour codes, so the codes do not change the
+/// column widths.
 fn first_line_padded(cells: Cells) -> String {
-  string.pad_end(
-    result.unwrap(list.first(cells.lines), ""),
-    cells.width + 2,
-    " ",
-  )
+  let text = result.unwrap(list.first(cells.lines), "")
+  paint(cells.color, text)
+  <> string.repeat(" ", cells.width + 2 - string.length(text))
+}
+
+fn paint(color: CellColor, text: String) -> String {
+  case color, text {
+    _, "" -> ""
+    Plain, _ -> text
+    Red, _ -> ansi.red(text)
+    Yellow, _ -> ansi.yellow(text)
+    Green, _ -> ansi.green(text)
+  }
 }
 
 /// `Excluded: 1 file, 6 lines in 1 file`, or nothing when nothing is
@@ -483,6 +654,14 @@ fn render_excluded_summary(coverage_report: CoverageReport) -> String {
       <> ", "
       <> lines_in_files_text(line_count, list.length(files_with_ranges))
       <> "\n"
+  }
+}
+
+/// `Hidden: 2 files at 100.0%`, or nothing when no file was hidden.
+fn render_hidden_summary(hidden_count: Int) -> String {
+  case hidden_count {
+    0 -> ""
+    _ -> "Hidden: " <> count_text(hidden_count, "file") <> " at 100.0%\n"
   }
 }
 

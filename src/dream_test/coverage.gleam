@@ -131,6 +131,22 @@
 //// marker a reason with text after it. `coverage.require_exclusion_reasons`
 //// fails the run when a pattern or a marker has no reason.
 ////
+//// ## Table options
+////
+//// - `coverage.color()` prints the table in colour: the `Cover` cell is
+////   green at `100.0%`, red below the minimum and yellow in between, and the
+////   `Missing` column is red.
+//// - `coverage.sort_by_coverage()` lists the lowest coverage first.
+//// - `coverage.hide_complete()` leaves out files where every line ran. The
+////   total still counts them, and a line says how many were left out:
+////
+//// ```text
+//// File                Lines  Cover
+//// src/app/cart.gleam  18/20  90.0%
+//// Total               58/60  96.6%
+//// Hidden: 2 files at 100.0%
+//// ```
+////
 //// ## Line accuracy
 ////
 //// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
@@ -158,7 +174,9 @@
 //// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
 //// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
 //// |              | `require_exclusion_reasons`                               |
-//// | **Read**     | `shows_missing`, `shows_excluded`, `lcov_file`            |
+//// | **Table**    | `color`, `sort_by_coverage`, `hide_complete`              |
+//// | **Read**     | `shows_missing`, `shows_excluded`, `uses_color`,          |
+//// |              | `sorts_by_coverage`, `hides_complete`, `lcov_file`        |
 //// | **Run**      | `start`, `finish`, `check_minimum`                        |
 ////
 //// ## Import Style
@@ -199,6 +217,9 @@ pub opaque type CoverageConfig {
     exclude_patterns: List(ExcludePattern),
     show_excluded: Bool,
     require_exclusion_reasons: Bool,
+    color: Bool,
+    sort_by_coverage: Bool,
+    hide_complete: Bool,
   )
 }
 
@@ -413,6 +434,9 @@ pub fn new() -> CoverageConfig {
     exclude_patterns: [],
     show_excluded: False,
     require_exclusion_reasons: False,
+    color: False,
+    sort_by_coverage: False,
+    hide_complete: False,
   )
 }
 
@@ -765,6 +789,85 @@ pub fn require_exclusion_reasons(
   CoverageConfig(..config, require_exclusion_reasons: True)
 }
 
+/// Print the coverage table in colour.
+///
+/// The `Cover` cell of each row is green at `100.0%`, red below
+/// `coverage.minimum_percent`, and yellow in between (yellow below 100% when
+/// no minimum is set). A `-` cell (no executable lines) stays plain. The
+/// `Missing` column is red. Off by default, like `bdd.color()`, so output
+/// that goes to a file or a CI log has no escape codes.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_missing()
+/// |> coverage.color()
+/// ```
+pub fn color(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, color: True)
+}
+
+/// List the files with the lowest coverage first.
+///
+/// Files are sorted by the share of their lines that ran, lowest first.
+/// Files with the same share are sorted by path. A file with no executable
+/// lines counts as fully covered. Rows for excluded files stay after the
+/// measured files. Off by default: files keep the order of the report, which
+/// is by path for a report from `coverage.finish`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.sort_by_coverage()
+/// ```
+pub fn sort_by_coverage(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, sort_by_coverage: True)
+}
+
+/// Leave out the rows of files where every line ran.
+///
+/// A file is left out only when it has executable lines and all of them
+/// ran, so it would show `100.0%`. The total, the minimum and the LCOV file
+/// still count it. A line after the total says how many files were left
+/// out, for example `Hidden: 12 files at 100.0%`, so the table never hides
+/// them silently. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.hide_complete()
+/// ```
+pub fn hide_complete(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, hide_complete: True)
+}
+
 // =============================================================================
 // Read settings
 // =============================================================================
@@ -799,6 +902,55 @@ pub fn shows_missing(config config: CoverageConfig) -> Bool {
 /// ```
 pub fn shows_excluded(config config: CoverageConfig) -> Bool {
   config.show_excluded
+}
+
+/// Whether `coverage.color` is on.
+///
+/// Reporters read this to decide whether to print ANSI colour codes.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.color()
+/// |> coverage.uses_color()
+/// // -> True
+/// ```
+pub fn uses_color(config config: CoverageConfig) -> Bool {
+  config.color
+}
+
+/// Whether `coverage.sort_by_coverage` is on.
+///
+/// Reporters read this to decide whether to list the lowest coverage first.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.sort_by_coverage()
+/// |> coverage.sorts_by_coverage()
+/// // -> True
+/// ```
+pub fn sorts_by_coverage(config config: CoverageConfig) -> Bool {
+  config.sort_by_coverage
+}
+
+/// Whether `coverage.hide_complete` is on.
+///
+/// Reporters read this to decide whether to leave out files where every
+/// line ran.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.hide_complete()
+/// |> coverage.hides_complete()
+/// // -> True
+/// ```
+pub fn hides_complete(config config: CoverageConfig) -> Bool {
+  config.hide_complete
 }
 
 /// The LCOV file that `coverage.finish` writes, if any.

@@ -132,6 +132,51 @@ pub fn tests() {
         |> be_equal(True)
         |> or_fail_with("expected missing lines to be shown")
       }),
+      it("new prints the table without colour", fn() {
+        coverage.new()
+        |> coverage.uses_color()
+        |> should
+        |> be_equal(False)
+        |> or_fail_with("expected no colour by default")
+      }),
+      it("color turns colour on", fn() {
+        coverage.new()
+        |> coverage.color()
+        |> coverage.uses_color()
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("expected colour")
+      }),
+      it("new does not sort by coverage", fn() {
+        coverage.new()
+        |> coverage.sorts_by_coverage()
+        |> should
+        |> be_equal(False)
+        |> or_fail_with("expected the report order by default")
+      }),
+      it("sort_by_coverage turns the coverage order on", fn() {
+        coverage.new()
+        |> coverage.sort_by_coverage()
+        |> coverage.sorts_by_coverage()
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("expected the coverage order")
+      }),
+      it("new does not hide complete files", fn() {
+        coverage.new()
+        |> coverage.hides_complete()
+        |> should
+        |> be_equal(False)
+        |> or_fail_with("expected every file to be shown by default")
+      }),
+      it("hide_complete turns hiding complete files on", fn() {
+        coverage.new()
+        |> coverage.hide_complete()
+        |> coverage.hides_complete()
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("expected complete files to be hidden")
+      }),
       it("new writes LCOV to build/coverage/lcov.info", fn() {
         coverage.new()
         |> coverage.lcov_file()

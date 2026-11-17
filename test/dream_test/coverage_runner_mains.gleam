@@ -4,6 +4,7 @@
 //// modules in test/coverage_fixtures. The tests call them in a new `erl`
 //// process, so they can check the real output and exit status.
 
+import coverage_fixtures/nested/deep
 import coverage_fixtures/sample
 import dream_test/coverage
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -89,6 +90,39 @@ pub fn exclusion_without_reason_with_exit_on_failure() -> Nil {
       fixture_coverage()
       |> coverage.exclude("test/coverage_fixtures/nested/**")
       |> coverage.require_exclusion_reasons(),
+    )
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+fn fixture_tests_with_deep() {
+  describe("fixture", [
+    it("classifies a positive number", fn() {
+      sample.classify(1)
+      |> should
+      |> be_equal("positive")
+      |> or_fail_with("expected positive")
+    }),
+    it("gives the answer", fn() {
+      deep.answer()
+      |> should
+      |> be_equal(42)
+      |> or_fail_with("expected 42")
+    }),
+  ])
+}
+
+pub fn table_options() -> Nil {
+  let _ =
+    runner.new([fixture_tests_with_deep()])
+    |> runner.coverage(
+      fixture_coverage()
+      |> coverage.show_missing()
+      |> coverage.minimum_percent(30.0)
+      |> coverage.color()
+      |> coverage.sort_by_coverage()
+      |> coverage.hide_complete(),
     )
     |> runner.exit_on_failure()
     |> runner.run()
