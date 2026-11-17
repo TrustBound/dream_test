@@ -83,6 +83,4 @@ make_error(Path, eisdir) ->
 make_error(Path, enospc) ->
     {no_space, Path};
 make_error(Path, Reason) when is_atom(Reason) ->
-    {file_system_error, Path, atom_to_binary(Reason, utf8)};
-make_error(Path, Reason) ->
-    {file_system_error, Path, list_to_binary(io_lib:format("~p", [Reason]))}.
+    {file_system_error, Path, atom_to_binary(Reason, utf8)}.
