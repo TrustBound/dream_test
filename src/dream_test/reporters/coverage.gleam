@@ -93,7 +93,7 @@ import dream_test/coverage/report.{
   type LineCoverage,
 }
 import dream_test/file.{type FileError}
-import dream_test/internal/ansi
+import dream_test/reporters/ansi
 import gleam/float
 import gleam/int
 import gleam/list

@@ -7,7 +7,7 @@
 //// (e.g. snapshot tests) or when you’re formatting results incrementally in a
 //// custom runner.
 
-import dream_test/internal/ansi
+import dream_test/reporters/ansi
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/reporters/types as reporter_types
 import dream_test/timing

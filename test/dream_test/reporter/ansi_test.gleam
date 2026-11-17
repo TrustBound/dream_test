@@ -1,9 +1,9 @@
-import dream_test/internal/ansi
 import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/ansi
 import dream_test/unit.{describe, it}
 
 pub fn tests() {
-  describe("dream_test/internal/ansi", [
+  describe("dream_test/reporters/ansi", [
     it("red wraps the text in code 31", fn() {
       ansi.red("text")
       |> should
