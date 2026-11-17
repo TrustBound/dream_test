@@ -58,6 +58,19 @@ pub fn new() -> ProgressReporter {
 /// - `TestFinishedProgress`: one more test finished. `completed` counts the
 ///   finished tests, this one included.
 /// - `RunFinishedProgress`: the run finished.
+///
+/// ## Example
+///
+/// ```gleam
+/// progress.line(
+///   progress.new(),
+///   progress.RunFinishedProgress(completed: 4, total: 4),
+/// )
+/// |> string.ends_with("\n")
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("expected the last line to end the bar")
+/// ```
 pub type ProgressEvent {
   RunStartedProgress(total: Int)
   TestFinishedProgress(completed: Int, total: Int, result: TestResult)
