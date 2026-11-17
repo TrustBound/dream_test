@@ -117,5 +117,83 @@ pub fn tests() {
       |> be_equal(["a", "b"])
       |> or_fail_with("two spaces should not make an empty token")
     }),
+
+    it(
+      "tokenize_step_text keeps a minus sign in front of digits with the number",
+      fn() {
+        step_trie.tokenize_step_text("-5")
+        |> should
+        |> be_equal(["-5"])
+        |> or_fail_with("unexpected tokens")
+      },
+    ),
+
+    it(
+      "tokenize_step_text splits a negative number from the letters around it",
+      fn() {
+        step_trie.tokenize_step_text("a-5b")
+        |> should
+        |> be_equal(["a", "-5", "b"])
+        |> or_fail_with("unexpected tokens")
+      },
+    ),
+
+    it("tokenize_step_text ends a number at its second decimal point", fn() {
+      step_trie.tokenize_step_text("1.2.3")
+      |> should
+      |> be_equal(["1.2", ".", "3"])
+      |> or_fail_with("unexpected tokens")
+    }),
+
+    it(
+      "tokenize_step_text keeps a decimal point that has no digits after it",
+      fn() {
+        step_trie.tokenize_step_text("3.")
+        |> should
+        |> be_equal(["3."])
+        |> or_fail_with("unexpected tokens")
+      },
+    ),
+
+    it(
+      "tokenize_step_text keeps only the last minus sign of two with the number",
+      fn() {
+        step_trie.tokenize_step_text("--5")
+        |> should
+        |> be_equal(["-", "-5"])
+        |> or_fail_with("unexpected tokens")
+      },
+    ),
+
+    it(
+      "tokenize_step_text keeps a minus sign with no digits after it as text",
+      fn() {
+        step_trie.tokenize_step_text("x-")
+        |> should
+        |> be_equal(["x-"])
+        |> or_fail_with("unexpected tokens")
+      },
+    ),
+
+    it("tokenize_step_text splits a suffix from a number", fn() {
+      step_trie.tokenize_step_text("10%")
+      |> should
+      |> be_equal(["10", "%"])
+      |> or_fail_with("unexpected tokens")
+    }),
+
+    it("tokenize_step_text does not split a quoted number", fn() {
+      step_trie.tokenize_step_text("\"$5\"")
+      |> should
+      |> be_equal(["\"$5\""])
+      |> or_fail_with("unexpected tokens")
+    }),
+
+    it("tokenize_step_text keeps a token without digits as one token", fn() {
+      step_trie.tokenize_step_text("hello")
+      |> should
+      |> be_equal(["hello"])
+      |> or_fail_with("unexpected tokens")
+    }),
   ])
 }

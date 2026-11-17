@@ -34,7 +34,6 @@ import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/regexp
 import gleam/string
 
 // ============================================================================
@@ -466,25 +465,83 @@ fn append_list(parts: List(String), extra: List(String)) -> List(String) {
 /// e.g., "10%" -> ["10", "%"]
 /// e.g., "hello" -> ["hello"]
 /// Quoted strings are not split.
+///
+/// A number is an optional `-`, one or more digits, then an optional `.`
+/// and zero or more digits. The first number that starts at a position
+/// takes as many characters as it can.
 fn split_numeric_boundaries(token: String) -> List(String) {
   case is_quoted_string(token) {
     True -> [token]
-    False -> do_split_numeric(token)
+    False -> split_numbers(string.to_graphemes(token), "", [])
   }
 }
 
-fn do_split_numeric(token: String) -> List(String) {
-  case regexp.from_string("(-?[0-9]+\\.?[0-9]*)") {
-    Ok(re) -> split_numeric_with_regex(token, re)
-    Error(_) -> [token]
+/// A number read from the start of a list of graphemes, and the graphemes
+/// after it.
+type NumberRead {
+  NumberRead(number: String, rest: List(String))
+}
+
+/// Walk the graphemes. `text` holds the non-numeric characters since the
+/// last number. `parts` holds the finished parts in reverse order.
+fn split_numbers(
+  graphemes: List(String),
+  text: String,
+  parts: List(String),
+) -> List(String) {
+  case graphemes {
+    [] -> finalize_tokens(parts, text)
+    [first, ..rest] -> split_at_grapheme(first, rest, text, parts)
   }
 }
 
-fn split_numeric_with_regex(token: String, re: regexp.Regexp) -> List(String) {
-  case regexp.split(re, token) {
-    // No match, return as-is
-    [only] -> [only]
-    parts -> parts |> list.filter(is_non_empty)
+fn split_at_grapheme(
+  first: String,
+  rest: List(String),
+  text: String,
+  parts: List(String),
+) -> List(String) {
+  case read_number(first, rest) {
+    Some(NumberRead(number: number, rest: after)) ->
+      split_numbers(after, "", [number, ..add_token_if_non_empty(parts, text)])
+    None -> split_numbers(rest, text <> first, parts)
+  }
+}
+
+fn read_number(first: String, rest: List(String)) -> Option(NumberRead) {
+  case first, rest {
+    "-", [second, ..after] -> read_integer_part("-", second, after)
+    _, _ -> read_integer_part("", first, rest)
+  }
+}
+
+fn read_integer_part(
+  sign: String,
+  first: String,
+  rest: List(String),
+) -> Option(NumberRead) {
+  case is_digit(first) {
+    True -> Some(read_fraction(take_digits(rest, sign <> first)))
+    False -> None
+  }
+}
+
+fn read_fraction(integer_part: NumberRead) -> NumberRead {
+  case integer_part.rest {
+    [".", ..after] -> take_digits(after, integer_part.number <> ".")
+    _ -> integer_part
+  }
+}
+
+fn take_digits(graphemes: List(String), collected: String) -> NumberRead {
+  let #(digits, rest) = list.split_while(graphemes, is_digit)
+  NumberRead(number: collected <> string.concat(digits), rest: rest)
+}
+
+fn is_digit(grapheme: String) -> Bool {
+  case grapheme {
+    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
+    _ -> False
   }
 }
 
