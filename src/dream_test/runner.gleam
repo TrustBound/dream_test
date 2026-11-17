@@ -804,7 +804,8 @@ pub fn after_all_suites(
 pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
   let total = count_total_tests(selected_runs)
-  let suite_infos = suite_infos_from_runs(selected_runs, [])
+  let suite_runs_with_infos = suite_runs_with_infos(selected_runs, [])
+  let suite_infos = list.map(suite_runs_with_infos, suite_info_of_pair)
 
   let output = case builder.output {
     Some(output) -> output
@@ -833,8 +834,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   let #(results, completed2, progress_reporter1) = case before_all_result {
     Ok(_) ->
       run_suites_with_hooks(
-        selected_runs,
-        suite_infos,
+        suite_runs_with_infos,
         builder.config,
         progress_reporter0,
         output,
@@ -913,15 +913,26 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   final_results
 }
 
-fn suite_infos_from_runs(
+/// Each suite run with the `SuiteInfo` of its suite, so the hooks of a
+/// suite always get the info of the suite that runs.
+fn suite_runs_with_infos(
   suite_runs: List(SuiteRun(ctx)),
-  acc_rev: List(types.SuiteInfo),
-) -> List(types.SuiteInfo) {
+  acc_rev: List(#(SuiteRun(ctx), types.SuiteInfo)),
+) -> List(#(SuiteRun(ctx), types.SuiteInfo)) {
   case suite_runs {
     [] -> list.reverse(acc_rev)
-    [SuiteRun(suite: suite, config_override: _), ..rest] ->
-      suite_infos_from_runs(rest, [suite_info_from_suite(suite), ..acc_rev])
+    [suite_run, ..rest] ->
+      suite_runs_with_infos(rest, [
+        #(suite_run, suite_info_from_suite(suite_run.suite)),
+        ..acc_rev
+      ])
   }
+}
+
+fn suite_info_of_pair(
+  pair: #(SuiteRun(ctx), types.SuiteInfo),
+) -> types.SuiteInfo {
+  pair.1
 }
 
 fn suite_info_from_suite(suite: TestSuite(ctx)) -> types.SuiteInfo {
@@ -1108,8 +1119,7 @@ fn run_after_all_suites_hooks(
 }
 
 fn run_suites_with_hooks(
-  suite_runs: List(SuiteRun(ctx)),
-  suite_infos: List(types.SuiteInfo),
+  suite_runs: List(#(SuiteRun(ctx), types.SuiteInfo)),
   default_config: parallel.ParallelConfig,
   progress_reporter: Option(progress.ProgressReporter),
   output: Output,
@@ -1121,11 +1131,9 @@ fn run_suites_with_hooks(
   runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
   acc: List(TestResult),
 ) -> #(List(TestResult), Int, Option(progress.ProgressReporter)) {
-  case suite_runs, suite_infos {
-    [], [] -> #(acc, completed, progress_reporter)
-    [SuiteRun(suite: suite, config_override: override), ..rest],
-      [suite_info, ..rest_infos]
-    -> {
+  case suite_runs {
+    [] -> #(acc, completed, progress_reporter)
+    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
       let before_result =
         run_before_each_suite_hooks(before_each_suite_hooks, suite_info)
       case before_result {
@@ -1153,7 +1161,6 @@ fn run_suites_with_hooks(
             )
           run_suites_with_hooks(
             rest,
-            rest_infos,
             default_config,
             progress_reporter,
             output,
@@ -1195,7 +1202,6 @@ fn run_suites_with_hooks(
             )
           run_suites_with_hooks(
             rest,
-            rest_infos,
             default_config,
             next_progress_reporter,
             output,
@@ -1210,7 +1216,6 @@ fn run_suites_with_hooks(
         }
       }
     }
-    _, _ -> #(acc, completed, progress_reporter)
   }
 }
 
