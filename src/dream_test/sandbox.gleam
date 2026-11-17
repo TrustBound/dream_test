@@ -84,8 +84,9 @@
 //// ```
 
 import gleam/erlang/process.{
-  type Pid, type Selector, type Subject, kill, monitor, new_selector,
-  new_subject, select, select_monitors, selector_receive, send, spawn_unlinked,
+  type Monitor, type Pid, type Selector, type Subject, demonitor_process, kill,
+  monitor, new_selector, new_subject, select, select_specific_monitor,
+  selector_receive, send, spawn_unlinked,
 }
 import gleam/string
 
@@ -220,8 +221,7 @@ pub fn run_isolated(
   let worker_pid =
     spawn_worker(result_subject, test_function, config.show_crash_reports)
   let worker_monitor = monitor(worker_pid)
-  let selector =
-    build_result_selector(result_subject, config.show_crash_reports)
+  let selector = build_result_selector(result_subject, worker_monitor)
 
   wait_for_result(config, selector, worker_pid, worker_monitor)
 }
@@ -249,22 +249,20 @@ fn spawn_worker(
 }
 
 /// Build a selector that waits for either test completion or process down.
+///
+/// Only the down message of this worker's monitor is selected, so down
+/// messages of other monitors of the calling process stay in its mailbox.
+/// The worker sends its result before it exits, so the result comes before
+/// the down message of a normal exit. The down message is needed in both
+/// modes: an exit signal (for example from a linked process that crashed)
+/// stops the worker before it can send anything.
 fn build_result_selector(
   result_subject: Subject(WorkerMessage(a)),
-  show_crash_reports: Bool,
+  worker_monitor: Monitor,
 ) -> Selector(WorkerMessage(a)) {
-  case show_crash_reports {
-    True ->
-      new_selector()
-      |> select(result_subject)
-      |> select_monitors(map_down_to_message)
-
-    False ->
-      // In quiet mode the worker always sends a WorkerMessage, so we don't need
-      // to listen to monitor down messages (which would otherwise include Normal).
-      new_selector()
-      |> select(result_subject)
-  }
+  new_selector()
+  |> select(result_subject)
+  |> select_specific_monitor(worker_monitor, map_down_to_message)
 }
 
 /// Map a process down event to a WorkerMessage.
@@ -287,12 +285,16 @@ fn wait_for_result(
   config: SandboxConfig,
   selector: Selector(WorkerMessage(a)),
   worker_pid: Pid,
-  _worker_monitor: process.Monitor,
+  worker_monitor: Monitor,
 ) -> SandboxResult(a) {
-  case selector_receive(selector, config.timeout_ms) {
+  let result = case selector_receive(selector, config.timeout_ms) {
     Ok(message) -> handle_worker_message(message)
     Error(Nil) -> handle_timeout(worker_pid)
   }
+  // Remove the monitor and any down message it left in the mailbox, so the
+  // caller's mailbox does not fill up and a later selector cannot see it.
+  demonitor_process(worker_monitor)
+  result
 }
 
 /// Handle a message from the worker or monitor.

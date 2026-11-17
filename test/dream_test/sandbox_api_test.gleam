@@ -48,5 +48,30 @@ pub fn tests() {
           )
       }
     }),
+
+    it("reports a quiet worker that an exit signal stops as crashed", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
+      sandbox.run_isolated(config, fn() {
+        process.kill(process.self())
+        process.sleep(5000)
+      })
+      |> should
+      |> be_equal(sandbox.SandboxCrashed("killed"))
+      |> or_fail_with(
+        "an exit signal should give SandboxCrashed, not a timeout",
+      )
+    }),
+
+    it("does not take the down message of an earlier worker", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
+      let _ = sandbox.run_isolated(config, fn() { 1 })
+      process.sleep(10)
+      sandbox.run_isolated(config, fn() { 2 })
+      |> should
+      |> be_equal(sandbox.SandboxCompleted(2))
+      |> or_fail_with("the second run should complete")
+    }),
   ])
 }

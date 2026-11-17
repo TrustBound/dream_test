@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error or deleted files in other directories.
 - `timing.format_duration_us` now gives `"0.0ms"` for a negative duration,
   the same as for `0`. Before, it gave text such as `"0.-5ms"`.
+- `sandbox.run_isolated` without crash reports now gives `SandboxCrashed`
+  when an exit signal stops the worker, for example when a linked process
+  crashes. Before, it waited for the full timeout and gave `SandboxTimedOut`.
+- `sandbox.run_isolated` now waits only for the down message of its own
+  worker, and removes that message when it returns. Before, with crash
+  reports on, it left the down message in the mailbox, and a later call in
+  the same process took it and gave `SandboxCrashed("normal")`.
 
 ## [2.2.0] - 2026-11-17
 
