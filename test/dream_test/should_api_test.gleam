@@ -1,7 +1,7 @@
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should, succeed}
 import dream_test/types
 import dream_test/unit.{describe, it}
-import gleam/option.{None}
+import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("dream_test/matchers", [
@@ -23,6 +23,25 @@ pub fn tests() {
       should(1)
       |> be_equal(1)
       |> or_fail_with("should be 1")
+    }),
+
+    it("or_fail_with puts its message on a failure", fn() {
+      should(1)
+      |> be_equal(2)
+      |> or_fail_with("one is not two")
+      |> should
+      |> be_equal(
+        Ok(
+          types.AssertionFailed(types.AssertionFailure(
+            operator: "be_equal",
+            message: "one is not two",
+            payload: Some(types.EqualityFailure(actual: "1", expected: "2")),
+          )),
+        ),
+      )
+      |> or_fail_with(
+        "or_fail_with should keep the failure and set the message",
+      )
     }),
 
     it("fail_with produces AssertionFailed with the message", fn() {
