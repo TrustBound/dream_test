@@ -31,7 +31,7 @@ pub fn tests() {
       |> or_fail_with("run_root_parallel should run the suite")
     }),
 
-    it("a before_all failure fails the tests of nested groups", fn() {
+    it("a before_all failure gives SetupFailed in nested groups", fn() {
       describe("root", [
         before_all(fn() { Error("nope") }),
         group("inner", [it("a", fn() { Ok(AssertionOk) })]),
@@ -41,10 +41,10 @@ pub fn tests() {
       |> summaries
       |> should
       |> be_equal([
-        #(["root", "inner", "a"], Failed, [failure("before_all", "nope")]),
-        #(["root", "other", "b"], Failed, [failure("before_all", "nope")]),
+        #(["root", "inner", "a"], SetupFailed, [failure("before_all", "nope")]),
+        #(["root", "other", "b"], SetupFailed, [failure("before_all", "nope")]),
       ])
-      |> or_fail_with("tests in nested groups should fail with the hook error")
+      |> or_fail_with("tests in nested groups should give SetupFailed")
     }),
 
     it("a test that returns an error fails in parallel", fn() {
@@ -164,7 +164,7 @@ pub fn tests() {
       |> or_fail_with("a failing after_all should add an <after_all> result")
     }),
 
-    it("a before_all that runs too long fails the tests", fn() {
+    it("a before_all that runs too long gives SetupFailed", fn() {
       describe("root", [
         before_all(fn() {
           process.sleep(1000)
@@ -176,14 +176,14 @@ pub fn tests() {
       |> summaries
       |> should
       |> be_equal([
-        #(["root", "a"], Failed, [
+        #(["root", "a"], SetupFailed, [
           failure("before_all", "hook timed out in root"),
         ]),
       ])
-      |> or_fail_with("a slow before_all should fail the tests")
+      |> or_fail_with("a slow before_all should give SetupFailed")
     }),
 
-    it("a before_all that crashes fails the tests", fn() {
+    it("a before_all that crashes gives SetupFailed", fn() {
       describe("root", [
         before_all(fn() { erlang_error(atom.create("boom")) }),
         it("a", fn() { Ok(AssertionOk) }),
@@ -192,11 +192,11 @@ pub fn tests() {
       |> summaries
       |> should
       |> be_equal([
-        #(["root", "a"], Failed, [
+        #(["root", "a"], SetupFailed, [
           failure("before_all", "hook crashed in root: error:boom"),
         ]),
       ])
-      |> or_fail_with("a crashing before_all should fail the tests")
+      |> or_fail_with("a crashing before_all should give SetupFailed")
     }),
 
     it("an after_each that runs too long fails the test", fn() {

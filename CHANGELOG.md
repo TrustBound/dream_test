@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deadline. It counts from the start of the body, and each hook has its own
   timeout. The failure is still `timeout: test timed out`, and the
   `after_each` hooks still run.
+- BREAKING: When a `before_all` hook fails, times out or crashes, the tests
+  of its group and of every group inside it are now `SetupFailed`, as the
+  docs of `types.Status` say. Before, they were `Failed`. The failure is
+  still `before_all` with the hook's message.
 
 ### Fixed
 

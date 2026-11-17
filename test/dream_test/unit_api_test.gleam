@@ -74,7 +74,7 @@ pub fn tests() {
       |> or_fail_with("failed assertion should produce Failed status")
     }),
 
-    it("before_all failure fails tests and skips the test body", fn() {
+    it("before_all failure gives SetupFailed and skips the test body", fn() {
       let suite =
         describe("root", [
           before_all(fn() { Error("nope") }),
@@ -87,7 +87,7 @@ pub fn tests() {
       #(r.status, r.failures)
       |> should
       |> be_equal(
-        #(Failed, [
+        #(SetupFailed, [
           AssertionFailure(
             operator: "before_all",
             message: "nope",
@@ -96,7 +96,7 @@ pub fn tests() {
         ]),
       )
       |> or_fail_with(
-        "before_all error should fail the test without running the body",
+        "before_all error should give SetupFailed without running the body",
       )
     }),
 

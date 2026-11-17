@@ -504,7 +504,8 @@ fn execute_node(
       case list.is_empty(failures_rev) {
         False -> {
           // If before_all fails, do not execute any tests in this scope.
-          // Instead, mark all tests under this group as failed and skip bodies.
+          // Instead, mark all tests under this group as SetupFailed and skip
+          // their bodies.
           let group_results_rev =
             fail_tests_due_to_before_all(
               group_scope,
@@ -622,7 +623,7 @@ fn fail_test_nodes(
         TestResult(
           name: test_case.name,
           full_name: list.append(scope, [test_case.name]),
-          status: Failed,
+          status: SetupFailed,
           duration_ms: 0,
           tags: list.append(inherited_tags, test_case.tags),
           failures: list.reverse(failures_rev),
