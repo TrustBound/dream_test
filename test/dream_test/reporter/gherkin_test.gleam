@@ -142,6 +142,29 @@ pub fn tests() {
         )
       }),
 
+      it("format_scenarios writes the scenarios without a summary", fn() {
+        gherkin.format_scenarios([
+          scenario(["Cart", "adds"], types.Passed, []),
+          scenario(["Cart", "removes"], types.Failed, [failure("bad", None)]),
+        ])
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: adds ✓\n"
+          <> "  Scenario: removes ✗\n"
+          <> "      ✗ check\n"
+          <> "        Message: bad\n",
+        )
+        |> or_fail_with("format_scenarios should give no summary line")
+      }),
+
+      it("format_scenarios gives no text for no results", fn() {
+        gherkin.format_scenarios([])
+        |> should
+        |> be_equal("")
+        |> or_fail_with("no results should give no text")
+      }),
+
       it("shows the duration of a slow scenario", fn() {
         gherkin.format([
           types.TestResult(

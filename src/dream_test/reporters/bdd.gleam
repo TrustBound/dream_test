@@ -218,7 +218,7 @@ pub fn format(results results: List(TestResult)) -> String {
 
   // Format each group with appropriate reporter
   let unit_text = format_unit_results(False, unit_results)
-  let gherkin_text = format_gherkin_results(gherkin_results)
+  let gherkin_text = gherkin_reporter.format_scenarios(gherkin_results)
 
   // Combine with single summary
   let summary_text = format_summary(False, results)
@@ -257,47 +257,6 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
         order.Eq -> compare_string_lists(rest_a, rest_b)
         other -> other
       }
-  }
-}
-
-fn format_gherkin_results(results: List(TestResult)) -> String {
-  case results {
-    [] -> ""
-    _ -> {
-      let formatted = gherkin_reporter.format(results)
-      // Remove the gherkin reporter's own summary (we'll use combined summary)
-      remove_summary_line(formatted)
-    }
-  }
-}
-
-fn remove_summary_line(text: String) -> String {
-  // Find and remove the summary line (may have trailing empty lines)
-  let lines = string.split(text, "\n")
-  let without_summary = remove_gherkin_summary(lines, [])
-  string.join(without_summary, "\n")
-}
-
-fn remove_gherkin_summary(
-  lines: List(String),
-  accumulated: List(String),
-) -> List(String) {
-  case lines {
-    [] -> list.reverse(accumulated)
-    [line] -> {
-      // Check if this is the summary line or trailing empty line
-      case string.starts_with(line, "Summary:") || line == "" {
-        True -> list.reverse(accumulated)
-        False -> list.reverse([line, ..accumulated])
-      }
-    }
-    [line, ..rest] -> {
-      // Skip summary lines anywhere in the list
-      case string.starts_with(line, "Summary:") {
-        True -> remove_gherkin_summary(rest, accumulated)
-        False -> remove_gherkin_summary(rest, [line, ..accumulated])
-      }
-    }
   }
 }
 

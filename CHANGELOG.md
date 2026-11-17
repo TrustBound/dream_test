@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same form that `run_isolated` and the parallel runner use for a crash
   (`"normal"`, `"killed"`, or the inspected reason). Use it in a custom
   runner to show a crash reason the same way as dream_test.
+- `gherkin.format_scenarios` gives the feature and scenario lines of the
+  Gherkin reporter without the summary line. Use it in a reporter that
+  writes its own summary. The BDD reporter now uses it, in place of a
+  removal of the summary line from the full Gherkin report.
 
 ### Changed
 

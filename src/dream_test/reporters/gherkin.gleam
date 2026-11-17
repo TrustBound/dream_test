@@ -8,6 +8,7 @@
 //// in automatically—but it’s useful when you want:
 ////
 //// - a Gherkin report as a `String` (`format`)
+//// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
 import dream_test/timing
@@ -50,9 +51,59 @@ import gleam/string
 ///
 /// The formatted report as a `String`.
 pub fn format(results results: List(TestResult)) -> String {
-  let formatted_results = format_all_results(results, "", "")
   let summary_text = format_summary(results)
-  string.concat([formatted_results, "\n", summary_text])
+  string.concat([format_scenarios(results), "\n", summary_text])
+}
+
+/// Format test results as Gherkin feature and scenario lines, with no
+/// summary.
+///
+/// `format` gives these lines, then an empty line and the summary line.
+/// Use `format_scenarios` when you write your own summary, for example in a
+/// reporter that shows unit tests and Gherkin scenarios together with one
+/// summary for all of them. The BDD reporter does this.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/gherkin as gherkin_reporter
+/// import dream_test/types.{GherkinScenario, Passed, TestResult}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() {
+///   describe("Gherkin scenario lines", [
+///     it("format_scenarios gives the lines without a summary", fn() {
+///       let result =
+///         TestResult(
+///           name: "Adding items",
+///           full_name: ["Shopping Cart", "Adding items"],
+///           status: Passed,
+///           duration_ms: 0,
+///           tags: [],
+///           failures: [],
+///           kind: GherkinScenario("cart"),
+///         )
+///
+///       gherkin_reporter.format_scenarios([result])
+///       |> should
+///       |> be_equal("Feature: Shopping Cart\n  Scenario: Adding items ✓\n")
+///       |> or_fail_with("expected one feature line and one scenario line")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `results`: The test results to format
+///
+/// ## Returns
+///
+/// The feature and scenario lines as a `String`. Each line ends with `\n`.
+/// An empty list gives `""`.
+pub fn format_scenarios(results results: List(TestResult)) -> String {
+  format_all_results(results, "", "")
 }
 
 /// Print test results using a provided writer function.
