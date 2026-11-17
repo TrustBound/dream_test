@@ -1,4 +1,4 @@
-//// Black-box tests of `coverage.exclude`, run in a child node.
+//// Black-box tests of `coverage.exclude`.
 
 import coverage_fixtures/sample
 import dream_test/coverage.{
@@ -6,9 +6,9 @@ import dream_test/coverage.{
   ExcludeMatchedNothing,
 }
 import dream_test/coverage/report.{type CoverageReport}
-import dream_test/coverage_child_support.{
-  add_damaged_beam, add_source, child_project, compile_source, measure,
-  run_in_child,
+import dream_test/coverage_project_support.{
+  add_damaged_beam, add_source, compile_source, measure, project, project_config,
+  with_fixture_lock,
 }
 import dream_test/file.{read, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -36,13 +36,14 @@ fn test_directory() -> String {
   "build/coverage/exclude_tests/" <> int.to_string(unique_port())
 }
 
-/// Measure `classify(1)` with `config` in a child, and list the paths of the
-/// report's files.
+/// Measure `classify(1)` with `config`, and list the paths of the report's
+/// files.
 fn measured_paths(config: CoverageConfig) -> Result(List(String), String) {
-  case run_in_child(fn() { measure(config, fn() { sample.classify(1) }) }) {
-    Ok(Ok(coverage_report)) -> Ok(source_paths(coverage_report))
-    Ok(Error(error)) -> Error(string_of(error))
-    Error(message) -> Error(message)
+  case
+    with_fixture_lock(fn() { measure(config, fn() { sample.classify(1) }) })
+  {
+    Ok(coverage_report) -> Ok(source_paths(coverage_report))
+    Error(error) -> Error(string_of(error))
   }
 }
 
@@ -50,12 +51,11 @@ fn source_paths(coverage_report: CoverageReport) -> List(String) {
   list.map(report.files(coverage_report), report.source_path)
 }
 
-/// Start coverage with `config` in a child, and return the start error.
+/// Start coverage with `config`, and return the start error.
 fn start_error(config: CoverageConfig) -> Result(CoverageError, String) {
-  case run_in_child(fn() { coverage.start(config) }) {
-    Ok(Error(error)) -> Ok(error)
-    Ok(Ok(_)) -> Error("expected start to fail")
-    Error(message) -> Error(message)
+  case with_fixture_lock(fn() { coverage.start(config) }) {
+    Error(error) -> Ok(error)
+    Ok(_) -> Error("expected start to fail")
   }
 }
 
@@ -122,33 +122,42 @@ pub fn tests() {
         |> be_equal(Ok(["test/coverage_fixtures/coverage_fixture_ffi.erl"]))
         |> or_fail_with("expected only the FFI file to be left")
       }),
-      it("does not instrument an excluded module", fn() {
-        run_in_child(fn() {
-          let _ = child_project("excluded")
-          add_source("kept.erl", "-module(kept).\n")
-          compile_source("kept.erl", "debug_info")
-          add_source("damaged.erl", "-module(damaged).\n")
-          add_damaged_beam("damaged")
-          case
-            measure(
-              coverage.new()
-                |> coverage.no_lcov()
-                |> coverage.exclude("src/damaged.erl"),
-              fn() { Nil },
-            )
-          {
-            Ok(coverage_report) -> Ok(source_paths(coverage_report))
-            Error(error) -> Error(string_of(error))
-          }
-        })
+      it("does not add line counters to an excluded module", fn() {
+        let source_directory = project("excluded")
+        add_source(
+          source_directory,
+          "exclude_kept.erl",
+          "-module(exclude_kept).\n",
+        )
+        compile_source(source_directory, "exclude_kept.erl", "debug_info")
+        add_source(
+          source_directory,
+          "exclude_damaged.erl",
+          "-module(exclude_damaged).\n",
+        )
+        add_damaged_beam(source_directory, "exclude_damaged")
+        case
+          measure(
+            project_config(source_directory)
+              |> coverage.exclude(
+                "test/../build/coverage/projects/excluded/src/exclude_damaged.erl",
+              ),
+            fn() { Nil },
+          )
+        {
+          Ok(coverage_report) -> Ok(source_paths(coverage_report))
+          Error(error) -> Error(string_of(error))
+        }
         |> should
-        |> be_equal(Ok(Ok(["src/kept.erl"])))
+        |> be_equal(
+          Ok(["test/../build/coverage/projects/excluded/src/exclude_kept.erl"]),
+        )
         |> or_fail_with("expected the damaged module to be skipped")
       }),
       it("leaves excluded files out of the LCOV file", fn() {
         let path = test_directory() <> "/lcov.info"
         let _ =
-          run_in_child(fn() {
+          with_fixture_lock(fn() {
             measure(
               fixture_config()
                 |> coverage.lcov_path(path)
@@ -170,7 +179,7 @@ pub fn tests() {
           |> coverage.minimum_percent(50.0)
           |> coverage.exclude(nested_pattern())
           |> coverage.exclude(ffi_pattern())
-        run_in_child(fn() {
+        with_fixture_lock(fn() {
           case measure(config, fn() { sample.classify(1) }) {
             Ok(coverage_report) ->
               coverage.check_minimum(config: config, report: coverage_report)
@@ -178,7 +187,7 @@ pub fn tests() {
           }
         })
         |> should
-        |> be_equal(Ok(Ok(Nil)))
+        |> be_equal(Ok(Nil))
         |> or_fail_with("expected 2 of 4 lines to reach 50%")
       }),
       it("drops merged line counts for excluded files", fn() {
@@ -246,8 +255,8 @@ pub fn tests() {
         )
         |> or_fail_with("expected ExcludeMatchedNothing")
       }),
-      it("checks the patterns before cover starts", fn() {
-        run_in_child(fn() {
+      it("checks the patterns before any module gets line counters", fn() {
+        with_fixture_lock(fn() {
           let _ =
             fixture_config()
             |> coverage.exclude("test/coverage_fixtures/generated/**")
@@ -259,7 +268,7 @@ pub fn tests() {
           }
         })
         |> should
-        |> be_equal(Ok(Ok(3)))
+        |> be_equal(Ok(3))
         |> or_fail_with("expected a second start to succeed")
       }),
       it("returns EverySourceFileExcluded when no file is left", fn() {

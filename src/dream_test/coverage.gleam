@@ -1740,9 +1740,8 @@ fn module_prefix(
   source_directory: String,
 ) -> Result(List(String), CoverageError) {
   case path_segments(source_directory) {
-    ["src", ..prefix] -> Ok(prefix)
-    ["test", ..prefix] -> Ok(prefix)
-    ["dev", ..prefix] -> Ok(prefix)
+    [root, ..prefix] if root == "src" || root == "test" || root == "dev" ->
+      Ok(prefix)
     _ -> Error(SourceDirectoryOutsideSourceRoot(path: source_directory))
   }
 }

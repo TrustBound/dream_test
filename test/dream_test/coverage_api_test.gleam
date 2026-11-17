@@ -1,7 +1,7 @@
 //// Black-box tests of `dream_test/coverage`.
 ////
-//// Tests that start `cover` run in a new peer node, because `cover` runs
-//// once per BEAM instance and this test run may already be measuring itself.
+//// Tests that measure the shared fixtures hold the fixture lock, so no two
+//// of them measure the same modules at the same time.
 
 import coverage_fixtures/nested/deep
 import coverage_fixtures/sample
@@ -16,10 +16,10 @@ import dream_test/coverage.{
 import dream_test/coverage/report.{
   type CoverageReport, type LineCoverage, LineCoverage,
 }
-import dream_test/coverage_child_support.{
-  add_source, child_project, compile_source, make_unreadable, run_in_child,
+import dream_test/coverage_project_support.{
+  add_source, compile_source, make_unreadable, project, project_config,
+  with_fixture_lock,
 }
-import dream_test/coverage_project_support.{with_fixture_lock}
 import dream_test/file.{
   FileSystemError, IsDirectory, NotFound, PermissionDenied, read, write,
 }
@@ -32,9 +32,6 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
-
-@external(erlang, "dream_test_coverage_test_ffi", "run_in_peer")
-fn run_in_peer(function: fn() -> a) -> Result(a, String)
 
 fn fixture_config() {
   coverage.new()
@@ -89,7 +86,6 @@ fn counted_lines(
   }
 }
 
-/// Start coverage, run `classify(1)`, and finish, all in a new peer node.
 /// The Cobertura timestamp is the time of the run, so replace its value
 /// with `T` before comparing.
 fn without_timestamp(xml: String) -> String {
@@ -222,8 +218,8 @@ fn output_path(name: String) -> String {
 
 fn measure_classify(
   config: coverage.CoverageConfig,
-) -> Result(Result(CoverageReport, CoverageError), String) {
-  run_in_peer(fn() {
+) -> Result(CoverageReport, CoverageError) {
+  with_fixture_lock(fn() {
     case coverage.start(config) {
       Ok(session) -> {
         let _ = sample.classify(1)
@@ -427,7 +423,7 @@ pub fn tests() {
     group("start and finish", [
       it("report every source file with each executable line", fn() {
         case measure_classify(fixture_config()) {
-          Ok(Ok(coverage_report)) -> Ok(file_lines(coverage_report))
+          Ok(coverage_report) -> Ok(file_lines(coverage_report))
           other -> Error(other)
         }
         |> should
@@ -450,7 +446,7 @@ pub fn tests() {
         |> or_fail_with("expected the fixture lines")
       }),
       it("measure a folder inside a source root with its module names", fn() {
-        run_in_peer(fn() {
+        with_fixture_lock(fn() {
           let config =
             fixture_config()
             |> coverage.source_directory("./test/coverage_fixtures/nested/")
@@ -465,13 +461,11 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok(
-            Ok(
-              report.new([
-                report.file("test/coverage_fixtures/nested/deep.gleam", [
-                  LineCoverage(line: 4, calls: 1),
-                ]),
+            report.new([
+              report.file("test/coverage_fixtures/nested/deep.gleam", [
+                LineCoverage(line: 4, calls: 1),
               ]),
-            ),
+            ]),
           ),
         )
         |> or_fail_with("expected nested@deep to be measured")
@@ -494,7 +488,7 @@ pub fn tests() {
       it("return LcovWriteFailed when the LCOV path is a directory", fn() {
         measure_classify(fixture_config() |> coverage.lcov_path("test"))
         |> should
-        |> be_equal(Ok(Error(LcovWriteFailed("test", IsDirectory("test")))))
+        |> be_equal(Error(LcovWriteFailed("test", IsDirectory("test"))))
         |> or_fail_with("expected LcovWriteFailed")
       }),
       it("write the JSON, Cobertura and Markdown files", fn() {
@@ -526,7 +520,7 @@ pub fn tests() {
       it("return JsonWriteFailed when the JSON path is a directory", fn() {
         measure_classify(fixture_config() |> coverage.json_path("test"))
         |> should
-        |> be_equal(Ok(Error(JsonWriteFailed("test", IsDirectory("test")))))
+        |> be_equal(Error(JsonWriteFailed("test", IsDirectory("test"))))
         |> or_fail_with("expected JsonWriteFailed")
       }),
       it(
@@ -534,9 +528,7 @@ pub fn tests() {
         fn() {
           measure_classify(fixture_config() |> coverage.cobertura_path("test"))
           |> should
-          |> be_equal(
-            Ok(Error(CoberturaWriteFailed("test", IsDirectory("test")))),
-          )
+          |> be_equal(Error(CoberturaWriteFailed("test", IsDirectory("test"))))
           |> or_fail_with("expected CoberturaWriteFailed")
         },
       ),
@@ -545,9 +537,7 @@ pub fn tests() {
         fn() {
           measure_classify(fixture_config() |> coverage.markdown_path("test"))
           |> should
-          |> be_equal(
-            Ok(Error(MarkdownWriteFailed("test", IsDirectory("test")))),
-          )
+          |> be_equal(Error(MarkdownWriteFailed("test", IsDirectory("test"))))
           |> or_fail_with("expected MarkdownWriteFailed")
         },
       ),
@@ -582,9 +572,7 @@ pub fn tests() {
         let _ = write(index_path <> "/blocker", "")
         measure_classify(fixture_config() |> coverage.html_path(directory))
         |> should
-        |> be_equal(
-          Ok(Error(HtmlWriteFailed(index_path, IsDirectory(index_path)))),
-        )
+        |> be_equal(Error(HtmlWriteFailed(index_path, IsDirectory(index_path))))
         |> or_fail_with("expected HtmlWriteFailed")
       }),
       it("return HtmlWriteFailed when a source page cannot be written", fn() {
@@ -599,7 +587,7 @@ pub fn tests() {
         let _ = change_mode(directory, 0o755)
         result
         |> should
-        |> be_equal(Ok(Error(HtmlWriteFailed(page_path, NotFound(page_path)))))
+        |> be_equal(Error(HtmlWriteFailed(page_path, NotFound(page_path))))
         |> or_fail_with("expected HtmlWriteFailed for the page")
       }),
       it("delete a page from an earlier run", fn() {
@@ -637,45 +625,40 @@ pub fn tests() {
         result
         |> should
         |> be_equal(
-          Ok(
-            Error(HtmlDeleteFailed(
-              files_path,
-              FileSystemError(files_path, "eexist"),
-            )),
-          ),
+          Error(HtmlDeleteFailed(
+            files_path,
+            FileSystemError(files_path, "eexist"),
+          )),
         )
         |> or_fail_with("expected HtmlDeleteFailed")
       }),
       it(
         "return HtmlSourceReadFailed when a source file cannot be read at finish",
         fn() {
-          run_in_child(fn() {
-            let _ = child_project("html_unreadable")
-            add_source(
-              "plain.erl",
-              "-module(plain).\n-export([one/0]).\none() -> 1.\n",
-            )
-            compile_source("plain.erl", "debug_info")
-            let config =
-              coverage.new()
-              |> coverage.no_lcov()
-              |> coverage.html_path("build/html")
-            case coverage.start(config) {
-              Ok(session) -> {
-                make_unreadable("plain.erl")
-                coverage.finish(session)
-              }
-              Error(error) -> Error(error)
+          let source_directory = project("html_unreadable")
+          add_source(
+            source_directory,
+            "api_html_plain.erl",
+            "-module(api_html_plain).\n-export([one/0]).\none() -> 1.\n",
+          )
+          compile_source(source_directory, "api_html_plain.erl", "debug_info")
+          let config =
+            project_config(source_directory) |> coverage.html_path("build/html")
+          case coverage.start(config) {
+            Ok(session) -> {
+              make_unreadable(source_directory, "api_html_plain.erl")
+              coverage.finish(session)
             }
-          })
+            Error(error) -> Error(error)
+          }
           |> should
           |> be_equal(
-            Ok(
-              Error(HtmlSourceReadFailed(
-                "src/plain.erl",
-                PermissionDenied("src/plain.erl"),
-              )),
-            ),
+            Error(HtmlSourceReadFailed(
+              "test/../build/coverage/projects/html_unreadable/src/api_html_plain.erl",
+              PermissionDenied(
+                "test/../build/coverage/projects/html_unreadable/src/api_html_plain.erl",
+              ),
+            )),
           )
           |> or_fail_with("expected HtmlSourceReadFailed")
         },
@@ -710,42 +693,42 @@ pub fn tests() {
         fn() {
           measure_classify(fixture_config() |> coverage.html_file("test"))
           |> should
-          |> be_equal(
-            Ok(Error(HtmlFileWriteFailed("test", IsDirectory("test")))),
-          )
+          |> be_equal(Error(HtmlFileWriteFailed("test", IsDirectory("test"))))
           |> or_fail_with("expected HtmlFileWriteFailed")
         },
       ),
       it(
         "return HtmlFileSourceReadFailed when a source file cannot be read for the combined page",
         fn() {
-          run_in_child(fn() {
-            let _ = child_project("html_file_unreadable")
-            add_source(
-              "plain.erl",
-              "-module(plain).\n-export([one/0]).\none() -> 1.\n",
-            )
-            compile_source("plain.erl", "debug_info")
-            let config =
-              coverage.new()
-              |> coverage.no_lcov()
-              |> coverage.html_file("build/all.html")
-            case coverage.start(config) {
-              Ok(session) -> {
-                make_unreadable("plain.erl")
-                coverage.finish(session)
-              }
-              Error(error) -> Error(error)
+          let source_directory = project("html_file_unreadable")
+          add_source(
+            source_directory,
+            "api_html_file_plain.erl",
+            "-module(api_html_file_plain).\n-export([one/0]).\none() -> 1.\n",
+          )
+          compile_source(
+            source_directory,
+            "api_html_file_plain.erl",
+            "debug_info",
+          )
+          let config =
+            project_config(source_directory)
+            |> coverage.html_file("build/all.html")
+          case coverage.start(config) {
+            Ok(session) -> {
+              make_unreadable(source_directory, "api_html_file_plain.erl")
+              coverage.finish(session)
             }
-          })
+            Error(error) -> Error(error)
+          }
           |> should
           |> be_equal(
-            Ok(
-              Error(HtmlFileSourceReadFailed(
-                "src/plain.erl",
-                PermissionDenied("src/plain.erl"),
-              )),
-            ),
+            Error(HtmlFileSourceReadFailed(
+              "test/../build/coverage/projects/html_file_unreadable/src/api_html_file_plain.erl",
+              PermissionDenied(
+                "test/../build/coverage/projects/html_file_unreadable/src/api_html_file_plain.erl",
+              ),
+            )),
           )
           |> or_fail_with("expected HtmlFileSourceReadFailed")
         },

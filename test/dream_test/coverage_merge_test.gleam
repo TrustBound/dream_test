@@ -1,4 +1,4 @@
-//// Black-box tests of `coverage.merge_lcov`, run in a child node.
+//// Black-box tests of `coverage.merge_lcov`.
 
 import coverage_fixtures/sample
 import dream_test/coverage.{
@@ -6,7 +6,7 @@ import dream_test/coverage.{
   NoLcovFilesMatched,
 }
 import dream_test/coverage/report.{type CoverageReport, LineCoverage}
-import dream_test/coverage_child_support.{measure, run_in_child}
+import dream_test/coverage_project_support.{measure, with_fixture_lock}
 import dream_test/file.{IsDirectory, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process.{unique_port}
@@ -21,8 +21,8 @@ fn merge_directory() -> String {
 /// Measure `classify(1)` on the fixtures, merging `<directory>/*.info`.
 fn measure_with_merge(
   directory: String,
-) -> Result(Result(CoverageReport, CoverageError), String) {
-  run_in_child(fn() {
+) -> Result(CoverageReport, CoverageError) {
+  with_fixture_lock(fn() {
     measure(
       coverage.new()
         |> coverage.source_directory("test/coverage_fixtures")
@@ -38,7 +38,7 @@ fn merge_error(text: String) -> #(String, Result(CoverageError, String)) {
   let directory = merge_directory()
   let _ = write(directory <> "/part.info", text)
   #(directory, case measure_with_merge(directory) {
-    Ok(Error(error)) -> Ok(error)
+    Error(error) -> Ok(error)
     other -> Error(string_of(other))
   })
 }
@@ -76,25 +76,23 @@ pub fn tests() {
         |> should
         |> be_equal(
           Ok(
-            Ok(
-              report.new([
-                report.file("src/dream_test/timing.gleam", [
-                  LineCoverage(line: 1, calls: 7),
-                ]),
-                report.file("test/coverage_fixtures/coverage_fixture_ffi.erl", [
-                  LineCoverage(line: 6, calls: 0),
-                ]),
-                report.file("test/coverage_fixtures/nested/deep.gleam", [
-                  LineCoverage(line: 4, calls: 5),
-                ]),
-                report.file("test/coverage_fixtures/sample.gleam", [
-                  LineCoverage(line: 7, calls: 1),
-                  LineCoverage(line: 8, calls: 1),
-                  LineCoverage(line: 9, calls: 3),
-                  LineCoverage(line: 14, calls: 1),
-                ]),
+            report.new([
+              report.file("src/dream_test/timing.gleam", [
+                LineCoverage(line: 1, calls: 7),
               ]),
-            ),
+              report.file("test/coverage_fixtures/coverage_fixture_ffi.erl", [
+                LineCoverage(line: 6, calls: 0),
+              ]),
+              report.file("test/coverage_fixtures/nested/deep.gleam", [
+                LineCoverage(line: 4, calls: 5),
+              ]),
+              report.file("test/coverage_fixtures/sample.gleam", [
+                LineCoverage(line: 7, calls: 1),
+                LineCoverage(line: 8, calls: 1),
+                LineCoverage(line: 9, calls: 3),
+                LineCoverage(line: 14, calls: 1),
+              ]),
+            ]),
           ),
         )
         |> or_fail_with("expected the summed counts")
@@ -110,7 +108,7 @@ pub fn tests() {
               <> "end_of_record\n",
           )
         case measure_with_merge(directory) {
-          Ok(Ok(coverage_report)) ->
+          Ok(coverage_report) ->
             Ok(report.total_hit_line_count(coverage_report))
           other -> Error(string_of(other))
         }
@@ -124,7 +122,7 @@ pub fn tests() {
       it("returns NoLcovFilesMatched when nothing matches", fn() {
         let directory = merge_directory()
         case measure_with_merge(directory) {
-          Ok(Error(error)) -> Ok(error)
+          Error(error) -> Ok(error)
           other -> Error(string_of(other))
         }
         |> should
@@ -135,7 +133,7 @@ pub fn tests() {
         let directory = merge_directory()
         let _ = write(directory <> "/folder.info/inside.txt", "")
         case measure_with_merge(directory) {
-          Ok(Error(error)) -> Ok(error)
+          Error(error) -> Ok(error)
           other -> Error(string_of(other))
         }
         |> should

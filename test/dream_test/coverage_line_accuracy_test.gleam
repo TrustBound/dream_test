@@ -3,14 +3,17 @@
 //// Gleam before 1.19 writes Erlang source and compiles it, and Gleam 1.19
 //// compiles abstract code directly. Each test builds a module both ways in a
 //// child node, from the Erlang source that Gleam 1.14 generated for
-//// `legacy.gleam`, and checks `report.inexact_line_files`.
+//// `legacy.gleam`, and checks `report.inexact_line_files`. The tests run in
+//// a child node because the module names of `.gleam` files start at the
+//// `src` folder of the working directory, and each project needs its own.
 
 import dream_test/coverage
 import dream_test/coverage/report
 import dream_test/coverage_child_support.{
   add_source, child_project, compile_like_new_gleam, compile_like_old_gleam,
-  compile_source, measure, run_in_child,
+  compile_source, run_in_child,
 }
+import dream_test/coverage_project_support.{measure}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
 import gleam/result
@@ -113,7 +116,7 @@ pub fn tests() {
       run_in_child(fn() {
         let _ = child_project("erlang_source")
         add_source("legacy_ffi.erl", erlang_ffi_source())
-        compile_source("legacy_ffi.erl", "debug_info")
+        compile_source("legacy_ffi.erl")
         inexact_line_files_of_project()
       })
       |> should

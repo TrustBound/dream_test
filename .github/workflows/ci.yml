@@ -34,8 +34,9 @@ jobs:
         run: gleam deps download
 
       - name: Check native coverage support
-        # The coverage self-tests start child BEAMs with `+JPcover line_counters`.
-        # That needs Erlang/OTP 27 or later with the JIT.
+        # Coverage counts lines with the native line counters of the BEAM,
+        # which need Erlang/OTP 27 or later with the JIT. The test run
+        # measures its own coverage code with them.
         run: >-
           erl -noshell -eval 'case code:coverage_support() of
           true -> halt(0);

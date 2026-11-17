@@ -1,4 +1,7 @@
-//// Black-box tests of the coverage:ignore markers, run in a child node.
+//// Black-box tests of the coverage:ignore markers.
+////
+//// Each test that writes files gets its own project with a module named
+//// `ignore_<n>` (see `coverage_project_support.new_marked_project`).
 
 import coverage_ignore_fixtures/ignored
 import dream_test/coverage.{
@@ -7,11 +10,11 @@ import dream_test/coverage.{
   SourceReadFailed,
 }
 import dream_test/coverage/report.{type CoverageReport, type LineCoverage}
-import dream_test/coverage_child_support.{
-  add_source, child_project, compile_source, make_unreadable, measure,
-  run_in_child,
+import dream_test/coverage_project_support.{
+  type MarkedProject, add_marked_module, add_project_file, from_project,
+  make_unreadable, measure, new_marked_project, to_project, with_fixture_lock,
 }
-import dream_test/file.{PermissionDenied, read, write}
+import dream_test/file.{type FileError, PermissionDenied, read}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, group, it}
 import gleam/int
@@ -19,12 +22,56 @@ import gleam/list
 import gleam/result
 import gleam/string
 
-fn project_config() -> CoverageConfig {
-  coverage.new() |> coverage.no_lcov()
+/// The error with the short paths in place of the project's own paths.
+fn error_from_project(
+  project: MarkedProject,
+  error: CoverageError,
+) -> CoverageError {
+  case error {
+    IgnoreStartWithoutEnd(source_path, line) ->
+      IgnoreStartWithoutEnd(from_project(project, source_path), line)
+    IgnoreEndWithoutStart(source_path, line) ->
+      IgnoreEndWithoutStart(from_project(project, source_path), line)
+    NestedIgnoreStart(source_path, line, open_line) ->
+      NestedIgnoreStart(from_project(project, source_path), line, open_line)
+    IgnoreFunctionWithoutFunction(source_path, line) ->
+      IgnoreFunctionWithoutFunction(from_project(project, source_path), line)
+    SourceReadFailed(path, file_error) ->
+      SourceReadFailed(
+        from_project(project, path),
+        file_error_from_project(project, file_error),
+      )
+    other -> other
+  }
 }
 
-fn merge_config() -> CoverageConfig {
-  project_config() |> coverage.merge_lcov("merge.info")
+fn file_error_from_project(
+  project: MarkedProject,
+  error: FileError,
+) -> FileError {
+  case error {
+    PermissionDenied(path) -> PermissionDenied(from_project(project, path))
+    other -> other
+  }
+}
+
+/// The settings for a project: its source directory, no LCOV file.
+fn project_config(project: MarkedProject) -> CoverageConfig {
+  coverage.new()
+  |> coverage.source_directory(project.source_directory)
+  |> coverage.no_lcov()
+}
+
+/// The project settings, merging the project's merge.info.
+fn merge_config(project: MarkedProject) -> CoverageConfig {
+  project_config(project)
+  |> coverage.merge_lcov(project.root <> "/merge.info")
+}
+
+fn ignore_fixture_config() -> CoverageConfig {
+  coverage.new()
+  |> coverage.source_directory("test/coverage_ignore_fixtures")
+  |> coverage.no_lcov()
 }
 
 fn marked_path() -> String {
@@ -68,51 +115,37 @@ fn outside_source(marker: String) -> String {
   "pub fn run() {\n  " <> marker <> "\n  helper()\n}\n"
 }
 
-/// In a child: create a project with src/marked.erl, write the files in
-/// `extra_files`, measure with `config`, and return the report.
+/// Create a project with src/marked.erl, write the files in `extra_files`,
+/// and measure with the settings that `settings` gives.
 fn measure_marked(
-  config: CoverageConfig,
+  project: MarkedProject,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
-) -> Result(CoverageReport, String) {
-  let _ = child_project("ignore")
-  add_source("marked.erl", source)
-  compile_source("marked.erl", "debug_info")
-  list.each(extra_files, write_extra_file)
-  case measure(config, fn() { Nil }) {
-    Ok(coverage_report) -> Ok(coverage_report)
-    Error(error) -> Error(string_of(error))
-  }
+) -> Result(CoverageReport, CoverageError) {
+  add_marked_module(project, source)
+  list.each(extra_files, add_project_file(project, _))
+  measure(settings(project), fn() { Nil })
 }
 
-fn write_extra_file(entry: #(String, String)) -> Nil {
-  let assert Ok(Nil) = write(entry.0, entry.1)
-  Nil
-}
-
-/// The lines of one file of a report measured in a child.
+/// The lines of one file of the report of a new project.
 fn file_lines(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
   source_path: String,
 ) -> Result(List(LineCoverage), String) {
-  case
-    run_in_child(fn() {
-      case measure_marked(config, source, extra_files) {
-        Ok(coverage_report) -> Ok(lines_of(coverage_report, source_path))
-        Error(message) -> Error(message)
-      }
-    })
-  {
-    Ok(result) -> result
-    Error(message) -> Error(message)
+  let project = new_marked_project("ignore")
+  case measure_marked(project, settings, source, extra_files) {
+    Ok(coverage_report) ->
+      Ok(lines_of(coverage_report, to_project(project, source_path)))
+    Error(error) -> Error(string_of(error))
   }
 }
 
-/// The line numbers of src/marked.erl, measured in a child.
+/// The line numbers of src/marked.erl.
 fn marked_line_numbers(source: String) -> Result(List(Int), String) {
-  case file_lines(project_config(), source, [], marked_path()) {
+  case file_lines(project_config, source, [], marked_path()) {
     Ok(lines) -> Ok(list.map(lines, line_number))
     Error(message) -> Error(message)
   }
@@ -136,25 +169,17 @@ fn line_number(line: LineCoverage) -> Int {
   line.line
 }
 
-/// In a child: create a project with src/marked.erl and return the error
-/// that measuring it gives.
+/// Create a project with src/marked.erl and return the error that
+/// measuring it gives.
 fn measure_error(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
 ) -> Result(CoverageError, String) {
-  case
-    run_in_child(fn() {
-      let _ = child_project("ignore_error")
-      add_source("marked.erl", source)
-      compile_source("marked.erl", "debug_info")
-      list.each(extra_files, write_extra_file)
-      measure(config, fn() { Nil })
-    })
-  {
-    Ok(Error(error)) -> Ok(error)
-    Ok(Ok(_)) -> Error("expected coverage to fail")
-    Error(message) -> Error(message)
+  let project = new_marked_project("ignore")
+  case measure_marked(project, settings, source, extra_files) {
+    Error(error) -> Ok(error_from_project(project, error))
+    Ok(_) -> Error("expected coverage to fail")
   }
 }
 
@@ -194,7 +219,7 @@ fn outside_lines_left(
     #("merge.info", lcov_for_every_line(path, list.length(source_lines))),
   ]
   case
-    file_lines(merge_config(), marked_module(plain_body()), extra_files, path)
+    file_lines(merge_config, marked_module(plain_body()), extra_files, path)
   {
     Ok(lines) -> Ok(list.map(lines, line_number))
     Error(message) -> Error(message)
@@ -207,7 +232,7 @@ fn outside_error(
   path: String,
   source_lines: List(String),
 ) -> Result(CoverageError, String) {
-  measure_error(merge_config(), marked_module(plain_body()), [
+  measure_error(merge_config, marked_module(plain_body()), [
     #(path, string.join(source_lines, "\n")),
     #("merge.info", lcov_for_every_line(path, 1)),
   ])
@@ -268,15 +293,11 @@ pub fn tests() {
       }),
       it("reads // markers in a measured Gleam file", fn() {
         case
-          run_in_child(fn() {
-            measure(
-              project_config()
-                |> coverage.source_directory("test/coverage_ignore_fixtures"),
-              fn() { ignored.describe(0) },
-            )
+          with_fixture_lock(fn() {
+            measure(ignore_fixture_config(), fn() { ignored.describe(0) })
           })
         {
-          Ok(Ok(coverage_report)) ->
+          Ok(coverage_report) ->
             Ok(list.map(
               lines_of(
                 coverage_report,
@@ -284,8 +305,7 @@ pub fn tests() {
               ),
               line_number,
             ))
-          Ok(Error(error)) -> Error(string_of(error))
-          Error(message) -> Error(message)
+          Error(error) -> Error(string_of(error))
         }
         |> should
         |> be_equal(Ok([6, 7, 10]))
@@ -320,15 +340,11 @@ pub fn tests() {
       }),
       it("ignores a Gleam function with a doc comment and an attribute", fn() {
         case
-          run_in_child(fn() {
-            measure(
-              project_config()
-                |> coverage.source_directory("test/coverage_ignore_fixtures"),
-              fn() { Nil },
-            )
+          with_fixture_lock(fn() {
+            measure(ignore_fixture_config(), fn() { Nil })
           })
         {
-          Ok(Ok(coverage_report)) ->
+          Ok(coverage_report) ->
             Ok(list.map(
               lines_of(
                 coverage_report,
@@ -336,8 +352,7 @@ pub fn tests() {
               ),
               line_number,
             ))
-          Ok(Error(error)) -> Error(string_of(error))
-          Error(message) -> Error(message)
+          Error(error) -> Error(string_of(error))
         }
         |> should
         |> be_equal(Ok([16]))
@@ -471,7 +486,7 @@ pub fn tests() {
     group("merged LCOV and output", [
       it("drops merged counts on an ignored line", fn() {
         file_lines(
-          merge_config(),
+          merge_config,
           marked_module(line_marker_body()),
           [
             #(
@@ -493,7 +508,7 @@ pub fn tests() {
       }),
       it("reads markers in a file that only merged LCOV covers", fn() {
         file_lines(
-          merge_config(),
+          merge_config,
           marked_module(plain_body()),
           [
             #(outside_path(), outside_source("// coverage:ignore")),
@@ -509,40 +524,52 @@ pub fn tests() {
         |> or_fail_with("expected line 3 of lib/outside.gleam to be ignored")
       }),
       it("leaves ignored lines out of the LCOV file", fn() {
-        run_in_child(fn() {
-          let config =
-            coverage.new() |> coverage.lcov_path("build/ignored.info")
-          case measure_marked(config, marked_module(line_marker_body()), []) {
-            Ok(_) -> read("build/ignored.info") |> result.map_error(string_of)
-            Error(message) -> Error(message)
-          }
-        })
+        let project = new_marked_project("ignore")
+        let lcov_path = project.root <> "/ignored.info"
+        case
+          measure_marked(
+            project,
+            fn(project) {
+              project_config(project) |> coverage.lcov_path(lcov_path)
+            },
+            marked_module(line_marker_body()),
+            [],
+          )
+        {
+          Ok(_) ->
+            read(lcov_path)
+            |> result.map(from_project(project, _))
+            |> result.map_error(string_of)
+          Error(error) -> Error(string_of(error))
+        }
         |> should
-        |> be_equal(
-          Ok(Ok(
-            "TN:\nSF:src/marked.erl\nDA:5,0\nDA:8,0\nDA:9,0\nLF:3\nLH:0\nend_of_record\n",
-          )),
-        )
+        |> be_equal(Ok(
+          "TN:\nSF:src/marked.erl\nDA:5,0\nDA:8,0\nDA:9,0\nLF:3\nLH:0\nend_of_record\n",
+        ))
         |> or_fail_with("expected no DA line for line 7")
       }),
       it("leaves ignored lines out of the minimum", fn() {
-        let config = merge_config() |> coverage.minimum_percent(100.0)
-        run_in_child(fn() {
-          case
-            measure_marked(config, marked_module(line_marker_body()), [
+        let project = new_marked_project("ignore")
+        let config = merge_config(project) |> coverage.minimum_percent(100.0)
+        case
+          measure_marked(
+            project,
+            fn(_) { config },
+            marked_module(line_marker_body()),
+            [
               #(
                 "merge.info",
                 "SF:src/marked.erl\nDA:5,1\nDA:7,0\nDA:8,1\nDA:9,1\nend_of_record\n",
               ),
-            ])
-          {
-            Ok(coverage_report) ->
-              Ok(coverage.check_minimum(config, coverage_report))
-            Error(message) -> Error(message)
-          }
-        })
+            ],
+          )
+        {
+          Ok(coverage_report) ->
+            Ok(coverage.check_minimum(config, coverage_report))
+          Error(error) -> Error(string_of(error))
+        }
         |> should
-        |> be_equal(Ok(Ok(Ok(Nil))))
+        |> be_equal(Ok(Ok(Nil)))
         |> or_fail_with("expected 100% with line 7 ignored")
       }),
     ]),
@@ -553,7 +580,7 @@ pub fn tests() {
           "    %% coverage:ignore-start",
           "    First.",
         ])
-        |> measure_error(project_config(), _, [])
+        |> measure_error(project_config, _, [])
         |> should
         |> be_equal(Ok(IgnoreStartWithoutEnd("src/marked.erl", 6)))
         |> or_fail_with("expected IgnoreStartWithoutEnd at line 6")
@@ -564,7 +591,7 @@ pub fn tests() {
           "    %% coverage:ignore-end",
           "    First.",
         ])
-        |> measure_error(project_config(), _, [])
+        |> measure_error(project_config, _, [])
         |> should
         |> be_equal(Ok(IgnoreEndWithoutStart("src/marked.erl", 6)))
         |> or_fail_with("expected IgnoreEndWithoutStart at line 6")
@@ -578,7 +605,7 @@ pub fn tests() {
           "    Second.",
           "    %% coverage:ignore-end",
         ])
-        |> measure_error(project_config(), _, [])
+        |> measure_error(project_config, _, [])
         |> should
         |> be_equal(Ok(NestedIgnoreStart("src/marked.erl", 8, 6)))
         |> or_fail_with("expected NestedIgnoreStart at line 8")
@@ -586,7 +613,7 @@ pub fn tests() {
       it(
         "returns a marker error from a file that only merged LCOV covers",
         fn() {
-          measure_error(merge_config(), marked_module(plain_body()), [
+          measure_error(merge_config, marked_module(plain_body()), [
             #(outside_path(), outside_source("// coverage:ignore-end")),
             #("merge.info", "SF:lib/outside.gleam\nDA:1,1\nend_of_record\n"),
           ])
@@ -697,21 +724,19 @@ pub fn tests() {
         },
       ),
       it("returns SourceReadFailed when a source file cannot be read", fn() {
-        run_in_child(fn() {
-          let _ = child_project("unreadable")
-          add_source("marked.erl", marked_module(plain_body()))
-          compile_source("marked.erl", "debug_info")
-          make_unreadable("marked.erl")
-          coverage.start(project_config())
-        })
+        let project = new_marked_project("ignore")
+        add_marked_module(project, marked_module(plain_body()))
+        make_unreadable(project.source_directory, project.module <> ".erl")
+        case coverage.start(project_config(project)) {
+          Error(error) -> Ok(error_from_project(project, error))
+          Ok(_) -> Error("expected start to fail")
+        }
         |> should
         |> be_equal(
-          Ok(
-            Error(SourceReadFailed(
-              "src/marked.erl",
-              PermissionDenied("src/marked.erl"),
-            )),
-          ),
+          Ok(SourceReadFailed(
+            "src/marked.erl",
+            PermissionDenied("src/marked.erl"),
+          )),
         )
         |> or_fail_with("expected SourceReadFailed")
       }),

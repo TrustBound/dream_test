@@ -6,7 +6,11 @@
 
 import dream_test/coverage.{type CoverageConfig, type CoverageError}
 import dream_test/coverage/report.{type CoverageReport}
+import dream_test/file
+import dream_test/process.{unique_port}
 import gleam/dynamic.{type Dynamic}
+import gleam/int
+import gleam/string
 
 /// Create an empty project and return its source directory.
 @external(erlang, "dream_test_coverage_project_ffi", "project")
@@ -106,3 +110,70 @@ pub fn is_alive(process: ServerProcess) -> Bool
 /// Call `module.answer()`.
 @external(erlang, "dream_test_coverage_project_ffi", "call_answer")
 pub fn call_answer(module: String) -> Dynamic
+
+/// A project for tests that name files by short paths: `src/marked.erl`
+/// for its one compiled module, `src/...` for other source files, `lib/...`
+/// for files that only merged LCOV covers, and `merge.info`. `to_project`
+/// turns the short paths, and `-module(marked).`, into the project's own;
+/// `from_project` turns them back, so expected values stay short.
+pub type MarkedProject {
+  MarkedProject(root: String, source_directory: String, module: String)
+}
+
+/// Create a project named `<prefix>_<n>`, with a new `n` each time. Its
+/// module has the same name.
+pub fn new_marked_project(prefix: String) -> MarkedProject {
+  let name = prefix <> "_" <> int.to_string(unique_port())
+  MarkedProject(
+    root: "build/coverage/projects/" <> name,
+    source_directory: project(name),
+    module: name,
+  )
+}
+
+/// The project's own paths and module name in place of the short ones.
+pub fn to_project(project: MarkedProject, text: String) -> String {
+  text
+  |> string.replace("-module(marked).", "-module(" <> project.module <> ").")
+  |> string.replace("src/marked.erl", "src/" <> project.module <> ".erl")
+  |> string.replace("src/", project.source_directory <> "/")
+  |> string.replace("lib/", project.root <> "/lib/")
+  |> string.replace("merge.info", project.root <> "/merge.info")
+}
+
+/// The short paths in place of the project's own paths.
+pub fn from_project(project: MarkedProject, text: String) -> String {
+  text
+  |> string.replace(marked_file(project), "src/marked.erl")
+  |> string.replace(project.source_directory <> "/", "src/")
+  |> string.replace(project.root <> "/lib/", "lib/")
+  |> string.replace(project.root <> "/merge.info", "merge.info")
+}
+
+fn marked_file(project: MarkedProject) -> String {
+  project.source_directory <> "/" <> project.module <> ".erl"
+}
+
+/// Write `source` as src/marked.erl and compile it.
+pub fn add_marked_module(project: MarkedProject, source: String) -> Nil {
+  add_source(
+    project.source_directory,
+    project.module <> ".erl",
+    to_project(project, source),
+  )
+  compile_source(
+    project.source_directory,
+    project.module <> ".erl",
+    "debug_info",
+  )
+}
+
+/// Write the file `entry.0` with the text `entry.1`, both by short paths.
+pub fn add_project_file(
+  project: MarkedProject,
+  entry: #(String, String),
+) -> Nil {
+  let assert Ok(Nil) =
+    file.write(to_project(project, entry.0), to_project(project, entry.1))
+  Nil
+}

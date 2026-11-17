@@ -1,27 +1,34 @@
 //// Black-box tests of what `coverage.finish` reports as excluded, and of
-//// `coverage.require_exclusion_reasons`, run in a child node.
+//// `coverage.require_exclusion_reasons`. Each test gets its own project
+//// with a module named `reasons_<n>` (see
+//// `coverage_project_support.new_marked_project`).
 
 import dream_test/coverage.{
   type CoverageConfig, type CoverageError, ExcludeWithoutReason,
   IgnoreMarkerWithoutReason,
 }
 import dream_test/coverage/report.{type CoverageReport}
-import dream_test/coverage_child_support.{
-  add_source, child_project, compile_source, measure, run_in_child,
+import dream_test/coverage_project_support.{
+  type MarkedProject, add_marked_module, add_project_file, from_project, measure,
+  new_marked_project, to_project,
 }
-import dream_test/file.{write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, group, it}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
 
-fn project_config() -> CoverageConfig {
-  coverage.new() |> coverage.no_lcov()
+/// The settings for a project: its source directory, no LCOV file.
+fn project_config(project: MarkedProject) -> CoverageConfig {
+  coverage.new()
+  |> coverage.source_directory(project.source_directory)
+  |> coverage.no_lcov()
 }
 
-fn merge_config() -> CoverageConfig {
-  project_config() |> coverage.merge_lcov("merge.info")
+/// The project settings, merging the project's merge.info.
+fn merge_config(project: MarkedProject) -> CoverageConfig {
+  project_config(project)
+  |> coverage.merge_lcov(project.root <> "/merge.info")
 }
 
 fn generated_pattern() -> String {
@@ -75,59 +82,108 @@ fn generated_files() -> List(#(String, String)) {
   [#("src/generated.erl", "-module(generated).\n")]
 }
 
-/// In a child: create a project with src/marked.erl and the files in
-/// `extra_files`, then measure with `config`.
-fn measure_in_child(
-  config: CoverageConfig,
+/// Create a project with src/marked.erl and the files in `extra_files`,
+/// then measure with the settings that `settings` gives. Paths in the result
+/// are short paths.
+fn measure_project(
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
-) -> Result(Result(CoverageReport, CoverageError), String) {
-  run_in_child(fn() {
-    let _ = child_project("exclusion_reasons")
-    add_source("marked.erl", source)
-    compile_source("marked.erl", "debug_info")
-    list.each(extra_files, write_extra_file)
-    measure(config, fn() { Nil })
-  })
+) -> Result(CoverageReport, CoverageError) {
+  let project = new_marked_project("reasons")
+  add_marked_module(project, source)
+  list.each(extra_files, add_project_file(project, _))
+  case measure(settings(project), fn() { Nil }) {
+    Ok(coverage_report) -> Ok(report_from_project(project, coverage_report))
+    Error(error) -> Error(error_from_project(project, error))
+  }
 }
 
-fn write_extra_file(entry: #(String, String)) -> Nil {
-  let assert Ok(Nil) = write(entry.0, entry.1)
-  Nil
+/// The report with short paths in its files and excluded files.
+fn report_from_project(
+  project: MarkedProject,
+  coverage_report: CoverageReport,
+) -> CoverageReport {
+  report.new(
+    list.map(report.files(coverage_report), file_from_project(project, _)),
+  )
+  |> report.add_excluded_files(
+    list.map(report.excluded_files(coverage_report), excluded_from_project(
+      project,
+      _,
+    )),
+  )
+}
+
+fn file_from_project(
+  project: MarkedProject,
+  file: report.FileCoverage,
+) -> report.FileCoverage {
+  report.file(
+    from_project(project, report.source_path(file)),
+    report.lines(file),
+  )
+  |> report.add_ignored_ranges(report.ignored_ranges(file))
+}
+
+fn excluded_from_project(
+  project: MarkedProject,
+  file: report.ExcludedFile,
+) -> report.ExcludedFile {
+  report.excluded_file(
+    source_path: from_project(project, report.excluded_source_path(file)),
+    pattern: from_project(project, report.excluded_pattern(file)),
+    reason: report.excluded_reason(file),
+  )
+}
+
+fn error_from_project(
+  project: MarkedProject,
+  error: CoverageError,
+) -> CoverageError {
+  case error {
+    ExcludeWithoutReason(pattern) ->
+      ExcludeWithoutReason(from_project(project, pattern))
+    IgnoreMarkerWithoutReason(source_path, line_number, marker) ->
+      IgnoreMarkerWithoutReason(
+        from_project(project, source_path),
+        line_number,
+        marker,
+      )
+    other -> other
+  }
 }
 
 fn measured_report(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
 ) -> Result(CoverageReport, String) {
-  case measure_in_child(config, source, extra_files) {
-    Ok(Ok(coverage_report)) -> Ok(coverage_report)
-    Ok(Error(error)) -> Error(string_of(error))
-    Error(message) -> Error(message)
+  case measure_project(settings, source, extra_files) {
+    Ok(coverage_report) -> Ok(coverage_report)
+    Error(error) -> Error(string_of(error))
   }
 }
 
 fn measure_error(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
 ) -> Result(CoverageError, String) {
-  case measure_in_child(config, source, extra_files) {
-    Ok(Error(error)) -> Ok(error)
-    Ok(Ok(_)) -> Error("expected coverage to fail")
-    Error(message) -> Error(message)
+  case measure_project(settings, source, extra_files) {
+    Error(error) -> Ok(error)
+    Ok(_) -> Error("expected coverage to fail")
   }
 }
 
 /// The ignored ranges of the file at `source_path` in a measured report.
 fn ranges_of(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
   source: String,
   extra_files: List(#(String, String)),
   source_path: String,
 ) -> Result(List(report.IgnoredRange), String) {
-  case measured_report(config, source, extra_files) {
+  case measured_report(settings, source, extra_files) {
     Ok(coverage_report) -> Ok(file_ranges(coverage_report, source_path))
     Error(message) -> Error(message)
   }
@@ -148,9 +204,11 @@ fn file_ranges(
 }
 
 fn excluded_files_of(
-  config: CoverageConfig,
+  settings: fn(MarkedProject) -> CoverageConfig,
 ) -> Result(List(report.ExcludedFile), String) {
-  case measured_report(config, marked_module(plain_body()), generated_files()) {
+  case
+    measured_report(settings, marked_module(plain_body()), generated_files())
+  {
     Ok(coverage_report) -> Ok(report.excluded_files(coverage_report))
     Error(message) -> Error(message)
   }
@@ -164,7 +222,7 @@ pub fn tests() {
     group("ignored ranges", [
       it("lists the ignored ranges of a measured file with their text", fn() {
         ranges_of(
-          project_config(),
+          project_config,
           marked_module(marked_body("%% coverage:ignore")),
           [],
           "src/marked.erl",
@@ -184,7 +242,7 @@ pub fn tests() {
       }),
       it("lists the ignored ranges of a file only merged LCOV covers", fn() {
         ranges_of(
-          merge_config(),
+          merge_config,
           marked_module(plain_body()),
           outside_files("// coverage:ignore merged only"),
           "lib/outside.gleam",
@@ -204,12 +262,13 @@ pub fn tests() {
     ]),
     group("excluded files", [
       it("lists an excluded file with its pattern and reason", fn() {
-        project_config()
-        |> coverage.exclude_with_reason(
-          pattern: generated_pattern(),
-          reason: " generated code ",
-        )
-        |> excluded_files_of()
+        excluded_files_of(fn(project) {
+          project_config(project)
+          |> coverage.exclude_with_reason(
+            pattern: to_project(project, generated_pattern()),
+            reason: " generated code ",
+          )
+        })
         |> should
         |> be_equal(
           Ok([
@@ -223,13 +282,14 @@ pub fn tests() {
         |> or_fail_with("expected src/generated.erl with the trimmed reason")
       }),
       it("keeps the first pattern that matches a file", fn() {
-        project_config()
-        |> coverage.exclude("src/generated.erl")
-        |> coverage.exclude_with_reason(
-          pattern: generated_pattern(),
-          reason: "generated code",
-        )
-        |> excluded_files_of()
+        excluded_files_of(fn(project) {
+          project_config(project)
+          |> coverage.exclude(to_project(project, "src/generated.erl"))
+          |> coverage.exclude_with_reason(
+            pattern: to_project(project, generated_pattern()),
+            reason: "generated code",
+          )
+        })
         |> should
         |> be_equal(
           Ok([
@@ -246,9 +306,11 @@ pub fn tests() {
     group("require_exclusion_reasons", [
       it("returns ExcludeWithoutReason for a pattern from exclude", fn() {
         measure_error(
-          project_config()
-            |> coverage.exclude(generated_pattern())
-            |> coverage.require_exclusion_reasons(),
+          fn(project) {
+            project_config(project)
+            |> coverage.exclude(to_project(project, generated_pattern()))
+            |> coverage.require_exclusion_reasons()
+          },
           marked_module(plain_body()),
           generated_files(),
         )
@@ -258,12 +320,14 @@ pub fn tests() {
       }),
       it("returns ExcludeWithoutReason for a blank reason", fn() {
         measure_error(
-          project_config()
+          fn(project) {
+            project_config(project)
             |> coverage.exclude_with_reason(
-              pattern: generated_pattern(),
+              pattern: to_project(project, generated_pattern()),
               reason: "  ",
             )
-            |> coverage.require_exclusion_reasons(),
+            |> coverage.require_exclusion_reasons()
+          },
           marked_module(plain_body()),
           generated_files(),
         )
@@ -273,12 +337,14 @@ pub fn tests() {
       }),
       it("passes when every pattern and marker has a reason", fn() {
         ranges_of(
-          project_config()
+          fn(project) {
+            project_config(project)
             |> coverage.exclude_with_reason(
-              pattern: generated_pattern(),
+              pattern: to_project(project, generated_pattern()),
               reason: "generated code",
             )
-            |> coverage.require_exclusion_reasons(),
+            |> coverage.require_exclusion_reasons()
+          },
           marked_module(marked_body("%% coverage:ignore old callers")),
           generated_files(),
           "src/marked.erl",
@@ -302,7 +368,9 @@ pub fn tests() {
       }),
       it("returns IgnoreMarkerWithoutReason for a measured file", fn() {
         measure_error(
-          project_config() |> coverage.require_exclusion_reasons(),
+          fn(project) {
+            project_config(project) |> coverage.require_exclusion_reasons()
+          },
           marked_module(marked_body("%% coverage:ignore")),
           [],
         )
@@ -318,7 +386,9 @@ pub fn tests() {
       }),
       it("returns IgnoreMarkerWithoutReason for a merged-only file", fn() {
         measure_error(
-          merge_config() |> coverage.require_exclusion_reasons(),
+          fn(project) {
+            merge_config(project) |> coverage.require_exclusion_reasons()
+          },
           marked_module(plain_body()),
           outside_files("// coverage:ignore-function"),
         )

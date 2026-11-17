@@ -8,7 +8,7 @@ import dream_test/coverage.{
   InvalidMinimumPercentPerFile,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
-import dream_test/coverage_child_support.{run_in_child}
+import dream_test/coverage_project_support.{with_fixture_lock}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/coverage.{RunOutcome} as coverage_reporter
 import dream_test/unit.{describe, group, it}
@@ -84,9 +84,9 @@ fn render_failure_for(error: CoverageError) -> String {
   )
 }
 
-/// In a child node: measure the fixtures while one test calls
+/// Measure the fixtures while one test calls
 /// `sample.classify(1)`, then check the per-file minimum of 50.0.
-fn check_fixtures_in_child() -> Result(Nil, CoverageError) {
+fn check_fixtures() -> Result(Nil, CoverageError) {
   let config =
     coverage.new()
     |> coverage.source_directory("test/coverage_fixtures")
@@ -271,26 +271,24 @@ pub fn tests() {
         |> or_fail_with("expected InvalidMinimumPercentPerFile")
       }),
       it("checks the files that coverage measured", fn() {
-        run_in_child(check_fixtures_in_child)
+        with_fixture_lock(check_fixtures)
         |> should
         |> be_equal(
-          Ok(
-            Error(
-              FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
-                coverage.file_below_minimum(
-                  source_path: "test/coverage_fixtures/coverage_fixture_ffi.erl",
-                  hit: 0,
-                  total: 1,
-                  lines_needed: 1,
-                ),
-                coverage.file_below_minimum(
-                  source_path: "test/coverage_fixtures/nested/deep.gleam",
-                  hit: 0,
-                  total: 1,
-                  lines_needed: 1,
-                ),
-              ]),
-            ),
+          Error(
+            FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
+              coverage.file_below_minimum(
+                source_path: "test/coverage_fixtures/coverage_fixture_ffi.erl",
+                hit: 0,
+                total: 1,
+                lines_needed: 1,
+              ),
+              coverage.file_below_minimum(
+                source_path: "test/coverage_fixtures/nested/deep.gleam",
+                hit: 0,
+                total: 1,
+                lines_needed: 1,
+              ),
+            ]),
           ),
         )
         |> or_fail_with("expected the two fixture files that did not run")

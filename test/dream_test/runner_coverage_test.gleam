@@ -1,8 +1,10 @@
 //// Black-box tests of `runner.coverage`.
 ////
 //// Each test runs a main from test/dream_test/coverage_runner_mains.gleam in
-//// a new `erl` process (cover runs once per BEAM instance), then checks the
-//// exact output (stdout and stderr together) and the exit status.
+//// a new `erl` process, because the main ends by halting its BEAM, then
+//// checks the exact output (stdout and stderr together) and the exit status.
+//// The tests that change DREAM_TEST_COVERAGE do it in a child node, because
+//// environment variables belong to the whole BEAM.
 
 import dream_test/coverage
 import dream_test/coverage_child_support.{run_in_child}
@@ -28,6 +30,10 @@ fn set_environment_variable(name: String, value: String) -> Nil
 
 @external(erlang, "dream_test_coverage_test_ffi", "unset_environment_variable")
 fn unset_environment_variable(name: String) -> Nil
+
+/// How `runner.coverage_from_environment` reads a variable.
+@external(erlang, "dream_test_coverage_ffi", "environment_variable")
+fn environment_variable(name: String) -> Result(String, Nil)
 
 fn run_main(function: String) -> #(Int, String) {
   run_main_in_new_vm("dream_test@coverage_runner_mains", function)
@@ -253,6 +259,21 @@ pub fn tests() {
       ))
       |> or_fail_with("expected the reason failure and exit status 1")
     }),
+    group("environment variables", [
+      it("reads the value of a variable that is set", fn() {
+        set_environment_variable("DREAM_TEST_ENVIRONMENT_PROBE", "on")
+        environment_variable("DREAM_TEST_ENVIRONMENT_PROBE")
+        |> should
+        |> be_equal(Ok("on"))
+        |> or_fail_with("expected the value on")
+      }),
+      it("reads a variable that is not set as Error(Nil)", fn() {
+        environment_variable("DREAM_TEST_ENVIRONMENT_NOT_SET")
+        |> should
+        |> be_equal(Error(Nil))
+        |> or_fail_with("expected Error(Nil)")
+      }),
+    ]),
     group("runner.coverage_from_environment", [
       it("measures coverage when DREAM_TEST_COVERAGE is 1", fn() {
         run_with_coverage_variable(Some("1"))

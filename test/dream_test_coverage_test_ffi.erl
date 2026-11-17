@@ -10,56 +10,21 @@
     send_server_request/2,
     wait_for_server_exit/1,
     read_line/0,
-    reset_child_output/0,
     child_project/1,
     add_source/2,
-    compile_source/2,
+    compile_source/1,
     compile_like_old_gleam/2,
     compile_like_new_gleam/3,
-    add_damaged_beam/1,
-    make_unreadable/1,
     format/1
 ]).
 %% Called inside the child node only.
--export([prepare_child/1, preload_build_modules/0, write_native_counts/0]).
+-export([prepare_child/1]).
 
-%% Helpers for the coverage tests.
-%%
-%% Tests that start coverage on the shared fixtures run in a child node.
-%% Each child reloads dream_test's own coverage modules with the
-%% `line_coverage` compile option, so their lines are counted in the child
-%% too. After the test, the child writes those counts as an LCOV file into
-%% build/coverage/parts/, and dream_test's own run merges them with
-%% `coverage.merge_lcov`.
+%% Helpers for the coverage tests that need a child node or a new `erl`
+%% process: tests that change the code server mode, the working directory
+%% or an environment variable, and tests whose main halts its BEAM.
 
--define(PARTS_DIRECTORY, "build/coverage/parts").
 -define(PROJECTS_DIRECTORY, "build/coverage/child_projects").
-
-%% The modules measured with native counters, and their source files.
-self_modules() ->
-    [
-        {'dream_test@coverage', "src/dream_test/coverage.gleam"},
-        {'dream_test@coverage@report', "src/dream_test/coverage/report.gleam"},
-        {'dream_test@coverage@format', "src/dream_test/coverage/format.gleam"},
-        {'dream_test@coverage@json_summary', "src/dream_test/coverage/json_summary.gleam"},
-        {'dream_test@coverage@cobertura', "src/dream_test/coverage/cobertura.gleam"},
-        {'dream_test@coverage@markdown', "src/dream_test/coverage/markdown.gleam"},
-        {'dream_test@coverage@html', "src/dream_test/coverage/html.gleam"},
-        {'dream_test@reporters@coverage', "src/dream_test/reporters/coverage.gleam"},
-        {dream_test_coverage_ffi, "src/dream_test_coverage_ffi.erl"}
-    ].
-
-%% Delete the LCOV parts and child projects of an earlier run.
-reset_child_output() ->
-    ok = delete_directory(?PARTS_DIRECTORY),
-    ok = delete_directory(?PROJECTS_DIRECTORY),
-    nil.
-
-delete_directory(Directory) ->
-    case file:del_dir_r(Directory) of
-        ok -> ok;
-        {error, enoent} -> ok
-    end.
 
 %% ---------------------------------------------------------------------------
 %% Running a child
@@ -75,8 +40,7 @@ run_in_embedded_peer(Function) ->
     run_in_child(Function, ["-mode", "embedded"]).
 
 run_in_child(Function, ExtraArgs) ->
-    Args = ExtraArgs ++ code_path_args(),
-    case peer:start_link(#{connection => standard_io, args => Args}) of
+    case peer:start_link(#{connection => standard_io, args => ExtraArgs ++ code_path_args()}) of
         {ok, Peer, _Node} -> prepare_call_and_stop(Peer, Function);
         {error, Reason} -> {error, format(Reason)}
     end.
@@ -91,20 +55,17 @@ prepare_call_and_stop(Peer, Function) ->
         catch
             Class:Reason -> {error, format({Class, Reason})}
         end,
-    ok = peer:call(Peer, ?MODULE, write_native_counts, [], 60000),
     peer:stop(Peer),
     Result.
 
-%% In the child: remember the project root, load every build module when the
-%% child runs in embedded mode, and reload the measured modules with native
-%% line counters.
+%% In the child: remember the project root, and load every build module
+%% when the child runs in embedded mode.
 prepare_child(Root) ->
     persistent_term:put({?MODULE, root}, Root),
     case code:get_mode() of
         embedded -> preload_build_modules();
         interactive -> ok
-    end,
-    lists:foreach(fun({Module, _Source}) -> load_with_line_counters(Module) end, self_modules()).
+    end.
 
 %% Embedded mode only loads the modules of the boot script (kernel and
 %% stdlib), so load the build modules and the compiler (for line counters)
@@ -115,47 +76,17 @@ preload_build_modules() ->
     Beams = lists:append([filelib:wildcard(filename:join(Path, "*.beam")) || Path <- BuildPaths ++ OtpPaths]),
     lists:foreach(fun(Beam) -> code:load_abs(filename:rootname(Beam)) end, Beams).
 
-load_with_line_counters(Module) ->
-    Beam = code:which(Module),
-    {ok, {Module, [{abstract_code, {raw_abstract_v1, Forms}}]}} = beam_lib:chunks(Beam, [abstract_code]),
-    {ok, Module, Binary} = compile:forms(Forms, [binary, debug_info, line_coverage, force_line_counters, return_errors]),
-    {module, Module} = code:load_binary(Module, Beam, Binary),
-    line_counters = code:get_coverage_mode(Module),
-    ok.
-
-%% In the child: write the native line counts as one LCOV file.
-write_native_counts() ->
-    Root = persistent_term:get({?MODULE, root}),
-    Name = io_lib:format("~s_~b.info", [os:getpid(), erlang:unique_integer([positive])]),
-    Path = filename:join([Root, ?PARTS_DIRECTORY, Name]),
-    ok = filelib:ensure_dir(Path),
-    Records = [lcov_record(Module, Source) || {Module, Source} <- self_modules()],
-    ok = file:write_file(Path, Records).
-
-lcov_record(Module, Source) ->
-    Counts = lists:foldl(fun add_count/2, #{}, code:get_coverage(line, Module)),
-    Lines = lists:sort(maps:to_list(Counts)),
-    [
-        "TN:\nSF:", Source, "\n",
-        [io_lib:format("DA:~b,~b~n", [Line, Calls]) || {Line, Calls} <- Lines],
-        "end_of_record\n"
-    ].
-
-%% The same line can have more than one counter (for example, one per clause);
-%% line 0 is code with no source line.
-add_count({0, _Calls}, Counts) -> Counts;
-add_count({Line, Calls}, Counts) -> maps:update_with(Line, fun(Old) -> Old + Calls end, Calls, Counts).
-
 %% ---------------------------------------------------------------------------
-%% Building broken projects inside a child
+%% Building projects inside a child
 %% ---------------------------------------------------------------------------
 
-%% Create an empty project (src/ and ebin/) and make it the working
-%% directory. Its ebin/ is added to the code path.
+%% Create an empty project (src/ and ebin/), deleting the project of an
+%% earlier run, and make it the working directory. Its ebin/ is added to the
+%% code path.
 child_project(Name) ->
     Root = persistent_term:get({?MODULE, root}),
-    Unique = io_lib:format("~s_~s_~b", [Name, os:getpid(), erlang:unique_integer([positive])]),
-    Directory = filename:join([Root, ?PROJECTS_DIRECTORY, Unique]),
+    Directory = filename:join([Root, ?PROJECTS_DIRECTORY, unicode:characters_to_list(Name)]),
+    ok = delete_directory(Directory),
     ok = filelib:ensure_path(filename:join(Directory, "src")),
     ok = filelib:ensure_path(filename:join(Directory, "ebin")),
     true = code:add_patha(filename:join(Directory, "ebin")),
@@ -167,10 +98,10 @@ add_source(File, Text) ->
     ok = file:write_file(filename:join("src", File), Text),
     nil.
 
-%% Compile src/File into ebin/ with debug information of a given kind.
-compile_source(File, Kind) ->
+%% Compile src/File into ebin/ with debug information.
+compile_source(File) ->
     Source = unicode:characters_to_list(filename:join("src", File)),
-    {ok, Module, Binary} = compile:file(Source, [binary, return_errors | debug_options(Kind)]),
+    {ok, Module, Binary} = compile:file(Source, [binary, return_errors, debug_info]),
     ok = file:write_file(filename:join("ebin", atom_to_list(Module) ++ ".beam"), Binary),
     nil.
 
@@ -199,21 +130,11 @@ split_forms([], []) -> [];
 split_forms([{dot, _} = Dot | Rest], Current) -> [lists:reverse([Dot | Current]) | split_forms(Rest, [])];
 split_forms([Token | Rest], Current) -> split_forms(Rest, [Token | Current]).
 
-debug_options(<<"debug_info">>) -> [debug_info];
-debug_options(<<"no_debug_info">>) -> [];
-debug_options(<<"encrypted_debug_info">>) -> [{debug_info_key, "secret"}];
-debug_options(<<"missing_debug_info_backend">>) -> [{debug_info, {no_such_backend, []}}].
-
-%% Write ebin/Module.beam with bytes that are not a .beam file.
-add_damaged_beam(Module) ->
-    ok = file:write_file(filename:join("ebin", <<Module/binary, ".beam">>), <<"not a beam file">>),
-    nil.
-
-%% Take away every permission on src/File in the current project, so reading
-%% it fails.
-make_unreadable(File) ->
-    ok = file:change_mode(filename:join("src", File), 8#000),
-    nil.
+delete_directory(Directory) ->
+    case file:del_dir_r(Directory) of
+        ok -> ok;
+        {error, enoent} -> ok
+    end.
 
 %% ---------------------------------------------------------------------------
 %% Running a main in a new `erl` process
@@ -243,13 +164,15 @@ environment_entry({Name, {some, Value}}) ->
 environment_entry({Name, none}) ->
     {unicode:characters_to_list(Name), false}.
 
-%% Set an environment variable of this node. Call it in a child node only,
-%% because the test run shares its own environment with every test.
+%% Set an environment variable of this node. In the test run's own node,
+%% set only variables that no other test reads, because every test and
+%% every `erl` process the tests start share this environment.
 set_environment_variable(Name, Value) ->
     true = os:putenv(unicode:characters_to_list(Name), unicode:characters_to_list(Value)),
     nil.
 
-%% Remove an environment variable of this node. Call it in a child node only.
+%% Remove an environment variable of this node. In the test run's own node,
+%% remove only variables that no other test reads.
 unset_environment_variable(Name) ->
     true = os:unsetenv(unicode:characters_to_list(Name)),
     nil.
