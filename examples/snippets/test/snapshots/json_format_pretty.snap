@@ -25,13 +25,9 @@
       ],
       "status": "passed",
       "duration_ms": 0,
-      "tags": [
-        
-      ],
+      "tags": [],
       "kind": "unit",
-      "failures": [
-        
-      ]
+      "failures": []
     }
   ]
 }

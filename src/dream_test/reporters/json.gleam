@@ -456,6 +456,7 @@ fn prettify_chars(
         acc <> "\n" <> spaces(new_indent) <> "}",
       )
     }
+    ["[", "]", ..rest] -> prettify_chars(rest, indent, False, acc <> "[]")
     ["[", ..rest] -> {
       let new_indent = indent + 2
       prettify_chars(
@@ -477,7 +478,6 @@ fn prettify_chars(
     [",", ..rest] ->
       prettify_chars(rest, indent, False, acc <> ",\n" <> spaces(indent))
     [":", ..rest] -> prettify_chars(rest, indent, False, acc <> ": ")
-    [" ", ..rest] -> prettify_chars(rest, indent, False, acc)
     [char, ..rest] -> prettify_chars(rest, indent, False, acc <> char)
   }
 }
