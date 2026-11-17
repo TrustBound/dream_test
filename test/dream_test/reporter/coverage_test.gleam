@@ -4,13 +4,13 @@ import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
   CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  IgnoreEndWithoutStart, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidMinimumPercent, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
-  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction, IgnoreStartWithoutEnd,
+  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
+  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -387,6 +387,19 @@ pub fn tests() {
           "add a coverage:ignore-end marker before line 15, or remove one of the two coverage:ignore-start markers.",
         ))
         |> or_fail_with("expected the NestedIgnoreStart message")
+      }),
+      it("describes IgnoreFunctionWithoutFunction", fn() {
+        render_failure_for(IgnoreFunctionWithoutFunction(
+          "src/app/cart.gleam",
+          30,
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore-function marker at src/app/cart.gleam:30 is not followed by a complete function.",
+          "a coverage:ignore-function marker ignores the whole function after it, but the code after this marker is not a function, or the file ends before the function ends.",
+          "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
+        ))
+        |> or_fail_with("expected the IgnoreFunctionWithoutFunction message")
       }),
       it("describes ModuleNotInstrumented with NoDebugInfo", fn() {
         render_failure_for(ModuleNotInstrumented(

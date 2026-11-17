@@ -50,13 +50,14 @@ import dream_test/coverage.{
   type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
   BadBeamFile, BelowMinimumPercent, CoverAlreadyRunning, CoverDidNotStart,
   CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, IgnoreEndWithoutStart, IgnoreStartWithoutEnd,
-  InstrumentedLoadFailed, InvalidMinimumPercent, LcovReadFailed,
-  LcovSourceNotFound, LcovWriteFailed, MalformedLcov, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
-  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
-  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
-  UnknownAnalysisError, UnknownInstrumentError,
+  ExcludeMatchedNothing, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
+  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
+  ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
+  NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched, NoSourceFiles,
+  NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
+  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
+  UnknownInstrumentError,
 }
 import dream_test/coverage/report.{
   type CoverageReport, type FileCoverage, type LineCoverage,
@@ -570,6 +571,14 @@ fn error_message(error: CoverageError) -> ErrorMessage {
         fix: "add a coverage:ignore-end marker before line "
           <> int.to_string(line_number)
           <> ", or remove one of the two coverage:ignore-start markers.",
+      )
+    IgnoreFunctionWithoutFunction(source_path, line_number) ->
+      ErrorMessage(
+        what: "The coverage:ignore-function marker at "
+          <> source_location(source_path, line_number)
+          <> " is not followed by a complete function.",
+        reason: "a coverage:ignore-function marker ignores the whole function after it, but the code after this marker is not a function, or the file ends before the function ends.",
+        fix: "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
       )
   }
 }

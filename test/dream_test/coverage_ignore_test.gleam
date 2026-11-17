@@ -3,7 +3,8 @@
 import coverage_ignore_fixtures/ignored
 import dream_test/coverage.{
   type CoverageConfig, type CoverageError, IgnoreEndWithoutStart,
-  IgnoreStartWithoutEnd, NestedIgnoreStart, SourceReadFailed,
+  IgnoreFunctionWithoutFunction, IgnoreStartWithoutEnd, NestedIgnoreStart,
+  SourceReadFailed,
 }
 import dream_test/coverage/report.{type CoverageReport, type LineCoverage}
 import dream_test/coverage_child_support.{
@@ -13,6 +14,7 @@ import dream_test/coverage_child_support.{
 import dream_test/file.{PermissionDenied, read, write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, group, it}
+import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
@@ -156,6 +158,61 @@ fn measure_error(
   }
 }
 
+fn outside_erlang_path() -> String {
+  "lib/outside.erl"
+}
+
+/// A merged LCOV record for `path` with a count of 1 on lines 1 to
+/// `line_count`.
+fn lcov_for_every_line(path: String, line_count: Int) -> String {
+  "SF:"
+  <> path
+  <> "\n"
+  <> string.concat(list.map(numbers_to(line_count), da_line))
+  <> "end_of_record\n"
+}
+
+fn numbers_to(last: Int) -> List(Int) {
+  case last {
+    0 -> []
+    _ -> list.append(numbers_to(last - 1), [last])
+  }
+}
+
+fn da_line(line: Int) -> String {
+  "DA:" <> int.to_string(line) <> ",1\n"
+}
+
+/// The lines of the file at `path` with `source_lines` that are left after
+/// its ignore markers, when a merged LCOV file counts every line of it.
+fn outside_lines_left(
+  path: String,
+  source_lines: List(String),
+) -> Result(List(Int), String) {
+  let extra_files = [
+    #(path, string.join(source_lines, "\n")),
+    #("merge.info", lcov_for_every_line(path, list.length(source_lines))),
+  ]
+  case
+    file_lines(merge_config(), marked_module(plain_body()), extra_files, path)
+  {
+    Ok(lines) -> Ok(list.map(lines, line_number))
+    Error(message) -> Error(message)
+  }
+}
+
+/// The error that measuring gives when a merged LCOV file covers the file at
+/// `path` with `source_lines`.
+fn outside_error(
+  path: String,
+  source_lines: List(String),
+) -> Result(CoverageError, String) {
+  measure_error(merge_config(), marked_module(plain_body()), [
+    #(path, string.join(source_lines, "\n")),
+    #("merge.info", lcov_for_every_line(path, 1)),
+  ])
+}
+
 @external(erlang, "dream_test_coverage_test_ffi", "format")
 fn string_of(value: a) -> String
 
@@ -233,6 +290,122 @@ pub fn tests() {
         |> should
         |> be_equal(Ok([6, 7, 10]))
         |> or_fail_with("expected lines 9 and 16 to be ignored")
+      }),
+    ]),
+    group("ignoring functions", [
+      it("ignores every clause of an Erlang function and its -spec", fn() {
+        [
+          "-module(marked).",
+          "-export([run/1, skipped/1, after_skipped/1]).",
+          "",
+          "run(Number) ->",
+          "    Number + 1.",
+          "",
+          "%% coverage:ignore-function only old callers use it",
+          "-spec skipped(integer()) -> integer().",
+          "skipped(0) ->",
+          "    0;",
+          "skipped(Number) ->",
+          "    Number - 1.",
+          "",
+          "after_skipped(Number) ->",
+          "    Number * 2.",
+          "",
+        ]
+        |> string.join("\n")
+        |> marked_line_numbers()
+        |> should
+        |> be_equal(Ok([5, 15]))
+        |> or_fail_with("expected lines 7 to 12 to be ignored")
+      }),
+      it("ignores a Gleam function with a doc comment and an attribute", fn() {
+        case
+          run_in_child(fn() {
+            measure(
+              project_config()
+                |> coverage.source_directory("test/coverage_ignore_fixtures"),
+              fn() { Nil },
+            )
+          })
+        {
+          Ok(Ok(coverage_report)) ->
+            Ok(list.map(
+              lines_of(
+                coverage_report,
+                "test/coverage_ignore_fixtures/ignored_function.gleam",
+              ),
+              line_number,
+            ))
+          Ok(Error(error)) -> Error(string_of(error))
+          Error(message) -> Error(message)
+        }
+        |> should
+        |> be_equal(Ok([16]))
+        |> or_fail_with("expected lines 5 to 13 to be ignored")
+      }),
+      it("skips braces in Gleam strings and comments and nested braces", fn() {
+        outside_lines_left(outside_path(), [
+          "// coverage:ignore-function braces in strings and comments",
+          "/// Doc comment.",
+          "@internal",
+          "pub fn tricky(value: String) -> fn(Int) -> #(Int, option.Option(String)) {",
+          "  // a } in a comment",
+          "  let text = \"a } \\\" {",
+          "b\"",
+          "\tfn(number) { #(number, option.Some(text <> value)) }",
+          "}",
+          "",
+          "pub fn after_tricky() {",
+          "  1",
+          "}",
+        ])
+        |> should
+        |> be_equal(Ok([10, 11, 12, 13]))
+        |> or_fail_with("expected lines 1 to 9 to be ignored")
+      }),
+      it("ends an external Gleam function before the next declaration", fn() {
+        outside_lines_left(outside_path(), [
+          "// coverage:ignore-function",
+          "@external(erlang, \"outside_ffi\", \"now\")",
+          "fn now() -> Int",
+          "",
+          "pub fn run_now() {",
+          "  now()",
+          "}",
+        ])
+        |> should
+        |> be_equal(Ok([4, 5, 6, 7]))
+        |> or_fail_with("expected lines 1 to 3 to be ignored")
+      }),
+      it("ends an external Gleam function before the next attribute", fn() {
+        outside_lines_left(outside_path(), [
+          "// coverage:ignore-function",
+          "@external(erlang, \"outside_ffi\", \"now\")",
+          "pub fn now() -> Int",
+          "",
+          "@external(erlang, \"outside_ffi\", \"later\")",
+          "pub fn later() -> Int",
+        ])
+        |> should
+        |> be_equal(Ok([4, 5, 6]))
+        |> or_fail_with("expected lines 1 to 3 to be ignored")
+      }),
+      it("skips Erlang strings, atoms, characters and inner dots", fn() {
+        outside_lines_left(outside_erlang_path(), [
+          "-module(outside).",
+          "%% coverage:ignore-function",
+          "-spec 'odd name'(term()) -> term().",
+          "'odd name'($.) ->",
+          "    {\"a. b\", 'x. y'};",
+          "'odd name'($\\.) ->",
+          "    next@fun(1.5) + R#r.f;",
+          "'odd name'(_) -> $",
+          ". % the dot on this line ends the function",
+          "next@fun(Number) -> Number.",
+        ])
+        |> should
+        |> be_equal(Ok([1, 10]))
+        |> or_fail_with("expected lines 2 to 9 to be ignored")
       }),
     ]),
     group("merged LCOV and output", [
@@ -360,6 +533,89 @@ pub fn tests() {
           |> should
           |> be_equal(Ok(IgnoreEndWithoutStart("lib/outside.gleam", 2)))
           |> or_fail_with("expected IgnoreEndWithoutStart in lib/outside.gleam")
+        },
+      ),
+      it("returns IgnoreFunctionWithoutFunction above a Gleam constant", fn() {
+        outside_error(outside_path(), [
+          "pub fn run() {",
+          "  1",
+          "}",
+          "// coverage:ignore-function",
+          "pub const limit = 10",
+        ])
+        |> should
+        |> be_equal(Ok(IgnoreFunctionWithoutFunction(outside_path(), 4)))
+        |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 4")
+      }),
+      it(
+        "returns IgnoreFunctionWithoutFunction when only a comment follows",
+        fn() {
+          outside_error(outside_path(), [
+            "pub fn run() {",
+            "  1",
+            "}",
+            "// coverage:ignore-function",
+            "// nothing follows",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreFunctionWithoutFunction(outside_path(), 4)))
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 4")
+        },
+      ),
+      it(
+        "returns IgnoreFunctionWithoutFunction when the parameters never close",
+        fn() {
+          outside_error(outside_path(), [
+            "// coverage:ignore-function",
+            "pub fn broken(",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreFunctionWithoutFunction(outside_path(), 1)))
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 1")
+        },
+      ),
+      it(
+        "returns IgnoreFunctionWithoutFunction when a string never closes",
+        fn() {
+          outside_error(outside_path(), [
+            "// coverage:ignore-function",
+            "pub fn broken() {",
+            "  \"never closed",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreFunctionWithoutFunction(outside_path(), 1)))
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 1")
+        },
+      ),
+      it(
+        "returns IgnoreFunctionWithoutFunction above an Erlang attribute only",
+        fn() {
+          outside_error(outside_erlang_path(), [
+            "-module(outside).",
+            "%% coverage:ignore-function",
+            "-define(LIMIT, 10).",
+          ])
+          |> should
+          |> be_equal(
+            Ok(IgnoreFunctionWithoutFunction(outside_erlang_path(), 2)),
+          )
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 2")
+        },
+      ),
+      it(
+        "returns IgnoreFunctionWithoutFunction when an Erlang function never ends",
+        fn() {
+          outside_error(outside_erlang_path(), [
+            "-module(outside).",
+            "%% coverage:ignore-function",
+            "broken() ->",
+            "    ok",
+          ])
+          |> should
+          |> be_equal(
+            Ok(IgnoreFunctionWithoutFunction(outside_erlang_path(), 2)),
+          )
+          |> or_fail_with("expected IgnoreFunctionWithoutFunction at line 2")
         },
       ),
       it("returns SourceReadFailed when a source file cannot be read", fn() {

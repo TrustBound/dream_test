@@ -70,12 +70,25 @@
 ////   echo value
 //// }
 //// // coverage:ignore-end
+////
+//// // coverage:ignore-function only old callers use this
+//// /// Converts the old record format.
+//// @deprecated("Use convert instead")
+//// pub fn convert_legacy(record: String) -> String {
+////   string.replace(record, ";", ",")
+//// }
 //// ```
 ////
 //// - `// coverage:ignore` ignores the next line that holds code. Blank lines
 ////   and comment lines between the marker and the code are skipped.
 //// - `// coverage:ignore-start` and `// coverage:ignore-end` ignore every
 ////   line from the start marker to the end marker.
+//// - `// coverage:ignore-function` ignores every line from the marker to the
+////   last line of the function after it. Blank lines, comments, doc comments
+////   and attributes such as `@external(...)` or `@deprecated(...)` can be
+////   between the marker and `fn`. In an `.erl` file, put the marker above the
+////   first clause; attributes such as `-spec` can be between them, and every
+////   clause up to the dot that ends the function is ignored.
 //// - In `.erl` files, write the markers after `%` or `%%`, for example
 ////   `%% coverage:ignore`.
 //// - Text after a marker is a note for the people who read the code.
@@ -86,8 +99,9 @@
 //// merged LCOV file covers.
 ////
 //// An ignore-start marker without an ignore-end marker, an ignore-end marker
-//// without an ignore-start marker, and an ignore-start marker inside an
-//// ignored block are errors. The error gives the file and the line.
+//// without an ignore-start marker, an ignore-start marker inside an ignored
+//// block, and an ignore-function marker that no complete function follows
+//// are errors. The error gives the file and the line.
 ////
 //// Markers match exact source lines only on Gleam 1.19 and later. See
 //// "Line accuracy".
@@ -270,6 +284,12 @@ pub type CoverageError {
     line_number: Int,
     open_line_number: Int,
   )
+  /// A `coverage:ignore-function` marker is not followed by a complete
+  /// function: the code after it is a constant, a type or other code, or the
+  /// file ends first.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  IgnoreFunctionWithoutFunction(source_path: String, line_number: Int)
 }
 
 /// Why the `cover` tool did not start.
@@ -1057,6 +1077,7 @@ type MarkerKind {
   IgnoreLine
   IgnoreStart
   IgnoreEnd
+  IgnoreFunction
 }
 
 /// An ignore-start marker that has no ignore-end marker yet.
@@ -1166,18 +1187,7 @@ fn scan_line_then_continue(
   line: String,
   rest: List(String),
 ) -> Result(Dict(Int, String), CoverageError) {
-  case scan_line(scan, classify_line(scan.syntax, line)) {
-    Ok(next) ->
-      scan_lines(MarkerScan(..next, line_number: scan.line_number + 1), rest)
-    Error(error) -> Error(error)
-  }
-}
-
-fn scan_line(
-  scan: MarkerScan,
-  source_line: SourceLine,
-) -> Result(MarkerScan, CoverageError) {
-  case source_line, scan.open_block, scan.pending_text {
+  case classify_line(scan.syntax, line), scan.open_block, scan.pending_text {
     Marker(IgnoreStart, _), Some(open), _ ->
       Error(NestedIgnoreStart(
         source_path: scan.source_path,
@@ -1185,28 +1195,38 @@ fn scan_line(
         open_line_number: open.line_number,
       ))
     Marker(IgnoreStart, text), None, _ ->
-      Ok(
-        MarkerScan(
-          ..ignore_line(scan, text),
-          open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
-          pending_text: None,
-        ),
+      MarkerScan(
+        ..ignore_line(scan, text),
+        open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
+        pending_text: None,
       )
+      |> next_line(rest)
     Marker(IgnoreEnd, _), None, _ ->
       Error(IgnoreEndWithoutStart(
         source_path: scan.source_path,
         line_number: scan.line_number,
       ))
     Marker(IgnoreEnd, _), Some(open), _ ->
-      Ok(MarkerScan(..ignore_line(scan, open.text), open_block: None))
-    _, Some(open), _ -> Ok(ignore_line(scan, open.text))
+      MarkerScan(..ignore_line(scan, open.text), open_block: None)
+      |> next_line(rest)
+    _, Some(open), _ -> next_line(ignore_line(scan, open.text), rest)
+    Marker(IgnoreFunction, text), None, _ ->
+      ignore_function_then_continue(scan, text, rest)
     Marker(IgnoreLine, text), None, _ ->
-      Ok(MarkerScan(..scan, pending_text: Some(text)))
+      next_line(MarkerScan(..scan, pending_text: Some(text)), rest)
     CodeLine, None, Some(text) ->
-      Ok(MarkerScan(..ignore_line(scan, text), pending_text: None))
-    CodeLine, None, None -> Ok(scan)
-    OtherLine, None, _ -> Ok(scan)
+      MarkerScan(..ignore_line(scan, text), pending_text: None)
+      |> next_line(rest)
+    CodeLine, None, None -> next_line(scan, rest)
+    OtherLine, None, _ -> next_line(scan, rest)
   }
+}
+
+fn next_line(
+  scan: MarkerScan,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  scan_lines(MarkerScan(..scan, line_number: scan.line_number + 1), rest)
 }
 
 fn ignore_line(scan: MarkerScan, text: String) -> MarkerScan {
@@ -1249,7 +1269,305 @@ fn marker_line(word: String, text: String) -> SourceLine {
     "coverage:ignore" -> Marker(kind: IgnoreLine, text: text)
     "coverage:ignore-start" -> Marker(kind: IgnoreStart, text: text)
     "coverage:ignore-end" -> Marker(kind: IgnoreEnd, text: text)
+    "coverage:ignore-function" -> Marker(kind: IgnoreFunction, text: text)
     _ -> OtherLine
+  }
+}
+
+// =============================================================================
+// Function markers
+// =============================================================================
+
+/// Where the function reader is: the source text that is left, and the line
+/// that this text starts on. Line 1 is the line after the marker.
+type Cursor {
+  Cursor(text: String, line: Int)
+}
+
+/// One token of source code. The reader skips white space, comments, strings
+/// and Erlang character literals, so a brace or a dot in them is never a
+/// token.
+type Token {
+  Token(kind: TokenKind, line: Int)
+}
+
+type TokenKind {
+  Word(String)
+  Symbol(String)
+  /// The Erlang `.` that ends a form: a dot before white space, a comment or
+  /// the end of the text.
+  FormEnd
+  EndOfText
+}
+
+/// Ignore the marker line and every line of the function after it, then go
+/// on from the line after the function.
+fn ignore_function_then_continue(
+  scan: MarkerScan,
+  text: String,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  let source =
+    rest
+    |> string.join("\n")
+    |> string.replace("\r", "")
+  case function_last_line(scan.syntax, Cursor(text: source, line: 1)) {
+    Ok(offset) ->
+      MarkerScan(..scan, pending_text: None)
+      |> ignore_range(scan.line_number + offset, text)
+      |> next_line(list.drop(rest, offset))
+    Error(Nil) ->
+      Error(IgnoreFunctionWithoutFunction(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+      ))
+  }
+}
+
+/// Ignore every line from the scan's line to `last_line`. The scan stays on
+/// `last_line`.
+fn ignore_range(scan: MarkerScan, last_line: Int, text: String) -> MarkerScan {
+  let ignored = ignore_line(scan, text)
+  case scan.line_number < last_line {
+    True ->
+      ignore_range(
+        MarkerScan(..ignored, line_number: scan.line_number + 1),
+        last_line,
+        text,
+      )
+    False -> ignored
+  }
+}
+
+/// The line, counted from the cursor, where the function after a
+/// `coverage:ignore-function` marker ends. `Error(Nil)` when the code after
+/// the marker is not a complete function.
+fn function_last_line(
+  syntax: CommentSyntax,
+  cursor: Cursor,
+) -> Result(Int, Nil) {
+  case syntax {
+    GleamComments -> gleam_function_last_line(cursor)
+    ErlangComments -> erlang_function_last_line(cursor)
+  }
+}
+
+/// Skip attributes such as `@external(...)` and `@deprecated(...)`, then
+/// read a `fn` or `pub fn` up to its parameters.
+fn gleam_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
+  let #(first, after_first) = next_token(GleamComments, cursor)
+  let #(second, after_second) = next_token(GleamComments, after_first)
+  case first.kind, second.kind {
+    Symbol("@"), Word(_) ->
+      gleam_function_last_line(after_attribute_arguments(after_second))
+    Word("pub"), Word("fn") ->
+      gleam_after_parameters(read_to_close(after_second, "(", ")", -1))
+    Word("fn"), _ ->
+      gleam_after_parameters(read_to_close(after_first, "(", ")", -1))
+    _, _ -> Error(Nil)
+  }
+}
+
+fn after_attribute_arguments(cursor: Cursor) -> Cursor {
+  let #(token, after) = next_token(GleamComments, cursor)
+  case token.kind {
+    Symbol("(") -> read_to_close(after, "(", ")", 0).1
+    _ -> cursor
+  }
+}
+
+/// Read tokens up to the bracket that closes at `depth` 0. Each `open`
+/// adds 1 to the depth and each `close` takes 1 away, so a start depth of
+/// -1 reads past the first `open` too. Returns the closing token, or the
+/// end-of-text token when the bracket never closes.
+fn read_to_close(
+  cursor: Cursor,
+  open: String,
+  close: String,
+  depth: Int,
+) -> #(Token, Cursor) {
+  let #(token, after) = next_token(GleamComments, cursor)
+  case token.kind {
+    EndOfText -> #(token, after)
+    Symbol(symbol) if symbol == close && depth == 0 -> #(token, after)
+    Symbol(symbol) if symbol == close ->
+      read_to_close(after, open, close, depth - 1)
+    Symbol(symbol) if symbol == open ->
+      read_to_close(after, open, close, depth + 1)
+    _ -> read_to_close(after, open, close, depth)
+  }
+}
+
+fn gleam_after_parameters(close: #(Token, Cursor)) -> Result(Int, Nil) {
+  case close.0.kind {
+    EndOfText -> Error(Nil)
+    _ -> gleam_return_type_last_line(close.1, close.0.line)
+  }
+}
+
+/// Read the return type, if there is one, then the body in braces. An
+/// external function has no body: it ends at the last token of its return
+/// type, or at its parameters.
+fn gleam_return_type_last_line(
+  cursor: Cursor,
+  last_line: Int,
+) -> Result(Int, Nil) {
+  let #(token, after) = next_token(GleamComments, cursor)
+  let #(following, _) = next_token(GleamComments, after)
+  case token.kind, following.kind {
+    Symbol("{"), _ -> closing_line(read_to_close(after, "{", "}", 0))
+    Word("fn"), Symbol("(") -> gleam_return_type_last_line(after, token.line)
+    Word("pub"), _
+    | Word("fn"), _
+    | Word("type"), _
+    | Word("const"), _
+    | Word("import"), _
+    -> Ok(last_line)
+    Word(_), _
+    | Symbol("->"), _
+    | Symbol("."), _
+    | Symbol(","), _
+    | Symbol("#"), _
+    | Symbol("("), _
+    | Symbol(")"), _
+    -> gleam_return_type_last_line(after, token.line)
+    _, _ -> Ok(last_line)
+  }
+}
+
+fn closing_line(close: #(Token, Cursor)) -> Result(Int, Nil) {
+  case close.0.kind {
+    EndOfText -> Error(Nil)
+    _ -> Ok(close.0.line)
+  }
+}
+
+/// Skip attributes such as `-spec` and `-doc`, then read the function to the
+/// dot that ends its last clause.
+fn erlang_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
+  let #(first, after_first) = next_token(ErlangComments, cursor)
+  let #(second, _) = next_token(ErlangComments, after_first)
+  case first.kind, second.kind {
+    Symbol("-"), _ -> erlang_function_last_line(read_form(after_first).1)
+    Word(_), Symbol("(") -> erlang_form_last_line(read_form(after_first))
+    _, _ -> Error(Nil)
+  }
+}
+
+/// Read tokens up to the end of the form, or to the end of the text.
+fn read_form(cursor: Cursor) -> #(Token, Cursor) {
+  let #(token, after) = next_token(ErlangComments, cursor)
+  case token.kind {
+    FormEnd | EndOfText -> #(token, after)
+    _ -> read_form(after)
+  }
+}
+
+fn erlang_form_last_line(form_end: #(Token, Cursor)) -> Result(Int, Nil) {
+  case form_end.0.kind {
+    FormEnd -> Ok(form_end.0.line)
+    _ -> Error(Nil)
+  }
+}
+
+fn next_token(syntax: CommentSyntax, cursor: Cursor) -> #(Token, Cursor) {
+  case syntax, cursor.text {
+    _, "" -> #(Token(kind: EndOfText, line: cursor.line), cursor)
+    _, "\n" <> rest ->
+      next_token(syntax, Cursor(text: rest, line: cursor.line + 1))
+    _, " " <> rest | _, "\t" <> rest ->
+      next_token(syntax, Cursor(..cursor, text: rest))
+    GleamComments, "//" <> rest | ErlangComments, "%" <> rest ->
+      next_token(syntax, after_comment(Cursor(..cursor, text: rest)))
+    _, "\"" <> rest ->
+      next_token(syntax, after_quoted(Cursor(..cursor, text: rest), "\""))
+    ErlangComments, "'" <> rest -> #(
+      Token(kind: Word("'"), line: cursor.line),
+      after_quoted(Cursor(..cursor, text: rest), "'"),
+    )
+    ErlangComments, "$\\" <> rest | ErlangComments, "$" <> rest ->
+      next_token(syntax, after_character(Cursor(..cursor, text: rest)))
+    ErlangComments, "." <> rest -> #(
+      Token(kind: erlang_dot(rest), line: cursor.line),
+      Cursor(..cursor, text: rest),
+    )
+    GleamComments, "->" <> rest -> #(
+      Token(kind: Symbol("->"), line: cursor.line),
+      Cursor(..cursor, text: rest),
+    )
+    _, text -> word_or_symbol(cursor, take_word(syntax, text, ""))
+  }
+}
+
+fn after_comment(cursor: Cursor) -> Cursor {
+  case string.split_once(cursor.text, "\n") {
+    Ok(#(_, rest)) -> Cursor(text: rest, line: cursor.line + 1)
+    Error(Nil) -> Cursor(..cursor, text: "")
+  }
+}
+
+/// Skip to the character after the closing `quote`. A backslash escapes the
+/// character after it.
+fn after_quoted(cursor: Cursor, quote: String) -> Cursor {
+  case cursor.text, string.starts_with(cursor.text, quote) {
+    _, True -> Cursor(..cursor, text: string.drop_start(cursor.text, 1))
+    "", False -> cursor
+    "\\" <> rest, False ->
+      after_quoted(after_character(Cursor(..cursor, text: rest)), quote)
+    _, False -> after_quoted(after_character(cursor), quote)
+  }
+}
+
+/// Skip one character, and count it when it is a line break.
+fn after_character(cursor: Cursor) -> Cursor {
+  case cursor.text {
+    "\n" <> rest -> Cursor(text: rest, line: cursor.line + 1)
+    text -> Cursor(..cursor, text: string.drop_start(text, 1))
+  }
+}
+
+/// A dot ends an Erlang form when white space, a comment or the end of the
+/// text follows it. Other dots are in floats and record fields.
+fn erlang_dot(rest: String) -> TokenKind {
+  case rest {
+    "" | " " <> _ | "\t" <> _ | "\n" <> _ | "%" <> _ -> FormEnd
+    _ -> Symbol(".")
+  }
+}
+
+fn word_or_symbol(cursor: Cursor, word: #(String, String)) -> #(Token, Cursor) {
+  case word {
+    #("", text) -> #(
+      Token(kind: Symbol(string.slice(text, 0, 1)), line: cursor.line),
+      Cursor(..cursor, text: string.drop_start(text, 1)),
+    )
+    #(name, rest) -> #(
+      Token(kind: Word(name), line: cursor.line),
+      Cursor(..cursor, text: rest),
+    )
+  }
+}
+
+/// Split the text into the word at its start (letters, digits and `_`, and
+/// `@` in Erlang) and the text after the word.
+fn take_word(
+  syntax: CommentSyntax,
+  text: String,
+  word: String,
+) -> #(String, String) {
+  let first = string.slice(text, 0, 1)
+  case is_word_character(syntax, first) {
+    True -> take_word(syntax, string.drop_start(text, 1), word <> first)
+    False -> #(word, text)
+  }
+}
+
+fn is_word_character(syntax: CommentSyntax, character: String) -> Bool {
+  case syntax, character {
+    _, "_" | ErlangComments, "@" -> True
+    _, _ ->
+      string.lowercase(character) != string.uppercase(character)
+      || result.is_ok(int.parse(character))
   }
 }
 
