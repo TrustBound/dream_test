@@ -12,8 +12,10 @@ run_catching(Fun) ->
   catch
     Class:Reason:Stack ->
       %% Keep it simple and stable for tests: include class + reason.
-      Text0 = io_lib:format("~p:~p", [Class, Reason]),
-      Text = lists:flatten(Text0),
+      %% A Gleam String is a UTF-8 binary, not a charlist.
+      Text = unicode:characters_to_binary(
+        io_lib:format("~p:~p", [Class, Reason])
+      ),
       _ = Stack,
       {error, Text}
   end.

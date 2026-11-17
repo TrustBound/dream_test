@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   worker, and removes that message when it returns. Before, with crash
   reports on, it left the down message in the mailbox, and a later call in
   the same process took it and gave `SandboxCrashed("normal")`.
+- `sandbox.run_isolated` without crash reports now gives the crash reason
+  of `SandboxCrashed` as a `String`. Before, it was an Erlang charlist, so
+  the parallel runner crashed when it put the reason of a crashed hook in
+  its error text.
 
 ## [2.2.0] - 2026-11-17
 

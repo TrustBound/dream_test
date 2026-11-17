@@ -2,6 +2,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox
 import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
 import dream_test/unit.{describe, it}
+import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process
 import gleam/option.{None}
 import gleam/string
@@ -73,5 +74,61 @@ pub fn tests() {
       |> be_equal(sandbox.SandboxCompleted(2))
       |> or_fail_with("the second run should complete")
     }),
+
+    it("default_config waits 5 seconds and hides crash reports", fn() {
+      sandbox.default_config()
+      |> should
+      |> be_equal(sandbox.SandboxConfig(
+        timeout_ms: 5000,
+        show_crash_reports: False,
+      ))
+      |> or_fail_with("default_config should be 5000ms, quiet")
+    }),
+
+    it("with_crash_reports turns crash reports on", fn() {
+      sandbox.with_crash_reports(sandbox.default_config())
+      |> should
+      |> be_equal(sandbox.SandboxConfig(
+        timeout_ms: 5000,
+        show_crash_reports: True,
+      ))
+      |> or_fail_with("with_crash_reports should set show_crash_reports")
+    }),
+
+    it("reports a quiet crash with its class and reason", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
+      sandbox.run_isolated(config, fn() { erlang_error(atom.create("boom")) })
+      |> should
+      |> be_equal(sandbox.SandboxCrashed("error:boom"))
+      |> or_fail_with("a quiet crash should give error:boom")
+    }),
+
+    it("reports an abnormal exit with crash reports on", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
+      sandbox.run_isolated(config, fn() {
+        process.send_abnormal_exit(process.self(), "boom")
+        process.sleep(5000)
+      })
+      |> should
+      |> be_equal(sandbox.SandboxCrashed("\"boom\""))
+      |> or_fail_with("an abnormal exit should give its reason")
+    }),
+
+    it("reports a normal exit before a result as crashed", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
+      sandbox.run_isolated(config, fn() {
+        process.send_exit(process.self())
+        process.sleep(5000)
+      })
+      |> should
+      |> be_equal(sandbox.SandboxCrashed("normal"))
+      |> or_fail_with("a normal exit before a result should give normal")
+    }),
   ])
 }
+
+@external(erlang, "erlang", "error")
+fn erlang_error(reason: Atom) -> Nil
