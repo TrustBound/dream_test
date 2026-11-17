@@ -48,7 +48,7 @@ fn full_json() {
     "{\"path\":\"src/app/generated/db.gleam\",\"pattern\":\"src/app/generated/**\",\"reason\":\"generated code\"},",
     "{\"path\":\"src/app_ffi.erl\",\"pattern\":\"src/*_ffi.erl\",\"reason\":null}],",
     "\"total\":{\"lines_hit\":2,\"lines_total\":4,\"percent\":50.0},",
-    "\"minimum_percent\":80.0}\n",
+    "\"minimum_percent\":80.0,\"minimum_percent_per_file\":50.0}\n",
   ])
 }
 
@@ -56,7 +56,7 @@ fn empty_json() {
   string.concat([
     "{\"version\":1,\"files\":[],\"excluded_files\":[],",
     "\"total\":{\"lines_hit\":0,\"lines_total\":0,\"percent\":null},",
-    "\"minimum_percent\":null}\n",
+    "\"minimum_percent\":null,\"minimum_percent_per_file\":null}\n",
   ])
 }
 
@@ -67,23 +67,49 @@ fn rounded_json() {
     "\"missing\":[{\"first\":3,\"last\":3}],\"ignored\":[]}],",
     "\"excluded_files\":[],",
     "\"total\":{\"lines_hit\":2,\"lines_total\":3,\"percent\":66.6},",
-    "\"minimum_percent\":null}\n",
+    "\"minimum_percent\":null,\"minimum_percent_per_file\":null}\n",
+  ])
+}
+
+fn per_file_only_json() {
+  string.concat([
+    "{\"version\":1,\"files\":[],\"excluded_files\":[],",
+    "\"total\":{\"lines_hit\":0,\"lines_total\":0,\"percent\":null},",
+    "\"minimum_percent\":null,\"minimum_percent_per_file\":50.0}\n",
   ])
 }
 
 pub fn tests() {
   describe("dream_test/coverage/json_summary", [
     it("renders files, ignored lines, excluded files, total and minimum", fn() {
-      json_summary.render(report: full_report(), minimum_percent: Some(80.0))
+      json_summary.render(
+        report: full_report(),
+        options: json_summary.options()
+          |> json_summary.minimum_percent(80.0)
+          |> json_summary.minimum_percent_per_file(50.0),
+      )
       |> should
       |> be_equal(full_json())
       |> or_fail_with("expected the full JSON summary")
     }),
     it("renders an empty report with null percents and no minimum", fn() {
-      json_summary.render(report: report.new([]), minimum_percent: None)
+      json_summary.render(
+        report: report.new([]),
+        options: json_summary.options(),
+      )
       |> should
       |> be_equal(empty_json())
       |> or_fail_with("expected the empty JSON summary")
+    }),
+    it("renders the per-file minimum without the minimum", fn() {
+      json_summary.render(
+        report: report.new([]),
+        options: json_summary.options()
+          |> json_summary.minimum_percent_per_file(50.0),
+      )
+      |> should
+      |> be_equal(per_file_only_json())
+      |> or_fail_with("expected only the per-file minimum")
     }),
     it("rounds percents down to one decimal place", fn() {
       report.new([
@@ -93,7 +119,7 @@ pub fn tests() {
           LineCoverage(line: 3, calls: 0),
         ]),
       ])
-      |> json_summary.render(minimum_percent: None)
+      |> json_summary.render(options: json_summary.options())
       |> should
       |> be_equal(rounded_json())
       |> or_fail_with("expected 66.6")

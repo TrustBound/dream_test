@@ -106,7 +106,7 @@ fn fixture_json() {
     "{\"path\":\"test/coverage_fixtures/sample.gleam\",\"lines_hit\":2,\"lines_total\":4,\"percent\":50.0,\"missing\":[{\"first\":9,\"last\":9},{\"first\":14,\"last\":14}],\"ignored\":[]}],",
     "\"excluded_files\":[],",
     "\"total\":{\"lines_hit\":2,\"lines_total\":6,\"percent\":33.3},",
-    "\"minimum_percent\":10.0}\n",
+    "\"minimum_percent\":10.0,\"minimum_percent_per_file\":5.0}\n",
   ])
 }
 
@@ -489,6 +489,7 @@ pub fn tests() {
           measure_classify(
             fixture_config()
             |> coverage.minimum_percent(10.0)
+            |> coverage.minimum_percent_per_file(5.0)
             |> coverage.json_path(json_path)
             |> coverage.cobertura_path(cobertura_path)
             |> coverage.markdown_path(markdown_path),

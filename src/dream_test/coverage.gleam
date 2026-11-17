@@ -2042,11 +2042,31 @@ fn render_output(
     JsonOutput ->
       json_summary.render(
         report: coverage_report,
-        minimum_percent: config.minimum_percent,
+        options: json_summary_options(config),
       )
     CoberturaOutput ->
       cobertura.render(report: coverage_report, timestamp: system_time_ms())
     MarkdownOutput -> markdown.render(report: coverage_report)
+  }
+}
+
+fn json_summary_options(config: CoverageConfig) -> json_summary.Options {
+  json_summary.options()
+  |> set_when_given(config.minimum_percent, json_summary.minimum_percent)
+  |> set_when_given(
+    config.minimum_percent_per_file,
+    json_summary.minimum_percent_per_file,
+  )
+}
+
+fn set_when_given(
+  options: json_summary.Options,
+  value: Option(Float),
+  set: fn(json_summary.Options, Float) -> json_summary.Options,
+) -> json_summary.Options {
+  case value {
+    Some(percent) -> set(options, percent)
+    None -> options
   }
 }
 

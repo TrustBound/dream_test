@@ -35,9 +35,13 @@
 ////      "reason": "generated code"}         // null when there is no reason
 ////   ],
 ////   "total": {"lines_hit": 18, "lines_total": 20, "percent": 90.0},
-////   "minimum_percent": 80.0                   // null when no minimum is set
+////   "minimum_percent": 80.0,                  // null when no minimum is set
+////   "minimum_percent_per_file": 50.0          // null when no per-file minimum
 //// }
 //// ```
+////
+//// `minimum_percent` comes from `coverage.minimum_percent` and
+//// `minimum_percent_per_file` from `coverage.minimum_percent_per_file`.
 ////
 //// Files are sorted by path. Excluded files and ignored lines are never
 //// counted in `lines_hit` or `lines_total`.
@@ -53,14 +57,90 @@ import dream_test/coverage/report.{
 }
 import gleam/int
 import gleam/json.{type Json}
-import gleam/option.{type Option}
+import gleam/option.{type Option, None, Some}
+
+/// The settings that `render` writes into the summary next to the report.
+///
+/// Build one with `json_summary.options`, then set values with
+/// `json_summary.minimum_percent` and `json_summary.minimum_percent_per_file`.
+/// `coverage.json_path` fills it from your coverage settings.
+pub opaque type Options {
+  Options(
+    minimum_percent: Option(Float),
+    minimum_percent_per_file: Option(Float),
+  )
+}
+
+/// Options with no values set: both minimums render as `null`.
+///
+/// ## Returns
+///
+/// The options with no minimum and no per-file minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// json_summary.render(report: coverage_report, options: json_summary.options())
+/// ```
+pub fn options() -> Options {
+  Options(minimum_percent: None, minimum_percent_per_file: None)
+}
+
+/// Set the minimum for the whole run, rendered as `minimum_percent`.
+///
+/// ## Parameters
+///
+/// - `options`: the options to change
+/// - `percent`: the minimum, as given to `coverage.minimum_percent`
+///
+/// ## Returns
+///
+/// The updated options.
+///
+/// ## Example
+///
+/// ```gleam
+/// json_summary.options()
+/// |> json_summary.minimum_percent(80.0)
+/// ```
+pub fn minimum_percent(
+  options options: Options,
+  percent percent: Float,
+) -> Options {
+  Options(..options, minimum_percent: Some(percent))
+}
+
+/// Set the minimum for each file, rendered as `minimum_percent_per_file`.
+///
+/// ## Parameters
+///
+/// - `options`: the options to change
+/// - `percent`: the minimum, as given to `coverage.minimum_percent_per_file`
+///
+/// ## Returns
+///
+/// The updated options.
+///
+/// ## Example
+///
+/// ```gleam
+/// json_summary.options()
+/// |> json_summary.minimum_percent_per_file(50.0)
+/// ```
+pub fn minimum_percent_per_file(
+  options options: Options,
+  percent percent: Float,
+) -> Options {
+  Options(..options, minimum_percent_per_file: Some(percent))
+}
 
 /// Render a coverage report as a JSON summary.
 ///
 /// ## Parameters
 ///
 /// - `report`: the report to render
-/// - `minimum_percent`: the minimum from `coverage.minimum_percent`, if any
+/// - `options`: the minimums to write next to the report, from
+///   `json_summary.options`
 ///
 /// ## Returns
 ///
@@ -75,12 +155,12 @@ import gleam/option.{type Option}
 ///     LineCoverage(line: 2, calls: 0),
 ///   ]),
 /// ])
-/// |> json_summary.render(minimum_percent: None)
-/// // -> "{\"version\":1,\"files\":[{\"path\":\"src/a.gleam\",\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0,\"missing\":[{\"first\":2,\"last\":2}],\"ignored\":[]}],\"excluded_files\":[],\"total\":{\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0},\"minimum_percent\":null}\n"
+/// |> json_summary.render(options: json_summary.options())
+/// // -> "{\"version\":1,\"files\":[{\"path\":\"src/a.gleam\",\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0,\"missing\":[{\"first\":2,\"last\":2}],\"ignored\":[]}],\"excluded_files\":[],\"total\":{\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0},\"minimum_percent\":null,\"minimum_percent_per_file\":null}\n"
 /// ```
 pub fn render(
   report coverage_report: CoverageReport,
-  minimum_percent minimum_percent: Option(Float),
+  options options: Options,
 ) -> String {
   let hit = report.total_hit_line_count(coverage_report)
   let total = report.total_executable_line_count(coverage_report)
@@ -92,7 +172,11 @@ pub fn render(
       json.array(report.excluded_files(coverage_report), excluded_file_json),
     ),
     #("total", counts_json(hit, total)),
-    #("minimum_percent", json.nullable(minimum_percent, json.float)),
+    #("minimum_percent", json.nullable(options.minimum_percent, json.float)),
+    #(
+      "minimum_percent_per_file",
+      json.nullable(options.minimum_percent_per_file, json.float),
+    ),
   ])
   |> json.to_string()
   |> append_newline()
