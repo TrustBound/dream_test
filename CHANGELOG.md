@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-17
+
 ### Added
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
@@ -447,7 +449,8 @@ first shipped in 2.1.3._
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.3...HEAD
+[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.2.0...HEAD
+[2.2.0]: https://github.com/TrustBound/dream_test/compare/2.1.3...2.2.0
 [2.1.3]: https://github.com/TrustBound/dream_test/compare/2.1.1...2.1.3
 [2.1.2]: https://github.com/TrustBound/dream_test/compare/2.1.1...7c1daa617e276eef2f7ad4bf470f0ac8dfb634a3
 [2.1.1]: https://github.com/TrustBound/dream_test/compare/2.1.0...2.1.1
