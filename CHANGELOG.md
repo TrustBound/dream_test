@@ -62,6 +62,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     measured file, because older versions map only the first line of each
     function to its source line. The warning does not fail the run
 
+### Changed
+
+- **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)
+
+  - CI and the publish workflows now use Gleam 1.19.2. Contributors need
+    Gleam 1.19.0 or later, because coverage line numbers are exact only from
+    1.19 and the coverage self-tests check exact lines
+  - CI also runs the README snippet tests in `examples/snippets`
+
 ## [2.1.3] - 2026-07-06
 
 ### Fixed

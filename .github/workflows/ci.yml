@@ -24,11 +24,20 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.17.0"
+          gleam-version: "1.19.2"
           rebar3-version: "3"
 
       - name: Download dependencies
         run: gleam deps download
+
+      - name: Check native coverage support
+        # The coverage self-tests start child BEAMs with `+JPcover line_counters`.
+        # That needs Erlang/OTP 27 or later with the JIT.
+        run: >-
+          erl -noshell -eval 'case code:coverage_support() of
+          true -> halt(0);
+          false -> io:format("No native coverage support: use Erlang/OTP 27+ with the JIT~n"), halt(1)
+          end.'
 
       - name: Check code format
         run: gleam format --check src test
@@ -41,12 +50,6 @@ jobs:
           CI: "true"
         run: gleam test
 
-
-
-
-
-
-
-
-
-
+      - name: Run README snippet tests
+        working-directory: examples/snippets
+        run: gleam test
