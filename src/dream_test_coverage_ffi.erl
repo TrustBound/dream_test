@@ -6,7 +6,8 @@
     analyse_module/2,
     match_files/1,
     is_regular_file/1,
-    erlang_function_last_line/1
+    erlang_function_last_line/1,
+    system_time_ms/0
 ]).
 
 %% Erlang side of `dream_test/coverage`.
@@ -144,3 +145,8 @@ form_end(_LastToken) -> {error, nil}.
 
 format_reason(Reason) ->
     unicode:characters_to_binary(io_lib:format("~tp", [Reason])).
+
+%% The time now, in milliseconds since the Unix epoch, for the Cobertura
+%% `timestamp` attribute.
+system_time_ms() ->
+    os:system_time(millisecond).

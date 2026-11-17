@@ -58,6 +58,26 @@ pub fn tests() {
       |> be_equal("src/app/cart.gleam")
       |> or_fail_with("expected src/app/cart.gleam")
     }),
+    it("missed_ranges merges consecutive missed lines", fn() {
+      report.file("src/a.gleam", [
+        LineCoverage(line: 5, calls: 0),
+        LineCoverage(line: 1, calls: 0),
+        LineCoverage(line: 2, calls: 0),
+        LineCoverage(line: 3, calls: 1),
+        LineCoverage(line: 7, calls: 0),
+        LineCoverage(line: 8, calls: 0),
+      ])
+      |> report.missed_ranges()
+      |> should
+      |> be_equal([#(1, 2), #(5, 5), #(7, 8)])
+      |> or_fail_with("expected 1-2, 5 and 7-8")
+    }),
+    it("missed_ranges is empty when every line ran", fn() {
+      report.missed_ranges(types_file())
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected no ranges")
+    }),
     it("lines returns the lines sorted by line number", fn() {
       report.lines(cart_file())
       |> should

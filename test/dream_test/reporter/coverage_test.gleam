@@ -2,16 +2,17 @@
 
 import dream_test/coverage.{
   type CoverageError, AlreadyInstrumented, BadBeamFile, BelowMinimumPercent,
-  CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed, EmbeddedMode,
-  EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
-  ExcludeWithoutReason, IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
-  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
-  InvalidMinimumPercent, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
-  MalformedLcov, ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented,
-  ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched,
-  NoSourceFiles, NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  CoberturaWriteFailed, CoverAlreadyRunning, CoverDidNotStart, CoverStartFailed,
+  EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
+  ExcludeMatchedNothing, ExcludeWithoutReason, IgnoreEndWithoutStart,
+  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
+  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
+  JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
+  MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart, NoDebugInfo,
+  NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
 import dream_test/file.{
@@ -939,6 +940,39 @@ pub fn tests() {
         |> or_fail_with(
           "expected the ModuleNotAnalysed with UnknownAnalysisError message",
         )
+      }),
+      it("describes JsonWriteFailed", fn() {
+        render_failure_for(JsonWriteFailed("out", IsDirectory("out")))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the JSON summary \"out\".",
+          "the path is a directory, not a file (Is a directory: out).",
+          "give a file name with coverage.json_path(...), for example build/coverage/coverage.json.",
+        ))
+        |> or_fail_with("expected the JsonWriteFailed message")
+      }),
+      it("describes CoberturaWriteFailed", fn() {
+        render_failure_for(CoberturaWriteFailed(
+          "out.xml",
+          PermissionDenied("out.xml"),
+        ))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the Cobertura XML file \"out.xml\".",
+          "there is no permission to write to this path (Permission denied: out.xml).",
+          "choose a writable path with coverage.cobertura_path(...), or fix the folder permissions.",
+        ))
+        |> or_fail_with("expected the CoberturaWriteFailed message")
+      }),
+      it("describes MarkdownWriteFailed", fn() {
+        render_failure_for(MarkdownWriteFailed("out.md", NotFound("out.md")))
+        |> should
+        |> be_equal(failure_block(
+          "Could not write the Markdown summary \"out.md\".",
+          "a folder in the path does not exist and could not be created (File not found: out.md).",
+          "check the path given to coverage.markdown_path(...).",
+        ))
+        |> or_fail_with("expected the MarkdownWriteFailed message")
       }),
       it("describes LcovWriteFailed with PermissionDenied", fn() {
         render_failure_for(LcovWriteFailed(

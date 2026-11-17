@@ -7,7 +7,8 @@ import coverage_fixtures/nested/deep
 import coverage_fixtures/sample
 import dream_test/coverage.{
   type CoverageError, type CoverageSession, type StartCause, BelowMinimumPercent,
-  CoverAlreadyRunning, CoverStartFailed, InvalidMinimumPercent, LcovWriteFailed,
+  CoberturaWriteFailed, CoverAlreadyRunning, CoverStartFailed,
+  InvalidMinimumPercent, JsonWriteFailed, LcovWriteFailed, MarkdownWriteFailed,
   NoSourceFiles, SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot,
 }
 import dream_test/coverage/report.{
@@ -20,6 +21,8 @@ import dream_test/unit.{describe, group, it}
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
+import gleam/string
 
 @external(erlang, "dream_test_coverage_test_ffi", "run_in_peer")
 fn run_in_peer(function: fn() -> a) -> Result(a, String)
@@ -78,6 +81,90 @@ fn counted_lines(
 }
 
 /// Start coverage, run `classify(1)`, and finish, all in a new peer node.
+/// The Cobertura timestamp is the time of the run, so replace its value
+/// with `T` before comparing.
+fn without_timestamp(xml: String) -> String {
+  case string.split_once(xml, " timestamp=\"") {
+    Ok(#(before, after)) ->
+      case string.split_once(after, "\"") {
+        Ok(#(_, rest)) -> before <> " timestamp=\"T\"" <> rest
+        Error(Nil) -> xml
+      }
+    Error(Nil) -> xml
+  }
+}
+
+fn fixture_json() {
+  string.concat([
+    "{\"version\":1,\"files\":[",
+    "{\"path\":\"test/coverage_fixtures/coverage_fixture_ffi.erl\",\"lines_hit\":0,\"lines_total\":1,\"percent\":0.0,\"missing\":[{\"first\":6,\"last\":6}],\"ignored\":[]},",
+    "{\"path\":\"test/coverage_fixtures/nested/deep.gleam\",\"lines_hit\":0,\"lines_total\":1,\"percent\":0.0,\"missing\":[{\"first\":4,\"last\":4}],\"ignored\":[]},",
+    "{\"path\":\"test/coverage_fixtures/sample.gleam\",\"lines_hit\":2,\"lines_total\":4,\"percent\":50.0,\"missing\":[{\"first\":9,\"last\":9},{\"first\":14,\"last\":14}],\"ignored\":[]}],",
+    "\"excluded_files\":[],",
+    "\"total\":{\"lines_hit\":2,\"lines_total\":6,\"percent\":33.3},",
+    "\"minimum_percent\":10.0}\n",
+  ])
+}
+
+fn fixture_cobertura() {
+  string.concat([
+    "<?xml version=\"1.0\" ?>\n",
+    "<!DOCTYPE coverage SYSTEM \"http://cobertura.sourceforge.net/xml/coverage-04.dtd\">\n",
+    "<coverage line-rate=\"0.3333\" branch-rate=\"0\" lines-covered=\"2\" lines-valid=\"6\" branches-covered=\"0\" branches-valid=\"0\" complexity=\"0\" version=\"dream_test\" timestamp=\"T\">\n",
+    "  <sources>\n",
+    "    <source>.</source>\n",
+    "  </sources>\n",
+    "  <packages>\n",
+    "    <package name=\"test.coverage_fixtures\" line-rate=\"0.4000\" branch-rate=\"0\" complexity=\"0\">\n",
+    "      <classes>\n",
+    "        <class name=\"coverage_fixture_ffi.erl\" filename=\"test/coverage_fixtures/coverage_fixture_ffi.erl\" line-rate=\"0.0000\" branch-rate=\"0\" complexity=\"0\">\n",
+    "          <methods/>\n",
+    "          <lines>\n",
+    "            <line number=\"6\" hits=\"0\"/>\n",
+    "          </lines>\n",
+    "        </class>\n",
+    "        <class name=\"sample.gleam\" filename=\"test/coverage_fixtures/sample.gleam\" line-rate=\"0.5000\" branch-rate=\"0\" complexity=\"0\">\n",
+    "          <methods/>\n",
+    "          <lines>\n",
+    "            <line number=\"7\" hits=\"1\"/>\n",
+    "            <line number=\"8\" hits=\"1\"/>\n",
+    "            <line number=\"9\" hits=\"0\"/>\n",
+    "            <line number=\"14\" hits=\"0\"/>\n",
+    "          </lines>\n",
+    "        </class>\n",
+    "      </classes>\n",
+    "    </package>\n",
+    "    <package name=\"test.coverage_fixtures.nested\" line-rate=\"0.0000\" branch-rate=\"0\" complexity=\"0\">\n",
+    "      <classes>\n",
+    "        <class name=\"deep.gleam\" filename=\"test/coverage_fixtures/nested/deep.gleam\" line-rate=\"0.0000\" branch-rate=\"0\" complexity=\"0\">\n",
+    "          <methods/>\n",
+    "          <lines>\n",
+    "            <line number=\"4\" hits=\"0\"/>\n",
+    "          </lines>\n",
+    "        </class>\n",
+    "      </classes>\n",
+    "    </package>\n",
+    "  </packages>\n",
+    "</coverage>\n",
+  ])
+}
+
+fn fixture_markdown() {
+  string.concat([
+    "## Coverage\n\n",
+    "| File | Lines | Cover | Missing | Excluded |\n",
+    "| --- | ---: | ---: | --- | --- |\n",
+    "| test/coverage\\_fixtures/coverage\\_fixture\\_ffi.erl | 0/1 | 0.0% | 6 |  |\n",
+    "| test/coverage\\_fixtures/nested/deep.gleam | 0/1 | 0.0% | 4 |  |\n",
+    "| test/coverage\\_fixtures/sample.gleam | 2/4 | 50.0% | 9, 14 |  |\n",
+    "| Total | 2/6 | 33.3% |  |  |\n",
+  ])
+}
+
+fn output_path(name: String) -> String {
+  "test/tmp/coverage_api_test/" <> int.to_string(unique_port()) <> "_" <> name
+}
+
 fn measure_classify(
   config: coverage.CoverageConfig,
 ) -> Result(Result(CoverageReport, CoverageError), String) {
@@ -343,6 +430,59 @@ pub fn tests() {
         |> be_equal(Ok(Error(LcovWriteFailed("test", IsDirectory("test")))))
         |> or_fail_with("expected LcovWriteFailed")
       }),
+      it("write the JSON, Cobertura and Markdown files", fn() {
+        let json_path = output_path("coverage.json")
+        let cobertura_path = output_path("cobertura.xml")
+        let markdown_path = output_path("coverage.md")
+        let _ =
+          measure_classify(
+            fixture_config()
+            |> coverage.minimum_percent(10.0)
+            |> coverage.json_path(json_path)
+            |> coverage.cobertura_path(cobertura_path)
+            |> coverage.markdown_path(markdown_path),
+          )
+        #(
+          read(json_path),
+          result.map(read(cobertura_path), without_timestamp),
+          read(markdown_path),
+        )
+        |> should
+        |> be_equal(#(
+          Ok(fixture_json()),
+          Ok(fixture_cobertura()),
+          Ok(fixture_markdown()),
+        ))
+        |> or_fail_with("expected the three files")
+      }),
+      it("return JsonWriteFailed when the JSON path is a directory", fn() {
+        measure_classify(fixture_config() |> coverage.json_path("test"))
+        |> should
+        |> be_equal(Ok(Error(JsonWriteFailed("test", IsDirectory("test")))))
+        |> or_fail_with("expected JsonWriteFailed")
+      }),
+      it(
+        "return CoberturaWriteFailed when the Cobertura path is a directory",
+        fn() {
+          measure_classify(fixture_config() |> coverage.cobertura_path("test"))
+          |> should
+          |> be_equal(
+            Ok(Error(CoberturaWriteFailed("test", IsDirectory("test")))),
+          )
+          |> or_fail_with("expected CoberturaWriteFailed")
+        },
+      ),
+      it(
+        "return MarkdownWriteFailed when the Markdown path is a directory",
+        fn() {
+          measure_classify(fixture_config() |> coverage.markdown_path("test"))
+          |> should
+          |> be_equal(
+            Ok(Error(MarkdownWriteFailed("test", IsDirectory("test")))),
+          )
+          |> or_fail_with("expected MarkdownWriteFailed")
+        },
+      ),
     ]),
 
     group("check_minimum", [

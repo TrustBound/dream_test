@@ -147,6 +147,28 @@
 //// Hidden: 2 files at 100.0%
 //// ```
 ////
+//// ## Other file formats
+////
+//// Coverage always writes LCOV unless `coverage.no_lcov()` is set. It can
+//// also write the same report in other formats when it finishes:
+////
+//// ```gleam
+//// coverage.new()
+//// |> coverage.json_path("build/coverage/coverage.json")
+//// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+//// |> coverage.markdown_path("build/coverage/coverage.md")
+//// ```
+////
+//// - JSON: a summary per file, with missing lines, ignored lines and
+////   excluded files (`dream_test/coverage/json_summary`).
+//// - Cobertura XML: for GitLab, Jenkins and Azure DevOps
+////   (`dream_test/coverage/cobertura`).
+//// - Markdown: a table for `$GITHUB_STEP_SUMMARY` or a pull request comment
+////   (`dream_test/coverage/markdown`).
+////
+//// A file that cannot be written fails coverage with a `Coverage failed`
+//// message that names the format and the path.
+////
 //// ## Line accuracy
 ////
 //// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
@@ -171,6 +193,7 @@
 //// | Category     | Functions                                                 |
 //// |--------------|-----------------------------------------------------------|
 //// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
+//// |              | `json_path`, `cobertura_path`, `markdown_path`,           |
 //// |              | `show_missing`, `minimum_percent`, `merge_lcov`,          |
 //// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
 //// |              | `require_exclusion_reasons`                               |
@@ -185,6 +208,9 @@
 //// import dream_test/coverage
 //// ```
 
+import dream_test/coverage/cobertura
+import dream_test/coverage/json_summary
+import dream_test/coverage/markdown
 import dream_test/coverage/report.{
   type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
   type LineCoverage, LineCoverage,
@@ -220,6 +246,9 @@ pub opaque type CoverageConfig {
     color: Bool,
     sort_by_coverage: Bool,
     hide_complete: Bool,
+    json_path: Option(String),
+    cobertura_path: Option(String),
+    markdown_path: Option(String),
   )
 }
 
@@ -284,6 +313,13 @@ pub type CoverageError {
   )
   /// The LCOV file could not be written.
   LcovWriteFailed(path: String, error: FileError)
+  /// The JSON summary from `coverage.json_path` could not be written.
+  JsonWriteFailed(path: String, error: FileError)
+  /// The Cobertura XML file from `coverage.cobertura_path` could not be
+  /// written.
+  CoberturaWriteFailed(path: String, error: FileError)
+  /// The Markdown summary from `coverage.markdown_path` could not be written.
+  MarkdownWriteFailed(path: String, error: FileError)
   /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
   InvalidMinimumPercent(value: Float)
   /// Total coverage is below the value given to `coverage.minimum_percent`.
@@ -412,6 +448,7 @@ pub type AnalysisCause {
 ///
 /// - Source directory: `src`
 /// - LCOV file: `build/coverage/lcov.info`
+/// - JSON, Cobertura and Markdown files: not written
 /// - Missing lines: not shown
 /// - Excluded files and ignored lines: not listed, only counted
 /// - Exclusion reasons: not required
@@ -437,6 +474,9 @@ pub fn new() -> CoverageConfig {
     color: False,
     sort_by_coverage: False,
     hide_complete: False,
+    json_path: None,
+    cobertura_path: None,
+    markdown_path: None,
   )
 }
 
@@ -492,6 +532,92 @@ pub fn lcov_path(
   path path: String,
 ) -> CoverageConfig {
   CoverageConfig(..config, lcov_path: Some(path))
+}
+
+/// Write a JSON summary to this path when coverage finishes.
+///
+/// See `dream_test/coverage/json_summary` for the schema. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.json_path("build/coverage/coverage.json")
+/// ```
+pub fn json_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, json_path: Some(path))
+}
+
+/// Write Cobertura XML to this path when coverage finishes.
+///
+/// GitLab, Jenkins and Azure DevOps read this format. See
+/// `dream_test/coverage/cobertura` for the shape. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+/// ```
+pub fn cobertura_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, cobertura_path: Some(path))
+}
+
+/// Write a Markdown table to this path when coverage finishes.
+///
+/// On GitHub Actions, give the path in `$GITHUB_STEP_SUMMARY` to show
+/// the table on the run page. See `dream_test/coverage/markdown`. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.markdown_path("build/coverage/coverage.md")
+/// ```
+pub fn markdown_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, markdown_path: Some(path))
 }
 
 /// Do not write an LCOV file. The table is still printed.
@@ -1373,7 +1499,9 @@ fn erlang_module_name(relative_path: String) -> String {
 /// - `Error(CoverageError)` when a module cannot be analysed, an LCOV file to
 ///   merge cannot be read, a file that only merged LCOV covers has a bad
 ///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
-///   without a reason), or the LCOV file cannot be written
+///   without a reason), or the LCOV, JSON, Cobertura or Markdown file cannot
+///   be written. The files are written in that order, and the first failure
+///   stops the run.
 ///
 /// ## Example
 ///
@@ -1428,7 +1556,7 @@ fn ignore_then_write(
       |> without_ignored_lines(ignored_lines, dict.new())
       |> report_from_counts(ignored_lines)
       |> report.add_excluded_files(session.excluded_files)
-      |> write_report(session.config.lcov_path)
+      |> write_report(session.config)
     Error(error) -> Error(error)
   }
 }
@@ -1478,23 +1606,86 @@ fn analyse_then_continue(
   }
 }
 
+/// Write every file the settings ask for, in this order: LCOV, JSON,
+/// Cobertura, Markdown. The first write that fails stops the run.
 fn write_report(
   coverage_report: CoverageReport,
-  lcov_path: Option(String),
+  config: CoverageConfig,
 ) -> Result(CoverageReport, CoverageError) {
-  case lcov_path {
-    None -> Ok(coverage_report)
-    Some(path) -> write_report_to(coverage_report, path)
+  let outputs = [
+    #(config.lcov_path, LcovOutput),
+    #(config.json_path, JsonOutput),
+    #(config.cobertura_path, CoberturaOutput),
+    #(config.markdown_path, MarkdownOutput),
+  ]
+  case write_outputs(outputs, coverage_report, config) {
+    Ok(Nil) -> Ok(coverage_report)
+    Error(error) -> Error(error)
   }
 }
 
-fn write_report_to(
+/// A file that `coverage.finish` can write.
+type Output {
+  LcovOutput
+  JsonOutput
+  CoberturaOutput
+  MarkdownOutput
+}
+
+fn write_outputs(
+  outputs: List(#(Option(String), Output)),
   coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> Result(Nil, CoverageError) {
+  case outputs {
+    [] -> Ok(Nil)
+    [#(None, _), ..rest] -> write_outputs(rest, coverage_report, config)
+    [#(Some(path), output), ..rest] ->
+      write_then_continue(output, path, rest, coverage_report, config)
+  }
+}
+
+fn write_then_continue(
+  output: Output,
   path: String,
-) -> Result(CoverageReport, CoverageError) {
-  case file.write(path, render_lcov(coverage_report)) {
-    Ok(Nil) -> Ok(coverage_report)
-    Error(error) -> Error(LcovWriteFailed(path: path, error: error))
+  rest: List(#(Option(String), Output)),
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> Result(Nil, CoverageError) {
+  case file.write(path, render_output(output, coverage_report, config)) {
+    Ok(Nil) -> write_outputs(rest, coverage_report, config)
+    Error(error) -> Error(write_error(output, path, error))
+  }
+}
+
+fn render_output(
+  output: Output,
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> String {
+  case output {
+    LcovOutput -> render_lcov(coverage_report)
+    JsonOutput ->
+      json_summary.render(
+        report: coverage_report,
+        minimum_percent: config.minimum_percent,
+      )
+    CoberturaOutput ->
+      cobertura.render(report: coverage_report, timestamp: system_time_ms())
+    MarkdownOutput -> markdown.render(report: coverage_report)
+  }
+}
+
+fn write_error(
+  output: Output,
+  path: String,
+  error: FileError,
+) -> CoverageError {
+  case output {
+    LcovOutput -> LcovWriteFailed(path: path, error: error)
+    JsonOutput -> JsonWriteFailed(path: path, error: error)
+    CoberturaOutput -> CoberturaWriteFailed(path: path, error: error)
+    MarkdownOutput -> MarkdownWriteFailed(path: path, error: error)
   }
 }
 
@@ -2531,6 +2722,10 @@ fn check_counts_against_minimum(
 
 @external(erlang, "erlang", "round")
 fn round(value: Float) -> Int
+
+/// The time now, in milliseconds since the Unix epoch.
+@external(erlang, "dream_test_coverage_ffi", "system_time_ms")
+fn system_time_ms() -> Int
 
 @external(erlang, "dream_test_coverage_ffi", "start_cover")
 fn start_cover() -> Result(Nil, CoverageError)

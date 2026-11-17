@@ -76,21 +76,21 @@
 import dream_test/coverage.{
   type AnalysisCause, type CoverageConfig, type CoverageError,
   type InstrumentCause, type LoadCause, type StartCause, AlreadyInstrumented,
-  BadBeamFile, BelowMinimumPercent, CoverAlreadyRunning, CoverDidNotStart,
-  CoverStartFailed, EmbeddedMode, EncryptedDebugInfo, EverySourceFileExcluded,
-  ExcludeMatchedNothing, ExcludeWithoutReason, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreMarkerWithoutReason,
-  IgnoreStartWithoutEnd, InstrumentedLoadFailed, InvalidMinimumPercent,
-  LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
-  ModuleNotAnalysed, ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
-  NestedIgnoreStart, NoDebugInfo, NoLcovFilesMatched, NoSourceFiles,
-  NotInstrumented, OnLoadFailed, SourceDirectoryNotFound,
-  SourceDirectoryOutsideSourceRoot, SourceReadFailed, UnknownAnalysisError,
-  UnknownInstrumentError,
+  BadBeamFile, BelowMinimumPercent, CoberturaWriteFailed, CoverAlreadyRunning,
+  CoverDidNotStart, CoverStartFailed, EmbeddedMode, EncryptedDebugInfo,
+  EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
+  InvalidMinimumPercent, JsonWriteFailed, LcovReadFailed, LcovSourceNotFound,
+  LcovWriteFailed, MalformedLcov, MarkdownWriteFailed, ModuleNotAnalysed,
+  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded, NestedIgnoreStart,
+  NoDebugInfo, NoLcovFilesMatched, NoSourceFiles, NotInstrumented, OnLoadFailed,
+  SourceDirectoryNotFound, SourceDirectoryOutsideSourceRoot, SourceReadFailed,
+  UnknownAnalysisError, UnknownInstrumentError,
 }
+import dream_test/coverage/format
 import dream_test/coverage/report.{
-  type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
-  type LineCoverage,
+  type CoverageReport, type ExcludedFile, type FileCoverage,
 }
 import dream_test/file.{type FileError}
 import dream_test/reporters/ansi
@@ -273,11 +273,11 @@ fn file_row(file: FileCoverage) -> CoverageRow {
   CountsRow(
     measured: Some(report.new([file])),
     label: report.source_path(file),
-    lines: counts_text(hit, total),
-    percent: format_percent(hit, total),
-    missing: wrap_ranges(missing_line_ranges(report.lines(file)), "", []),
+    lines: format.line_counts(hit: hit, total: total),
+    percent: format.percent(hit: hit, total: total),
+    missing: wrap_ranges(format.missed_lines(file), "", []),
     excluded: wrap_ranges(
-      list.map(report.ignored_ranges(file), ignored_range_text),
+      list.map(report.ignored_ranges(file), format.ignored_range),
       "",
       [],
     ),
@@ -293,8 +293,8 @@ fn row_from_counts(
   CountsRow(
     measured: Some(measured),
     label: label,
-    lines: counts_text(hit, total),
-    percent: format_percent(hit, total),
+    lines: format.line_counts(hit: hit, total: total),
+    percent: format.percent(hit: hit, total: total),
     missing: [],
     excluded: [],
   )
@@ -347,82 +347,6 @@ fn covered_share(file: FileCoverage) -> #(Int, Int) {
   }
 }
 
-fn counts_text(hit: Int, total: Int) -> String {
-  int.to_string(hit) <> "/" <> int.to_string(total)
-}
-
-/// Format `hit / total` as a percent with one decimal place, rounded down,
-/// so `100.0%` means every line ran. No executable lines gives `-`.
-fn format_percent(hit: Int, total: Int) -> String {
-  case total {
-    0 -> "-"
-    _ -> format_tenths(hit * 1000 / total)
-  }
-}
-
-fn format_tenths(tenths: Int) -> String {
-  int.to_string(tenths / 10) <> "." <> int.to_string(tenths % 10) <> "%"
-}
-
-/// The lines that did not run, as ranges: consecutive line numbers merge
-/// (`258-260`), a single line stays a number (`245`).
-fn missing_line_ranges(lines: List(LineCoverage)) -> List(String) {
-  lines
-  |> list.filter(line_was_missed)
-  |> list.map(line_number)
-  |> merge_ranges(None, [])
-}
-
-fn line_was_missed(line: LineCoverage) -> Bool {
-  line.calls == 0
-}
-
-fn line_number(line: LineCoverage) -> Int {
-  line.line
-}
-
-fn merge_ranges(
-  numbers: List(Int),
-  open_range: option.Option(#(Int, Int)),
-  ranges_reversed: List(String),
-) -> List(String) {
-  case numbers, open_range {
-    [], None -> list.reverse(ranges_reversed)
-    [], Some(range) -> list.reverse([range_text(range), ..ranges_reversed])
-    [number, ..rest], None -> merge_ranges(rest, Some(#(number, number)), [])
-    [number, ..rest], Some(#(first, last)) if number == last + 1 ->
-      merge_ranges(rest, Some(#(first, number)), ranges_reversed)
-    [number, ..rest], Some(range) ->
-      merge_ranges(rest, Some(#(number, number)), [
-        range_text(range),
-        ..ranges_reversed
-      ])
-  }
-}
-
-fn range_text(range: #(Int, Int)) -> String {
-  case range {
-    #(first, last) if first == last -> int.to_string(first)
-    #(first, last) -> int.to_string(first) <> "-" <> int.to_string(last)
-  }
-}
-
-/// `40-44 (debug only)`, or `71` when the marker has no text.
-fn ignored_range_text(range: IgnoredRange) -> String {
-  range_text(#(
-    report.ignored_first_line(range),
-    report.ignored_last_line(range),
-  ))
-  <> reason_suffix(report.ignored_reason(range))
-}
-
-fn reason_suffix(reason: Option(String)) -> String {
-  case reason {
-    Some(text) -> " (" <> text <> ")"
-    None -> ""
-  }
-}
-
 fn excluded_file_rows(
   columns: Columns,
   excluded_files: List(ExcludedFile),
@@ -436,9 +360,7 @@ fn excluded_file_rows(
 fn excluded_file_row(excluded: ExcludedFile) -> CoverageRow {
   ExcludedFileRow(
     label: report.excluded_source_path(excluded),
-    text: "excluded: matches "
-      <> report.excluded_pattern(excluded)
-      <> reason_suffix(report.excluded_reason(excluded)),
+    text: format.excluded_file(excluded),
   )
 }
 
@@ -637,23 +559,9 @@ fn paint(color: CellColor, text: String) -> String {
 /// `Excluded: 1 file, 6 lines in 1 file`, or nothing when nothing is
 /// excluded.
 fn render_excluded_summary(coverage_report: CoverageReport) -> String {
-  let file_count = list.length(report.excluded_files(coverage_report))
-  let files_with_ranges =
-    list.filter(report.files(coverage_report), has_ignored_ranges)
-  let line_count = list.fold(files_with_ranges, 0, add_ignored_line_count)
-  case file_count, line_count {
-    0, 0 -> ""
-    _, 0 -> "Excluded: " <> count_text(file_count, "file") <> "\n"
-    0, _ ->
-      "Excluded: "
-      <> lines_in_files_text(line_count, list.length(files_with_ranges))
-      <> "\n"
-    _, _ ->
-      "Excluded: "
-      <> count_text(file_count, "file")
-      <> ", "
-      <> lines_in_files_text(line_count, list.length(files_with_ranges))
-      <> "\n"
+  case format.excluded_summary(coverage_report) {
+    Some(summary) -> summary <> "\n"
+    None -> ""
   }
 }
 
@@ -661,31 +569,7 @@ fn render_excluded_summary(coverage_report: CoverageReport) -> String {
 fn render_hidden_summary(hidden_count: Int) -> String {
   case hidden_count {
     0 -> ""
-    _ -> "Hidden: " <> count_text(hidden_count, "file") <> " at 100.0%\n"
-  }
-}
-
-fn has_ignored_ranges(file: FileCoverage) -> Bool {
-  !list.is_empty(report.ignored_ranges(file))
-}
-
-fn add_ignored_line_count(total: Int, file: FileCoverage) -> Int {
-  list.fold(report.ignored_ranges(file), total, add_range_line_count)
-}
-
-fn add_range_line_count(total: Int, range: IgnoredRange) -> Int {
-  total + report.ignored_last_line(range) - report.ignored_first_line(range) + 1
-}
-
-fn lines_in_files_text(line_count: Int, file_count: Int) -> String {
-  count_text(line_count, "line") <> " in " <> count_text(file_count, "file")
-}
-
-/// `1 file`, `2 files`.
-fn count_text(count: Int, noun: String) -> String {
-  case count {
-    1 -> "1 " <> noun
-    _ -> int.to_string(count) <> " " <> noun <> "s"
+    _ -> "Hidden: " <> format.file_count(hidden_count) <> " at 100.0%\n"
   }
 }
 
@@ -828,7 +712,12 @@ fn error_message(error: CoverageError) -> ErrorMessage {
       instrument_message(describe_module(module_name, source_path), cause, raw)
     ModuleNotAnalysed(module_name, source_path, cause, raw) ->
       analysis_message(describe_module(module_name, source_path), cause, raw)
-    LcovWriteFailed(path, error) -> lcov_message(path, error)
+    LcovWriteFailed(path, error) -> write_message(lcov_output(), path, error)
+    JsonWriteFailed(path, error) -> write_message(json_output(), path, error)
+    CoberturaWriteFailed(path, error) ->
+      write_message(cobertura_output(), path, error)
+    MarkdownWriteFailed(path, error) ->
+      write_message(markdown_output(), path, error)
     InvalidMinimumPercent(value) ->
       ErrorMessage(
         what: "The coverage minimum "
@@ -1094,21 +983,69 @@ fn analysis_message(
   }
 }
 
-fn lcov_message(path: String, error: FileError) -> ErrorMessage {
-  let what = "Could not write the LCOV file \"" <> path <> "\"."
+/// A file that `coverage.finish` writes: what to call it in a message, the
+/// setting that names its path, and an example path.
+type OutputFile {
+  OutputFile(name: String, setting: String, example_path: String)
+}
+
+fn lcov_output() -> OutputFile {
+  OutputFile(
+    name: "LCOV file",
+    setting: "coverage.lcov_path",
+    example_path: "build/coverage/lcov.info",
+  )
+}
+
+fn json_output() -> OutputFile {
+  OutputFile(
+    name: "JSON summary",
+    setting: "coverage.json_path",
+    example_path: "build/coverage/coverage.json",
+  )
+}
+
+fn cobertura_output() -> OutputFile {
+  OutputFile(
+    name: "Cobertura XML file",
+    setting: "coverage.cobertura_path",
+    example_path: "build/coverage/cobertura.xml",
+  )
+}
+
+fn markdown_output() -> OutputFile {
+  OutputFile(
+    name: "Markdown summary",
+    setting: "coverage.markdown_path",
+    example_path: "build/coverage/coverage.md",
+  )
+}
+
+fn write_message(
+  output: OutputFile,
+  path: String,
+  error: FileError,
+) -> ErrorMessage {
+  let what = "Could not write the " <> output.name <> " \"" <> path <> "\"."
   let raw = file.error_to_string(error)
   case error {
     file.PermissionDenied(_) ->
       ErrorMessage(
         what: what,
         reason: "there is no permission to write to this path (" <> raw <> ").",
-        fix: "choose a writable path with coverage.lcov_path(...), or fix the folder permissions.",
+        fix: "choose a writable path with "
+          <> output.setting
+          <> "(...), or fix the folder permissions.",
       )
     file.IsDirectory(_) ->
       ErrorMessage(
         what: what,
         reason: "the path is a directory, not a file (" <> raw <> ").",
-        fix: "give a file name with coverage.lcov_path(...), for example build/coverage/lcov.info.",
+        fix: "give a file name with "
+          <> output.setting
+          <> "(...), for example "
+          <> output.example_path
+          <> ".",
       )
     file.NoSpace(_) ->
       ErrorMessage(
@@ -1122,13 +1059,15 @@ fn lcov_message(path: String, error: FileError) -> ErrorMessage {
         reason: "a folder in the path does not exist and could not be created ("
           <> raw
           <> ").",
-        fix: "check the path given to coverage.lcov_path(...).",
+        fix: "check the path given to " <> output.setting <> "(...).",
       )
     file.FileSystemError(_, _) ->
       ErrorMessage(
         what: what,
         reason: "the file system returned an error (" <> raw <> ").",
-        fix: "check the path given to coverage.lcov_path(...). Every part before the file name must be a folder.",
+        fix: "check the path given to "
+          <> output.setting
+          <> "(...). Every part before the file name must be a folder.",
       )
   }
 }
@@ -1141,7 +1080,7 @@ fn below_minimum_message(
 ) -> ErrorMessage {
   ErrorMessage(
     what: "Coverage "
-      <> format_percent(hit, total)
+      <> format.percent(hit: hit, total: total)
       <> " is below the minimum "
       <> float.to_string(minimum)
       <> "% (needs "

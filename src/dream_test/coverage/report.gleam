@@ -46,7 +46,7 @@
 //// |--------------------|-------------------------------------------------------|
 //// | **Build**          | `new`, `file`, `add_ignored_ranges`,                  |
 //// |                    | `add_excluded_files`                                  |
-//// | **Files**          | `files`, `source_path`, `lines`                       |
+//// | **Files**          | `files`, `source_path`, `lines`, `missed_ranges`      |
 //// | **Counts**         | `hit_line_count`, `executable_line_count`,            |
 //// |                    | `total_hit_line_count`, `total_executable_line_count` |
 //// | **Excluded**       | `ignored_ranges`, `excluded_files`                    |
@@ -462,6 +462,66 @@ pub fn source_path(file file: FileCoverage) -> String {
 /// ```
 pub fn lines(file file: FileCoverage) -> List(LineCoverage) {
   file.lines
+}
+
+/// The lines of a file that did not run, as ranges of line numbers.
+///
+/// Consecutive line numbers merge into one range. A single line is a range
+/// whose first and last line are the same.
+///
+/// ## Parameters
+///
+/// - `file`: the file to read
+///
+/// ## Returns
+///
+/// `#(first_line, last_line)` pairs, sorted by line number.
+///
+/// ## Example
+///
+/// ```gleam
+/// report.file("src/a.gleam", [
+///   LineCoverage(line: 1, calls: 0),
+///   LineCoverage(line: 2, calls: 0),
+///   LineCoverage(line: 3, calls: 1),
+///   LineCoverage(line: 5, calls: 0),
+/// ])
+/// |> report.missed_ranges()
+/// // -> [#(1, 2), #(5, 5)]
+/// ```
+pub fn missed_ranges(file file: FileCoverage) -> List(#(Int, Int)) {
+  file.lines
+  |> list.filter(line_was_missed)
+  |> list.map(line_number)
+  |> merge_ranges(option.None, [])
+}
+
+fn line_was_missed(line: LineCoverage) -> Bool {
+  line.calls == 0
+}
+
+fn line_number(line: LineCoverage) -> Int {
+  line.line
+}
+
+fn merge_ranges(
+  numbers: List(Int),
+  open_range: Option(#(Int, Int)),
+  ranges_reversed: List(#(Int, Int)),
+) -> List(#(Int, Int)) {
+  case numbers, open_range {
+    [], option.None -> list.reverse(ranges_reversed)
+    [], option.Some(range) -> list.reverse([range, ..ranges_reversed])
+    [number, ..rest], option.None ->
+      merge_ranges(rest, option.Some(#(number, number)), [])
+    [number, ..rest], option.Some(#(first, last)) if number == last + 1 ->
+      merge_ranges(rest, option.Some(#(first, number)), ranges_reversed)
+    [number, ..rest], option.Some(range) ->
+      merge_ranges(rest, option.Some(#(number, number)), [
+        range,
+        ..ranges_reversed
+      ])
+  }
 }
 
 /// Count the lines of a file that ran at least once.
