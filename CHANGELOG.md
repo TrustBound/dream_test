@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line end at the end of a snapshot file, as they already did for `\n` and
   `\r`. Before, a snapshot file saved with Windows line ends did not match
   the same text.
+- The Gherkin parser now gives an error for a step that has both a
+  DataTable and a DocString. Before, it kept one argument and dropped the
+  other without a message.
+- The Gherkin parser now gives an error for a DocString that has no closing
+  `"""`. Before, the DocString took all the lines to the end of the file, and
+  the parser dropped the scenarios in those lines without a message.
 
 ## [2.2.0] - 2026-11-17
 

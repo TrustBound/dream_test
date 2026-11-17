@@ -18,6 +18,9 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 
+const step_argument_conflict_error =
+  "Step cannot have both a DataTable and a DocString"
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -200,6 +203,7 @@ fn close_doc_string(state: ParserState) -> Result(ParserState, String) {
 
   // Attach to the most recent step (head of list, since steps are prepended)
   case state.current_steps {
+    [Step(_, _, Some(DataTable(_))), ..] -> Error(step_argument_conflict_error)
     [Step(keyword, text, _), ..rest] -> {
       let updated_step = Step(keyword, text, Some(doc_string))
       Ok(
@@ -520,13 +524,13 @@ fn add_data_table_row(
 ) -> Result(ParserState, String) {
   // Add to the most recent step's DataTable (head of list, since steps are prepended)
   case state.current_steps {
+    [Step(_, _, Some(DocString(..))), ..] -> Error(step_argument_conflict_error)
     [Step(keyword, text, arg), ..rest] -> {
-      let updated_arg = case arg {
-        Some(DataTable(rows)) -> DataTable(rows: list.append(rows, [cells]))
-        Some(other) -> other
-        None -> DataTable(rows: [cells])
+      let rows = case arg {
+        Some(DataTable(rows)) -> list.append(rows, [cells])
+        _ -> [cells]
       }
-      let updated_step = Step(keyword, text, Some(updated_arg))
+      let updated_step = Step(keyword, text, Some(DataTable(rows: rows)))
       Ok(ParserState(..state, current_steps: [updated_step, ..rest]))
     }
     [] -> Error("DataTable without preceding step")
@@ -570,9 +574,10 @@ fn parse_description_or_unknown(
 fn finalize_feature(state: ParserState) -> Result(Feature, String) {
   let final_state = finalize_current_scenario(state)
 
-  case final_state.feature_name {
-    None -> Error("No Feature found in content")
-    Some(name) ->
+  case final_state.in_doc_string, final_state.feature_name {
+    True, _ -> Error("DocString is not closed")
+    False, None -> Error("No Feature found in content")
+    False, Some(name) ->
       Ok(Feature(
         name: name,
         source: None,

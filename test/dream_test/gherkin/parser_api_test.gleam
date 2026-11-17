@@ -1,7 +1,7 @@
 import dream_test/file
 import dream_test/gherkin/parser
 import dream_test/gherkin/types as gtypes
-import dream_test/matchers.{fail_with}
+import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
 import gleam/option.{None, Some}
@@ -70,6 +70,54 @@ pub fn tests() {
           }
         Error(msg) -> Ok(fail_with(msg))
       }
+    }),
+
+    it("parse_string rejects a DataTable after a DocString on one step", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario: S\n"
+        <> "  Given text\n"
+        <> "    \"\"\"\n"
+        <> "    hello\n"
+        <> "    \"\"\"\n"
+        <> "    | a |\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("Step cannot have both a DataTable and a DocString"))
+      |> or_fail_with("a table after a doc string should be an error")
+    }),
+
+    it("parse_string rejects a DocString after a DataTable on one step", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario: S\n"
+        <> "  Given text\n"
+        <> "    | a |\n"
+        <> "    \"\"\"\n"
+        <> "    hello\n"
+        <> "    \"\"\"\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("Step cannot have both a DataTable and a DocString"))
+      |> or_fail_with("a doc string after a table should be an error")
+    }),
+
+    it("parse_string rejects a DocString that is not closed", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario: S\n"
+        <> "  Given text\n"
+        <> "    \"\"\"\n"
+        <> "    hello\n"
+        <> "Scenario: Lost\n"
+        <> "  Given more\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("DocString is not closed"))
+      |> or_fail_with("an unclosed doc string should be an error")
     }),
   ])
 }
