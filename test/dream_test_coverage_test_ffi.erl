@@ -22,6 +22,8 @@
 ]).
 %% Called inside the child node only.
 -export([prepare_child/1]).
+%% Called inside a new `erl` process only.
+-export([call_main/2]).
 
 %% Helpers for the coverage tests that need a child node or a new `erl`
 %% process: tests that change the code server mode, the working directory
@@ -144,6 +146,9 @@ delete_directory(Directory) ->
 %% ---------------------------------------------------------------------------
 
 %% Run `Module:Function()` in a new `erl` process, then halt with status 0.
+%% The process measures dream_test's own `src` around the call, and writes
+%% an LCOV part that the test run merges (see
+%% test/dream_test/coverage_child_measure.gleam).
 %% Returns {ExitStatus, Output}, with stdout and stderr together.
 run_main_in_new_vm(Module, Function) ->
     run_main_in_new_vm_with_environment(Module, Function, []).
@@ -153,7 +158,10 @@ run_main_in_new_vm(Module, Function) ->
 %% the variable and `None` removes it.
 run_main_in_new_vm_with_environment(Module, Function, Environment) ->
     Erl = os:find_executable("erl"),
-    Eval = io_lib:format("'~ts':'~ts'(), erlang:halt(0).", [Module, Function]),
+    Eval = io_lib:format(
+        "'dream_test@coverage_child_measure':run_measured(<<\"~ts\">>, <<\"~ts\">>), erlang:halt(0).",
+        [Module, Function]
+    ),
     Port = open_port(
         {spawn_executable, Erl},
         [exit_status, binary, stderr_to_stdout, use_stdio,
@@ -161,6 +169,11 @@ run_main_in_new_vm_with_environment(Module, Function, Environment) ->
          {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
     ),
     collect_output(Port, <<>>).
+
+%% In a new `erl` process: call `Module:Function()`.
+call_main(Module, Function) ->
+    _ = (binary_to_atom(Module)):(binary_to_atom(Function))(),
+    nil.
 
 environment_entry({Name, {some, Value}}) ->
     {unicode:characters_to_list(Name), unicode:characters_to_list(Value)};

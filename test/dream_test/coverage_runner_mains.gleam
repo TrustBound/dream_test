@@ -165,6 +165,14 @@ pub fn coverage_from_environment_with_exit_on_failure() -> Nil {
   Nil
 }
 
+pub fn coverage_from_environment_without_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.coverage_from_environment(fixture_coverage())
+    |> runner.run()
+  Nil
+}
+
 /// A port to a server that runs in its own `erl` process.
 type ServerPort
 

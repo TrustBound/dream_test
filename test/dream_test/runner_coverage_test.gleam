@@ -315,6 +315,20 @@ pub fn tests() {
         ))
         |> or_fail_with("expected the invalid value failure and exit status 1")
       }),
+      it("fails an unknown value and exits 0 without exit_on_failure", fn() {
+        run_main_in_new_vm_with_environment(
+          "dream_test@coverage_runner_mains",
+          "coverage_from_environment_without_exit_on_failure",
+          [#("DREAM_TEST_COVERAGE", Some("yes"))],
+        )
+        |> should
+        |> be_equal(#(
+          0,
+          invalid_value_failure("yes")
+            <> "Tests: 1 passed. The exit status is not changed, because exit_on_failure is off.\n",
+        ))
+        |> or_fail_with("expected the invalid value failure and exit status 0")
+      }),
       it("writes an unknown value failure to the error output", fn() {
         run_in_child(fn() { error_output_in_child(Some("TRUE")) })
         |> should
