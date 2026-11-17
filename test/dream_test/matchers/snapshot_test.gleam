@@ -295,17 +295,15 @@ pub fn tests() {
       |> or_fail_with("clear_snapshot should report the delete error")
     }),
 
-    it(
-      "clear_snapshots_in_directory reports a directory it cannot search",
-      fn() {
-        snapshot.clear_snapshots_in_directory("./test/tmp/snapshots/open{brace")
-        |> should
-        |> be_equal(Error(
-          "File error ({badpattern,missing_delimiter}): ./test/tmp/snapshots/open{brace",
-        ))
-        |> or_fail_with("clear_snapshots_in_directory should report the error")
-      },
-    ),
+    it("clear_snapshots_in_directory reports a directory it cannot list", fn() {
+      let path = "./test/tmp/snapshots/clear_directory_is_a_file"
+      let _ = file.write(path, "a file, not a directory")
+
+      snapshot.clear_snapshots_in_directory(path)
+      |> should
+      |> be_equal(Error("File error (enotdir): " <> path))
+      |> or_fail_with("clear_snapshots_in_directory should report the error")
+    }),
   ])
 }
 

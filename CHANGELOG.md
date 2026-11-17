@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Gherkin parser now gives an error for a DocString that has no closing
   `"""`. Before, the DocString took all the lines to the end of the file, and
   the parser dropped the scenarios in those lines without a message.
+- `file.delete_files_matching` and `snapshot.clear_snapshots_in_directory`
+  now read the directory name as text. Before, they made a wildcard pattern
+  from the name, so a name with `{`, `[`, `*` or `?` gave a `badpattern`
+  error or deleted files in other directories.
 
 ## [2.2.0] - 2026-11-17
 

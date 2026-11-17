@@ -101,6 +101,55 @@ pub fn tests() {
       |> or_fail_with("c.other should remain")
     }),
 
+    it("delete_files_matching reads a brace in the directory as text", fn() {
+      let dir =
+        "./test/tmp/file_api_test/brace{" <> int.to_string(unique_port())
+      let _ = write(dir <> "/a.tmp", "a")
+      let _ = write(dir <> "/b.tmp", "b")
+
+      delete_files_matching(dir, ".tmp")
+      |> should
+      |> be_equal(Ok(2))
+      |> or_fail_with("expected 2 tmp files deleted in the brace directory")
+    }),
+
+    it("delete_files_matching leaves a directory that a star would match", fn() {
+      let id = int.to_string(unique_port())
+      let star_dir = "./test/tmp/file_api_test/star_" <> id <> "*"
+      let sibling = "./test/tmp/file_api_test/star_" <> id <> "x/a.tmp"
+      let _ = write(star_dir <> "/a.tmp", "a")
+      let _ = write(sibling, "sibling")
+      let _ = delete_files_matching(star_dir, ".tmp")
+
+      read(sibling)
+      |> should
+      |> be_equal(Ok("sibling"))
+      |> or_fail_with("the sibling directory's file should remain")
+    }),
+
+    it("delete_files_matching gives 0 for a missing directory", fn() {
+      let dir =
+        "./test/tmp/file_api_test/missing_" <> int.to_string(unique_port())
+
+      delete_files_matching(dir, ".tmp")
+      |> should
+      |> be_equal(Ok(0))
+      |> or_fail_with("expected no files deleted in a missing directory")
+    }),
+
+    it("delete_files_matching reports a path that is a file", fn() {
+      let path =
+        "./test/tmp/file_api_test/not_a_dir_"
+        <> int.to_string(unique_port())
+        <> ".txt"
+      let _ = write(path, "x")
+
+      delete_files_matching(path, ".tmp")
+      |> should
+      |> be_equal(Error(FileSystemError(path, "enotdir")))
+      |> or_fail_with("expected enotdir for a file path")
+    }),
+
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))
       |> should

@@ -265,6 +265,8 @@ pub fn delete(path path: String) -> Result(Nil, FileError)
 /// ## Notes
 ///
 /// - Only searches the immediate directory (not subdirectories)
+/// - The directory name is plain text, not a pattern
+/// - A missing directory gives `Ok(0)`
 /// - Files that can't be deleted are silently skipped
 /// - The count reflects only successfully deleted files
 ///
