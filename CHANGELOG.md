@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `match_snapshot` and `match_snapshot_inspect` now ignore a CRLF (`\r\n`)
+  line end at the end of a snapshot file, as they already did for `\n` and
+  `\r`. Before, a snapshot file saved with Windows line ends did not match
+  the same text.
+
 ## [2.2.0] - 2026-11-17
 
 ### Added

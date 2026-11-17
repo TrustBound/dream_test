@@ -64,5 +64,15 @@ pub fn tests() {
         |> or_fail_with("non-.snap file should remain")
       },
     ),
+
+    it("match_snapshot ignores a CRLF line end at the end of the file", fn() {
+      let path = "./test/tmp/snapshots/match_snapshot_crlf.snap"
+      let _ = file.write(path, "hello\r\n")
+
+      "hello"
+      |> should
+      |> snapshot.match_snapshot(path)
+      |> or_fail_with("a trailing CRLF should not cause a mismatch")
+    }),
   ])
 }
