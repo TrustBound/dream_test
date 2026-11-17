@@ -20,6 +20,20 @@ pub fn tests() {
       |> or_fail_with("500us should format as 0.5ms")
     }),
 
+    it("format_duration_us formats a negative duration as zero", fn() {
+      timing.format_duration_us(-500)
+      |> should
+      |> be_equal("0.0ms")
+      |> or_fail_with("-500us should format as 0.0ms")
+    }),
+
+    it("format_duration_us formats a negative duration over 1ms as zero", fn() {
+      timing.format_duration_us(-1500)
+      |> should
+      |> be_equal("0.0ms")
+      |> or_fail_with("-1500us should format as 0.0ms")
+    }),
+
     it("now_ms is monotonic", fn() {
       let a = timing.now_ms()
       let b = timing.now_ms()

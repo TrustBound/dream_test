@@ -98,8 +98,12 @@ pub fn format_duration_ms(duration_ms duration_ms: Int) -> String {
 /// ## Returns
 ///
 /// A human-readable duration string (for example `"0.5ms"` or `"42ms"`).
+/// A negative duration gives `"0.0ms"`, the same as `0`.
 pub fn format_duration_us(duration_us duration_us: Int) -> String {
   case duration_us {
+    // Negative: show zero, as for 0
+    us if us < 0 -> "0.0ms"
+
     // Under 1ms: show fractional milliseconds
     us if us < 1000 -> format_sub_millisecond(us)
 

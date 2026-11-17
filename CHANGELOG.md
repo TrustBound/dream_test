@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now read the directory name as text. Before, they made a wildcard pattern
   from the name, so a name with `{`, `[`, `*` or `?` gave a `badpattern`
   error or deleted files in other directories.
+- `timing.format_duration_us` now gives `"0.0ms"` for a negative duration,
+  the same as for `0`. Before, it gave text such as `"0.-5ms"`.
 
 ## [2.2.0] - 2026-11-17
 
