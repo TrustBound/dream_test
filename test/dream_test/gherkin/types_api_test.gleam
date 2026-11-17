@@ -2,7 +2,8 @@ import dream_test/gherkin/types
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
-import gleam/option.{None}
+import gleam/list
+import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("dream_test/gherkin/types", [
@@ -59,6 +60,28 @@ pub fn tests() {
     it("Step constructor with labeled args can be created", fn() {
       let _ = types.Step(keyword: types.Given, text: "a step", argument: None)
       Ok(test_types.AssertionOk)
+    }),
+
+    it("keyword_to_string names every keyword", fn() {
+      [types.Given, types.When, types.Then, types.And, types.But]
+      |> list.map(types.keyword_to_string)
+      |> should
+      |> be_equal(["Given", "When", "Then", "And", "But"])
+      |> or_fail_with("each keyword should have its name")
+    }),
+
+    it("keyword_from_string reads every keyword", fn() {
+      ["Given", "When", "Then", "And", "But"]
+      |> list.map(types.keyword_from_string)
+      |> should
+      |> be_equal([
+        Some(types.Given),
+        Some(types.When),
+        Some(types.Then),
+        Some(types.And),
+        Some(types.But),
+      ])
+      |> or_fail_with("each name should give its keyword")
     }),
   ])
 }

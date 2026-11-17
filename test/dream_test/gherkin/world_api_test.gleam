@@ -59,5 +59,14 @@ pub fn tests() {
       world.cleanup(w)
       Ok(test_types.AssertionOk)
     }),
+
+    it("get_or returns the stored value for a present key", fn() {
+      let w = world.new_world("scenario-4")
+      world.put(w, "count", 3)
+      world.get_or(w, "count", 9)
+      |> should
+      |> be_equal(3)
+      |> or_fail_with("the stored value should win over the default")
+    }),
   ])
 }

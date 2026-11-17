@@ -105,6 +105,97 @@ pub fn tests() {
         Error(_msg) -> Ok(test_types.AssertionOk)
       }
     }),
+
+    it("find_step names an And step in the undefined step error", fn() {
+      steps.find_step(steps.new(), gtypes.And, "x")
+      |> should
+      |> be_equal(Error("Undefined step: And x"))
+      |> or_fail_with("the error should name the And keyword")
+    }),
+
+    it("find_step names a But step in the undefined step error", fn() {
+      steps.find_step(steps.new(), gtypes.But, "x")
+      |> should
+      |> be_equal(Error("Undefined step: But x"))
+      |> or_fail_with("the error should name the But keyword")
+    }),
+
+    it("find_step names a When step in the undefined step error", fn() {
+      steps.find_step(steps.new(), gtypes.When, "x")
+      |> should
+      |> be_equal(Error("Undefined step: When x"))
+      |> or_fail_with("the error should name the When keyword")
+    }),
+
+    it("get_int returns Error for a capture that is not an int", fn() {
+      steps.get_int([step_trie.CapturedWord("a")], 0)
+      |> should
+      |> be_equal(Error("Capture at index is not an integer"))
+      |> or_fail_with("a word is not an int")
+    }),
+
+    it("get_float extracts a captured float", fn() {
+      steps.get_float([step_trie.CapturedFloat(1.5)], 0)
+      |> should
+      |> be_equal(Ok(1.5))
+      |> or_fail_with("the float should come back")
+    }),
+
+    it("get_float returns Error for a capture that is not a float", fn() {
+      steps.get_float([step_trie.CapturedInt(1)], 0)
+      |> should
+      |> be_equal(Error("Capture at index is not a float"))
+      |> or_fail_with("an int is not a float")
+    }),
+
+    it("get_float returns Error when capture index is out of bounds", fn() {
+      steps.get_float([], 0)
+      |> should
+      |> be_equal(Error("No capture at index"))
+      |> or_fail_with("an empty list has no capture")
+    }),
+
+    it("get_string accepts a captured word", fn() {
+      steps.get_string([step_trie.CapturedWord("w")], 0)
+      |> should
+      |> be_equal(Ok("w"))
+      |> or_fail_with("a word should count as a string")
+    }),
+
+    it("get_string returns Error for a capture that is not a string", fn() {
+      steps.get_string([step_trie.CapturedInt(1)], 0)
+      |> should
+      |> be_equal(Error("Capture at index is not a string"))
+      |> or_fail_with("an int is not a string")
+    }),
+
+    it("get_string returns Error when capture index is out of bounds", fn() {
+      steps.get_string([], 0)
+      |> should
+      |> be_equal(Error("No capture at index"))
+      |> or_fail_with("an empty list has no capture")
+    }),
+
+    it("get_word accepts a captured string", fn() {
+      steps.get_word([step_trie.CapturedString("s")], 0)
+      |> should
+      |> be_equal(Ok("s"))
+      |> or_fail_with("a string should count as a word")
+    }),
+
+    it("get_word returns Error for a capture that is not a word", fn() {
+      steps.get_word([step_trie.CapturedInt(1)], 0)
+      |> should
+      |> be_equal(Error("Capture at index is not a word"))
+      |> or_fail_with("an int is not a word")
+    }),
+
+    it("get_word returns Error when capture index is out of bounds", fn() {
+      steps.get_word([], 0)
+      |> should
+      |> be_equal(Error("No capture at index"))
+      |> or_fail_with("an empty list has no capture")
+    }),
   ])
 }
 

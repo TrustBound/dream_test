@@ -80,5 +80,42 @@ pub fn tests() {
       |> be_equal(None)
       |> or_fail_with("empty trie should not match")
     }),
+
+    it("lookup captures any word for a {} placeholder", fn() {
+      step_trie.new()
+      |> step_trie.insert("Given", "I see {} here", "h")
+      |> step_trie.lookup("Given", "I see thing here")
+      |> should
+      |> be_equal(
+        Some(step_trie.StepMatch("h", [step_trie.CapturedWord("thing")])),
+      )
+      |> or_fail_with("{} should capture the word")
+    }),
+
+    it("lookup finds the second of two patterns with a shared prefix", fn() {
+      step_trie.new()
+      |> step_trie.insert("Given", "a b", "h1")
+      |> step_trie.insert("Given", "a c", "h2")
+      |> step_trie.lookup("Given", "a c")
+      |> should
+      |> be_equal(Some(step_trie.StepMatch("h2", [])))
+      |> or_fail_with("the second pattern should match")
+    }),
+
+    it("lookup returns None for text that is only a pattern prefix", fn() {
+      step_trie.new()
+      |> step_trie.insert("Given", "a b", "h")
+      |> step_trie.lookup("Given", "a")
+      |> should
+      |> be_equal(None)
+      |> or_fail_with("a prefix has no handler")
+    }),
+
+    it("tokenize_step_text ignores repeated spaces", fn() {
+      step_trie.tokenize_step_text("a  b")
+      |> should
+      |> be_equal(["a", "b"])
+      |> or_fail_with("two spaces should not make an empty token")
+    }),
   ])
 }

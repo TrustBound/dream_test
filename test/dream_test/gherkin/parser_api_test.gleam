@@ -119,5 +119,268 @@ pub fn tests() {
       |> be_equal(Error("DocString is not closed"))
       |> or_fail_with("an unclosed doc string should be an error")
     }),
+
+    it("parse_string keeps a two-line description and skips comments", fn() {
+      let content =
+        "Feature: F\n"
+        <> "  First line\n"
+        <> "  Second line\n"
+        <> "  # a comment\n"
+        <> "Scenario: S\n"
+        <> "  Given a\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: Some("First line\nSecond line"),
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.Scenario(name: "S", tags: [], steps: [
+                gtypes.Step(keyword: gtypes.Given, text: "a", argument: None),
+              ]),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("description lines should join and comments should go")
+    }),
+
+    it("parse_string reads a Background and Then/And/But steps", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Background:\n"
+        <> "  Given base\n"
+        <> "Scenario: S\n"
+        <> "  Then x\n"
+        <> "  And y\n"
+        <> "  But z\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: Some(
+              gtypes.Background(steps: [
+                gtypes.Step(keyword: gtypes.Given, text: "base", argument: None),
+              ]),
+            ),
+            scenarios: [
+              gtypes.Scenario(name: "S", tags: [], steps: [
+                gtypes.Step(keyword: gtypes.Then, text: "x", argument: None),
+                gtypes.Step(keyword: gtypes.And, text: "y", argument: None),
+                gtypes.Step(keyword: gtypes.But, text: "z", argument: None),
+              ]),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("background and Then/And/But steps should parse")
+    }),
+
+    it("parse_string gives no Background for an empty Background", fn() {
+      let content =
+        "Feature: F\n" <> "Background:\n" <> "Scenario: S\n" <> "  Given a\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.Scenario(name: "S", tags: [], steps: [
+                gtypes.Step(keyword: gtypes.Given, text: "a", argument: None),
+              ]),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("an empty background should give None")
+    }),
+
+    it("parse_string attaches a DocString with a content type", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario: S\n"
+        <> "  Given text\n"
+        <> "\"\"\"json\n"
+        <> "{\"a\": 1}\n"
+        <> "\"\"\"\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.Scenario(name: "S", tags: [], steps: [
+                gtypes.Step(
+                  keyword: gtypes.Given,
+                  text: "text",
+                  argument: Some(gtypes.DocString(
+                    content: "{\"a\": 1}",
+                    content_type: Some("json"),
+                  )),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("the doc string should attach with its content type")
+    }),
+
+    it("parse_string attaches a two-row DataTable", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario: S\n"
+        <> "  Given rows\n"
+        <> "    | a | b |\n"
+        <> "    | c | d |\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.Scenario(name: "S", tags: [], steps: [
+                gtypes.Step(
+                  keyword: gtypes.Given,
+                  text: "rows",
+                  argument: Some(
+                    gtypes.DataTable(rows: [["a", "b"], ["c", "d"]]),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("both table rows should attach to the step")
+    }),
+
+    it("parse_string rejects a DocString without a step", fn() {
+      let content = "Feature: F\n" <> "\"\"\"\n" <> "x\n" <> "\"\"\"\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("DocString without preceding step"))
+      |> or_fail_with("a doc string needs a step")
+    }),
+
+    it("parse_string rejects a DataTable without a step", fn() {
+      let content = "Feature: F\n" <> "| a |\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(Error("DataTable without preceding step"))
+      |> or_fail_with("a table needs a step")
+    }),
+
+    it("parse_string reads a Scenario Outline with Examples", fn() {
+      let content =
+        "Feature: F\n"
+        <> "Scenario Outline: O\n"
+        <> "  Given <n>\n"
+        <> "Examples:\n"
+        <> "  | n |\n"
+        <> "  | 1 |\n"
+        <> "  | 2 |\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.ScenarioOutline(
+                name: "O",
+                tags: [],
+                steps: [
+                  gtypes.Step(
+                    keyword: gtypes.Given,
+                    text: "<n>",
+                    argument: None,
+                  ),
+                ],
+                examples: gtypes.ExamplesTable(headers: ["n"], rows: [
+                  ["1"],
+                  ["2"],
+                ]),
+              ),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("the outline should keep its examples")
+    }),
+
+    it("parse_string gives an empty table to an outline without Examples", fn() {
+      let content = "Feature: F\n" <> "Scenario Outline: O\n" <> "  Given a\n"
+
+      parser.parse_string(content)
+      |> should
+      |> be_equal(
+        Ok(
+          gtypes.Feature(
+            name: "F",
+            source: None,
+            description: None,
+            tags: [],
+            background: None,
+            scenarios: [
+              gtypes.ScenarioOutline(
+                name: "O",
+                tags: [],
+                steps: [
+                  gtypes.Step(keyword: gtypes.Given, text: "a", argument: None),
+                ],
+                examples: gtypes.ExamplesTable(headers: [], rows: []),
+              ),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("an outline without examples should get an empty table")
+    }),
+
+    it("parse_file returns an error for a missing file", fn() {
+      parser.parse_file("./test/tmp/features/parser_api_missing.feature")
+      |> should
+      |> be_equal(Error(
+        "Failed to read feature file: File not found: ./test/tmp/features/parser_api_missing.feature",
+      ))
+      |> or_fail_with("a missing file should give a read error")
+    }),
   ])
 }
