@@ -4,11 +4,13 @@ If you’ve used Jest/RSpec style assertions before, this is the Dream Test equi
 
 Dream Test assertions are designed around a single, composable pattern:
 
+### An assertion pipeline <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/equality.gleam#L7-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-value
-|> should
-|> matcher(...)
-|> or_fail_with("human-friendly message")
+      2 + 3
+      |> should
+      |> be_equal(5)
+      |> or_fail_with("2 + 3 should equal 5")
 ```
 
 Read it as a pipeline (top-to-bottom):
@@ -29,6 +31,8 @@ There’s also a human reason:
 - Assertions become part of your test’s narrative. A good pipeline reads like a sentence and fails with a message that tells you what matters.
 
 ### Chaining matchers (unwrap + assert)
+
+#### Chain matchers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/chaining.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
@@ -68,9 +72,9 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/chaining.gleam)</sub>
-
 ### Built-in matcher catalogue (practical examples)
+
+#### Built-in matchers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/builtin_matchers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{
@@ -88,14 +92,12 @@ pub fn tests() {
       |> be_true()
       |> or_fail_with("expected True")
     }),
-
     it("boolean: be_false", fn() {
       False
       |> should
       |> be_false()
       |> or_fail_with("expected False")
     }),
-
     it("option: be_some + equal", fn() {
       Some(42)
       |> should
@@ -103,7 +105,6 @@ pub fn tests() {
       |> be_equal(42)
       |> or_fail_with("expected Some(42)")
     }),
-
     it("result: be_ok + equal", fn() {
       Ok("hello")
       |> should
@@ -111,35 +112,30 @@ pub fn tests() {
       |> be_equal("hello")
       |> or_fail_with("expected Ok(\"hello\")")
     }),
-
     it("collection: have_length", fn() {
       [1, 2, 3]
       |> should
       |> have_length(3)
       |> or_fail_with("expected list length 3")
     }),
-
     it("collection: contain", fn() {
       [1, 2, 3]
       |> should
       |> contain(2)
       |> or_fail_with("expected list to contain 2")
     }),
-
     it("comparison: be_between", fn() {
       5
       |> should
       |> be_between(1, 10)
       |> or_fail_with("expected 5 to be between 1 and 10")
     }),
-
     it("string: contain_string", fn() {
       "hello world"
       |> should
       |> contain_string("world")
       |> or_fail_with("expected substring match")
     }),
-
     it("string: match_regex", fn() {
       "user-123"
       |> should
@@ -149,8 +145,6 @@ pub fn tests() {
   ])
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/builtin_matchers.gleam)</sub>
 
 ### Built-in matchers (table)
 
@@ -195,13 +189,23 @@ Dream Test doesn’t require a special “custom matcher API.” Built-in and cu
 
 Here’s a minimal custom matcher that checks “even number”:
 
+#### An even-number matcher <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/custom_matchers.gleam#L5-L41"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/types.{
   AssertionFailure, CustomMatcherFailure, MatchFailed, MatchOk,
 }
+import dream_test/unit.{describe, it}
 import gleam/int
 import gleam/option.{Some}
+import gleam/string
 
+/// A custom matcher that checks if an integer is even.
+///
+/// Matchers receive a `MatchResult(a)` and return a `MatchResult(b)`.
+/// Most matchers keep the same type (a == b), but unwrapping matchers
+/// like `be_some` change the type.
+///
 pub fn be_even(result) {
   case result {
     // If already failed, propagate the failure
@@ -229,8 +233,6 @@ fn check_even(value) {
 
 This example uses a structured `payload` (`CustomMatcherFailure`) so reporters can display richer diagnostics without forcing you to bake everything into a string message.
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/matchers/custom_matchers.gleam)</sub>
-
 ### Why matchers unwrap values
 
 The “unwrap then assert” flow is one of the biggest quality-of-life wins of the pipeline approach.
@@ -248,6 +250,8 @@ Instead of:
 Sometimes you need a conditional check that isn’t a good fit for the normal matcher pipeline.
 Use `succeed()` and `fail_with("...")` to keep the return type consistent.
 
+#### Explicit success and failure <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/explicit_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{fail_with, succeed}
 import dream_test/reporters/bdd
@@ -259,16 +263,18 @@ import snippets.{divide}
 pub fn tests() {
   describe("Explicit failures", [
     it("succeeds explicitly when division works", fn() {
-      case divide(10, 2) {
-        Ok(_) -> Ok(succeed())
-        Error(_) -> Ok(fail_with("Should have succeeded"))
-      }
+      let result = divide(10, 2)
+      Ok(case result {
+        Ok(_) -> succeed()
+        Error(_) -> fail_with("Should have succeeded")
+      })
     }),
     it("fails explicitly when expecting an error", fn() {
-      case divide(10, 0) {
-        Ok(_) -> Ok(fail_with("Should have returned an error"))
-        Error(_) -> Ok(succeed())
-      }
+      let result = divide(10, 0)
+      Ok(case result {
+        Ok(_) -> fail_with("Should have returned an error")
+        Error(_) -> succeed()
+      })
     }),
   ])
 }
@@ -281,8 +287,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/explicit_failures.gleam)</sub>
 
 ### Common pitfalls (and how to avoid them)
 

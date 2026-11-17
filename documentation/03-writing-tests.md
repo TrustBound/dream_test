@@ -15,10 +15,10 @@ If you need setup/teardown that spans multiple suites, use runner-level hooks in
 
 ### `describe` + `it` (the core loop)
 
+#### Describe and it <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/hero.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{
-  be_equal, be_error, be_ok, or_fail_with, should,
-}
+import dream_test/matchers.{be_equal, be_error, be_ok, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
@@ -58,8 +58,6 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/hero.gleam)</sub>
-
 ### How to think about `describe` and `it`
 
 Treat the test structure (nested describes/groups/tests) as documentation:
@@ -72,6 +70,8 @@ Treat the test structure (nested describes/groups/tests) as documentation:
 ### `skip` (keep the test, don’t run it)
 
 Use `skip` when you want to keep the test structure and body around, but temporarily disable execution.
+
+#### Skip a test <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/skipping_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -114,8 +114,6 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/skipping_tests.gleam)</sub>
-
 Why `skip` exists (beyond “turn it off”):
 
 - It keeps intent close to the code (“we know this should exist, but it’s not ready”).
@@ -128,47 +126,100 @@ Use `group` when you want nested structure inside a suite: a second level of nar
 
 The most common reason to use `group` is to scope hooks (setup/teardown) to a subset of tests. Even if you don’t use hooks, `group` can make long suites easier to skim.
 
-Here’s the minimal shape:
+Here’s the shape:
+
+#### Groups in a suite <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/grouping.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner
 import dream_test/unit.{describe, group, it}
 
 pub fn tests() {
-  describe("Thing", [
-    group("Case A", [
-      it("does one thing", fn() { Ok(succeed()) }),
+  describe("Calculator", [
+    group("addition", [
+      it("adds small numbers", fn() {
+        2 + 3
+        |> should
+        |> be_equal(5)
+        |> or_fail_with("2 + 3 should equal 5")
+      }),
+      it("adds negative numbers", fn() {
+        -2 + -3
+        |> should
+        |> be_equal(-5)
+        |> or_fail_with("-2 + -3 should equal -5")
+      }),
     ]),
-    group("Case B", [
-      it("does another thing", fn() { Ok(succeed()) }),
+    group("division", [
+      it("integer division rounds toward zero", fn() {
+        7 / 2
+        |> should
+        |> be_equal(3)
+        |> or_fail_with("7 / 2 should equal 3")
+      }),
     ]),
   ])
 }
-```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/grouping.gleam)</sub>
+pub fn main() {
+  runner.new([tests()])
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
 
 You’ll also see `group` used in the hook inheritance example (outer hooks apply to inner groups):
 
+#### Hooks in nested groups <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/hook_inheritance.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{succeed}
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
 import gleam/io
 
 pub fn tests() {
   describe("Outer", [
-    before_each(fn() { io.println("outer setup") Ok(Nil) }),
-    after_each(fn() { io.println("outer teardown") Ok(Nil) }),
+    before_each(fn() {
+      io.println("1. outer setup")
+      Ok(Nil)
+    }),
+    after_each(fn() {
+      io.println("4. outer teardown")
+      Ok(Nil)
+    }),
     group("Inner", [
-      before_each(fn() { io.println("inner setup") Ok(Nil) }),
-      after_each(fn() { io.println("inner teardown") Ok(Nil) }),
-      it("test", fn() { Ok(succeed()) }),
+      before_each(fn() {
+        io.println("2. inner setup")
+        Ok(Nil)
+      }),
+      after_each(fn() {
+        io.println("3. inner teardown")
+        Ok(Nil)
+      }),
+      it("test", fn() {
+        io.println("(test)")
+        Ok(succeed())
+      }),
     ]),
   ])
 }
-```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_inheritance.gleam)</sub>
+pub fn main() {
+  runner.new([tests()])
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
 
 ### Tags (when you need a “slice” of a suite)
 
@@ -192,33 +243,45 @@ This repo also uses tags heavily in Gherkin specs (see the Gherkin guide), where
 
 You can use tags to run only a subset of tests.
 
+#### Run only the smoke tests <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/filter_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/types.{AssertionOk}
+import dream_test/runner.{type TestInfo}
 import dream_test/unit.{describe, it, with_tags}
 import gleam/list
 
-fn is_smoke(info: runner.TestInfo) -> Bool {
+pub fn tests() {
+  describe("Filtering tests", [
+    it("smoke", fn() {
+      1 + 1
+      |> should
+      |> be_equal(2)
+      |> or_fail_with("math should work")
+    })
+      |> with_tags(["smoke"]),
+    it("slow", fn() { Ok(succeed()) })
+      |> with_tags(["slow"]),
+  ])
+}
+
+pub fn only_smoke(info: TestInfo) -> Bool {
   list.contains(info.tags, "smoke")
 }
 
 pub fn main() {
-  let suite =
-    describe("Tagged tests", [
-      it("smoke: fast", fn() { Ok(AssertionOk) }) |> with_tags(["smoke"]),
-      it("not smoke", fn() { Ok(AssertionOk) }),
-    ])
-
-  runner.new([suite])
-  |> runner.filter_tests(is_smoke)
+  runner.new([tests()])
+  |> runner.filter_tests(only_smoke)
   |> runner.progress_reporter(progress.new())
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
 ```
+
+#### Tag a group and a test <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/tagging.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -250,8 +313,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/tagging.gleam)</sub>
 
 ### What's Next?
 

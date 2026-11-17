@@ -20,12 +20,15 @@ Hooks let you run setup/teardown logic around tests while keeping the test bodie
 
 This example prints the execution order so you can see the flow directly:
 
+##### Print the hook order <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/hook_order.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
+import gleam/io
 
 pub fn tests() {
   describe("Enclosing", [
@@ -93,14 +96,10 @@ sequenceDiagram
 
 If a `before_each` hook returns `Error("...")`, the test body does not run:
 
-```gleam
-import dream_test/matchers.{succeed}
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/unit.{before_each, describe, it}
+##### A failing setup hook <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/setup_failure.gleam#L8-L17"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-pub fn tests() {
+```gleam
+pub fn setup_failure_tests() {
   describe("Setup failures", [
     before_each(fn() { Error("could not connect to database") }),
     it("will not run", fn() {
@@ -110,15 +109,9 @@ pub fn tests() {
     }),
   ])
 }
-
-pub fn main() {
-  runner.new([tests()])
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
-}
 ```
+
+The runner reports the test as `SetupFailed`.
 
 ### When to use hooks
 
@@ -138,6 +131,8 @@ Two practical rules of thumb:
 - `after_all`: runs once after all tests in the group
 
 ### Basic lifecycle example
+
+#### All four hooks <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_empty, or_fail_with, should}
@@ -206,11 +201,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/lifecycle_hooks.gleam)</sub>
-
 ### Hook inheritance (nested groups)
 
 Nested groups inherit hooks. Setup runs **enclosing → nested**, teardown runs **nested → enclosing**.
+
+#### Inherited hooks <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/hook_inheritance.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -218,6 +213,7 @@ import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{after_each, before_each, describe, group, it}
+import gleam/io
 
 pub fn tests() {
   describe("Outer", [
@@ -255,11 +251,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_inheritance.gleam)</sub>
-
 ### Hook failure behavior (important for reliability)
 
 If a hook fails, Dream Test records that failure and fails the affected tests.
+
+#### Report a setup error <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -268,10 +264,19 @@ import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{before_all, describe, it}
 
+fn connect_to_database() {
+  Ok(Nil)
+}
+
 pub fn tests() {
   describe("Handles failures", [
-    before_all(fn() { Error("Database connection failed") }),
-    // If before_all fails, these tests do not run, and they are reported as failed.
+    before_all(fn() {
+      case connect_to_database() {
+        Ok(_) -> Ok(Nil)
+        Error(e) -> Error("Database connection failed: " <> e)
+      }
+    }),
+    // If before_all fails, these tests are marked SetupFailed (not run)
     it("test1", fn() { Ok(succeed()) }),
     it("test2", fn() { Ok(succeed()) }),
   ])
@@ -285,8 +290,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/hook_failure.gleam)</sub>
 
 ### Hooks and parallelism (the source of most flaky tests)
 

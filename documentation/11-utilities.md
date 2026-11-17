@@ -20,12 +20,17 @@ They’re public because they’re useful in real test suites, but they’re int
 
 Use these helpers when you want predictable, structured error handling around file IO (snapshots, temp files, fixtures).
 
+#### File helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/file_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
+import dream_test/file.{
+  NotFound, delete, delete_files_matching, error_to_string, read, write,
+}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/file.{NotFound, delete, error_to_string, read, write}
 import dream_test/process.{unique_port}
 import dream_test/unit.{describe, it}
 import gleam/int
+import gleam/result
 
 fn tmp_path() {
   "./test/tmp/file_helpers_" <> int.to_string(unique_port()) <> ".txt"
@@ -35,7 +40,11 @@ pub fn tests() {
   describe("File helpers", [
     it("write + read roundtrip", fn() {
       let path = tmp_path()
-      let _ = write(path, "hello")
+
+      // Setup: create the file (no assertions during setup)
+      use _ <- result.try(
+        write(path, "hello") |> result.map_error(error_to_string),
+      )
 
       read(path)
       |> should
@@ -45,8 +54,12 @@ pub fn tests() {
 
     it("delete removes a file", fn() {
       let path = tmp_path()
-      let _ = write(path, "hello")
-      let _ = delete(path)
+
+      // Setup: create the file, then delete it (no assertions during setup)
+      use _ <- result.try(
+        write(path, "hello") |> result.map_error(error_to_string),
+      )
+      use _ <- result.try(delete(path) |> result.map_error(error_to_string))
 
       read(path)
       |> should
@@ -60,15 +73,34 @@ pub fn tests() {
       |> be_equal("File not found: /x")
       |> or_fail_with("expected NotFound formatting")
     }),
+
+    it("delete_files_matching deletes files with a given extension", fn() {
+      let directory = "./test/tmp/file_helpers_" <> int.to_string(unique_port())
+      let a = directory <> "/a.snap"
+      let b = directory <> "/b.snap"
+      let keep = directory <> "/keep.txt"
+
+      // Setup: create 2 matching files and 1 non-matching file
+      use _ <- result.try(write(a, "a") |> result.map_error(error_to_string))
+      use _ <- result.try(write(b, "b") |> result.map_error(error_to_string))
+      use _ <- result.try(
+        write(keep, "keep") |> result.map_error(error_to_string),
+      )
+
+      delete_files_matching(directory, ".snap")
+      |> should
+      |> be_equal(Ok(2))
+      |> or_fail_with("expected two deleted snapshots")
+    }),
   ])
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/file_helpers.gleam)</sub>
-
 ### `dream_test/process` (small helpers for tests)
 
 These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
+
+#### Counter and port helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/process_counter_and_port.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_between, be_equal, or_fail_with, should}
@@ -98,11 +130,11 @@ pub fn tests() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/process_helpers.gleam)</sub>
-
 ### `dream_test/timing` (durations + monotonic time)
 
 Use `timing.now_ms()` / `timing.now_us()` for monotonic timing, and format helpers for readable output.
+
+#### Timing helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/timing_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -146,15 +178,26 @@ pub fn tests() {
       |> be_equal(True)
       |> or_fail_with("expected now_ms to be monotonic")
     }),
+
+    it("now_us is monotonic (non-decreasing)", fn() {
+      let t1 = timing.now_us()
+      let t2 = timing.now_us()
+      let ok = t2 >= t1
+
+      ok
+      |> should
+      |> be_equal(True)
+      |> or_fail_with("expected now_us to be monotonic")
+    }),
   ])
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/timing_helpers.gleam)</sub>
-
 ### `dream_test/sandbox` (timeouts + crash isolation)
 
 This is the mechanism Dream Test uses to make test execution resilient: run code in an isolated process, detect timeouts, and catch crashes.
+
+#### Sandboxed functions <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/sandboxing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -210,12 +253,9 @@ pub fn tests() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/sandboxing.gleam)</sub>
-
 ### What's Next?
 
 - Go back to [Gherkin / BDD testing](10-gherkin-bdd.md)
 - Go back to [Documentation README](README.md)
 - Jump to the API reference on Hexdocs: [Dream Test on Hexdocs](https://hexdocs.pm/dream_test/)
-
 

@@ -20,6 +20,8 @@ This keeps output readable under parallel execution:
 
 This is the standard “human” output: live progress while tests run, then a full BDD report (with failures repeated near the end) and a summary.
 
+#### Progress and BDD output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/bdd_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{succeed}
 import dream_test/reporters/bdd
@@ -43,11 +45,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/bdd_reporter.gleam)</sub>
-
 ### JSON results reporter (end of run)
 
 Use JSON output for CI/CD integration and tooling (parsing, dashboards, artifact uploads).
+
+#### JSON output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/json_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -78,11 +80,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/json_reporter.gleam)</sub>
-
 ### Progress reporter (during the run)
 
 Use progress output when you want compact logs, especially for large suites.
+
+#### Progress output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -105,8 +107,6 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/progress_reporter.gleam)</sub>
-
 ### Post-run formatting (render into a string)
 
 Post-run formatting is useful when you want to:
@@ -115,36 +115,41 @@ Post-run formatting is useful when you want to:
 - Embed results into a larger tool
 - Perform extra processing before output
 
+#### Format a report into a string <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/bdd_formatting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{
-  contain_string, or_fail_with, should, succeed,
-}
+import dream_test/matchers.{match_snapshot, or_fail_with, should}
 import dream_test/reporters/bdd
-import dream_test/runner
+import dream_test/types
 import dream_test/unit.{describe, it}
 
-fn example_suite() {
-  describe("Example Suite", [
-    it("passes", fn() { Ok(succeed()) }),
-  ])
+fn sample_results() -> List(types.TestResult) {
+  [
+    types.TestResult(
+      name: "passes",
+      full_name: ["Example Suite", "passes"],
+      status: types.Passed,
+      duration_ms: 0,
+      tags: [],
+      failures: [],
+      kind: types.Unit,
+    ),
+  ]
 }
 
 pub fn tests() {
   describe("BDD formatting", [
     it("format returns a report string", fn() {
-      let results = runner.new([example_suite()]) |> runner.run()
-      let report = bdd.format(results)
+      let report = bdd.format(sample_results())
 
       report
       |> should
-      |> contain_string("Example Suite")
-      |> or_fail_with("Expected formatted report to include the suite name")
+      |> match_snapshot("./test/snapshots/bdd_format_report.snap")
+      |> or_fail_with("expected formatted report snapshot match")
     }),
   ])
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/bdd_formatting.gleam)</sub>
 
 ### Custom reporters
 
@@ -164,6 +169,8 @@ If you want “plug in an arbitrary reporter module” wired into the runner, yo
 
 Use `runner.output(...)` to route any reporter output into your own sinks.
 This is useful for snapshots, embedding Dream Test in other tools, or writing reports to files.
+
+##### Capture the runner output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/output_routing.gleam#L1-L65"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -238,12 +245,18 @@ fn example_suite() {
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
 write a pure formatter over `List(TestResult)` and run it after `runner.run()`.
 
+##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/parallel
+import dream_test/runner
 import dream_test/types.{
-  type Status, type TestResult, Failed, Passed, Pending, SetupFailed, Skipped,
-  TimedOut,
+  type Status, type TestResult, Failed, Pending, SetupFailed, Skipped, TimedOut,
 }
+import dream_test/unit.{describe, it}
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/string
 
@@ -285,10 +298,9 @@ fn count_loop(results: List(TestResult), wanted: Status, n: Int) -> Int {
 
 Then call it from your runner `main()`:
 
-```gleam
-import dream_test/runner
-import gleam/io
+##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L48-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
+```gleam
 pub fn main() {
   let results = runner.new([tests()]) |> runner.run()
   io.print(render_my_report(results))
@@ -310,10 +322,12 @@ This is intentionally **not** the common path; most users should attach progress
 
 If you’re using `dream_test/gherkin`, you can render results in Gherkin-friendly formatting.
 
+#### Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/gherkin_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{step}
+import dream_test/matchers.{succeed}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
 import gleam/io
@@ -335,12 +349,9 @@ pub fn tests() {
 
 pub fn main() {
   let results = runner.new([tests()]) |> runner.run()
-  let _ = gherkin_reporter.report(results, io.print)
-  Nil
+  gherkin_reporter.report(results, io.print)
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/reporters/gherkin_reporter.gleam)</sub>
 
 ### Choosing a reporter (a quick heuristic)
 

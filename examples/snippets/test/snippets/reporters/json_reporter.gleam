@@ -7,8 +7,7 @@ import dream_test/unit.{describe, it}
 pub fn tests() {
   describe("JSON Reporter", [
     it("outputs JSON format", fn() {
-      // The json.report function outputs machine-readable JSON
-      // while bdd.report outputs human-readable text
+      // `json.new()` prints machine-readable JSON at the end of the run.
       Ok(succeed())
     }),
     it("includes test metadata", fn() {

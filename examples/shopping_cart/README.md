@@ -36,14 +36,20 @@ inline DSL suite.
 
 Write features in standard `.feature` files:
 
+#### The feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/features/shopping_cart.feature#L1-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gherkin
-# features/shopping_cart.feature
+@shopping @e2e
 Feature: Shopping Cart
+  As a customer
+  I want to manage items in my shopping cart
+  So that I can purchase products I need
 
   Background:
     Given I have an empty cart
 
-  Scenario: Adding items to cart
+  @happy-path
+  Scenario: Adding a single item to the cart
     When I add 2 apples to the cart
     Then the cart should contain 2 items
     And the subtotal should be $3.00
@@ -53,14 +59,16 @@ Feature: Shopping Cart
 
 Define features directly in Gleam:
 
+#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/features/shopping_cart.gleam#L24-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-feature_with_background("Shopping Cart", registry, bg, [
-  scenario("Adding items to cart", [
-    when("I add 2 apples to the cart"),
-    then("the cart should contain 2 items"),
-    and("the subtotal should be $3.00"),
-  ]),
-])
+  feature_with_background("Shopping Cart (inline)", registry, bg, [
+    scenario("Adding a single item to the cart", [
+      when("I add 2 apples to the cart"),
+      then("the cart should contain 2 items"),
+      and("the subtotal should be $3.00"),
+    ])
+      |> with_tags(["happy-path"]),
 ```
 
 Both approaches share the same step definitions!
@@ -69,12 +77,16 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
+### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L19-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-// test/steps/cart.gleam
 pub fn register(registry: StepRegistry) -> StepRegistry {
   registry
   |> steps.step("I have an empty cart", step_empty_cart)
   |> steps.step("I add {int} {word} to the cart", step_add_product)
+  |> steps.step("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.step("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.step("I remove {word} from the cart", step_remove_product)
 }
 ```
 

@@ -34,6 +34,8 @@ Use `max_concurrency` and `default_timeout_ms` to tune execution:
 - **Higher concurrency** speeds up independent tests.
 - **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
 
+#### Concurrency and timeouts <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
@@ -63,11 +65,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/runner_config.gleam)</sub>
-
 ### Sequential execution (when shared resources matter)
 
 When tests share external state, you often want `max_concurrency(1)` to avoid flakiness.
+
+#### Sequential execution <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/sequential_execution.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -106,18 +108,32 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/sequential_execution.gleam)</sub>
-
 ### Mixed execution policies (per-suite concurrency/timeout)
 
 If only *some* suites share external state (for example: database suites) you don’t need two separate runners.
 Instead, run everything in one runner and apply an execution config override to the suites that need it.
 
+#### Execution config for each suite <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/suite_specific_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
+import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
+import dream_test/unit.{describe, it}
+
+fn unit_tests() {
+  describe("Unit suite", [
+    it("is fast", fn() { Ok(succeed()) }),
+  ])
+}
+
+fn db_tests() {
+  describe("DB suite (sequential)", [
+    it("pretend db test", fn() { Ok(succeed()) }),
+  ])
+}
 
 pub fn main() {
   let db_config =
@@ -134,8 +150,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/suite_specific_config.gleam)</sub>
 
 ### Runner hooks (test/suite/run)
 
@@ -168,6 +182,8 @@ about what is running.
 - Unit discovery suites use the **module name**.
 - Gherkin discovery suites use the **.feature path**.
 - Manually constructed suites use `None`.
+
+#### Runner hooks <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/runner_hooks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -215,8 +231,6 @@ fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/runner_hooks.gleam)</sub>
-
 ### Choosing a concurrency number (practical guidance)
 
 - Start with the default.
@@ -226,6 +240,8 @@ fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
 ### Advanced: running the executor directly
 
 Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor.
+
+#### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{have_length, or_fail_with, should, succeed}
@@ -249,8 +265,6 @@ pub fn tests() {
   ])
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/parallel_direct.gleam)</sub>
 
 ### What's Next?
 

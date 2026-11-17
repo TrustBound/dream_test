@@ -62,11 +62,13 @@ That’s why the examples annotate `context: StepContext` (it’s the minimal ty
 
 ### Inline Gherkin (the “hero” example)
 
+#### An inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_hero.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
@@ -105,6 +107,7 @@ pub fn tests() {
       given("I have 3 items in my cart"),
       when("I add 2 more items"),
       then("I should have 5 items total"),
+      but("I should have 5 items total"),
     ]),
   ])
 }
@@ -118,8 +121,6 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_hero.gleam)</sub>
-
 What to notice in this example:
 
 - The step registry is built once and shared by scenarios.
@@ -131,13 +132,15 @@ What to notice in this example:
 Placeholders let you capture values from the step text into `context.captures`.
 Typed helpers like `get_int` parse the capture into the right type.
 
+#### Typed placeholders <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_placeholders.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{succeed}
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
   type StepContext, get_float, get_int, get_string, get_word, step,
 }
 import dream_test/gherkin/world.{put}
+import dream_test/matchers.{succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
@@ -204,13 +207,13 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_placeholders.gleam)</sub>
-
 ### `.feature` files (authoring + parsing)
 
 If you want tests authored in plain text (often by QA/product, or copied from tickets), use real `.feature` files.
 
 #### Example `.feature` file
+
+##### The feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gherkin
 @shopping
@@ -233,28 +236,28 @@ Feature: Shopping Cart
     Then the cart should have 5 items
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/cart.feature)</sub>
-
 #### Loading a `.feature` file and converting to a suite
 
+##### Load a feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-fn step_empty_cart(context: StepContext) {
-  put(context.world, "cart", 0)
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
   Ok(succeed())
 }
 
-fn step_server_running(context: StepContext) {
-  put(context.world, "server_running", True)
+fn step_empty_cart(context: StepContext) {
+  put(context.world, "cart", 0)
   Ok(succeed())
 }
 
@@ -299,29 +302,29 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_file.gleam)</sub>
-
 ### Feature discovery (load `.feature` files)
 
 Use discovery when you want real `.feature` files (e.g. written by QA or copied into tickets).
 
+#### Discover feature files <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_discover.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps.{type StepContext, get_int, step}
 import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-fn step_empty_cart(context: StepContext) {
-  put(context.world, "cart", 0)
+fn step_server_running(context: StepContext) {
+  put(context.world, "server_running", True)
   Ok(succeed())
 }
 
-fn step_server_running(context: StepContext) {
-  put(context.world, "server_running", True)
+fn step_empty_cart(context: StepContext) {
+  put(context.world, "cart", 0)
   Ok(succeed())
 }
 
@@ -363,8 +366,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/gherkin/gherkin_discover.gleam)</sub>
 
 ### What's Next?
 
