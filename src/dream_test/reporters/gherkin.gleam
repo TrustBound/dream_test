@@ -11,13 +11,12 @@
 //// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
+import dream_test/reporters/summary
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
   GherkinScenario, Passed, Pending, SetupFailed, Skipped, TimedOut,
 }
-import gleam/int
-import gleam/list
 import gleam/option.{Some}
 import gleam/string
 
@@ -51,7 +50,7 @@ import gleam/string
 ///
 /// The formatted report as a `String`.
 pub fn format(results results: List(TestResult)) -> String {
-  let summary_text = format_summary(results)
+  let summary_text = summary.format(results)
   string.concat([format_scenarios(results), "\n", summary_text])
 }
 
@@ -281,102 +280,5 @@ fn format_failure_payload(
         "\n",
       ])
     _ -> ""
-  }
-}
-
-// ============================================================================
-// Summary
-// ============================================================================
-
-fn format_summary(results: List(TestResult)) -> String {
-  let total = list.length(results)
-  let failed = count_by_status(results, Failed)
-  let skipped = count_by_status(results, Skipped)
-  let pending = count_by_status(results, Pending)
-  let timed_out = count_by_status(results, TimedOut)
-  let setup_failed = count_by_status(results, SetupFailed)
-  let passed = total - failed - skipped - pending - timed_out - setup_failed
-  let total_duration = sum_durations(results, 0)
-
-  string.concat([
-    "Summary: ",
-    int.to_string(total),
-    " run, ",
-    int.to_string(failed),
-    " failed, ",
-    int.to_string(passed),
-    " passed",
-    build_summary_suffix(skipped, pending, timed_out, setup_failed),
-    " in ",
-    timing.format_duration_ms(total_duration),
-    "\n",
-  ])
-}
-
-fn sum_durations(results: List(TestResult), total: Int) -> Int {
-  case results {
-    [] -> total
-    [result, ..rest] -> sum_durations(rest, total + result.duration_ms)
-  }
-}
-
-fn build_summary_suffix(
-  skipped: Int,
-  pending: Int,
-  timed_out: Int,
-  setup_failed: Int,
-) -> String {
-  let parts =
-    []
-    |> add_summary_part_if_nonzero(skipped, " skipped")
-    |> add_summary_part_if_nonzero(pending, " pending")
-    |> add_summary_part_if_nonzero(timed_out, " timed out")
-    |> add_summary_part_if_nonzero(setup_failed, " setup failed")
-
-  format_summary_parts(parts)
-}
-
-fn format_summary_parts(parts: List(String)) -> String {
-  case parts {
-    [] -> ""
-    // Each part goes on the front of the list, so the list is in reverse
-    // order: setup failed first, skipped last.
-    _ -> string.concat([", ", string.join(list.reverse(parts), ", ")])
-  }
-}
-
-fn add_summary_part_if_nonzero(
-  parts: List(String),
-  count: Int,
-  label: String,
-) -> List(String) {
-  case count {
-    0 -> parts
-    _ -> [string.concat([int.to_string(count), label]), ..parts]
-  }
-}
-
-fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  count_matching_status(results, wanted, 0)
-}
-
-fn count_matching_status(
-  results: List(TestResult),
-  wanted: Status,
-  count: Int,
-) -> Int {
-  case results {
-    [] -> count
-    [result, ..rest] -> {
-      let next_count = increment_if_matches(result.status, wanted, count)
-      count_matching_status(rest, wanted, next_count)
-    }
-  }
-}
-
-fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
-  case status == wanted {
-    True -> count + 1
-    False -> count
   }
 }

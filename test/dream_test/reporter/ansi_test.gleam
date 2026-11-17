@@ -46,5 +46,17 @@ pub fn tests() {
       |> be_equal("\u{1b}[1mtext\u{1b}[0m")
       |> or_fail_with("expected the bold code")
     }),
+    it("apply_if applies the style when enabled is True", fn() {
+      ansi.apply_if(enabled: True, style: ansi.red, text: "text")
+      |> should
+      |> be_equal("\u{1b}[31mtext\u{1b}[0m")
+      |> or_fail_with("expected the red code")
+    }),
+    it("apply_if gives the text as it is when enabled is False", fn() {
+      ansi.apply_if(enabled: False, style: ansi.red, text: "text")
+      |> should
+      |> be_equal("text")
+      |> or_fail_with("expected the text without codes")
+    }),
   ])
 }

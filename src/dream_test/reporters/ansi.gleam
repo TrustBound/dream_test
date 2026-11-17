@@ -18,6 +18,7 @@
 //// |-------------|----------------------------------------------|
 //// | **Colours** | `red`, `green`, `yellow`, `magenta`, `cyan`  |
 //// | **Styles**  | `dim`, `bold`                                |
+//// | **Switch**  | `apply_if`                                   |
 
 import gleam/string
 
@@ -173,6 +174,43 @@ pub fn dim(text text: String) -> String {
 /// ```
 pub fn bold(text text: String) -> String {
   wrap("1", text)
+}
+
+/// Apply a style only when colour is on.
+///
+/// A reporter with a colour option can call this for each piece of text, in
+/// place of a `case` on the option at each call.
+///
+/// ## Parameters
+///
+/// - `enabled`: `True` to apply the style, `False` to give the text as it is
+/// - `style`: the style to apply, for example `ansi.red`
+/// - `text`: the text to style
+///
+/// ## Returns
+///
+/// The styled text when `enabled` is `True`, otherwise the same text.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/reporters/ansi
+///
+/// ansi.apply_if(enabled: True, style: ansi.red, text: "Failed")
+/// // -> "\u{1b}[31mFailed\u{1b}[0m"
+///
+/// ansi.apply_if(enabled: False, style: ansi.red, text: "Failed")
+/// // -> "Failed"
+/// ```
+pub fn apply_if(
+  enabled enabled: Bool,
+  style style: fn(String) -> String,
+  text text: String,
+) -> String {
+  case enabled {
+    True -> style(text)
+    False -> text
+  }
 }
 
 fn wrap(code: String, text: String) -> String {

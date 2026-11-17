@@ -9,6 +9,7 @@
 
 import dream_test/reporters/ansi
 import dream_test/reporters/gherkin as gherkin_reporter
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/timing
 import dream_test/types.{
@@ -17,7 +18,6 @@ import dream_test/types.{
   Failed, OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
   SnapshotFailure, StringMatchFailure, TimedOut,
 }
-import gleam/int
 import gleam/list
 import gleam/option.{Some}
 import gleam/order
@@ -170,15 +170,15 @@ fn is_failure_status(status: Status) -> Bool {
   }
 }
 
-fn maybe(color: Bool, apply: fn(String) -> String, text: String) -> String {
+fn format_summary(color: Bool, results: List(TestResult)) -> String {
   case color {
-    True -> apply(text)
-    False -> text
+    True -> summary.format_in_color(results)
+    False -> summary.format(results)
   }
 }
 
 fn format_failures_header(color: Bool) -> String {
-  maybe(color, fn(t) { ansi.bold(ansi.red(t)) }, "Failures:")
+  ansi.apply_if(color, ansi.bold, ansi.apply_if(color, ansi.red, "Failures:"))
 }
 
 /// Format test results as a BDD-style report string.
@@ -221,7 +221,7 @@ pub fn format(results results: List(TestResult)) -> String {
   let gherkin_text = gherkin_reporter.format_scenarios(gherkin_results)
 
   // Combine with single summary
-  let summary_text = format_summary(False, results)
+  let summary_text = summary.format(results)
   string.concat([unit_text, gherkin_text, "\n", summary_text])
 }
 
@@ -442,6 +442,9 @@ pub fn format_incremental_parts_with_test_indent(
 /// ```
 /// Format only the trailing summary line (no per-test output).
 ///
+/// This gives the same line as `summary.format` from
+/// `dream_test/reporters/summary`.
+///
 /// ## Parameters
 ///
 /// - `results`: The test results to summarize
@@ -449,10 +452,7 @@ pub fn format_incremental_parts_with_test_indent(
 /// ## Returns
 ///
 /// A single summary line as a `String` (including a trailing newline).
-pub fn format_summary_only(results results: List(TestResult)) -> String {
-  format_summary(False, results)
-}
-
+///
 /// ## Example
 ///
 /// ```gleam
@@ -463,6 +463,10 @@ pub fn format_summary_only(results results: List(TestResult)) -> String {
 /// |> match_snapshot("./test/snapshots/bdd_format_summary_only.snap")
 /// |> or_fail_with("expected summary snapshot match")
 /// ```
+pub fn format_summary_only(results results: List(TestResult)) -> String {
+  summary.format(results)
+}
+
 fn format_all_results(
   color: Bool,
   results: List(TestResult),
@@ -547,7 +551,8 @@ fn format_header_segments_for_kind(
         True -> "Feature: " <> segment
         False -> segment
       }
-      let styled = maybe(color, fn(t) { ansi.bold(ansi.cyan(t)) }, label)
+      let styled =
+        ansi.apply_if(color, ansi.bold, ansi.apply_if(color, ansi.cyan, label))
       let header = string.concat([indent, styled, "\n"])
       let updated = string.concat([accumulated, header])
       format_header_segments_for_kind(
@@ -608,11 +613,11 @@ fn format_test_line_with_indent_for_kind(
   let duration = format_duration(result.duration_ms)
   let colored_name = case result.status {
     Passed -> name
-    Failed -> maybe(color, ansi.red, name)
-    SetupFailed -> maybe(color, ansi.red, name)
-    TimedOut -> maybe(color, ansi.red, name)
-    Skipped -> maybe(color, ansi.yellow, name)
-    Pending -> maybe(color, ansi.yellow, name)
+    Failed -> ansi.apply_if(color, ansi.red, name)
+    SetupFailed -> ansi.apply_if(color, ansi.red, name)
+    TimedOut -> ansi.apply_if(color, ansi.red, name)
+    Skipped -> ansi.apply_if(color, ansi.yellow, name)
+    Pending -> ansi.apply_if(color, ansi.yellow, name)
   }
   let test_line =
     string.concat([indent, marker, " ", colored_name, duration, "\n"])
@@ -641,12 +646,12 @@ fn build_indent_recursive(level: Int, accumulated: String) -> String {
 
 fn status_marker(color: Bool, status: Status) -> String {
   case status {
-    Passed -> maybe(color, ansi.green, "✓")
-    Failed -> maybe(color, ansi.red, "✗")
-    Skipped -> maybe(color, ansi.yellow, "-")
-    Pending -> maybe(color, ansi.yellow, "~")
-    TimedOut -> maybe(color, ansi.red, "!")
-    SetupFailed -> maybe(color, ansi.red, "⚠")
+    Passed -> ansi.apply_if(color, ansi.green, "✓")
+    Failed -> ansi.apply_if(color, ansi.red, "✗")
+    Skipped -> ansi.apply_if(color, ansi.yellow, "-")
+    Pending -> ansi.apply_if(color, ansi.yellow, "~")
+    TimedOut -> ansi.apply_if(color, ansi.red, "!")
+    SetupFailed -> ansi.apply_if(color, ansi.red, "⚠")
   }
 }
 
@@ -687,7 +692,11 @@ fn format_one_failure(
   let base_indent = build_indent(indent_level)
 
   let operator_text =
-    maybe(color, fn(t) { ansi.bold(ansi.magenta(t)) }, failure.operator)
+    ansi.apply_if(
+      color,
+      ansi.bold,
+      ansi.apply_if(color, ansi.magenta, failure.operator),
+    )
   let header = string.concat([base_indent, "  ", operator_text, "\n"])
   let message_text = format_failure_message(color, failure.message, base_indent)
   let payload_text = format_failure_payload(color, failure.payload, base_indent)
@@ -703,8 +712,8 @@ fn format_failure_message(
   case message {
     "" -> ""
     _ -> {
-      let label = maybe(color, ansi.dim, "    Message: ")
-      let msg = maybe(color, ansi.red, message)
+      let label = ansi.apply_if(color, ansi.dim, "    Message: ")
+      let msg = ansi.apply_if(color, ansi.red, message)
       string.concat([base_indent, label, msg, "\n"])
     }
   }
@@ -746,34 +755,34 @@ fn format_failure_payload(
     Some(CollectionFailure(actual, expected, operation)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Operation: ")
-        <> maybe(color, ansi.cyan, operation)
+        <> ansi.apply_if(color, ansi.dim, "    Operation: ")
+        <> ansi.apply_if(color, ansi.cyan, operation)
         <> "\n"
       op_line <> format_expected_actual(color, base_indent, expected, actual)
     }
     Some(ComparisonFailure(actual, expected, operator)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Operator: ")
-        <> maybe(color, ansi.cyan, operator)
+        <> ansi.apply_if(color, ansi.dim, "    Operator: ")
+        <> ansi.apply_if(color, ansi.cyan, operator)
         <> "\n"
       op_line <> format_expected_actual(color, base_indent, expected, actual)
     }
     Some(StringMatchFailure(actual, pattern, operation)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Operation: ")
-        <> maybe(color, ansi.cyan, operation)
+        <> ansi.apply_if(color, ansi.dim, "    Operation: ")
+        <> ansi.apply_if(color, ansi.cyan, operation)
         <> "\n"
       let pat_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Pattern:   ")
-        <> maybe(color, ansi.green, pattern)
+        <> ansi.apply_if(color, ansi.dim, "    Pattern:   ")
+        <> ansi.apply_if(color, ansi.green, pattern)
         <> "\n"
       let actual_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Actual:    ")
-        <> maybe(color, ansi.red, actual)
+        <> ansi.apply_if(color, ansi.dim, "    Actual:    ")
+        <> ansi.apply_if(color, ansi.red, actual)
         <> "\n"
       op_line <> pat_line <> actual_line
     }
@@ -789,13 +798,13 @@ fn format_failure_payload(
     Some(CustomMatcherFailure(actual, description)) -> {
       let desc_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Description: ")
-        <> maybe(color, ansi.cyan, description)
+        <> ansi.apply_if(color, ansi.dim, "    Description: ")
+        <> ansi.apply_if(color, ansi.cyan, description)
         <> "\n"
       let actual_line =
         base_indent
-        <> maybe(color, ansi.dim, "    Actual:      ")
-        <> maybe(color, ansi.red, actual)
+        <> ansi.apply_if(color, ansi.dim, "    Actual:      ")
+        <> ansi.apply_if(color, ansi.red, actual)
         <> "\n"
       desc_line <> actual_line
     }
@@ -809,16 +818,16 @@ fn format_expected_actual(
   expected: String,
   actual: String,
 ) -> String {
-  let expected_label = maybe(color, ansi.dim, "    Expected: ")
-  let actual_label = maybe(color, ansi.dim, "    Actual:   ")
+  let expected_label = ansi.apply_if(color, ansi.dim, "    Expected: ")
+  let actual_label = ansi.apply_if(color, ansi.dim, "    Actual:   ")
   string.concat([
     base_indent,
     expected_label,
-    maybe(color, ansi.green, expected),
+    ansi.apply_if(color, ansi.green, expected),
     "\n",
     base_indent,
     actual_label,
-    maybe(color, ansi.red, actual),
+    ansi.apply_if(color, ansi.red, actual),
     "\n",
   ])
 }
@@ -835,124 +844,17 @@ fn format_snapshot_failure(
     True ->
       string.concat([
         base_indent,
-        maybe(color, ansi.dim, "    Snapshot missing: "),
-        maybe(color, ansi.yellow, snapshot_path),
+        ansi.apply_if(color, ansi.dim, "    Snapshot missing: "),
+        ansi.apply_if(color, ansi.yellow, snapshot_path),
         "\n",
       ])
     False ->
       string.concat([
         base_indent,
-        maybe(color, ansi.dim, "    Snapshot: "),
-        maybe(color, ansi.cyan, snapshot_path),
+        ansi.apply_if(color, ansi.dim, "    Snapshot: "),
+        ansi.apply_if(color, ansi.cyan, snapshot_path),
         "\n",
         format_expected_actual(color, base_indent, expected, actual),
       ])
-  }
-}
-
-fn format_summary(color: Bool, results: List(TestResult)) -> String {
-  let total = list.length(results)
-  let failed = count_by_status(results, Failed)
-  let skipped = count_by_status(results, Skipped)
-  let pending = count_by_status(results, Pending)
-  let timed_out = count_by_status(results, TimedOut)
-  let setup_failed = count_by_status(results, SetupFailed)
-  let passed = total - failed - skipped - pending - timed_out - setup_failed
-  let total_duration = sum_durations(results, 0)
-
-  string.concat([
-    maybe(color, fn(t) { ansi.bold(ansi.cyan(t)) }, "Summary: "),
-    maybe(color, ansi.cyan, int.to_string(total)),
-    " run, ",
-    maybe(color, ansi.red, int.to_string(failed)),
-    " failed, ",
-    maybe(color, ansi.green, int.to_string(passed)),
-    " passed",
-    build_summary_suffix(color, skipped, pending, timed_out, setup_failed),
-    " in ",
-    maybe(color, ansi.cyan, timing.format_duration_ms(total_duration)),
-    "\n",
-  ])
-}
-
-fn sum_durations(results: List(TestResult), total: Int) -> Int {
-  case results {
-    [] -> total
-    [result, ..rest] -> sum_durations(rest, total + result.duration_ms)
-  }
-}
-
-fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  count_matching_status(results, wanted, 0)
-}
-
-fn count_matching_status(
-  results: List(TestResult),
-  wanted: Status,
-  count: Int,
-) -> Int {
-  case results {
-    [] -> count
-    [result, ..rest] -> {
-      let next_count = increment_if_matches(result.status, wanted, count)
-      count_matching_status(rest, wanted, next_count)
-    }
-  }
-}
-
-fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
-  case status == wanted {
-    True -> count + 1
-    False -> count
-  }
-}
-
-fn build_summary_suffix(
-  color: Bool,
-  skipped: Int,
-  pending: Int,
-  timed_out: Int,
-  setup_failed: Int,
-) -> String {
-  let parts =
-    []
-    |> add_summary_part_if_nonzero(color, skipped, " skipped", ansi.yellow)
-    |> add_summary_part_if_nonzero(color, pending, " pending", ansi.yellow)
-    |> add_summary_part_if_nonzero(color, timed_out, " timed out", ansi.red)
-    |> add_summary_part_if_nonzero(
-      color,
-      setup_failed,
-      " setup failed",
-      ansi.red,
-    )
-
-  format_summary_parts(parts)
-}
-
-fn format_summary_parts(parts: List(String)) -> String {
-  case parts {
-    [] -> ""
-    // Each part goes on the front of the list, so the list is in reverse
-    // order: setup failed first, skipped last.
-    _ -> string.concat([", ", string.join(list.reverse(parts), ", ")])
-  }
-}
-
-fn add_summary_part_if_nonzero(
-  parts: List(String),
-  color: Bool,
-  count: Int,
-  label: String,
-  paint: fn(String) -> String,
-) -> List(String) {
-  case count {
-    0 -> parts
-    _ -> [
-      string.concat([
-        maybe(color, paint, int.to_string(count)),
-        maybe(color, ansi.dim, label),
-      ]),
-      ..parts
-    ]
   }
 }

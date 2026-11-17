@@ -43,6 +43,7 @@
 //// }
 //// ```
 
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
   type AssertionFailure, type FailurePayload, type Status, type TestKind,
@@ -252,14 +253,14 @@ pub fn report_pretty(
 // ============================================================================
 
 fn build_report_json(results: List(TestResult)) -> Json {
-  let total_duration = calculate_total_duration(results)
+  let counts = summary.count(results)
 
   json.object([
     #("version", json.string("1.0")),
     #("timestamp_ms", json.int(get_timestamp_ms())),
-    #("duration_ms", json.int(total_duration)),
+    #("duration_ms", json.int(counts.duration_ms)),
     #("system", build_system_json()),
-    #("summary", build_summary_json(results)),
+    #("summary", build_summary_json(counts)),
     #("tests", json.array(results, build_test_json)),
   ])
 }
@@ -272,23 +273,15 @@ fn build_system_json() -> Json {
   ])
 }
 
-fn build_summary_json(results: List(TestResult)) -> Json {
-  let total = list.length(results)
-  let passed = count_by_status(results, Passed)
-  let failed = count_by_status(results, Failed)
-  let skipped = count_by_status(results, Skipped)
-  let pending = count_by_status(results, Pending)
-  let timed_out = count_by_status(results, TimedOut)
-  let setup_failed = count_by_status(results, SetupFailed)
-
+fn build_summary_json(counts: summary.Counts) -> Json {
   json.object([
-    #("total", json.int(total)),
-    #("passed", json.int(passed)),
-    #("failed", json.int(failed)),
-    #("skipped", json.int(skipped)),
-    #("pending", json.int(pending)),
-    #("timed_out", json.int(timed_out)),
-    #("setup_failed", json.int(setup_failed)),
+    #("total", json.int(counts.run)),
+    #("passed", json.int(counts.passed)),
+    #("failed", json.int(counts.failed)),
+    #("skipped", json.int(counts.skipped)),
+    #("pending", json.int(counts.pending)),
+    #("timed_out", json.int(counts.timed_out)),
+    #("setup_failed", json.int(counts.setup_failed)),
   ])
 }
 
@@ -386,37 +379,6 @@ fn kind_to_string(kind: TestKind) -> String {
     Unit -> "unit"
     Integration -> "integration"
     GherkinScenario(id) -> "gherkin:" <> id
-  }
-}
-
-fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  count_by_status_loop(results, wanted, 0)
-}
-
-fn count_by_status_loop(
-  results: List(TestResult),
-  wanted: Status,
-  count: Int,
-) -> Int {
-  case results {
-    [] -> count
-    [result, ..rest] ->
-      case result.status == wanted {
-        True -> count_by_status_loop(rest, wanted, count + 1)
-        False -> count_by_status_loop(rest, wanted, count)
-      }
-  }
-}
-
-fn calculate_total_duration(results: List(TestResult)) -> Int {
-  calculate_total_duration_loop(results, 0)
-}
-
-fn calculate_total_duration_loop(results: List(TestResult), total: Int) -> Int {
-  case results {
-    [] -> total
-    [result, ..rest] ->
-      calculate_total_duration_loop(rest, total + result.duration_ms)
   }
 }
 

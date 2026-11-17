@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Gherkin reporter without the summary line. Use it in a reporter that
   writes its own summary. The BDD reporter now uses it, in place of a
   removal of the summary line from the full Gherkin report.
+- `dream_test/reporters/summary` gives the summary line of the BDD and
+  Gherkin reporters (`summary.format` and `summary.format_in_color`) and
+  the counts behind it (`summary.count`, which gives `summary.Counts`). Use
+  it in a custom reporter to give the same summary as dream_test. The BDD,
+  Gherkin and JSON reporters now use it, in place of three copies of the
+  same count code.
+- `ansi.apply_if` applies a style only when colour is on. Use it in a
+  reporter with a colour option.
 
 ### Changed
 
