@@ -240,27 +240,33 @@ pub fn tests() {
         )
         |> or_fail_with("expected green, yellow and red cells")
       }),
-      it("color paints Cover yellow below 100.0% without a minimum", fn() {
+      it("color paints Cover by the fixed rule without a minimum", fn() {
         coverage_reporter.render(
-          report: report.new([half_file()]),
+          report: report.new([full_file(), half_file(), low_file()]),
           config: coverage.new() |> coverage.no_lcov() |> coverage.color(),
         )
         |> should
         |> be_equal(
           "\nCoverage\n"
           <> "File              Lines  Cover\n"
+          <> "src/a_full.gleam  2/2    "
+          <> green("100.0%")
+          <> "\n"
           <> "src/b_half.gleam  1/2    "
           <> yellow("50.0%")
           <> "\n"
-          <> "Total             1/2    "
+          <> "src/c_low.gleam   1/4    "
+          <> red("25.0%")
+          <> "\n"
+          <> "Total             4/8    "
           <> yellow("50.0%")
           <> "\n",
         )
-        |> or_fail_with("expected yellow cells")
+        |> or_fail_with("expected green, yellow from 50.0% and red below")
       }),
-      it("color paints Cover red below 100.0% with an invalid minimum", fn() {
+      it("color paints Cover by the fixed rule with an invalid minimum", fn() {
         coverage_reporter.render(
-          report: report.new([full_file(), half_file()]),
+          report: report.new([full_file(), low_file()]),
           config: coverage.new()
             |> coverage.no_lcov()
             |> coverage.minimum_percent(150.0)
@@ -273,14 +279,14 @@ pub fn tests() {
           <> "src/a_full.gleam  2/2    "
           <> green("100.0%")
           <> "\n"
-          <> "src/b_half.gleam  1/2    "
-          <> red("50.0%")
+          <> "src/c_low.gleam   1/4    "
+          <> red("25.0%")
           <> "\n"
-          <> "Total             3/4    "
-          <> red("75.0%")
+          <> "Total             3/6    "
+          <> yellow("50.0%")
           <> "\n",
         )
-        |> or_fail_with("expected red cells below 100.0%")
+        |> or_fail_with("expected the fixed rule colours")
       }),
       it("sort_by_coverage lists the lowest coverage first, ties by path", fn() {
         coverage_reporter.render(

@@ -264,6 +264,21 @@ pub fn tests() {
         |> be_equal(True)
         |> or_fail_with("expected complete files to be hidden")
       }),
+      it("new sets no minimum", fn() {
+        coverage.new()
+        |> coverage.minimum()
+        |> should
+        |> be_equal(None)
+        |> or_fail_with("expected no minimum")
+      }),
+      it("minimum returns the value given to minimum_percent", fn() {
+        coverage.new()
+        |> coverage.minimum_percent(80.0)
+        |> coverage.minimum()
+        |> should
+        |> be_equal(Some(80.0))
+        |> or_fail_with("expected 80.0")
+      }),
       it("new writes LCOV to build/coverage/lcov.info", fn() {
         coverage.new()
         |> coverage.lcov_file()

@@ -65,7 +65,8 @@
 ////
 //// `coverage.color()` prints the `Cover` cell green at `100.0%`, red below
 //// `coverage.minimum_percent` and yellow in between, and the `Missing`
-//// column red.
+//// column red. With no minimum, or an invalid one, the `Cover` cell is
+//// yellow from `50.0%` and red below `50.0%`.
 ////
 //// When coverage fails, `render_failure` prints a `Coverage failed` block
 //// instead. The runner writes it to the error output.
@@ -474,8 +475,9 @@ fn optional_cells(
   }
 }
 
-/// Green at 100.0%, red below the minimum, yellow in between. The header
-/// and a `-` cell stay plain.
+/// Green at 100.0%. Below that, the minimum decides the colour when one is
+/// set and valid, and a fixed rule decides it otherwise. The header and a
+/// `-` cell stay plain.
 fn percent_color(
   columns: Columns,
   measured: Option(CoverageReport),
@@ -487,20 +489,44 @@ fn percent_color(
   }
 }
 
-/// `coverage.check_minimum` decides "below the minimum", so the colour
-/// matches the minimum check exactly. An invalid minimum makes every
-/// incomplete row red; the runner reports the invalid minimum as a failure.
 fn measured_percent_color(
   config: CoverageConfig,
   measured_report: CoverageReport,
 ) -> CellColor {
   let hit = report.total_hit_line_count(measured_report)
   let total = report.total_executable_line_count(measured_report)
-  case total, hit == total, coverage.check_minimum(config, measured_report) {
-    0, _, _ -> Plain
-    _, True, _ -> Green
-    _, False, Ok(Nil) -> Yellow
-    _, False, Error(_) -> Red
+  case total, hit == total {
+    0, _ -> Plain
+    _, True -> Green
+    _, False -> incomplete_color(config, measured_report, hit, total)
+  }
+}
+
+/// With a valid minimum, `coverage.check_minimum` decides "below the
+/// minimum", so the colour matches the minimum check exactly: red below it,
+/// yellow at it or above. With no minimum, or an invalid one (the runner
+/// reports that as its own failure), the fixed rule decides.
+fn incomplete_color(
+  config: CoverageConfig,
+  measured_report: CoverageReport,
+  hit: Int,
+  total: Int,
+) -> CellColor {
+  case
+    coverage.minimum(config),
+    coverage.check_minimum(config, measured_report)
+  {
+    Some(_), Ok(Nil) -> Yellow
+    Some(_), Error(BelowMinimumPercent(..)) -> Red
+    _, _ -> fixed_rule_color(hit, total)
+  }
+}
+
+/// Yellow at 50% or above, red below 50%. The comparison is exact.
+fn fixed_rule_color(hit: Int, total: Int) -> CellColor {
+  case hit * 2 >= total {
+    True -> Yellow
+    False -> Red
   }
 }
 

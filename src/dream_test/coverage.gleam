@@ -134,7 +134,8 @@
 //// ## Table options
 ////
 //// - `coverage.color()` prints the table in colour: the `Cover` cell is
-////   green at `100.0%`, red below the minimum and yellow in between, and the
+////   green at `100.0%`, red below the minimum and yellow in between (with no
+////   valid minimum: yellow from `50.0%`, red below it), and the
 ////   `Missing` column is red.
 //// - `coverage.sort_by_coverage()` lists the lowest coverage first.
 //// - `coverage.hide_complete()` leaves out files where every line ran. The
@@ -199,7 +200,8 @@
 //// |              | `require_exclusion_reasons`                               |
 //// | **Table**    | `color`, `sort_by_coverage`, `hide_complete`              |
 //// | **Read**     | `shows_missing`, `shows_excluded`, `uses_color`,          |
-//// |              | `sorts_by_coverage`, `hides_complete`, `lcov_file`        |
+//// |              | `sorts_by_coverage`, `hides_complete`, `lcov_file`,       |
+//// |              | `minimum`                                                 |
 //// | **Run**      | `start`, `finish`, `check_minimum`                        |
 ////
 //// ## Import Style
@@ -918,8 +920,9 @@ pub fn require_exclusion_reasons(
 /// Print the coverage table in colour.
 ///
 /// The `Cover` cell of each row is green at `100.0%`, red below
-/// `coverage.minimum_percent`, and yellow in between (yellow below 100% when
-/// no minimum is set). A `-` cell (no executable lines) stays plain. The
+/// `coverage.minimum_percent`, and yellow in between. With no minimum, or an
+/// invalid one, a fixed rule applies: yellow from `50.0%`, red below
+/// `50.0%`. A `-` cell (no executable lines) stays plain. The
 /// `Missing` column is red. Off by default, like `bdd.color()`, so output
 /// that goes to a file or a CI log has no escape codes.
 ///
@@ -1077,6 +1080,31 @@ pub fn sorts_by_coverage(config config: CoverageConfig) -> Bool {
 /// ```
 pub fn hides_complete(config config: CoverageConfig) -> Bool {
   config.hide_complete
+}
+
+/// The minimum from `coverage.minimum_percent`, if any.
+///
+/// The value is returned as given, even when it is not from 0.0 to 100.0.
+/// `coverage.check_minimum` reports an invalid value.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to read
+///
+/// ## Returns
+///
+/// `Some(percent)` when a minimum is set, otherwise `None`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(80.0)
+/// |> coverage.minimum()
+/// // -> Some(80.0)
+/// ```
+pub fn minimum(config config: CoverageConfig) -> Option(Float) {
+  config.minimum_percent
 }
 
 /// The LCOV file that `coverage.finish` writes, if any.
