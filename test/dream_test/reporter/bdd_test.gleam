@@ -100,6 +100,23 @@ pub fn tests() {
       }),
     ]),
 
+    it("format_summary_only writes the skipped count without colour", fn() {
+      bdd.format_summary_only([
+        types.TestResult(
+          name: "later",
+          full_name: ["suite", "later"],
+          status: types.Skipped,
+          duration_ms: 0,
+          tags: [],
+          failures: [],
+          kind: types.Unit,
+        ),
+      ])
+      |> should
+      |> be_equal("Summary: 1 run, 0 failed, 0 passed, 1 skipped in 0ms\n")
+      |> or_fail_with("an uncoloured summary should have no ANSI codes")
+    }),
+
     it("format_summary_only returns a non-empty summary", fn() {
       let out = bdd.format_summary_only(sample_results())
       case out == "" {

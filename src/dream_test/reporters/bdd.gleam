@@ -1007,7 +1007,10 @@ fn add_summary_part_if_nonzero(
   case count {
     0 -> parts
     _ -> [
-      string.concat([paint(int.to_string(count)), maybe(color, ansi.dim, label)]),
+      string.concat([
+        maybe(color, paint, int.to_string(count)),
+        maybe(color, ansi.dim, label),
+      ]),
       ..parts
     ]
   }

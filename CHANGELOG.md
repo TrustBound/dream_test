@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `SandboxCrashed` as a `String`. Before, it was an Erlang charlist, so
   the parallel runner crashed when it put the reason of a crashed hook in
   its error text.
+- The BDD reporter without colour now writes the skipped, pending, timed out
+  and setup failed counts of its summary as plain text. Before, it put ANSI
+  colour codes around these counts, also when colour was off.
 
 ## [2.2.0] - 2026-11-17
 
