@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1 pending, 1 skipped`. Now it is `1 skipped, 1 pending, 1 timed out,
   1 setup failed`. Update tests or tools that compare the exact summary
   text.
+- BREAKING: `gherkin/feature.InlineStep` now holds
+  `keyword: gherkin/types.StepKeyword` in place of `keyword: String`.
+  Before, an unknown keyword such as `"Gvien"` became `Given` without a
+  message. Now a wrong keyword cannot compile. The `given`, `when`, `then`,
+  `and` and `but` helpers do not change. Code that builds the record by hand
+  must change, for example `InlineStep(keyword: "When", text: "I add 3")`
+  becomes `InlineStep(keyword: gherkin_types.When, text: "I add 3")`.
 
 ### Fixed
 

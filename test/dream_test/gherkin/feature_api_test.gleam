@@ -1,6 +1,7 @@
 import dream_test/gherkin/feature as gfeature
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps
+import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types as test_types
@@ -207,6 +208,72 @@ pub fn tests() {
       |> should
       |> be_equal([test_types.Passed])
       |> or_fail_with("background and scenario steps should all pass")
+    }),
+
+    it("given builds an InlineStep with the Given keyword", fn() {
+      gfeature.given("a thing")
+      |> should
+      |> be_equal(gfeature.InlineStep(
+        keyword: gherkin_types.Given,
+        text: "a thing",
+      ))
+      |> or_fail_with("given should use the Given keyword")
+    }),
+
+    it("when builds an InlineStep with the When keyword", fn() {
+      gfeature.when("I act")
+      |> should
+      |> be_equal(gfeature.InlineStep(
+        keyword: gherkin_types.When,
+        text: "I act",
+      ))
+      |> or_fail_with("when should use the When keyword")
+    }),
+
+    it("then builds an InlineStep with the Then keyword", fn() {
+      gfeature.then("it works")
+      |> should
+      |> be_equal(gfeature.InlineStep(
+        keyword: gherkin_types.Then,
+        text: "it works",
+      ))
+      |> or_fail_with("then should use the Then keyword")
+    }),
+
+    it("and builds an InlineStep with the And keyword", fn() {
+      gfeature.and("more")
+      |> should
+      |> be_equal(gfeature.InlineStep(keyword: gherkin_types.And, text: "more"))
+      |> or_fail_with("and should use the And keyword")
+    }),
+
+    it("but builds an InlineStep with the But keyword", fn() {
+      gfeature.but("not this")
+      |> should
+      |> be_equal(gfeature.InlineStep(
+        keyword: gherkin_types.But,
+        text: "not this",
+      ))
+      |> or_fail_with("but should use the But keyword")
+    }),
+
+    it("a hand-built InlineStep runs the handler of its keyword", fn() {
+      let registry =
+        steps.new()
+        |> steps.then_("it works", gherkin_step_ok)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [
+            gfeature.InlineStep(keyword: gherkin_types.Then, text: "it works"),
+          ]),
+        ])
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(fn(result) { result.status })
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("a hand-built Then step should match the Then handler")
     }),
   ])
 }

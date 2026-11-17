@@ -107,10 +107,19 @@ pub type InlineScenario {
 
 /// An inline step for the DSL.
 ///
+/// The `given`, `when`, `then`, `and`, and `but` helpers build these for you.
+/// Build one by hand when you choose the keyword at run time.
+///
+/// ## Example
+///
+/// ```gleam
+/// InlineStep(keyword: gherkin_types.When, text: "I add 3 items")
+/// ```
+///
 pub type InlineStep {
   InlineStep(
-    /// Step keyword as string ("Given", "When", "Then", "And", "But")
-    keyword: String,
+    /// The step keyword (Given, When, Then, And, But)
+    keyword: gherkin_types.StepKeyword,
     /// Step text after the keyword
     text: String,
   )
@@ -602,7 +611,7 @@ pub fn with_tags(
 /// ```
 ///
 pub fn given(text text: String) -> InlineStep {
-  InlineStep(keyword: "Given", text: text)
+  InlineStep(keyword: gherkin_types.Given, text: text)
 }
 
 /// Create a When step for inline DSL.
@@ -614,7 +623,7 @@ pub fn given(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn when(text text: String) -> InlineStep {
-  InlineStep(keyword: "When", text: text)
+  InlineStep(keyword: gherkin_types.When, text: text)
 }
 
 /// Create a Then step for inline DSL.
@@ -626,7 +635,7 @@ pub fn when(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn then(text text: String) -> InlineStep {
-  InlineStep(keyword: "Then", text: text)
+  InlineStep(keyword: gherkin_types.Then, text: text)
 }
 
 /// Create an And step for inline DSL.
@@ -638,7 +647,7 @@ pub fn then(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn and(text text: String) -> InlineStep {
-  InlineStep(keyword: "And", text: text)
+  InlineStep(keyword: gherkin_types.And, text: text)
 }
 
 /// Create a But step for inline DSL.
@@ -650,7 +659,7 @@ pub fn and(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn but(text text: String) -> InlineStep {
-  InlineStep(keyword: "But", text: text)
+  InlineStep(keyword: gherkin_types.But, text: text)
 }
 
 fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {
@@ -663,19 +672,7 @@ fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {
 }
 
 fn inline_to_parsed_step(inline: InlineStep) -> gherkin_types.Step {
-  let keyword = parse_keyword(inline.keyword)
-  gherkin_types.Step(keyword: keyword, text: inline.text, argument: None)
-}
-
-fn parse_keyword(keyword_str: String) -> gherkin_types.StepKeyword {
-  case keyword_str {
-    "Given" -> gherkin_types.Given
-    "When" -> gherkin_types.When
-    "Then" -> gherkin_types.Then
-    "And" -> gherkin_types.And
-    "But" -> gherkin_types.But
-    _ -> gherkin_types.Given
-  }
+  gherkin_types.Step(keyword: inline.keyword, text: inline.text, argument: None)
 }
 
 // ============================================================================
