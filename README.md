@@ -28,6 +28,19 @@ Current version: `2.1.3`
 
 Rapid application development needs testing tools that scale and support the growing needs of the application without slowing down progress. Dream test was designed to help engineers write expressive unit and integration tests for their applications using the tools and techniques they know from other ecosystems; adapted properly to gleam and the beam.
 
+### Built-in coverage
+
+One line in your test `main` turns it on. [Read more](#coverage).
+
+| Feature                        | What you get                                                             |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| 📈 **Line coverage**           | A per-file table after your results, with the lines your tests never ran |
+| 🎯 **Minimums**                | Fail the run below a total or per-file percent                           |
+| 🙈 **Exclusions with reasons** | Skip files, lines, blocks or whole functions, and say why in the report  |
+| 📤 **Every format**            | LCOV, JSON, Cobertura XML, Markdown, and HTML with annotated source      |
+| 🔀 **Merged runs**             | Combine coverage from servers and other BEAM instances into one report   |
+| 🧭 **Exact lines**             | Every line maps to its Gleam source line on Gleam 1.19+                  |
+
 ### Test Styles
 
 | Feature                 | What you get                                     |
@@ -73,7 +86,6 @@ Rapid application development needs testing tools that scale and support the gro
 | 📊 **Progress reporter**     | Live single-line progress bar during the run         |
 | 📋 **JSON results reporter** | Machine-readable JSON (printed at end)               |
 | 🌿 **Gherkin formatting**    | Dedicated output for feature tests                   |
-| 📈 **Coverage**              | Opt-in line coverage, minimums, LCOV, HTML           |
 
 Dream Test splits reporting into:
 
