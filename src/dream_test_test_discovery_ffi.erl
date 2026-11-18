@@ -33,8 +33,9 @@ discover_test_modules(BeamGlob) ->
         Modules = lists:filtermap(fun test_module/1, Files),
         {ok, lists:usort(Modules)}
     catch
-        _:_ ->
-            {error, <<"discover_test_modules_failed">>}
+        Class:Reason ->
+            {error, crash_text(<<"cannot search for test modules: ">>,
+                               Class, Reason)}
     end.
 
 %% The module name of a `.beam` file that discovery keeps, as
@@ -66,12 +67,88 @@ test_module_exports_tests(false, _ModuleStr) ->
 %% Dynamically call tests() on a discovered module name. Discovery keeps
 %% only modules that export tests/0.
 %%
+%% The value must have the shape of a `TestSuite`: a root with a name, a
+%% list of tags and a list of nodes, where each node is a group, a test or
+%% a hook. discover.gleam reads these fields outside any `try`, so a value
+%% of another shape is an error here and never crashes the run.
+%%
 %% Returns: {ok, Suite} or {error, <<"message">>}
 call_tests(ModuleName) ->
-    try
-        Module = list_to_atom(binary_to_list(ModuleName)),
-        {ok, Module:tests()}
+    Module = binary_to_atom(ModuleName),
+    try Module:tests() of
+        Suite -> checked_suite(Suite)
     catch
-        _:_ ->
-            {error, <<"call_tests_failed">>}
+        Class:Reason ->
+            {error, crash_text(<<"tests() crashed: ">>, Class, Reason)}
     end.
+
+checked_suite({root, _Seed, Name, Tags, Children} = Suite)
+  when is_binary(Name) ->
+    suite_with_nodes(is_text_list(Tags), first_bad_node(Children), Suite);
+checked_suite(Other) ->
+    {error, value_text(<<"tests() did not return a test suite: ">>, Other)}.
+
+suite_with_nodes(false, _Bad, Suite) ->
+    {error, value_text(<<"tests() did not return a test suite: ">>, Suite)};
+suite_with_nodes(true, none, Suite) ->
+    {ok, Suite};
+suite_with_nodes(true, {bad, Node}, _Suite) ->
+    {error,
+     value_text(<<"tests() returned a node that is not a test, a group or a hook: ">>,
+                Node)}.
+
+%% The first node of a list, at any depth, that is not a test, a group or a
+%% hook, as {bad, Node}, or none. The tail of a list that is not proper is
+%% bad too.
+first_bad_node([]) ->
+    none;
+first_bad_node([Node | Rest]) ->
+    first_bad_or_next(bad_in_node(Node), Rest);
+first_bad_node(Tail) ->
+    {bad, Tail}.
+
+first_bad_or_next(none, Rest) ->
+    first_bad_node(Rest);
+first_bad_or_next(Bad, _Rest) ->
+    Bad.
+
+bad_in_node({group, Name, Tags, Children} = Node) when is_binary(Name) ->
+    bad_in_group(is_text_list(Tags), Node, Children);
+bad_in_node({test, Name, Tags, _Kind, _Run, _Timeout, _Source} = Node)
+  when is_binary(Name) ->
+    bad_unless(is_text_list(Tags), Node);
+bad_in_node({Hook, _Run})
+  when Hook =:= before_all; Hook =:= before_each;
+       Hook =:= after_each; Hook =:= after_all ->
+    none;
+bad_in_node(Node) ->
+    {bad, Node}.
+
+bad_in_group(true, _Node, Children) ->
+    first_bad_node(Children);
+bad_in_group(false, Node, _Children) ->
+    {bad, Node}.
+
+bad_unless(true, _Node) ->
+    none;
+bad_unless(false, Node) ->
+    {bad, Node}.
+
+is_text_list([]) ->
+    true;
+is_text_list([Text | Rest]) when is_binary(Text) ->
+    is_text_list(Rest);
+is_text_list(_Other) ->
+    false.
+
+%% `<Prefix><Class>:<Reason>`, as `sandbox.run_catching` writes a crash,
+%% on one line.
+crash_text(Prefix, Class, Reason) ->
+    Text = unicode:characters_to_binary(
+             io_lib:format("~0tp:~0tp", [Class, Reason])),
+    <<Prefix/binary, Text/binary>>.
+
+%% `<Prefix><Value>`, on one line.
+value_text(Prefix, Value) ->
+    Text = unicode:characters_to_binary(io_lib:format("~0tp", [Value])),
+    <<Prefix/binary, Text/binary>>.

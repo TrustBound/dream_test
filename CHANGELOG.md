@@ -479,6 +479,11 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- `discover.load` gives an error that names the module when `tests()`
+  returns a value that is not a test suite. Before, the whole run crashed.
+  The error text of a `tests()` that crashes, and of a pattern that cannot
+  be searched, now has the real cause, for example
+  `tests() crashed: error:...` in place of `call_tests_failed`.
 - `sandbox.run_isolated` gives `SandboxTimedOut` only after the process
   that timed out has exited, so what it held is free when the call
   returns.

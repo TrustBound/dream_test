@@ -245,6 +245,13 @@ pub fn list_modules(
 /// Load discovered suites and return both suites and errors.
 ///
 /// This never panics; discovery errors are returned in `LoadResult.errors`.
+/// Each error starts with the pattern or the module name, then the cause:
+/// `tests() crashed: <class>:<reason>` when `tests()` crashes,
+/// `tests() did not return a test suite: <value>` or
+/// `tests() returned a node that is not a test, a group or a hook: <node>`
+/// when its value has another shape, and
+/// `cannot search for test modules: <class>:<reason>` for a pattern that
+/// cannot be searched.
 ///
 /// ## Parameters
 ///

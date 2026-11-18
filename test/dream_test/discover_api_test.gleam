@@ -8,6 +8,16 @@ import dream_test/types.{
 import dream_test/unit.{describe, it}
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
+
+/// The load errors of the discovery fixture `name`.
+fn load_errors(name: String) -> List(String) {
+  let LoadResult(suites: _, errors: errors) =
+    discover.new()
+    |> from_path("discovery_fixtures/" <> name <> ".gleam")
+    |> discover.load()
+  errors
+}
 
 fn suite_test_sources(suite: types.TestSuite(Nil)) -> List(Option(String)) {
   list.flat_map(suite.children, node_test_sources)
@@ -75,7 +85,9 @@ pub fn tests() {
       |> from_path("{")
       |> list_modules()
       |> should
-      |> be_equal(Error("{: discover_test_modules_failed"))
+      |> be_equal(Error(
+        "{: cannot search for test modules: error:{badpattern,missing_delimiter}",
+      ))
       |> or_fail_with("a bad pattern should give an error")
     }),
 
@@ -102,17 +114,56 @@ pub fn tests() {
         |> from_path("discovery_fixtures/crashing_suite.gleam")
         |> discover.load()
 
-      #(list.length(suites), errors)
-      |> should
-      |> be_equal(
-        #(0, ["discovery_fixtures@crashing_suite: call_tests_failed"]),
+      #(
+        list.length(suites),
+        list.map(errors, string.starts_with(
+          _,
+          "discovery_fixtures@crashing_suite: tests() crashed: error:#{",
+        )),
+        list.map(errors, string.contains(_, "crashing_suite fixture")),
       )
-      |> or_fail_with("load should give the call error")
+      |> should
+      |> be_equal(#(0, [True], [True]))
+      |> or_fail_with("load should give the crash with its reason")
+    }),
+
+    it("load reports a module whose tests function gives no suite", fn() {
+      ["not_a_suite", "bad_root_tags_suite"]
+      |> list.flat_map(load_errors)
+      |> should
+      |> be_equal([
+        "discovery_fixtures@not_a_suite: tests() did not return a test suite: 42",
+        "discovery_fixtures@bad_root_tags_suite: tests() did not return a test suite: {root,nil,<<\"bad_root_tags_suite\">>,[1],[]}",
+      ])
+      |> or_fail_with("load should name the module and the value")
+    }),
+
+    it("load reports a suite with a node that is not a node", fn() {
+      ["bad_node_suite", "bad_group_suite", "improper_children_suite"]
+      |> list.flat_map(load_errors)
+      |> should
+      |> be_equal([
+        "discovery_fixtures@bad_node_suite: tests() returned a node that is not a test, a group or a hook: 42",
+        "discovery_fixtures@bad_group_suite: tests() returned a node that is not a test, a group or a hook: {group,<<\"bad\">>,[1],[]}",
+        "discovery_fixtures@improper_children_suite: tests() returned a node that is not a test, a group or a hook: 42",
+      ])
+      |> or_fail_with("load should name the module and the bad node")
+    }),
+
+    it("load reports a test with a tag that is not a string", fn() {
+      load_errors("bad_test_suite")
+      |> list.map(string.starts_with(
+        _,
+        "discovery_fixtures@bad_test_suite: tests() returned a node that is not a test, a group or a hook: {test,<<\"bad\">>,[1],",
+      ))
+      |> should
+      |> be_equal([True])
+      |> or_fail_with("load should name the module and the bad test")
     }),
 
     it("to_suites adds a failing test for each load error", fn() {
       discover.new()
-      |> from_path("discovery_fixtures/crashing_suite.gleam")
+      |> from_path("discovery_fixtures/not_a_suite.gleam")
       |> discover.to_suites()
       |> runner.new()
       |> runner.run()
@@ -123,7 +174,7 @@ pub fn tests() {
         #(
           [
             "Discovery Errors",
-            "Discovery Error: discovery_fixtures@crashing_suite: call_tests_failed",
+            "Discovery Error: discovery_fixtures@not_a_suite: tests() did not return a test suite: 42",
           ],
           Failed,
           [
@@ -141,7 +192,7 @@ pub fn tests() {
     it("to_suite puts suites and load errors under one group", fn() {
       discover.new()
       |> from_path("discovery_fixtures/hooked_suite.gleam")
-      |> from_path("discovery_fixtures/crashing_suite.gleam")
+      |> from_path("discovery_fixtures/not_a_suite.gleam")
       |> discover.to_suite("all")
       |> list.wrap()
       |> runner.new()
@@ -155,7 +206,7 @@ pub fn tests() {
         #(
           [
             "all",
-            "Discovery Error: discovery_fixtures@crashing_suite: call_tests_failed",
+            "Discovery Error: discovery_fixtures@not_a_suite: tests() did not return a test suite: 42",
           ],
           Failed,
         ),

@@ -870,6 +870,14 @@ pub fn tests() -> TestSuite(Nil) {
 }
 ```
 
+#### Discovery errors
+
+`discover.load` and `discover.to_suites` give a new error text for a test module that does not load. Code that compares the text must change:
+
+- A `tests()` function that crashes gives `tests() crashed: <class>:<reason>`, for example `tests() crashed: error:...`. In 2.x the text was `call_tests_failed`.
+- A `tests()` function whose value is not a test suite gives `tests() did not return a test suite: <value>`, or `tests() returned a node that is not a test, a group or a hook: <node>`. In 2.x the run crashed.
+- A pattern that cannot be searched gives `cannot search for test modules: <class>:<reason>`. In 2.x the text was `discover_test_modules_failed`.
+
 ### Hooks
 
 3.0.0 has one rule for every hook failure:
