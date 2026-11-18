@@ -494,6 +494,9 @@ How the tests get their names and tags:
 - Each Examples row becomes one test named `<scenario> (Example N)`. When the `Examples` section has a name, the test is named `<scenario> (<examples name>, Example N)`. N counts the rows of all `Examples` sections of the scenario, from 1, so each name is different.
 - A scenario with no `Examples` section runs one time, also when its keyword is `Scenario Outline`. An `Examples` section with no table rows makes no tests.
 - The tags of a test are the Feature tags, then the Rule tags, then the scenario tags, then the `Examples` tags. Tag filters see all of them.
+- The values of an Examples row replace the `<header>` placeholders in the scenario name, the step texts, the DocStrings and the DataTable cells. The headers replace in column order.
+- A scenario with no steps runs no Background steps.
+- A step can have a DataTable and a DocString, in either order. The handler gets them in `context.table` and `context.doc_string`.
 
 #### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

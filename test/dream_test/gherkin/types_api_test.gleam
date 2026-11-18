@@ -40,27 +40,6 @@ pub fn tests() {
       |> or_fail_with("keyword_from_string(unknown) should be None")
     }),
 
-    it("resolve_keyword resolves And/But and leaves other keywords alone", fn() {
-      types.resolve_keyword(types.And, types.Given)
-      |> should
-      |> be_equal(types.Given)
-      |> or_fail_with("And after Given should resolve to Given")
-    }),
-
-    it("resolve_keyword resolves But based on previous keyword", fn() {
-      types.resolve_keyword(types.But, types.Then)
-      |> should
-      |> be_equal(types.Then)
-      |> or_fail_with("But after Then should resolve to Then")
-    }),
-
-    it("resolve_keyword leaves non-And/But keywords unchanged", fn() {
-      types.resolve_keyword(types.When, types.Given)
-      |> should
-      |> be_equal(types.When)
-      |> or_fail_with("When should remain When")
-    }),
-
     it("empty_examples produces an empty table", fn() {
       types.empty_examples()
       |> should
@@ -76,7 +55,13 @@ pub fn tests() {
     }),
 
     it("Step constructor with labeled args can be created", fn() {
-      let _ = types.Step(keyword: types.Given, text: "a step", argument: None)
+      let _ =
+        types.Step(
+          keyword: types.Given,
+          text: "a step",
+          doc_string: None,
+          data_table: None,
+        )
       Ok(test_types.AssertionOk)
     }),
 
@@ -108,13 +93,6 @@ pub fn tests() {
         Some(types.Asterisk),
       ])
       |> or_fail_with("each name should give its keyword")
-    }),
-
-    it("resolve_keyword resolves * based on previous keyword", fn() {
-      types.resolve_keyword(types.Asterisk, types.When)
-      |> should
-      |> be_equal(types.When)
-      |> or_fail_with("* after When should resolve to When")
     }),
 
     it("resolve_phase gives Given, When and Then their own phase", fn() {

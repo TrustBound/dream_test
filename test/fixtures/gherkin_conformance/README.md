@@ -68,9 +68,6 @@ are in `differs/`, and the tests check the error that dream_test gives:
 - `empty.feature`, `incomplete_feature_3.feature`: the file has no Feature.
   dream_test gives a `MissingFeature` error, so that a wrong file is not a
   silent pass.
-- `step_with_datatable_and_docstring.feature`: a step has both a DataTable
-  and a DocString. dream_test permits one argument for each step and gives
-  a `StepArgumentConflict` error.
 
 The Markdown files (`*.md`) of `testdata/good` are Markdown with Gherkin,
 which dream_test does not parse.

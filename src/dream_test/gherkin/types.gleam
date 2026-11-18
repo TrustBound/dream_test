@@ -69,58 +69,88 @@ pub type StepPhase {
   ThenPhase
 }
 
-/// Optional argument attached to a step.
+/// Multi-line text after a step, between two `"""` (or two `` ``` ``) lines.
 ///
-/// Steps can have additional structured data:
+/// - `content` - The text between the separators
+/// - `content_type` - The media type after the opening separator, if any
+///   (for example `json` in `"""json`)
 ///
-/// ## DocString
+/// ## Example
 ///
-/// Multi-line text enclosed in triple quotes:
+/// ```gleam
+/// DocString(content: "{\"name\":\"example\"}", content_type: Some("json"))
+/// |> should
+/// |> be_equal(DocString(
+///   content: "{\"name\":\"example\"}",
+///   content_type: Some("json"),
+/// ))
+/// |> or_fail_with("expected DocString to be constructible")
+/// ```
 ///
-/// In Dream Test these values are represented as `DocString(...)`.
-///
-/// ## DataTable
-///
-/// Tabular data with pipe-delimited rows:
-///
-/// In Dream Test these values are represented as `DataTable(...)`.
-///
-pub type StepArgument {
-  /// Multi-line text content.
-  /// - `content` - The text between the triple quotes
-  /// - `content_type` - Optional media type hint (e.g., "json", "xml")
+pub type DocString {
   DocString(content: String, content_type: Option(String))
+}
 
-  /// Tabular data as a list of rows.
-  /// Each row is a list of cell values.
-  /// The first row is typically headers.
+/// Table rows after a step, one `| cell | cell |` line for each row.
+///
+/// Each row is a list of cell values. The first row is usually the headers.
+///
+/// ## Example
+///
+/// ```gleam
+/// DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]])
+/// |> should
+/// |> be_equal(
+///   DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]]),
+/// )
+/// |> or_fail_with("expected DataTable to be constructible")
+/// ```
+///
+pub type DataTable {
   DataTable(rows: List(List(String)))
 }
 
 /// A single step in a scenario.
 ///
 /// Steps are the executable units of a scenario. Each step has:
-/// - A keyword (Given/When/Then/And/But)
+/// - A keyword (Given/When/Then/And/But/*)
 /// - Text describing the action
-/// - Optional argument (DocString or DataTable)
+/// - An optional DocString
+/// - An optional DataTable
+///
+/// A step can have both a DocString and a DataTable, in either order, as
+/// in the official Gherkin grammar. A step handler gets them as
+/// `StepContext.doc_string` and `StepContext.table`.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// Step(keyword: Given, text: "I have 1 item", argument: None)
+/// Step(
+///   keyword: Given,
+///   text: "I have 1 item",
+///   doc_string: None,
+///   data_table: None,
+/// )
 /// |> should
-/// |> be_equal(Step(keyword: Given, text: "I have 1 item", argument: None))
+/// |> be_equal(Step(
+///   keyword: Given,
+///   text: "I have 1 item",
+///   doc_string: None,
+///   data_table: None,
+/// ))
 /// |> or_fail_with("expected Step to be constructible")
 /// ```
 ///
 pub type Step {
   Step(
-    /// The step keyword (Given, When, Then, And, But)
+    /// The step keyword (Given, When, Then, And, But, *)
     keyword: StepKeyword,
     /// The step text after the keyword
     text: String,
-    /// Optional DocString or DataTable argument
-    argument: Option(StepArgument),
+    /// The DocString after the step, if any
+    doc_string: Option(DocString),
+    /// The DataTable after the step, if any
+    data_table: Option(DataTable),
   )
 }
 
@@ -255,7 +285,13 @@ pub type ScenarioKeyword {
 /// ## Example
 ///
 /// ```gleam
-/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+/// let step =
+///   Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   )
 /// let scenario =
 ///   Scenario(
 ///     keyword: KeywordScenario,
@@ -346,7 +382,13 @@ pub type Rule {
 /// ## Example
 ///
 /// ```gleam
-/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+/// let step =
+///   Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   )
 /// let scenario =
 ///   Scenario(
 ///     keyword: KeywordScenario,
@@ -462,32 +504,6 @@ pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
     "But" -> option.Some(But)
     "*" -> option.Some(Asterisk)
     _ -> option.None
-  }
-}
-
-/// Resolve And/But/* to the effective keyword based on previous step.
-///
-/// In Gherkin, `And`, `But` and `*` inherit meaning from the previous step.
-/// This function resolves them to their effective keyword type.
-///
-/// ## Example
-///
-/// ```gleam
-/// resolve_keyword(And, Given)
-/// |> should
-/// |> be_equal(Given)
-/// |> or_fail_with("expected And after Given to resolve to Given")
-/// ```
-///
-pub fn resolve_keyword(
-  keyword keyword: StepKeyword,
-  previous previous: StepKeyword,
-) -> StepKeyword {
-  case keyword {
-    And -> previous
-    But -> previous
-    Asterisk -> previous
-    other -> other
   }
 }
 

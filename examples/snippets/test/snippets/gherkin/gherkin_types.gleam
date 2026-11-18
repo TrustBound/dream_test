@@ -3,7 +3,7 @@ import dream_test/gherkin/types.{
   Feature, Given, GivenPhase, KeywordScenario, KeywordScenarioOutline,
   KeywordScenarioTemplate, Rule, Scenario, Step, Then, WhenPhase,
   empty_background, empty_examples, keyword_from_string, keyword_to_string,
-  phase_to_string, resolve_keyword, resolve_phase, scenario_keyword_to_string,
+  phase_to_string, resolve_phase, scenario_keyword_to_string,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
@@ -22,12 +22,6 @@ pub fn tests() {
       |> should
       |> be_equal(Some(Then))
       |> or_fail_with("expected Some(Then)")
-    }),
-    it("resolve_keyword turns And/But into the previous keyword", fn() {
-      resolve_keyword(And, Given)
-      |> should
-      |> be_equal(Given)
-      |> or_fail_with("expected And after Given to resolve to Given")
     }),
     it("resolve_phase gives And the phase of the step before it", fn() {
       resolve_phase(keyword: And, previous: Some(GivenPhase))
@@ -48,9 +42,19 @@ pub fn tests() {
       |> or_fail_with("expected When")
     }),
     it("Step can be constructed", fn() {
-      Step(keyword: Given, text: "I have 1 item", argument: None)
+      Step(
+        keyword: Given,
+        text: "I have 1 item",
+        doc_string: None,
+        data_table: None,
+      )
       |> should
-      |> be_equal(Step(keyword: Given, text: "I have 1 item", argument: None))
+      |> be_equal(Step(
+        keyword: Given,
+        text: "I have 1 item",
+        doc_string: None,
+        data_table: None,
+      ))
       |> or_fail_with("expected Step to be constructible")
     }),
     it("DocString can be constructed", fn() {
@@ -89,7 +93,13 @@ pub fn tests() {
       |> or_fail_with("expected ExamplesTable to be constructible")
     }),
     it("Scenario can be constructed", fn() {
-      let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+      let step =
+        Step(
+          keyword: Given,
+          text: "I have 1 item",
+          doc_string: None,
+          data_table: None,
+        )
       let scenario =
         Scenario(
           keyword: KeywordScenario,
@@ -140,7 +150,12 @@ pub fn tests() {
     }),
     it("a scenario outline holds its Examples sections", fn() {
       let step =
-        Step(keyword: Given, text: "I have <count> items", argument: None)
+        Step(
+          keyword: Given,
+          text: "I have <count> items",
+          doc_string: None,
+          data_table: None,
+        )
       let small =
         Examples(
           name: "Small",

@@ -42,7 +42,8 @@ Feature: Demo
                     gtypes.Step(
                       keyword: gtypes.Given,
                       text: "a thing",
-                      argument: None,
+                      doc_string: None,
+                      data_table: None,
                     ),
                   ],
                   examples: [],
@@ -175,14 +176,14 @@ Scenario: S
         parser.parse_string("Feature: F\r\n  Scenario: S\r\n    Given a\r\n")
         |> result.map(first_scenario_steps)
         |> should
-        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None)]))
+        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None)]))
         |> or_fail_with("expected the step text without a carriage return")
       }),
       it("parse_string reads a file without a final newline", fn() {
         parser.parse_string("\nFeature: F\n  Scenario: S\n    Given a")
         |> result.map(first_scenario_steps)
         |> should
-        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None)]))
+        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None)]))
         |> or_fail_with("expected the last step")
       }),
       it("parse_string skips comments between steps", fn() {
@@ -193,8 +194,8 @@ Scenario: S
         |> should
         |> be_equal(
           Ok([
-            gtypes.Step(gtypes.Given, "a", None),
-            gtypes.Step(gtypes.Then, "b", None),
+            gtypes.Step(gtypes.Given, "a", None, None),
+            gtypes.Step(gtypes.Then, "b", None, None),
           ]),
         )
         |> or_fail_with("expected two steps")
@@ -210,6 +211,7 @@ Scenario: S
             gtypes.Step(
               gtypes.Given,
               "a",
+              None,
               Some(gtypes.DataTable([["a|b", "c\\d", "e\nf", "\\x"]])),
             ),
           ]),
@@ -264,7 +266,7 @@ Scenario: S
               gtypes.Background(
                 name: "Setup",
                 description: Some("    Some words"),
-                steps: [gtypes.Step(gtypes.Given, "a", None)],
+                steps: [gtypes.Step(gtypes.Given, "a", None, None)],
               ),
             ),
           ),
@@ -293,7 +295,7 @@ Scenario: S
               tags: ["slow"],
               background: Some(
                 gtypes.Background(name: "", description: None, steps: [
-                  gtypes.Step(gtypes.Given, "stock", None),
+                  gtypes.Step(gtypes.Given, "stock", None, None),
                 ]),
               ),
               scenarios: [
@@ -302,7 +304,7 @@ Scenario: S
                   name: "Sell",
                   description: None,
                   tags: [],
-                  steps: [gtypes.Step(gtypes.When, "I sell", None)],
+                  steps: [gtypes.Step(gtypes.When, "I sell", None, None)],
                   examples: [],
                 ),
               ],
@@ -563,6 +565,7 @@ Scenario: S
             gtypes.Step(
               gtypes.Given,
               "a",
+              None,
               Some(gtypes.DataTable([["x", "", "y"]])),
             ),
           ]),
@@ -587,6 +590,7 @@ Scenario: S
               gtypes.Given,
               "a",
               Some(gtypes.DocString("{}", Some("json"))),
+              None,
             ),
           ]),
         )
@@ -681,9 +685,11 @@ Scenario: S
       }),
     ]),
     group("step arguments", [
-      it("parse_string rejects a DataTable after a DocString on one step", fn() {
-        parser.parse_string(
-          "Feature: F
+      it(
+        "parse_string keeps a DocString and the DataTable after it on one step",
+        fn() {
+          parser.parse_string(
+            "Feature: F
 Scenario: S
   Given text
     \"\"\"
@@ -691,16 +697,27 @@ Scenario: S
     \"\"\"
     | a |
 ",
-        )
-        |> should
-        |> be_equal(
-          Error(ParseError(line: 7, problem: parser.StepArgumentConflict)),
-        )
-        |> or_fail_with("expected an argument conflict")
-      }),
-      it("parse_string rejects a DocString after a DataTable on one step", fn() {
-        parser.parse_string(
-          "Feature: F
+          )
+          |> result.map(first_scenario_steps)
+          |> should
+          |> be_equal(
+            Ok([
+              gtypes.Step(
+                gtypes.Given,
+                "text",
+                Some(gtypes.DocString("hello", None)),
+                Some(gtypes.DataTable([["a"]])),
+              ),
+            ]),
+          )
+          |> or_fail_with("expected both step arguments")
+        },
+      ),
+      it(
+        "parse_string keeps a DataTable and the DocString after it on one step",
+        fn() {
+          parser.parse_string(
+            "Feature: F
 Scenario: S
   Given text
     | a |
@@ -708,13 +725,22 @@ Scenario: S
     hello
     \"\"\"
 ",
-        )
-        |> should
-        |> be_equal(
-          Error(ParseError(line: 5, problem: parser.StepArgumentConflict)),
-        )
-        |> or_fail_with("expected an argument conflict")
-      }),
+          )
+          |> result.map(first_scenario_steps)
+          |> should
+          |> be_equal(
+            Ok([
+              gtypes.Step(
+                gtypes.Given,
+                "text",
+                Some(gtypes.DocString("hello", None)),
+                Some(gtypes.DataTable([["a"]])),
+              ),
+            ]),
+          )
+          |> or_fail_with("expected both step arguments")
+        },
+      ),
       it("parse_string rejects a second DocString on one step", fn() {
         parser.parse_string(
           "Feature: F
@@ -734,6 +760,94 @@ Scenario: S
         )
         |> or_fail_with("expected a repeated DocString error")
       }),
+      it(
+        "parse_string rejects a second DocString after a DataTable and a DocString",
+        fn() {
+          parser.parse_string(
+            "Feature: F
+Scenario: S
+  Given text
+    | a |
+    \"\"\"
+    one
+    \"\"\"
+    \"\"\"
+    two
+    \"\"\"
+",
+          )
+          |> should
+          |> be_equal(
+            Error(ParseError(line: 8, problem: parser.RepeatedDocString)),
+          )
+          |> or_fail_with("expected a repeated DocString error")
+        },
+      ),
+      it("parse_string rejects an unclosed DocString after a DataTable", fn() {
+        parser.parse_string(
+          "Feature: F
+Scenario: S
+  Given text
+    | a |
+    \"\"\"
+    one
+",
+        )
+        |> should
+        |> be_equal(
+          Error(ParseError(line: 7, problem: parser.UnclosedDocString(5))),
+        )
+        |> or_fail_with("expected an unclosed DocString error")
+      }),
+      it("parse_string rejects a short table row after a DocString", fn() {
+        parser.parse_string(
+          "Feature: F
+Scenario: S
+  Given text
+    \"\"\"
+    one
+    \"\"\"
+    | a | b |
+    | c |
+",
+        )
+        |> should
+        |> be_equal(
+          Error(ParseError(line: 8, problem: parser.InconsistentCellCount(2, 1))),
+        )
+        |> or_fail_with("expected an inconsistent cell count error")
+      }),
+      it(
+        "parse_string rejects a DataTable after a DataTable and a DocString",
+        fn() {
+          parser.parse_string(
+            "Feature: F
+Scenario: S
+  Given text
+    | a |
+    \"\"\"
+    one
+    \"\"\"
+    | b |
+",
+          )
+          |> should
+          |> be_equal(
+            Error(ParseError(
+              line: 8,
+              problem: parser.UnexpectedLine("| b |", [
+                StepLine,
+                TagLine,
+                ExamplesLine,
+                ScenarioLine,
+                RuleLine,
+                EndOfFile,
+              ]),
+            )),
+          )
+          |> or_fail_with("expected an unexpected line error")
+        },
+      ),
       it(
         "parse_string removes the separator indentation and unescapes a separator",
         fn() {
@@ -756,6 +870,7 @@ Scenario: S
                 gtypes.Given,
                 "text",
                 Some(gtypes.DocString("  deeper\nshallow\na \"\"\" b", None)),
+                None,
               ),
             ]),
           )
@@ -847,7 +962,6 @@ Scenario: S
           parser.InconsistentCellCount(2, 1),
           parser.TagContainsWhitespace("a b"),
           parser.UnsupportedLanguage("fr"),
-          parser.StepArgumentConflict,
           parser.RepeatedDocString,
           parser.MissingPreviousStep(gtypes.But, "b"),
         ]
@@ -862,7 +976,6 @@ Scenario: S
           "This table row has 1 cells, but the first row of the table has 2 cells",
           "The tag \"@a b\" contains whitespace. A tag cannot contain whitespace.",
           "The language \"fr\" is not supported. dream_test supports only English (\"en\").",
-          "Step cannot have both a DataTable and a DocString",
           "Step cannot have more than one DocString",
           "\"But b\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
         ])

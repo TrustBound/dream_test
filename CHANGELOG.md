@@ -64,8 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The name and description of a Background, and the description of a
   scenario, a Rule and an `Examples` section.
 - Conformance tests for the Gherkin parser, from the official Gherkin
-  test files: 36 good files parse to the official structure, 12 bad files
-  give the official error line, and 9 good files that dream_test rejects on
+  test files: 37 good files parse to the official structure, 12 bad files
+  give the official error line, and 8 good files that dream_test rejects on
   purpose give the dream_test error. The fixture README lists the skipped
   files and the reasons.
 - `gherkin/parser.ParseError`, `ParseProblem`, `TokenKind` and
@@ -228,6 +228,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BREAKING: A `# language:` line before the Feature must name `en`.
   Another language is an `UnsupportedLanguage` error. Before, the line was
   a comment.
+- BREAKING: `gherkin/types.Step` now holds `doc_string: Option(DocString)`
+  and `data_table: Option(DataTable)` in place of
+  `argument: Option(StepArgument)`, so that a step can have both arguments.
+  The `StepArgument` type is removed; `DocString(content:, content_type:)`
+  and `DataTable(rows:)` are now types of their own. Before:
+  `Step(keyword: Given, text: "a", argument: Some(DataTable(rows: rows)))`.
+  After:
+  `Step(keyword: Given, text: "a", doc_string: None, data_table: Some(DataTable(rows: rows)))`.
+  Step handlers do not change: they still read `context.table` and
+  `context.doc_string`.
+- BREAKING: `gherkin/types.resolve_keyword` is removed. Use
+  `gherkin/types.resolve_phase`. Before: `resolve_keyword(And, Given)` gave
+  `Given`. After: `resolve_phase(keyword: And, previous: Some(GivenPhase))`
+  gives `Ok(GivenPhase)`.
 
 ### Fixed
 
@@ -240,9 +254,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line end at the end of a snapshot file, as they already did for `\n` and
   `\r`. Before, a snapshot file saved with Windows line ends did not match
   the same text.
-- The Gherkin parser now gives an error for a step that has both a
-  DataTable and a DocString. Before, it kept one argument and dropped the
-  other without a message.
+- A Gherkin step can now have both a DataTable and a DocString, in either
+  order, as in the official Gherkin grammar. The step handler gets both, in
+  `context.table` and `context.doc_string`. Before, the parser kept one
+  argument and dropped the other without a message. A second DocString on
+  one step is a `RepeatedDocString` error.
+- The values of an `Examples` row now replace the `<header>` placeholders
+  in the scenario name, the DocStrings (content and media type) and the
+  DataTable cells, as in the official Gherkin compiler. Before, only the
+  step text changed, so a test was named `the <one> (Example 1)` in place
+  of `the un (Example 1)`. The headers now replace in column order; before,
+  the order was not defined, so with two columns of the same name either
+  value could win. Now the first column wins.
+- A scenario with no steps now runs no Background steps, as in the official
+  Gherkin compiler. Before, the Background steps ran, so a failing
+  Background step failed a scenario with no steps.
+- The Feature tags now appear one time in the tags of a Gherkin test.
+  Before, a test of a Feature tagged `@f` with a scenario tagged `@s` had
+  the tags `["f", "f", "s"]`; now it has `["f", "s"]`. The Feature keeps its
+  tags, each Rule group now holds its own tags, and each test holds the
+  scenario and `Examples` tags. The order is still Feature, Rule, scenario,
+  `Examples`.
 - The Gherkin parser now gives an error for a DocString that has no closing
   `"""`. Before, the DocString took all the lines to the end of the file, and
   the parser dropped the scenarios in those lines without a message.

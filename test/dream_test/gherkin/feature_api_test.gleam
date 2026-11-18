@@ -122,7 +122,7 @@ pub fn tests() {
       run_parsed(rules_feature(), rules_registry())
       |> list.map(result_tags)
       |> should
-      |> be_equal([["f", "f", "outside"], ["f", "f", "r", "sell"], ["f", "f"]])
+      |> be_equal([["f", "outside"], ["f", "r", "sell"], ["f"]])
       |> or_fail_with(
         "expected Feature tags, then Rule tags, then scenario tags",
       )
@@ -213,6 +213,119 @@ pub fn tests() {
       |> be_equal([[]])
       |> or_fail_with("handlers should get the step arguments")
     }),
+
+    it("to_test_suite gives a step both its DataTable and its DocString", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("a step with both arguments", expect_both_arguments)
+
+      run_file(
+        conformance_directory <> "step_with_datatable_and_docstring.feature",
+        registry,
+      )
+      |> list.map(result_failures)
+      |> should
+      |> be_equal([[], []])
+      |> or_fail_with("expected the handler to get both arguments")
+    }),
+
+    it("to_test_suite puts the example values in the scenario name", fn() {
+      run_file(
+        conformance_directory <> "example_tokens_everywhere.feature",
+        steps.new(),
+      )
+      |> list.map(result_name)
+      |> should
+      |> be_equal(["the un (Example 1)", "the uno (Example 2)"])
+      |> or_fail_with("expected the example values in the names")
+    }),
+
+    it("to_test_suite puts the example values in the DocString", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("the {}", fail_with_doc_string)
+
+      run_file(
+        conformance_directory <> "example_tokens_everywhere.feature",
+        registry,
+      )
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["trois"], ["tres"]])
+      |> or_fail_with("expected the example values in the DocString")
+    }),
+
+    it(
+      "to_test_suite puts the example values in a DocString with a media type",
+      fn() {
+        let registry =
+          steps.new()
+          |> steps.given("this file:", fail_with_doc_string)
+
+        run_file(
+          conformance_directory <> "scenario_outline_with_docstring.feature",
+          registry,
+        )
+        |> list.map(result_failure_messages)
+        |> should
+        |> be_equal([["Greeting:Hello"], ["Greeting:Bonjour"]])
+        |> or_fail_with("expected the example values in the DocString")
+      },
+    ),
+
+    it("to_test_suite puts the example values in the DataTable cells", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("the {}", fail_with_table)
+
+      run_file(
+        conformance_directory <> "example_tokens_everywhere.feature",
+        registry,
+      )
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["cinq"], ["cinco"]])
+      |> or_fail_with("expected the example values in the DataTable")
+    }),
+
+    it("to_test_suite uses the first column of a repeated example header", fn() {
+      run_parsed(
+        "Feature: F\n  Scenario Outline: O\n    Given <x>\n    Examples:\n      | x | x |\n      | 1 | 2 |\n",
+        steps.new(),
+      )
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["Undefined step: Given 1"]])
+      |> or_fail_with("expected the headers to replace in column order")
+    }),
+
+    it(
+      "to_test_suite runs no Background steps for a scenario with no steps",
+      fn() {
+        run_parsed(
+          "Feature: F\n  Background:\n    Given missing\n  Scenario: S\n",
+          steps.new(),
+        )
+        |> list.map(result_status)
+        |> should
+        |> be_equal([test_types.Passed])
+        |> or_fail_with("expected the Background to be left out")
+      },
+    ),
+
+    it(
+      "to_test_suite runs no Background steps for an example row with no steps",
+      fn() {
+        run_parsed(
+          "Feature: F\n  Background:\n    Given missing\n  Scenario Outline: O\n    Examples:\n      | n |\n      | 1 |\n",
+          steps.new(),
+        )
+        |> list.map(result_status)
+        |> should
+        |> be_equal([test_types.Passed])
+        |> or_fail_with("expected the Background to be left out")
+      },
+    ),
 
     it("a scenario fails with the message of an undefined step", fn() {
       let suite =
@@ -525,6 +638,73 @@ fn run_parsed(
       |> runner.run()
     Error(_) -> []
   }
+}
+
+const conformance_directory = "test/fixtures/gherkin_conformance/good/"
+
+fn run_file(
+  path: String,
+  registry: steps.StepRegistry,
+) -> List(test_types.TestResult) {
+  case parser.parse_file(path) {
+    Ok(feature) ->
+      runner.new([
+        gfeature.to_test_suite(gfeature.FeatureConfig(
+          feature: feature,
+          step_registry: registry,
+        )),
+      ])
+      |> runner.run()
+    Error(_) -> []
+  }
+}
+
+fn expect_both_arguments(
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  case context.table, context.doc_string {
+    Some([["id", "name"], ["1", "bob"]]), Some("hello") ->
+      Ok(test_types.AssertionOk)
+    table, doc_string ->
+      Error(
+        "unexpected arguments: "
+        <> string.inspect(table)
+        <> " "
+        <> string.inspect(doc_string),
+      )
+  }
+}
+
+fn fail_with_doc_string(
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  case context.doc_string {
+    Some(content) -> Error(content)
+    None -> Ok(test_types.AssertionOk)
+  }
+}
+
+fn fail_with_table(
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  case context.table {
+    Some(rows) -> Error(string.join(list.flatten(rows), ","))
+    None -> Ok(test_types.AssertionOk)
+  }
+}
+
+fn result_failures(
+  result: test_types.TestResult,
+) -> List(test_types.AssertionFailure) {
+  result.failures
+}
+
+fn result_failure_messages(result: test_types.TestResult) -> List(String) {
+  list.map(result.failures, failure_message)
+}
+
+fn failure_message(failure: test_types.AssertionFailure) -> String {
+  failure.message
 }
 
 fn gherkin_step_error(

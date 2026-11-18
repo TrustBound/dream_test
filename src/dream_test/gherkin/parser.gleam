@@ -18,9 +18,8 @@
 //// error. Each error is a `ParseError` with the line number and a
 //// `ParseProblem` that tells what is wrong.
 ////
-//// dream_test differs from the official grammar in three ways:
+//// dream_test differs from the official grammar in two ways:
 ////
-//// - A step has one argument at most: a DataTable or a DocString.
 //// - `And`, `But` and `*` take the phase of the step before them. The first
 ////   step of a Background, or of a scenario with no Background steps before
 ////   it, must use `Given`, `When` or `Then`.
@@ -29,10 +28,10 @@
 
 import dream_test/file.{type FileError}
 import dream_test/gherkin/types.{
-  type Background, type Examples, type Feature, type Rule, type Scenario,
-  type ScenarioKeyword, type Step, type StepKeyword, And, Asterisk, Background,
-  But, DataTable, DocString, Examples, ExamplesTable, Feature, Given,
-  KeywordExample, KeywordScenario, KeywordScenarioOutline,
+  type Background, type DocString, type Examples, type Feature, type Rule,
+  type Scenario, type ScenarioKeyword, type Step, type StepKeyword, And,
+  Asterisk, Background, But, DataTable, DocString, Examples, ExamplesTable,
+  Feature, Given, KeywordExample, KeywordScenario, KeywordScenarioOutline,
   KeywordScenarioTemplate, Rule, Scenario, Step, Then, When,
 }
 import gleam/int
@@ -114,8 +113,6 @@ pub type ParseProblem {
   TagContainsWhitespace(tag: String)
   /// A `# language:` line names a language other than `en`.
   UnsupportedLanguage(language: String)
-  /// A step has both a DataTable and a DocString.
-  StepArgumentConflict
   /// A step has more than one DocString.
   RepeatedDocString
   /// An `And`, `But` or `*` step has no step before it.
@@ -271,10 +268,10 @@ pub fn token_kind_to_string(kind kind: TokenKind) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// parser.problem_to_string(parser.StepArgumentConflict)
+/// parser.problem_to_string(parser.RepeatedDocString)
 /// |> should
-/// |> be_equal("Step cannot have both a DataTable and a DocString")
-/// |> or_fail_with("expected the argument conflict message")
+/// |> be_equal("Step cannot have more than one DocString")
+/// |> or_fail_with("expected the repeated DocString message")
 /// ```
 ///
 pub fn problem_to_string(problem problem: ParseProblem) -> String {
@@ -302,7 +299,6 @@ pub fn problem_to_string(problem problem: ParseProblem) -> String {
       "The language \""
       <> language
       <> "\" is not supported. dream_test supports only English (\"en\")."
-    StepArgumentConflict -> "Step cannot have both a DataTable and a DocString"
     RepeatedDocString -> "Step cannot have more than one DocString"
     MissingPreviousStep(keyword, text) ->
       "\""
@@ -791,7 +787,7 @@ fn parse_steps(
   case skip_ignored(stream) {
     Next(Token(kind: StepToken(keyword, text), line: line, ..), rest) ->
       check_first_step(
-        Step(keyword: keyword, text: text, argument: None),
+        Step(keyword: keyword, text: text, doc_string: None, data_table: None),
         line,
         has_previous_step || steps_newest_first != [],
       )
@@ -838,6 +834,10 @@ fn continue_steps(
   }
 }
 
+/// Read the arguments of a step: a DataTable, a DocString, or both in either
+/// order. A step cannot have a second DocString. A table row after the
+/// DataTable and the DocString is not a step argument, so the grammar
+/// reports it as an unexpected line.
 fn parse_step_argument(
   step: Step,
   stream: Stream,
@@ -847,16 +847,7 @@ fn parse_step_argument(
       take_table_rows(rest, list.length(cells), [cells])
       |> after_data_table(step)
     Next(Token(kind: DocStringToken(separator, media_type), ..) as token, rest) ->
-      take_doc_string(
-        rest,
-        DocStringDraft(
-          separator: separator,
-          media_type: media_type,
-          indentation: indentation_of(token.text),
-          opened_on_line: token.line,
-          lines_newest_first: [],
-        ),
-      )
+      take_doc_string(rest, doc_string_draft(token, separator, media_type))
       |> after_doc_string(step)
     other -> Ok(#(step, other))
   }
@@ -868,48 +859,89 @@ fn after_data_table(
 ) -> Result(#(Step, Stream), ParseError) {
   case table {
     Ok(#(rows, rest)) ->
-      reject_argument_after_table(
-        Step(..step, argument: Some(DataTable(rows: rows))),
+      doc_string_after_data_table(
+        Step(..step, data_table: Some(DataTable(rows: rows))),
         skip_ignored(rest),
       )
     Error(error) -> Error(error)
   }
 }
 
-fn reject_argument_after_table(
+fn doc_string_after_data_table(
   step: Step,
   stream: Stream,
 ) -> Result(#(Step, Stream), ParseError) {
   case stream {
-    Next(Token(kind: DocStringToken(..), line: line, ..), _) ->
-      Error(ParseError(line, StepArgumentConflict))
+    Next(Token(kind: DocStringToken(separator, media_type), ..) as token, rest) ->
+      take_doc_string(rest, doc_string_draft(token, separator, media_type))
+      |> after_last_doc_string(step)
     _ -> Ok(#(step, stream))
   }
 }
 
 fn after_doc_string(
-  doc_string: Result(#(types.StepArgument, Stream), ParseError),
+  doc_string: Result(#(DocString, Stream), ParseError),
   step: Step,
 ) -> Result(#(Step, Stream), ParseError) {
   case doc_string {
-    Ok(#(argument, rest)) ->
-      reject_argument_after_doc_string(
-        Step(..step, argument: Some(argument)),
+    Ok(#(doc_string, rest)) ->
+      data_table_after_doc_string(
+        Step(..step, doc_string: Some(doc_string)),
         skip_ignored(rest),
       )
     Error(error) -> Error(error)
   }
 }
 
-fn reject_argument_after_doc_string(
+fn data_table_after_doc_string(
   step: Step,
   stream: Stream,
 ) -> Result(#(Step, Stream), ParseError) {
   case stream {
     Next(Token(kind: DocStringToken(..), line: line, ..), _) ->
       Error(ParseError(line, RepeatedDocString))
-    Next(Token(kind: TableToken(_), line: line, ..), _) ->
-      Error(ParseError(line, StepArgumentConflict))
+    Next(Token(kind: TableToken(cells), ..), rest) ->
+      take_table_rows(rest, list.length(cells), [cells])
+      |> after_last_data_table(step)
+    _ -> Ok(#(step, stream))
+  }
+}
+
+fn after_last_doc_string(
+  doc_string: Result(#(DocString, Stream), ParseError),
+  step: Step,
+) -> Result(#(Step, Stream), ParseError) {
+  case doc_string {
+    Ok(#(doc_string, rest)) ->
+      reject_repeated_doc_string(
+        Step(..step, doc_string: Some(doc_string)),
+        skip_ignored(rest),
+      )
+    Error(error) -> Error(error)
+  }
+}
+
+fn after_last_data_table(
+  table: Result(#(List(List(String)), Stream), ParseError),
+  step: Step,
+) -> Result(#(Step, Stream), ParseError) {
+  case table {
+    Ok(#(rows, rest)) ->
+      reject_repeated_doc_string(
+        Step(..step, data_table: Some(DataTable(rows: rows))),
+        skip_ignored(rest),
+      )
+    Error(error) -> Error(error)
+  }
+}
+
+fn reject_repeated_doc_string(
+  step: Step,
+  stream: Stream,
+) -> Result(#(Step, Stream), ParseError) {
+  case stream {
+    Next(Token(kind: DocStringToken(..), line: line, ..), _) ->
+      Error(ParseError(line, RepeatedDocString))
     _ -> Ok(#(step, stream))
   }
 }
@@ -960,10 +992,24 @@ type DocStringDraft {
   )
 }
 
+fn doc_string_draft(
+  token: Token,
+  separator: String,
+  media_type: String,
+) -> DocStringDraft {
+  DocStringDraft(
+    separator: separator,
+    media_type: media_type,
+    indentation: indentation_of(token.text),
+    opened_on_line: token.line,
+    lines_newest_first: [],
+  )
+}
+
 fn take_doc_string(
   stream: Stream,
   draft: DocStringDraft,
-) -> Result(#(types.StepArgument, Stream), ParseError) {
+) -> Result(#(DocString, Stream), ParseError) {
   case stream {
     Next(token, rest) ->
       doc_string_line(
@@ -982,7 +1028,7 @@ fn doc_string_line(
   rest: Stream,
   draft: DocStringDraft,
   closes: Bool,
-) -> Result(#(types.StepArgument, Stream), ParseError) {
+) -> Result(#(DocString, Stream), ParseError) {
   case closes {
     True -> Ok(#(finish_doc_string(draft), rest))
     False ->
@@ -996,7 +1042,7 @@ fn doc_string_line(
   }
 }
 
-fn finish_doc_string(draft: DocStringDraft) -> types.StepArgument {
+fn finish_doc_string(draft: DocStringDraft) -> DocString {
   DocString(
     content: string.join(list.reverse(draft.lines_newest_first), "\n"),
     content_type: media_type_option(draft.media_type),

@@ -12,8 +12,8 @@ import dream_test/file
 import dream_test/gherkin/parser.{
   ExamplesLine, FeatureLine, InconsistentCellCount, InvalidFeatureFile,
   MissingFeature, MissingPreviousStep, ParseError, RepeatedDocString, RuleLine,
-  ScenarioLine, StepArgumentConflict, TagContainsWhitespace, TagLine,
-  UnclosedDocString, UnexpectedEndOfFile, UnexpectedLine, UnsupportedLanguage,
+  ScenarioLine, TagContainsWhitespace, TagLine, UnclosedDocString,
+  UnexpectedEndOfFile, UnexpectedLine, UnsupportedLanguage,
 }
 import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -36,8 +36,8 @@ const good_files = [
   "scenario_outline_with_value_with_dollar_sign",
   "scenario_outline_with_value_with_trailing_backslash",
   "scenario_outlines_with_tags", "several_examples",
-  "tagged_feature_with_scenario_outline", "tags", "trim_space", "trim_tab",
-  "very_long",
+  "step_with_datatable_and_docstring", "tagged_feature_with_scenario_outline",
+  "tags", "trim_space", "trim_tab", "very_long",
 ]
 
 pub fn tests() {
@@ -166,10 +166,6 @@ pub fn tests() {
       bad_file_test(
         "test/fixtures/gherkin_conformance/differs/incomplete_feature_3.feature",
         ParseError(line: 2, problem: MissingFeature),
-      ),
-      bad_file_test(
-        "test/fixtures/gherkin_conformance/differs/step_with_datatable_and_docstring.feature",
-        ParseError(line: 7, problem: StepArgumentConflict),
       ),
     ]),
   ])
@@ -300,15 +296,18 @@ fn render_step(depth: Int, step: gherkin_types.Step) -> List(String) {
         <> " "
         <> quote(step.text),
     ),
-    ..render_argument(depth + 1, step.argument)
+    ..list.append(
+      render_doc_string(depth + 1, step.doc_string),
+      render_data_table(depth + 1, step.data_table),
+    )
   ]
 }
 
-fn render_argument(
+fn render_doc_string(
   depth: Int,
-  argument: Option(gherkin_types.StepArgument),
+  doc_string: Option(gherkin_types.DocString),
 ) -> List(String) {
-  case argument {
+  case doc_string {
     None -> []
     Some(gherkin_types.DocString(content, None)) -> [
       line(depth, "docstring none " <> quote(content)),
@@ -316,6 +315,15 @@ fn render_argument(
     Some(gherkin_types.DocString(content, Some(media_type))) -> [
       line(depth, "docstring " <> quote(media_type) <> " " <> quote(content)),
     ]
+  }
+}
+
+fn render_data_table(
+  depth: Int,
+  data_table: Option(gherkin_types.DataTable),
+) -> List(String) {
+  case data_table {
+    None -> []
     Some(gherkin_types.DataTable(rows)) -> [
       line(depth, "table"),
       ..list.map(rows, render_row(depth + 1, "row", _))

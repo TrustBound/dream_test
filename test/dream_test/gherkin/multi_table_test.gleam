@@ -5,7 +5,7 @@ import dream_test/gherkin/types as gtypes
 import dream_test/matchers.{fail_with}
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/result
 
 pub fn tests() {
@@ -74,9 +74,9 @@ fn get_step_table(
   step: gtypes.Step,
   step_name: String,
 ) -> Result(List(List(String)), String) {
-  case step.argument {
+  case step.data_table {
     Some(gtypes.DataTable(rows)) -> Ok(rows)
-    _ -> Error(step_name <> " has no table")
+    None -> Error(step_name <> " has no table")
   }
 }
 

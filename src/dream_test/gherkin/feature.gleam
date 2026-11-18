@@ -67,7 +67,6 @@ import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
   AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
 }
-import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -170,7 +169,6 @@ pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
       source: feature.source,
       registry: config.step_registry,
       rule_groups: [],
-      tags: feature.tags,
       background_steps: background_steps(feature.background),
     )
   let scenario_nodes = scenarios_to_nodes(scope, feature.scenarios, [])
@@ -191,7 +189,6 @@ type ScenarioScope {
     source: Option(String),
     registry: StepRegistry,
     rule_groups: List(String),
-    tags: List(String),
     background_steps: List(gherkin_types.Step),
   )
 }
@@ -226,7 +223,6 @@ fn rule_to_node(scope: ScenarioScope, rule: gherkin_types.Rule) -> Node(Nil) {
     ScenarioScope(
       ..scope,
       rule_groups: [group_name],
-      tags: list.append(scope.tags, rule.tags),
       background_steps: list.append(
         scope.background_steps,
         background_steps(rule.background),
@@ -234,7 +230,7 @@ fn rule_to_node(scope: ScenarioScope, rule: gherkin_types.Rule) -> Node(Nil) {
     )
   Group(
     name: group_name,
-    tags: [],
+    tags: rule.tags,
     children: scenarios_to_nodes(rule_scope, rule.scenarios, []),
   )
 }
@@ -290,13 +286,12 @@ fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
   let full_name =
     list.flatten([[scope.feature_name], scope.rule_groups, [run.name]])
   let scenario_id = string.join(full_name, "::")
-  let all_tags = list.append(scope.tags, run.tags)
-  let all_steps = list.append(scope.background_steps, run.steps)
+  let all_steps = with_background(scope.background_steps, run.steps)
   let registry = scope.registry
 
   Test(
     name: run.name,
-    tags: all_tags,
+    tags: run.tags,
     kind: GherkinScenario(scenario_id),
     run: fn(_nil: Nil) {
       Ok(execute_scenario(scenario_id, all_steps, registry))
@@ -304,6 +299,19 @@ fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
     timeout_ms: None,
     source: scope.source,
   )
+}
+
+/// The steps of a test: the Background steps, then the scenario steps. A
+/// scenario with no steps runs no Background steps, as in the official
+/// Gherkin compiler.
+fn with_background(
+  background_steps: List(gherkin_types.Step),
+  scenario_steps: List(gherkin_types.Step),
+) -> List(gherkin_types.Step) {
+  case scenario_steps {
+    [] -> []
+    _ -> list.append(background_steps, scenario_steps)
+  }
 }
 
 /// Build the tests of every row of every Examples table. `index` counts the
@@ -352,10 +360,13 @@ fn rows_to_nodes(
   case values {
     [] -> #(index, nodes_newest_first)
     [row, ..rest] -> {
-      let substitutions = build_substitution_map(rows.headers, row)
+      let substitutions = list.zip(rows.headers, row)
       let run =
         ScenarioRun(
-          name: rows.scenario.name <> " (" <> example_label(rows, index) <> ")",
+          name: substitute_placeholders(rows.scenario.name, substitutions)
+            <> " ("
+            <> example_label(rows, index)
+            <> ")",
           tags: list.append(rows.scenario.tags, rows.section.tags),
           steps: substitute_steps(rows.scenario.steps, substitutions),
         )
@@ -374,34 +385,20 @@ fn example_label(rows: ExampleRows, index: Int) -> String {
   }
 }
 
-fn build_substitution_map(
-  headers: List(String),
-  values: List(String),
-) -> Dict(String, String) {
-  build_substitution_map_loop(list.zip(headers, values), dict.new())
-}
-
-fn build_substitution_map_loop(
-  pairs: List(#(String, String)),
-  acc: Dict(String, String),
-) -> Dict(String, String) {
-  case pairs {
-    [] -> acc
-    [#(header, value), ..rest] ->
-      build_substitution_map_loop(rest, dict.insert(acc, header, value))
-  }
-}
+// Example values replace `<header>` placeholders in the scenario name, the
+// step texts, the DocStrings and the DataTable cells. The headers replace in
+// column order, as in the official Gherkin compiler.
 
 fn substitute_steps(
   steps: List(gherkin_types.Step),
-  substitutions: Dict(String, String),
+  substitutions: List(#(String, String)),
 ) -> List(gherkin_types.Step) {
   substitute_steps_loop(steps, substitutions, [])
 }
 
 fn substitute_steps_loop(
   steps: List(gherkin_types.Step),
-  substitutions: Dict(String, String),
+  substitutions: List(#(String, String)),
   acc_rev: List(gherkin_types.Step),
 ) -> List(gherkin_types.Step) {
   case steps {
@@ -416,34 +413,94 @@ fn substitute_steps_loop(
 
 fn substitute_step(
   step: gherkin_types.Step,
-  substitutions: Dict(String, String),
+  substitutions: List(#(String, String)),
 ) -> gherkin_types.Step {
-  let new_text = substitute_placeholders(step.text, substitutions)
   gherkin_types.Step(
     keyword: step.keyword,
-    text: new_text,
-    argument: step.argument,
+    text: substitute_placeholders(step.text, substitutions),
+    doc_string: substitute_doc_string(step.doc_string, substitutions),
+    data_table: substitute_data_table(step.data_table, substitutions),
   )
+}
+
+fn substitute_doc_string(
+  doc_string: Option(gherkin_types.DocString),
+  substitutions: List(#(String, String)),
+) -> Option(gherkin_types.DocString) {
+  case doc_string {
+    Some(gherkin_types.DocString(content, content_type)) ->
+      Some(gherkin_types.DocString(
+        content: substitute_placeholders(content, substitutions),
+        content_type: substitute_content_type(content_type, substitutions),
+      ))
+    None -> None
+  }
+}
+
+fn substitute_content_type(
+  content_type: Option(String),
+  substitutions: List(#(String, String)),
+) -> Option(String) {
+  case content_type {
+    Some(media_type) -> Some(substitute_placeholders(media_type, substitutions))
+    None -> None
+  }
+}
+
+fn substitute_data_table(
+  data_table: Option(gherkin_types.DataTable),
+  substitutions: List(#(String, String)),
+) -> Option(gherkin_types.DataTable) {
+  case data_table {
+    Some(gherkin_types.DataTable(rows)) ->
+      Some(
+        gherkin_types.DataTable(rows: substitute_rows(rows, substitutions, [])),
+      )
+    None -> None
+  }
+}
+
+fn substitute_rows(
+  rows: List(List(String)),
+  substitutions: List(#(String, String)),
+  rows_newest_first: List(List(String)),
+) -> List(List(String)) {
+  case rows {
+    [] -> list.reverse(rows_newest_first)
+    [row, ..rest] ->
+      substitute_rows(rest, substitutions, [
+        substitute_cells(row, substitutions, []),
+        ..rows_newest_first
+      ])
+  }
+}
+
+fn substitute_cells(
+  cells: List(String),
+  substitutions: List(#(String, String)),
+  cells_newest_first: List(String),
+) -> List(String) {
+  case cells {
+    [] -> list.reverse(cells_newest_first)
+    [cell, ..rest] ->
+      substitute_cells(rest, substitutions, [
+        substitute_placeholders(cell, substitutions),
+        ..cells_newest_first
+      ])
+  }
 }
 
 fn substitute_placeholders(
   text: String,
-  substitutions: Dict(String, String),
+  substitutions: List(#(String, String)),
 ) -> String {
-  substitute_placeholders_loop(dict.to_list(substitutions), text)
-}
-
-fn substitute_placeholders_loop(
-  pairs: List(#(String, String)),
-  acc: String,
-) -> String {
-  case pairs {
-    [] -> acc
-    [#(header, value), ..rest] -> {
-      let placeholder = "<" <> header <> ">"
-      let next = string.replace(acc, placeholder, value)
-      substitute_placeholders_loop(rest, next)
-    }
+  case substitutions {
+    [] -> text
+    [#(header, value), ..rest] ->
+      substitute_placeholders(
+        string.replace(text, "<" <> header <> ">", value),
+        rest,
+      )
   }
 }
 
@@ -602,16 +659,16 @@ fn build_step_context(
 fn extract_table_from_step(
   step: gherkin_types.Step,
 ) -> Option(List(List(String))) {
-  case step.argument {
+  case step.data_table {
     Some(gherkin_types.DataTable(rows)) -> Some(rows)
-    _ -> None
+    None -> None
   }
 }
 
 fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
-  case step.argument {
+  case step.doc_string {
     Some(gherkin_types.DocString(content, _)) -> Some(content)
-    _ -> None
+    None -> None
   }
 }
 
@@ -811,7 +868,12 @@ fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {
 }
 
 fn inline_to_parsed_step(inline: InlineStep) -> gherkin_types.Step {
-  gherkin_types.Step(keyword: inline.keyword, text: inline.text, argument: None)
+  gherkin_types.Step(
+    keyword: inline.keyword,
+    text: inline.text,
+    doc_string: None,
+    data_table: None,
+  )
 }
 
 // ============================================================================
