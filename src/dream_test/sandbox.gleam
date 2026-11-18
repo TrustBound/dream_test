@@ -95,6 +95,8 @@
 //// }
 //// ```
 
+import gleam/dynamic.{type Dynamic}
+import gleam/erlang/atom
 import gleam/erlang/process.{
   type Monitor, type Pid, type Selector, type Subject, demonitor_process, kill,
   monitor, new_selector, new_subject, receive_forever, select, select_map,
@@ -367,7 +369,10 @@ fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
 ///
 /// - `Normal` gives `"normal"`.
 /// - `Killed` gives `"killed"`.
-/// - `Abnormal(reason)` gives `string.inspect(reason)`.
+/// - `Abnormal(noproc)`, the reason that a monitor gives for a process that
+///   had already stopped when the monitor was made, gives
+///   `"the process had already stopped"`.
+/// - Any other `Abnormal(reason)` gives `string.inspect(reason)`.
 ///
 /// ## Example
 ///
@@ -403,7 +408,14 @@ pub fn format_exit_reason(reason: process.ExitReason) -> String {
   case reason {
     process.Normal -> "normal"
     process.Killed -> "killed"
-    process.Abnormal(dynamic_reason) -> string.inspect(dynamic_reason)
+    process.Abnormal(dynamic_reason) -> abnormal_reason_text(dynamic_reason)
+  }
+}
+
+fn abnormal_reason_text(reason: Dynamic) -> String {
+  case reason == atom.to_dynamic(atom.create("noproc")) {
+    True -> "the process had already stopped"
+    False -> string.inspect(reason)
   }
 }
 
@@ -546,7 +558,7 @@ pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
 /// itself, so a call never waits for an owner that is gone. The exit
 /// reason of an owner that stopped is known only once, and only in the
 /// process that started the owner. A later call, or a call in another
-/// process, gives the reason `Noproc` ("no process").
+/// process, gives the reason `"the process had already stopped"`.
 pub opaque type Owner(input, output) {
   Owner(
     pid: Pid,
@@ -576,8 +588,8 @@ pub opaque type Owner(input, output) {
 ///   `Some(owner)`: the owner stopped after the function before, for
 ///   example because a process that links to it crashed. Run the function
 ///   again with `None` to run it in a new owner. `reason` is the exit
-///   reason as text, or `"Noproc"` when the exit was told before (see
-///   `Owner`).
+///   reason as text, or `"the process had already stopped"` when the exit
+///   was told before (see `Owner`).
 pub type OwnerResult(input, output) {
   OwnerReturned(owner: Owner(input, output), value: output)
   OwnerCaught(owner: Owner(input, output), reason: String)
@@ -875,7 +887,8 @@ fn serve_owner(
 /// ## Returns
 ///
 /// `Ok(owner)` when the owner is alive, or `Error(reason)` with the exit
-/// reason as text when it stopped. The reason is `"Noproc"` when the exit
+/// reason as text when it stopped. The reason is
+/// `"the process had already stopped"` when the exit
 /// was told before or the caller is not the process that started the
 /// owner (see `Owner`). After `Error`, `run_in_owner` with the owner gives
 /// `OwnerLost`, and `stop_owner` returns at once.

@@ -155,6 +155,13 @@ pub fn tests() {
       |> or_fail_with("the function should get the input 4")
     }),
 
+    it("format_exit_reason shows noproc in plain words", fn() {
+      process.Abnormal(atom.to_dynamic(atom.create("noproc")))
+      |> sandbox.format_exit_reason
+      |> should
+      |> be_equal("the process had already stopped")
+      |> or_fail_with("noproc should be plain text")
+    }),
     it("format_exit_reason shows a normal exit as normal", fn() {
       process.Normal
       |> sandbox.format_exit_reason

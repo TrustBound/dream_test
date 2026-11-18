@@ -344,7 +344,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     function crashes
   - `sandbox.format_exit_reason` gives the text of a process exit reason, in
     the same form that `run_isolated` and the parallel runner use for a
-    crash (`"normal"`, `"killed"`, or the inspected reason)
+    crash (`"normal"`, `"killed"`, `"the process had already stopped"`
+    for a monitor of a process that was gone, or the inspected reason)
 
 - **Reporters**
 

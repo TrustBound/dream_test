@@ -164,7 +164,7 @@ pub fn tests() {
           other -> summary(other)
         }
         |> should
-        |> be_equal(Lost("Noproc"))
+        |> be_equal(Lost("the process had already stopped"))
         |> or_fail_with("expected OwnerLost for an owner that was checked")
       },
     ),
@@ -194,7 +194,9 @@ pub fn tests() {
         _other -> sandbox.SandboxCrashed("did not start")
       }
       |> should
-      |> be_equal(sandbox.SandboxCompleted(Error("Noproc")))
+      |> be_equal(
+        sandbox.SandboxCompleted(Error("the process had already stopped")),
+      )
       |> or_fail_with("expected the other process to see the stop")
     }),
 
