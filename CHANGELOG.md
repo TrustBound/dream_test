@@ -479,6 +479,11 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- A process that a test starts and links to its test process, such as
+  the actor of `process.start_counter` or `process.start_actor`, stops
+  when the test ends, as the `dream_test/process` docs say. The test
+  process exits with reason `shutdown`. Before, a linked process that did
+  not trap exits stayed alive after a test that passed, failed or crashed.
 - `process.await_ready` and `process.await_some` measure the timeout on
   the monotonic clock. `interval_ms: 0` no longer waits forever, and the
   time in the check counts toward the timeout.

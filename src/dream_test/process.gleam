@@ -1,8 +1,12 @@
 //// Process helpers for tests that need actors or async operations.
 ////
-//// When Dream Test runs a test, it runs in an isolated BEAM process. Any
-//// processes you spawn inside a test can be *linked* to that test process, so
-//// they automatically die when the test ends (pass, fail, timeout, crash).
+//// When Dream Test runs a test, it runs the test body and its `before_each`
+//// and `after_each` hooks in one isolated BEAM process. A process that you
+//// start there and *link* to that test process stops when the test ends
+//// (pass, fail, timeout, crash): the test process exits with reason
+//// `shutdown`, or is killed on a timeout. A process that a `before_all`
+//// hook starts links to the process of its group instead; stop it in
+//// `after_all`.
 ////
 //// This module gives you a few “batteries included” patterns:
 ////
@@ -59,8 +63,8 @@ pub type CounterMessage {
 
 /// Start a counter actor initialized to 0.
 ///
-/// The counter is linked to the test process and will be automatically cleaned
-/// up when the test ends.
+/// The counter is linked to the calling process. Started in a test, it stops
+/// when the test ends.
 ///
 /// ## Returns
 ///
@@ -310,8 +314,8 @@ pub fn unique_port() -> Int {
 
 /// Start a generic actor with custom state and message handler.
 ///
-/// The actor is linked to the test process and will be automatically
-/// cleaned up when the test ends.
+/// The actor is linked to the calling process. Started in a test, it stops
+/// when the test ends.
 ///
 /// ## Parameters
 ///

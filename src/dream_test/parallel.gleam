@@ -52,6 +52,7 @@ import dream_test/types.{
   AssertionSkipped, BeforeAll, BeforeAllHook, BeforeEach, Failed, Group, Passed,
   Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
 }
+import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
   demonitor_process, monitor, new_selector, new_subject, select,
@@ -2188,13 +2189,23 @@ fn emit_test_finished_progress_results(
 /// The body of a test process: run the steps of the job, then send the
 /// outcome. Before each step that runs, the process tells the loop the
 /// step and the state, so the loop can end the test if the process stops.
+/// The body of a test process: run the steps, send the outcome, then exit
+/// with reason `shutdown`. A process that links to the test process and
+/// does not trap exits, such as an actor that the test started, stops with
+/// it, whether the test passed, failed or crashed. A normal exit would not
+/// stop it.
 fn run_test_process(job: TestJob(context)) -> Nil {
   let state = run_steps(job, [job.first_step, ..job.later_steps], job.state)
   send(
     job.subject,
     WorkerFinished(worker: process.self(), outcome: test_outcome(job, state)),
   )
+  exit(atom.create("shutdown"))
 }
+
+/// Exit the calling process with `reason`.
+@external(erlang, "erlang", "exit")
+fn exit(reason: Atom) -> Nil
 
 fn run_steps(
   job: TestJob(context),

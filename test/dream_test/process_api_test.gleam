@@ -1,11 +1,13 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process as dt_process
+import dream_test/runner
 import dream_test/types
 import dream_test/unit.{describe, it}
 import gleam/erlang/process as beam_process
 import gleam/int
 import gleam/option.{None}
 import gleam/otp/actor
+import gleam/result
 
 pub type Msg {
   Add(String)
@@ -27,6 +29,30 @@ fn handle_list_actor(
 
 pub fn tests() {
   describe("dream_test/process", [
+    it("a linked counter stops when its test ends", fn() {
+      // Each test starts a counter that links to its test process and
+      // sends the counter process out. The tests pass, fail and crash.
+      // When the run returns, each counter must stop.
+      let counters = beam_process.new_subject()
+      runner.new([
+        describe("linked", [
+          it("passes", fn() {
+            start_counter_then(counters, Ok(types.AssertionOk))
+          }),
+          it("fails", fn() { start_counter_then(counters, Error("fails")) }),
+          it("crashes", fn() { start_counter_then_crash(counters) }),
+        ]),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) {
+        [receive_down(counters), receive_down(counters), receive_down(counters)]
+      }
+      |> should
+      |> be_equal([Ok(Nil), Ok(Nil), Ok(Nil)])
+      |> or_fail_with("each linked counter should stop with its test")
+    }),
+
     it("counter helpers work", fn() {
       let counter = dt_process.start_counter()
 
@@ -187,4 +213,44 @@ pub fn tests() {
       }
     }),
   ])
+}
+
+fn start_counter_then(
+  counters: beam_process.Subject(beam_process.Pid),
+  result: Result(types.AssertionResult, String),
+) -> Result(types.AssertionResult, String) {
+  let counter = dt_process.start_counter()
+  let assert Ok(pid) = beam_process.subject_owner(counter)
+  beam_process.send(counters, pid)
+  result
+}
+
+fn start_counter_then_crash(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(types.AssertionResult, String) {
+  let _ = start_counter_then(counters, Ok(types.AssertionOk))
+  panic as "crashes"
+}
+
+/// Take the next counter process, and wait until it has stopped. Gives an
+/// error when it does not stop.
+fn receive_down(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(Nil, String) {
+  case beam_process.receive(counters, 60_000) {
+    Ok(pid) -> wait_for_down(pid)
+    Error(Nil) -> Error("no counter")
+  }
+}
+
+fn wait_for_down(pid: beam_process.Pid) -> Result(Nil, String) {
+  let monitor = beam_process.monitor(pid)
+  beam_process.new_selector()
+  |> beam_process.select_specific_monitor(monitor, ignore_down)
+  |> beam_process.selector_receive(60_000)
+  |> result.replace_error("the counter is still alive")
+}
+
+fn ignore_down(_down: beam_process.Down) -> Nil {
+  Nil
 }
