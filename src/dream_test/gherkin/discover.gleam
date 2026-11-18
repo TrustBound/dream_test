@@ -132,7 +132,9 @@ pub type LoadResult {
 
 /// Start discovering features matching a glob pattern.
 ///
-/// Use Erlang’s `filelib:wildcard/1` semantics (see `wildcard/1` below).
+/// The pattern uses the glob syntax of Erlang’s `filelib:wildcard/1`: `*`,
+/// `?`, `**`, `[...]` and `{a,b}`. A relative pattern is read from the
+/// current directory.
 ///
 /// ## Example
 ///

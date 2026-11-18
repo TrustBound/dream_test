@@ -112,8 +112,7 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Parameters
 ///
-/// - `report`: The run report to format: the test results and the
-///   tear-down failures
+/// - `results`: The test results to format, in run order
 ///
 /// ## Returns
 ///
