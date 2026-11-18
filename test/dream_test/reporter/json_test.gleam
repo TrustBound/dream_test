@@ -252,11 +252,28 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"hook\":\"after_all\",\"scope\":[\"root\"],\"message\":\"no cleanup\"}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"scope\":[\"root\"],\"message\":\"no cleanup\"}]}",
         )
         |> or_fail_with(
-          "each tear-down failure should have its hook, scope and message",
+          "each tear-down failure should have its kind, hook, scope and message",
         )
+      }),
+
+      it("writes a lost scope with its set-up hook and reason", fn() {
+        types.run_report(tests: [], teardown_failures: [
+          types.ScopeLost(
+            set_up: types.BeforeAllHook,
+            scope: ["root"],
+            reason: "Boom",
+          ),
+        ])
+        |> json.format
+        |> after("\"tests\":")
+        |> should
+        |> be_equal(
+          "[],\"teardown_failures\":[{\"kind\":\"scope_lost\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\"}]}",
+        )
+        |> or_fail_with("a lost scope should have its own kind")
       }),
 
       it("counts every status in the summary", fn() {

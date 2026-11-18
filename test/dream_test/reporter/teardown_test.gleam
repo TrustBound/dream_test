@@ -35,6 +35,36 @@ pub fn tests() {
       |> or_fail_with("a run-level hook should have no scope")
     }),
 
+    it("format shows a lost scope with its set-up hook and reason", fn() {
+      teardown.format([
+        types.ScopeLost(
+          set_up: types.BeforeAllHook,
+          scope: ["root", "pool"],
+          reason: "Boom",
+        ),
+      ])
+      |> should
+      |> be_equal(
+        "Tear-down failures:\n  lost scope of before_all in root > pool\n    the owner process exited: Boom\n",
+      )
+      |> or_fail_with("a lost scope should name its set-up hook and reason")
+    }),
+
+    it("format shows a lost scope of the whole run without a scope", fn() {
+      teardown.format([
+        types.ScopeLost(
+          set_up: types.BeforeAllSuitesHook,
+          scope: [],
+          reason: "Boom",
+        ),
+      ])
+      |> should
+      |> be_equal(
+        "Tear-down failures:\n  lost scope of before_all_suites\n    the owner process exited: Boom\n",
+      )
+      |> or_fail_with("a lost run scope should have no scope names")
+    }),
+
     it("format joins a scope of more than one name with >", fn() {
       teardown.format([
         types.TeardownFailure(

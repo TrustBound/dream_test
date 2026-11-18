@@ -13,13 +13,15 @@
 //// ```
 
 import dream_test/reporters/ansi
-import dream_test/types.{type TeardownFailure}
+import dream_test/types.{type TeardownFailure, ScopeLost, TeardownFailure}
 import gleam/string
 
 /// Format the tear-down failures without colour.
 ///
 /// Each failure has a line with the hook name and the scope (the scope is
-/// left out for a hook of the whole run), and a line with the message.
+/// left out for a hook of the whole run), and a line with the message. A
+/// lost scope (`ScopeLost`) has the line `lost scope of <set-up hook> in
+/// <scope>`, and the line `the owner process exited: <reason>`.
 ///
 /// ## Parameters
 ///
@@ -104,17 +106,35 @@ fn format_failures(
 fn format_failure(color: Bool, failure: TeardownFailure) -> String {
   string.concat([
     "  ",
-    ansi.apply_if(color, ansi.red, hook_and_scope(failure)),
+    ansi.apply_if(color, ansi.red, title(failure)),
     "\n    ",
-    failure.message,
+    detail(failure),
     "\n",
   ])
 }
 
-fn hook_and_scope(failure: TeardownFailure) -> String {
-  let hook = types.teardown_hook_name(failure.hook)
-  case failure.scope {
-    [] -> hook
-    scope -> hook <> " in " <> string.join(scope, " > ")
+/// The first line of a failure: the hook name and the scope.
+fn title(failure: TeardownFailure) -> String {
+  case failure {
+    TeardownFailure(hook: hook, scope: scope, message: _) ->
+      with_scope(types.teardown_hook_name(hook), scope)
+    ScopeLost(set_up: set_up, scope: scope, reason: _) ->
+      with_scope("lost scope of " <> types.set_up_hook_name(set_up), scope)
+  }
+}
+
+/// The second line of a failure: what went wrong.
+fn detail(failure: TeardownFailure) -> String {
+  case failure {
+    TeardownFailure(hook: _, scope: _, message: message) -> message
+    ScopeLost(set_up: _, scope: _, reason: reason) ->
+      "the owner process exited: " <> reason
+  }
+}
+
+fn with_scope(name: String, scope: List(String)) -> String {
+  case scope {
+    [] -> name
+    _ -> name <> " in " <> string.join(scope, " > ")
   }
 }

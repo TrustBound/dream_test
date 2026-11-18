@@ -662,18 +662,73 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
   }
 }
 
-/// A tear-down hook that returned `Error` or crashed.
+/// The set-up hook that starts the owner process of a scope. A `ScopeLost`
+/// failure names it.
+///
+/// Each variant is the hook of the builder function with the same name:
+///
+/// - `BeforeAllHook`: `unit.before_all` (and the same hook of the other
+///   DSLs). Its scope is one group.
+/// - `BeforeEachSuiteHook`: `runner.before_each_suite`. Its scope is one
+///   suite.
+/// - `BeforeAllSuitesHook`: `runner.before_all_suites`. Its scope is the
+///   whole run.
+pub type SetUpHook {
+  BeforeAllHook
+  BeforeEachSuiteHook
+  BeforeAllSuitesHook
+}
+
+/// The name of a set-up hook, as reporters show it.
+///
+/// ## Parameters
+///
+/// - `hook`: the set-up hook
+///
+/// ## Returns
+///
+/// The name of the builder function of the hook, for example
+/// `"before_all"` for `BeforeAllHook`.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.set_up_hook_name(types.BeforeAllSuitesHook)
+/// |> should
+/// |> be_equal("before_all_suites")
+/// |> or_fail_with("expected the builder name")
+/// ```
+pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
+  case hook {
+    BeforeAllHook -> "before_all"
+    BeforeEachSuiteHook -> "before_each_suite"
+    BeforeAllSuitesHook -> "before_all_suites"
+  }
+}
+
+/// A failure at the end of a scope: a tear-down hook that returned `Error`
+/// or crashed, or a scope whose owner process stopped.
 ///
 /// A tear-down failure does not change the status of a test. The run keeps
 /// it in its own list, and the run fails.
 ///
-/// ## Fields
+/// ## Variants
 ///
-/// - `hook`: which tear-down hook failed
-/// - `scope`: where it ran. For `AfterEachTestHook` and `AfterEachHook`,
-///   the full name of the test. For `AfterAllHook`, the group path. For
-///   `AfterEachSuiteHook`, the suite name. For `AfterAllSuitesHook`, `[]`.
-/// - `message`: the error message of the hook, or the crash text
+/// - `TeardownFailure(hook, scope, message)`: a tear-down hook failed.
+///   `hook` is the hook. `scope` is where it ran: for `AfterEachTestHook`
+///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
+///   the group path. For `AfterEachSuiteHook`, the suite name. For
+///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
+///   hook, or the crash text.
+/// - `ScopeLost(set_up, scope, reason)`: the owner process of a scope
+///   stopped after its set-up hooks, for example because a process that a
+///   `before_all` hook linked to it crashed. `set_up` is the hook that
+///   started the owner. `scope` is the group path for `BeforeAllHook`, the
+///   suite name for `BeforeEachSuiteHook` and `[]` for
+///   `BeforeAllSuitesHook`. `reason` is the exit reason of the owner. The
+///   tests of the scope that had not started do not run: each one is
+///   `SetupFailed`. The tear-down hooks of the scope run in a new owner
+///   process.
 ///
 /// ## Example
 ///
@@ -686,6 +741,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 /// ```
 pub type TeardownFailure {
   TeardownFailure(hook: TeardownHook, scope: List(String), message: String)
+  ScopeLost(set_up: SetUpHook, scope: List(String), reason: String)
 }
 
 /// The result of a run: the result of each test, and the tear-down hooks

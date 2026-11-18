@@ -58,14 +58,15 @@ import dream_test/reporters/json
 import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
 import dream_test/sandbox.{
-  type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerReturned,
-  OwnerTimedOut,
+  type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerLost,
+  OwnerReturned, OwnerTimedOut,
 }
 import dream_test/types.{
-  type AssertionFailure, type Node, type RunReport, type TeardownFailure,
-  type TeardownHook, type TestResult, type TestSuite, AfterAll,
-  AfterAllSuitesHook, AfterEach, AfterEachSuiteHook, BeforeAll, BeforeEach,
-  Group, Passed, Root, SetupFailed, TeardownFailure, Test,
+  type AssertionFailure, type Node, type RunReport, type SetUpHook,
+  type TeardownFailure, type TeardownHook, type TestResult, type TestSuite,
+  AfterAll, AfterAllSuitesHook, AfterEach, AfterEachSuiteHook, BeforeAll,
+  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, Group, Passed, Root,
+  ScopeLost, SetupFailed, TeardownFailure, Test,
 }
 import gleam/io
 import gleam/list
@@ -881,7 +882,9 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
       None,
     )
 
-  let #(collected, completed2) = case before_all_result {
+  let #(collected, completed2, all_suites_owner_after_run) = case
+    before_all_result
+  {
     Ok(_) ->
       run_suites_with_hooks(
         suite_runs_with_infos,
@@ -895,6 +898,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
         builder.runner_before_each_test,
         builder.runner_after_each_test,
         Collected(tests: [], teardown_failures: []),
+        alive_suite_owner(all_suites_owner),
       )
     Error(message) -> {
       let setup_failures =
@@ -914,6 +918,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
       #(
         Collected(tests: setup_failures, teardown_failures: []),
         completed_after_failures,
+        alive_suite_owner(all_suites_owner),
       )
     }
   }
@@ -926,9 +931,9 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
         scope: [],
         timeout_ms: all_suites_timeout_ms,
         hook_kind: AfterAllSuitesHook,
-        set_up_name: "before_all_suites",
+        set_up: BeforeAllSuitesHook,
       ),
-      all_suites_owner,
+      all_suites_owner_after_run,
     )
 
   let report =
@@ -1140,8 +1145,8 @@ type SuiteSetUp(input) {
 }
 
 /// The tear-down hooks of a suite-level scope, the kind of hook that they
-/// are in a `TeardownFailure`, and the name of the set-up hooks of the
-/// scope for the message about an owner that stopped.
+/// are in a `TeardownFailure`, and the set-up hook of the scope for a
+/// `ScopeLost` failure.
 type SuiteTearDown(input) {
   SuiteTearDown(
     hooks: List(fn(input) -> Result(Nil, String)),
@@ -1149,8 +1154,47 @@ type SuiteTearDown(input) {
     scope: List(String),
     timeout_ms: Int,
     hook_kind: TeardownHook,
-    set_up_name: String,
+    set_up: SetUpHook,
   )
+}
+
+/// The owner process of a suite-level scope whose set-up hooks returned.
+type SuiteScopeOwner(input) {
+  /// The owner was alive at the last check.
+  SuiteOwnerAlive(owner: SuiteOwner(input))
+  /// The owner stopped with `reason`. The suites of the scope that have
+  /// not started do not run, and its tear-down hooks run in a new owner.
+  SuiteOwnerGone(reason: String)
+}
+
+fn alive_suite_owner(
+  owner: Option(SuiteOwner(input)),
+) -> Option(SuiteScopeOwner(input)) {
+  case owner {
+    Some(owner) -> Some(SuiteOwnerAlive(owner: owner))
+    None -> None
+  }
+}
+
+/// Look again at an owner that was alive. The check takes the down
+/// message of a stopped owner, so its reason is kept in `SuiteOwnerGone`.
+fn refresh_suite_owner(
+  owner: Option(SuiteScopeOwner(input)),
+) -> Option(SuiteScopeOwner(input)) {
+  case owner {
+    Some(SuiteOwnerAlive(owner: alive)) ->
+      Some(checked_suite_owner(sandbox.check_owner(alive)))
+    _ -> owner
+  }
+}
+
+fn checked_suite_owner(
+  checked: Result(SuiteOwner(input), String),
+) -> SuiteScopeOwner(input) {
+  case checked {
+    Ok(alive) -> SuiteOwnerAlive(owner: alive)
+    Error(reason) -> SuiteOwnerGone(reason: reason)
+  }
 }
 
 /// Run suite-level set-up hooks in order, in the owner process of their
@@ -1193,7 +1237,7 @@ fn suite_set_up_result(
       Error(suite_hook_crash_message(rest.scope, reason)),
     )
     OwnerTimedOut -> #(None, Error(suite_hook_timeout_message(rest.scope)))
-    OwnerExited(reason: reason) -> #(
+    OwnerExited(reason: reason) | OwnerLost(reason: reason) -> #(
       None,
       Error(suite_hook_crash_message(rest.scope, reason)),
     )
@@ -1206,55 +1250,58 @@ fn suite_set_up_result(
 /// they happened.
 fn finish_suite_scope(
   tear_down: SuiteTearDown(input),
-  owner: Option(SuiteOwner(input)),
+  owner: Option(SuiteScopeOwner(input)),
 ) -> List(TeardownFailure) {
-  let #(checked_owner, exit_failures_rev) = check_suite_owner(tear_down, owner)
-  let #(last_owner, failures_rev) =
-    run_suite_teardown_hooks(
-      tear_down,
-      tear_down.hooks,
-      checked_owner,
-      exit_failures_rev,
-    )
-  let _stopped = option.map(last_owner, sandbox.stop_owner)
-  list.reverse(failures_rev)
-}
-
-fn check_suite_owner(
-  tear_down: SuiteTearDown(input),
-  owner: Option(SuiteOwner(input)),
-) -> #(Option(SuiteOwner(input)), List(TeardownFailure)) {
-  case owner {
-    None -> #(None, [])
-    Some(owner) ->
-      suite_owner_check_result(tear_down, sandbox.check_owner(owner))
+  case owner, tear_down.hooks {
+    None, _ -> run_suite_teardown(tear_down, None, [])
+    Some(SuiteOwnerGone(reason: reason)), _ ->
+      run_suite_teardown(tear_down, None, [suite_scope_lost(tear_down, reason)])
+    Some(SuiteOwnerAlive(owner: alive)), [] ->
+      stop_checked_suite_owner(tear_down, sandbox.check_owner(alive))
+    Some(SuiteOwnerAlive(owner: alive)), _ ->
+      run_suite_teardown(tear_down, Some(alive), [])
   }
 }
 
-fn suite_owner_check_result(
+/// Run the tear-down hooks, then stop the last owner.
+fn run_suite_teardown(
+  tear_down: SuiteTearDown(input),
+  owner: Option(SuiteOwner(input)),
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  let #(last_owner, next_failures_rev) =
+    run_suite_teardown_hooks(tear_down, tear_down.hooks, owner, failures_rev)
+  let _stopped = option.map(last_owner, sandbox.stop_owner)
+  list.reverse(next_failures_rev)
+}
+
+/// Stop the owner of a scope with no tear-down hook, or report that it
+/// stopped already.
+fn stop_checked_suite_owner(
   tear_down: SuiteTearDown(input),
   checked: Result(SuiteOwner(input), String),
-) -> #(Option(SuiteOwner(input)), List(TeardownFailure)) {
+) -> List(TeardownFailure) {
   case checked {
-    Ok(owner) -> #(Some(owner), [])
-    Error(reason) -> #(None, [
-      TeardownFailure(
-        hook: tear_down.hook_kind,
-        scope: tear_down.scope,
-        message: suite_scope_message(
-          tear_down.set_up_name <> " process exited",
-          tear_down.scope,
-        )
-          <> ": "
-          <> reason,
-      ),
-    ])
+    Ok(owner) -> {
+      sandbox.stop_owner(owner)
+      []
+    }
+    Error(reason) -> [suite_scope_lost(tear_down, reason)]
   }
+}
+
+fn suite_scope_lost(
+  tear_down: SuiteTearDown(input),
+  reason: String,
+) -> TeardownFailure {
+  ScopeLost(set_up: tear_down.set_up, scope: tear_down.scope, reason: reason)
 }
 
 /// Run every suite-level tear-down hook, also after one fails, and give
 /// the failures newest first, in front of `failures_rev`. After a timeout
-/// or an exit of the owner, the next hook runs in a new owner.
+/// or an exit of the owner, the next hook runs in a new owner. An owner
+/// that stopped before a hook started is a lost scope: the hook runs again
+/// in a new owner, so it never stays not run.
 fn run_suite_teardown_hooks(
   tear_down: SuiteTearDown(input),
   hooks: List(fn(input) -> Result(Nil, String)),
@@ -1263,58 +1310,77 @@ fn run_suite_teardown_hooks(
 ) -> #(Option(SuiteOwner(input)), List(TeardownFailure)) {
   case hooks {
     [] -> #(owner, failures_rev)
-    [hook, ..rest] -> {
-      let #(next_owner, next_failures_rev) =
-        suite_tear_down_result(
-          tear_down,
-          sandbox.run_in_owner(
-            owner,
-            tear_down.timeout_ms,
-            call_suite_hook,
-            SuiteHookCall(hook: hook, input: tear_down.input),
-          ),
-          failures_rev,
-        )
-      run_suite_teardown_hooks(tear_down, rest, next_owner, next_failures_rev)
-    }
+    [hook, ..rest] ->
+      suite_tear_down_result(
+        tear_down,
+        hook,
+        rest,
+        sandbox.run_in_owner(
+          owner,
+          tear_down.timeout_ms,
+          call_suite_hook,
+          SuiteHookCall(hook: hook, input: tear_down.input),
+        ),
+        failures_rev,
+      )
   }
 }
 
 fn suite_tear_down_result(
   tear_down: SuiteTearDown(input),
+  hook: fn(input) -> Result(Nil, String),
+  rest: List(fn(input) -> Result(Nil, String)),
   owner_result: OwnerResult(SuiteHookCall(input), Result(Nil, String)),
   failures_rev: List(TeardownFailure),
 ) -> #(Option(SuiteOwner(input)), List(TeardownFailure)) {
   case owner_result {
-    OwnerReturned(owner: owner, value: Ok(Nil)) -> #(Some(owner), failures_rev)
-    OwnerReturned(owner: owner, value: Error(message)) -> #(
-      Some(owner),
-      add_teardown_failure(tear_down, message, failures_rev),
-    )
-    OwnerCaught(owner: owner, reason: reason) -> #(
-      Some(owner),
-      add_teardown_failure(
+    OwnerReturned(owner: owner, value: Ok(Nil)) ->
+      run_suite_teardown_hooks(tear_down, rest, Some(owner), failures_rev)
+    OwnerReturned(owner: owner, value: Error(message)) ->
+      run_suite_teardown_hooks(
         tear_down,
-        suite_hook_crash_message(tear_down.scope, reason),
-        failures_rev,
-      ),
-    )
-    OwnerTimedOut -> #(
-      None,
-      add_teardown_failure(
+        rest,
+        Some(owner),
+        add_teardown_failure(tear_down, message, failures_rev),
+      )
+    OwnerCaught(owner: owner, reason: reason) ->
+      run_suite_teardown_hooks(
         tear_down,
-        suite_hook_timeout_message(tear_down.scope),
-        failures_rev,
-      ),
-    )
-    OwnerExited(reason: reason) -> #(
-      None,
-      add_teardown_failure(
+        rest,
+        Some(owner),
+        add_teardown_failure(
+          tear_down,
+          suite_hook_crash_message(tear_down.scope, reason),
+          failures_rev,
+        ),
+      )
+    OwnerTimedOut ->
+      run_suite_teardown_hooks(
         tear_down,
-        suite_hook_crash_message(tear_down.scope, reason),
-        failures_rev,
-      ),
-    )
+        rest,
+        None,
+        add_teardown_failure(
+          tear_down,
+          suite_hook_timeout_message(tear_down.scope),
+          failures_rev,
+        ),
+      )
+    OwnerExited(reason: reason) ->
+      run_suite_teardown_hooks(
+        tear_down,
+        rest,
+        None,
+        add_teardown_failure(
+          tear_down,
+          suite_hook_crash_message(tear_down.scope, reason),
+          failures_rev,
+        ),
+      )
+    OwnerLost(reason: reason) ->
+      run_suite_teardown_hooks(tear_down, [hook, ..rest], None, [
+        suite_scope_lost(tear_down, reason),
+        ..failures_rev
+      ])
   }
 }
 
@@ -1366,10 +1432,38 @@ fn run_suites_with_hooks(
   runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
   runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
   collected: Collected,
-) -> #(Collected, Int) {
-  case suite_runs {
-    [] -> #(collected, completed)
-    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
+  all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
+) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
+  let checked_owner = refresh_suite_owner(all_suites_owner)
+  case suite_runs, checked_owner {
+    [], _ -> #(collected, completed, checked_owner)
+    _, Some(SuiteOwnerGone(reason: reason)) -> {
+      let setup_failures =
+        setup_failed_results_from_suites(
+          list.map(suite_runs, suite_run_info),
+          "before_all_suites",
+          suite_scope_message("before_all_suites process exited", [])
+            <> ": "
+            <> reason,
+        )
+      #(
+        Collected(
+          tests: list.append(collected.tests, setup_failures),
+          teardown_failures: collected.teardown_failures,
+        ),
+        emit_test_finished_progress_results(
+          progress_reporter,
+          output,
+          completed,
+          total,
+          setup_failures,
+        ),
+        checked_owner,
+      )
+    }
+    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest],
+      _
+    -> {
       let suite_config = suite_run_config(default_config, override)
       let #(suite_owner, suite_collected, completed_after_suite) =
         run_one_suite(
@@ -1392,9 +1486,9 @@ fn run_suites_with_hooks(
             scope: [suite_info.name],
             timeout_ms: suite_config.default_timeout_ms,
             hook_kind: AfterEachSuiteHook,
-            set_up_name: "before_each_suite",
+            set_up: BeforeEachSuiteHook,
           ),
-          suite_owner,
+          alive_suite_owner(suite_owner),
         )
       run_suites_with_hooks(
         rest,
@@ -1415,9 +1509,16 @@ fn run_suites_with_hooks(
             after_each_failures,
           ]),
         ),
+        checked_owner,
       )
     }
   }
+}
+
+fn suite_run_info(
+  suite_run: #(SuiteRun(ctx), types.SuiteInfo),
+) -> types.SuiteInfo {
+  suite_run.1
 }
 
 /// Run `before_each_suite`, then the tests of one suite. A failed

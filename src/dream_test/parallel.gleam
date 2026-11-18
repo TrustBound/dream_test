@@ -39,8 +39,8 @@
 
 import dream_test/reporters/progress
 import dream_test/sandbox.{
-  type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerReturned,
-  OwnerTimedOut,
+  type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerLost,
+  OwnerReturned, OwnerTimedOut,
 }
 import dream_test/timing
 import dream_test/types.{
@@ -48,9 +48,9 @@ import dream_test/types.{
   type RunReport, type Status, type TeardownFailure, type TeardownHook,
   type TestInfo, type TestKind, type TestResult, type TestSuite, AfterAll,
   AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed,
-  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeEach, Failed,
-  Group, Passed, Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult,
-  TimedOut,
+  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeAllHook,
+  BeforeEach, Failed, Group, Passed, Root, ScopeLost, SetupFailed, Skipped,
+  TeardownFailure, Test, TestResult, TimedOut,
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
@@ -156,6 +156,8 @@ type ExecuteNodeConfig(context) {
     total: Int,
     completed: Int,
     collected: Collected,
+    /// The owners of the enclosing group scopes, outermost first.
+    owners: List(ScopeOwner(context)),
   )
 }
 
@@ -321,6 +323,9 @@ type LoopState(context) {
     emitted_rev: List(TestOutcome),
     next_emit_index: Int,
     completed: Int,
+    /// The owners of the scopes of the group, outermost first. A test
+    /// starts only while every owner is alive.
+    owners: List(ScopeOwner(context)),
   )
 }
 
@@ -335,6 +340,16 @@ type GroupHookCall(context) {
 /// hooks.
 type GroupOwner(context) =
   Owner(GroupHookCall(context), Result(context, String))
+
+/// The owner process of a group scope whose `before_all` hooks returned,
+/// as the tests of the scope see it.
+type ScopeOwner(context) {
+  /// The owner was alive at the last check.
+  OwnerAlive(scope: List(String), owner: GroupOwner(context))
+  /// The owner stopped with `reason`. The tests of the scope that have not
+  /// started do not run, and its `after_all` hooks run in a new owner.
+  OwnerGone(scope: List(String), reason: String)
+}
 
 /// Default executor configuration.
 ///
@@ -440,9 +455,10 @@ pub fn run_root_parallel(
       total: 0,
       completed: 0,
       collected: empty_collected(),
+      owners: [],
     )
 
-  let #(collected, _completed) = execute_node(executor_input)
+  let #(collected, _completed, _owners) = execute_node(executor_input)
   types.run_report(
     tests: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
@@ -546,9 +562,11 @@ pub fn run_root_parallel_with_reporter(
       total: total,
       completed: completed,
       collected: empty_collected(),
+      owners: [],
     )
 
-  let #(collected, completed_after_suite) = execute_node(executor_input)
+  let #(collected, completed_after_suite, _owners) =
+    execute_node(executor_input)
   RunRootParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
@@ -563,7 +581,7 @@ pub fn run_root_parallel_with_reporter(
 
 fn execute_node(
   executor_input: ExecuteNodeConfig(context),
-) -> #(Collected, Int) {
+) -> #(Collected, Int, List(ScopeOwner(context))) {
   let ExecuteNodeConfig(
     config: config,
     scope: scope,
@@ -578,6 +596,7 @@ fn execute_node(
     total: total,
     completed: completed,
     collected: base_collected,
+    owners: owners,
   ) = executor_input
 
   case node {
@@ -631,7 +650,7 @@ fn execute_node(
             finish_group_scope(
               config,
               group_scope,
-              owner,
+              alive_owner(group_scope, owner),
               ctx2,
               hooks.after_all,
             )
@@ -645,6 +664,7 @@ fn execute_node(
               base_collected,
             ),
             completed_after_failures,
+            owners,
           )
         }
 
@@ -654,7 +674,12 @@ fn execute_node(
           let combined_after_each =
             list.append(hooks.after_each, inherited_after_each)
 
-          let #(group_outcomes_rev, completed_after_tests) =
+          let scope_owners =
+            list.append(
+              owners,
+              option.values([alive_owner(group_scope, owner)]),
+            )
+          let #(group_outcomes_rev, completed_after_tests, owners_after_tests) =
             run_tests_in_group(
               GroupRun(
                 config: config,
@@ -672,9 +697,10 @@ fn execute_node(
               ),
               tests,
               completed,
+              scope_owners,
             )
 
-          let #(after_groups, completed_after_groups) =
+          let #(after_groups, completed_after_groups, owners_after_groups) =
             run_child_groups_sequentially(
               config,
               group_scope,
@@ -689,13 +715,16 @@ fn execute_node(
               total,
               completed_after_tests,
               collected_from_outcomes_rev(group_outcomes_rev),
+              owners_after_tests,
             )
 
+          let #(outer_owners, own_owner) =
+            list.split(owners_after_groups, list.length(owners))
           let teardown_failures_rev =
             finish_group_scope(
               config,
               group_scope,
-              owner,
+              list.first(own_owner) |> option.from_result,
               ctx2,
               hooks.after_all,
             )
@@ -709,13 +738,75 @@ fn execute_node(
               add_collected(after_groups, base_collected),
             ),
             completed_after_groups,
+            outer_owners,
           )
         }
       }
     }
 
-    _ -> #(base_collected, completed)
+    _ -> #(base_collected, completed, owners)
   }
+}
+
+/// The scope owner of a group whose `before_all` hooks gave `owner`.
+fn alive_owner(
+  scope: List(String),
+  owner: Option(GroupOwner(context)),
+) -> Option(ScopeOwner(context)) {
+  case owner {
+    Some(owner) -> Some(OwnerAlive(scope: scope, owner: owner))
+    None -> None
+  }
+}
+
+/// Look again at each owner that was alive. The check takes the down
+/// message of a stopped owner, so its reason is kept in `OwnerGone`.
+fn refresh_owners(
+  owners: List(ScopeOwner(context)),
+) -> List(ScopeOwner(context)) {
+  list.map(owners, refresh_owner)
+}
+
+fn refresh_owner(owner: ScopeOwner(context)) -> ScopeOwner(context) {
+  case owner {
+    OwnerAlive(scope: scope, owner: alive) ->
+      checked_owner(scope, alive, sandbox.check_owner(alive))
+    OwnerGone(..) -> owner
+  }
+}
+
+fn checked_owner(
+  scope: List(String),
+  owner: GroupOwner(context),
+  checked: Result(GroupOwner(context), String),
+) -> ScopeOwner(context) {
+  case checked {
+    Ok(_alive) -> OwnerAlive(scope: scope, owner: owner)
+    Error(reason) -> OwnerGone(scope: scope, reason: reason)
+  }
+}
+
+/// The outermost scope whose owner stopped, as the failure of a test that
+/// does not run because of it.
+fn lost_scope_failure(
+  owners: List(ScopeOwner(context)),
+) -> Option(AssertionFailure) {
+  case list.find(owners, is_gone) {
+    Ok(OwnerGone(scope: scope, reason: reason)) ->
+      Some(hook_failure("before_all", owner_exited_message(scope, reason)))
+    _ -> None
+  }
+}
+
+fn is_gone(owner: ScopeOwner(context)) -> Bool {
+  case owner {
+    OwnerGone(..) -> True
+    OwnerAlive(..) -> False
+  }
+}
+
+fn owner_exited_message(scope: List(String), reason: String) -> String {
+  "before_all process exited in " <> string.join(scope, " > ") <> ": " <> reason
 }
 
 fn empty_collected() -> Collected {
@@ -968,7 +1059,7 @@ fn before_all_result(
     OwnerTimedOut -> #(None, context, [
       hook_failure("before_all", hook_timeout_message(scope)),
     ])
-    OwnerExited(reason: reason) -> #(None, context, [
+    OwnerExited(reason: reason) | OwnerLost(reason: reason) -> #(None, context, [
       hook_failure("before_all", hook_crash_message(scope, reason)),
     ])
   }
@@ -981,51 +1072,55 @@ fn before_all_result(
 fn finish_group_scope(
   config: ParallelConfig,
   scope: List(String),
-  owner: Option(GroupOwner(context)),
+  owner: Option(ScopeOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
 ) -> List(TeardownFailure) {
-  let #(checked_owner, exit_failures_rev) = check_group_owner(scope, owner)
-  let #(last_owner, failures_rev) =
-    run_after_all_chain(
-      config,
-      scope,
-      checked_owner,
-      context,
-      hooks,
-      exit_failures_rev,
-    )
-  let _stopped = option.map(last_owner, sandbox.stop_owner)
-  failures_rev
+  case owner, hooks {
+    None, _ -> run_after_all_hooks(config, scope, None, context, hooks, [])
+    Some(OwnerGone(scope: _, reason: reason)), _ ->
+      run_after_all_hooks(config, scope, None, context, hooks, [
+        group_scope_lost(scope, reason),
+      ])
+    Some(OwnerAlive(scope: _, owner: alive)), [] ->
+      stop_checked_owner(scope, sandbox.check_owner(alive))
+    Some(OwnerAlive(scope: _, owner: alive)), _ ->
+      run_after_all_hooks(config, scope, Some(alive), context, hooks, [])
+  }
 }
 
-fn check_group_owner(
+/// Run the `after_all` hooks, then stop the last owner.
+fn run_after_all_hooks(
+  config: ParallelConfig,
   scope: List(String),
   owner: Option(GroupOwner(context)),
-) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
-  case owner {
-    None -> #(None, [])
-    Some(owner) -> group_owner_check_result(scope, sandbox.check_owner(owner))
+  context: context,
+  hooks: List(Callback(context, Result(Nil, String))),
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  let #(last_owner, next_failures_rev) =
+    run_after_all_chain(config, scope, owner, context, hooks, failures_rev)
+  let _stopped = option.map(last_owner, sandbox.stop_owner)
+  next_failures_rev
+}
+
+/// Stop the owner of a scope with no `after_all` hook, or report that it
+/// stopped already.
+fn stop_checked_owner(
+  scope: List(String),
+  checked: Result(GroupOwner(context), String),
+) -> List(TeardownFailure) {
+  case checked {
+    Ok(owner) -> {
+      sandbox.stop_owner(owner)
+      []
+    }
+    Error(reason) -> [group_scope_lost(scope, reason)]
   }
 }
 
-fn group_owner_check_result(
-  scope: List(String),
-  checked: Result(GroupOwner(context), String),
-) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
-  case checked {
-    Ok(owner) -> #(Some(owner), [])
-    Error(reason) -> #(None, [
-      TeardownFailure(
-        hook: AfterAllHook,
-        scope: scope,
-        message: "before_all process exited in "
-          <> string.join(scope, " > ")
-          <> ": "
-          <> reason,
-      ),
-    ])
-  }
+fn group_scope_lost(scope: List(String), reason: String) -> TeardownFailure {
+  ScopeLost(set_up: BeforeAllHook, scope: scope, reason: reason)
 }
 
 /// Run every `after_all` hook of a group, also after one fails, and give
@@ -1042,71 +1137,118 @@ fn run_after_all_chain(
 ) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
   case hooks {
     [] -> #(owner, failures_rev)
-    [hook, ..rest] -> {
-      let #(next_owner, next_failures_rev) =
-        after_all_result(
-          scope,
-          sandbox.run_in_owner(
-            owner,
-            config.default_timeout_ms,
-            run_group_hook,
-            TearDownCall(hook: hook, context: context),
-          ),
-          failures_rev,
-        )
-      run_after_all_chain(
-        config,
-        scope,
-        next_owner,
-        context,
-        rest,
-        next_failures_rev,
+    [hook, ..rest] ->
+      after_all_result(
+        AfterAllStep(
+          config: config,
+          scope: scope,
+          context: context,
+          hook: hook,
+          rest: rest,
+        ),
+        sandbox.run_in_owner(
+          owner,
+          config.default_timeout_ms,
+          run_group_hook,
+          TearDownCall(hook: hook, context: context),
+        ),
+        failures_rev,
       )
-    }
   }
 }
 
+/// One `after_all` hook of a group and the hooks after it.
+type AfterAllStep(context) {
+  AfterAllStep(
+    config: ParallelConfig,
+    scope: List(String),
+    context: context,
+    hook: Callback(context, Result(Nil, String)),
+    rest: List(Callback(context, Result(Nil, String))),
+  )
+}
+
+/// Record the result of an `after_all` hook and run the hooks after it.
+/// An owner that stopped before the hook started is a lost scope: the hook
+/// runs again in a new owner, so it never stays not run.
 fn after_all_result(
-  scope: List(String),
+  step: AfterAllStep(context),
   owner_result: OwnerResult(GroupHookCall(context), Result(context, String)),
   failures_rev: List(TeardownFailure),
 ) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
+  let AfterAllStep(
+    config: config,
+    scope: scope,
+    context: context,
+    hook: hook,
+    rest: rest,
+  ) = step
   case owner_result {
-    OwnerReturned(owner: owner, value: Ok(_context)) -> #(
-      Some(owner),
-      failures_rev,
-    )
-    OwnerReturned(owner: owner, value: Error(message)) -> #(
-      Some(owner),
-      add_teardown_failure(AfterAllHook, scope, message, failures_rev),
-    )
-    OwnerCaught(owner: owner, reason: reason) -> #(
-      Some(owner),
-      add_teardown_failure(
-        AfterAllHook,
+    OwnerReturned(owner: owner, value: Ok(_context)) ->
+      run_after_all_chain(
+        config,
         scope,
-        hook_crash_message(scope, reason),
+        Some(owner),
+        context,
+        rest,
         failures_rev,
-      ),
-    )
-    OwnerTimedOut -> #(
-      None,
-      add_teardown_failure(
-        AfterAllHook,
+      )
+    OwnerReturned(owner: owner, value: Error(message)) ->
+      run_after_all_chain(
+        config,
         scope,
-        hook_timeout_message(scope),
-        failures_rev,
-      ),
-    )
-    OwnerExited(reason: reason) -> #(
-      None,
-      add_teardown_failure(
-        AfterAllHook,
+        Some(owner),
+        context,
+        rest,
+        add_teardown_failure(AfterAllHook, scope, message, failures_rev),
+      )
+    OwnerCaught(owner: owner, reason: reason) ->
+      run_after_all_chain(
+        config,
         scope,
-        hook_crash_message(scope, reason),
-        failures_rev,
-      ),
-    )
+        Some(owner),
+        context,
+        rest,
+        add_teardown_failure(
+          AfterAllHook,
+          scope,
+          hook_crash_message(scope, reason),
+          failures_rev,
+        ),
+      )
+    OwnerTimedOut ->
+      run_after_all_chain(
+        config,
+        scope,
+        None,
+        context,
+        rest,
+        add_teardown_failure(
+          AfterAllHook,
+          scope,
+          hook_timeout_message(scope),
+          failures_rev,
+        ),
+      )
+    OwnerExited(reason: reason) ->
+      run_after_all_chain(
+        config,
+        scope,
+        None,
+        context,
+        rest,
+        add_teardown_failure(
+          AfterAllHook,
+          scope,
+          hook_crash_message(scope, reason),
+          failures_rev,
+        ),
+      )
+    OwnerLost(reason: reason) ->
+      run_after_all_chain(config, scope, None, context, [hook, ..rest], [
+        group_scope_lost(scope, reason),
+        ..failures_rev
+      ])
   }
 }
 
@@ -1136,12 +1278,13 @@ fn run_child_groups_sequentially(
   total: Int,
   completed: Int,
   collected: Collected,
-) -> #(Collected, Int) {
+  owners: List(ScopeOwner(context)),
+) -> #(Collected, Int, List(ScopeOwner(context))) {
   case groups {
-    [] -> #(collected, completed)
+    [] -> #(collected, completed, owners)
     [group_node, ..rest] -> {
-      let #(next_collected, next_completed) =
-        execute_node(ExecuteNodeConfig(
+      let node_config =
+        ExecuteNodeConfig(
           config: config,
           scope: scope,
           inherited_tags: inherited_tags,
@@ -1155,7 +1298,13 @@ fn run_child_groups_sequentially(
           total: total,
           completed: completed,
           collected: collected,
-        ))
+          owners: refresh_owners(owners),
+        )
+      let #(next_collected, next_completed, next_owners) =
+        execute_or_fail_group(
+          node_config,
+          lost_scope_failure(node_config.owners),
+        )
       run_child_groups_sequentially(
         config,
         scope,
@@ -1170,6 +1319,42 @@ fn run_child_groups_sequentially(
         total,
         next_completed,
         next_collected,
+        next_owners,
+      )
+    }
+  }
+}
+
+/// Run a child group while the owner of each enclosing scope is alive.
+/// After an owner stopped, the group does not start: no hook of it runs,
+/// and each of its tests is `SetupFailed` with `lost`.
+fn execute_or_fail_group(
+  node_config: ExecuteNodeConfig(context),
+  lost: Option(AssertionFailure),
+) -> #(Collected, Int, List(ScopeOwner(context))) {
+  case lost {
+    None -> execute_node(node_config)
+    Some(failure) -> {
+      let results_rev =
+        fail_group_nodes(
+          node_config.scope,
+          node_config.inherited_tags,
+          [node_config.node],
+          [failure],
+          [],
+        )
+      #(
+        add_collected(
+          Collected(results_rev: results_rev, teardown_failures_rev: []),
+          node_config.collected,
+        ),
+        emit_test_finished_progress_results(
+          node_config.progress_output,
+          node_config.completed,
+          node_config.total,
+          list.reverse(results_rev),
+        ),
+        node_config.owners,
       )
     }
   }
@@ -1186,7 +1371,8 @@ fn run_tests_in_group(
   group: GroupRun(context),
   tests: List(TestCase(context)),
   completed: Int,
-) -> #(List(TestOutcome), Int) {
+  owners: List(ScopeOwner(context)),
+) -> #(List(TestOutcome), Int, List(ScopeOwner(context))) {
   run_loop(
     group,
     LoopState(
@@ -1196,6 +1382,7 @@ fn run_tests_in_group(
       emitted_rev: [],
       next_emit_index: 0,
       completed: completed,
+      owners: owners,
     ),
   )
 }
@@ -1218,10 +1405,11 @@ fn index_tests(
 fn run_loop(
   group: GroupRun(context),
   state: LoopState(context),
-) -> #(List(TestOutcome), Int) {
-  let started = start_tests_up_to_limit(group, state, timing.now_ms())
+) -> #(List(TestOutcome), Int, List(ScopeOwner(context))) {
+  let started =
+    emit_ready(start_tests_up_to_limit(group, state, timing.now_ms()))
   case started.running {
-    [] -> #(started.emitted_rev, started.completed)
+    [] -> #(started.emitted_rev, started.completed, started.owners)
     [first, ..] ->
       run_loop(group, emit_ready(wait_for_event(group, started, first)))
   }
@@ -1265,7 +1453,36 @@ fn start_tests_up_to_limit(
   now: Int,
 ) -> LoopState(context) {
   case state.pending, list.length(state.running) < group.max_concurrency {
-    [#(index, test_case), ..rest], True ->
+    [next, ..rest], True ->
+      start_or_fail_next(
+        group,
+        LoopState(..state, owners: refresh_owners(state.owners)),
+        next,
+        rest,
+        now,
+      )
+    _, _ -> state
+  }
+}
+
+/// Start the next test while the owner of each scope is alive. After an
+/// owner stopped, no test that waits starts: each one is `SetupFailed`.
+fn start_or_fail_next(
+  group: GroupRun(context),
+  state: LoopState(context),
+  next: #(Int, TestCase(context)),
+  rest: List(#(Int, TestCase(context))),
+  now: Int,
+) -> LoopState(context) {
+  let #(index, test_case) = next
+  case lost_scope_failure(state.owners) {
+    Some(failure) ->
+      add_results(
+        group,
+        LoopState(..state, pending: []),
+        lost_scope_results(group, failure, [next, ..rest], []),
+      )
+    None ->
       start_tests_up_to_limit(
         group,
         LoopState(..state, pending: rest, running: [
@@ -1274,7 +1491,37 @@ fn start_tests_up_to_limit(
         ]),
         now,
       )
-    _, _ -> state
+  }
+}
+
+/// A `SetupFailed` result with `failure` for each test that waits.
+fn lost_scope_results(
+  group: GroupRun(context),
+  failure: AssertionFailure,
+  pending: List(#(Int, TestCase(context))),
+  results_rev: List(IndexedResult),
+) -> List(IndexedResult) {
+  case pending {
+    [] -> list.reverse(results_rev)
+    [#(index, test_case), ..rest] ->
+      lost_scope_results(group, failure, rest, [
+        IndexedResult(
+          index: index,
+          outcome: TestOutcome(
+            result: TestResult(
+              name: test_case.name,
+              groups: group.scope,
+              status: SetupFailed,
+              duration_ms: 0,
+              tags: list.append(group.inherited_tags, test_case.tags),
+              failures: [failure],
+              kind: test_case.kind,
+            ),
+            teardown_failures: [],
+          ),
+        ),
+        ..results_rev
+      ])
   }
 }
 

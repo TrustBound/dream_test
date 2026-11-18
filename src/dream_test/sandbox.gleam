@@ -509,40 +509,50 @@ pub opaque type Owner(input, output) {
 ///   owner is alive and can run the next function.
 /// - `OwnerTimedOut`: the function did not return in time. The owner was
 ///   killed, so a process that links to it stops too.
-/// - `OwnerExited(reason)`: the owner stopped before the function
-///   returned, for example because a process that links to it crashed.
-///   `reason` is the exit reason as text, from `format_exit_reason`.
+/// - `OwnerExited(reason)`: the owner stopped after the function started
+///   and before it returned, for example because a process that links to
+///   it crashed. `reason` is the exit reason as text, from
+///   `format_exit_reason`.
+/// - `OwnerLost(reason)`: the owner had stopped before it started the
+///   function, so the function did not run. This comes only for
+///   `Some(owner)`: the owner stopped after the function before, for
+///   example because a process that links to it crashed. Run the function
+///   again with `None` to run it in a new owner. `reason` is the exit
+///   reason as text.
 pub type OwnerResult(input, output) {
   OwnerReturned(owner: Owner(input, output), value: output)
   OwnerCaught(owner: Owner(input, output), reason: String)
   OwnerTimedOut
   OwnerExited(reason: String)
+  OwnerLost(reason: String)
 }
 
 /// A message to an owner: run a function, or stop.
+///
+/// Before the owner runs the function, it sends the subject for later
+/// requests to `started`. When the function returns or crashes, it sends
+/// the result to `reply`. The caller then knows if the function started.
 type OwnerRequest(input, output) {
   RunRequest(
     run: fn(input) -> output,
     input: input,
-    reply: Subject(OwnerReply(input, output)),
+    started: Subject(Subject(OwnerRequest(input, output))),
+    reply: Subject(Result(output, String)),
   )
   StopRequest
 }
 
-/// The answer of an owner to a `RunRequest`. It names the subject of the
-/// owner, so the first answer tells the caller where to send later
-/// requests.
-type OwnerReply(input, output) {
-  OwnerReply(
-    requests: Subject(OwnerRequest(input, output)),
-    result: Result(output, String),
-  )
+/// What the caller gets while it waits for the owner to start the
+/// function.
+type StartEvent(input, output) {
+  FunctionStarted(requests: Subject(OwnerRequest(input, output)))
+  StoppedBeforeStart(reason: String)
 }
 
-/// What the caller gets while it waits for an owner.
-type OwnerEvent(input, output) {
-  OwnerAnswered(reply: OwnerReply(input, output))
-  OwnerWentDown(reason: String)
+/// What the caller gets while it waits for the function to finish.
+type FinishEvent(output) {
+  FunctionFinished(result: Result(output, String))
+  StoppedDuringFunction(reason: String)
 }
 
 /// Run a function with its input in an owner process, and wait for it with
@@ -605,31 +615,55 @@ pub fn run_in_owner(
   run run: fn(input) -> output,
   input input: input,
 ) -> OwnerResult(input, output) {
+  let started = new_subject()
   let reply = new_subject()
-  let request = RunRequest(run: run, input: input, reply: reply)
+  let request =
+    RunRequest(run: run, input: input, started: started, reply: reply)
   let #(pid, owner_monitor) = send_owner_request(owner, request)
   let selector =
     new_selector()
-    |> select_map(reply, OwnerAnswered)
-    |> select_specific_monitor(owner_monitor, owner_went_down)
+    |> select_map(started, FunctionStarted)
+    |> select_specific_monitor(owner_monitor, stopped_before_start)
   case selector_receive(selector, timeout_ms) {
-    Ok(OwnerAnswered(OwnerReply(requests: requests, result: Ok(value)))) ->
-      OwnerReturned(
-        owner: Owner(pid: pid, monitor: owner_monitor, requests: requests),
-        value: value,
+    Ok(FunctionStarted(requests: requests)) ->
+      wait_for_function(
+        Owner(pid: pid, monitor: owner_monitor, requests: requests),
+        reply,
+        timeout_ms,
       )
-    Ok(OwnerAnswered(OwnerReply(requests: requests, result: Error(reason)))) ->
-      OwnerCaught(
-        owner: Owner(pid: pid, monitor: owner_monitor, requests: requests),
-        reason: reason,
-      )
-    Ok(OwnerWentDown(reason: reason)) -> OwnerExited(reason: reason)
-    Error(Nil) -> {
-      kill(pid)
-      demonitor_process(owner_monitor)
-      OwnerTimedOut
-    }
+    Ok(StoppedBeforeStart(reason: reason)) -> OwnerLost(reason: reason)
+    Error(Nil) -> time_out_owner(pid, owner_monitor)
   }
+}
+
+/// Wait for the function that the owner started, until `timeout_ms`.
+fn wait_for_function(
+  owner: Owner(input, output),
+  reply: Subject(Result(output, String)),
+  timeout_ms: Int,
+) -> OwnerResult(input, output) {
+  let selector =
+    new_selector()
+    |> select_map(reply, FunctionFinished)
+    |> select_specific_monitor(owner.monitor, stopped_during_function)
+  case selector_receive(selector, timeout_ms) {
+    Ok(FunctionFinished(result: Ok(value))) ->
+      OwnerReturned(owner: owner, value: value)
+    Ok(FunctionFinished(result: Error(reason))) ->
+      OwnerCaught(owner: owner, reason: reason)
+    Ok(StoppedDuringFunction(reason: reason)) -> OwnerExited(reason: reason)
+    Error(Nil) -> time_out_owner(owner.pid, owner.monitor)
+  }
+}
+
+/// Kill an owner that did not answer in time.
+fn time_out_owner(
+  pid: Pid,
+  owner_monitor: Monitor,
+) -> OwnerResult(input, output) {
+  kill(pid)
+  demonitor_process(owner_monitor)
+  OwnerTimedOut
 }
 
 /// Give the request to the owner, or start a new owner with it. Gives the
@@ -650,8 +684,12 @@ fn send_owner_request(
   }
 }
 
-fn owner_went_down(down: process.Down) -> OwnerEvent(input, output) {
-  OwnerWentDown(reason: format_exit_reason(down.reason))
+fn stopped_before_start(down: process.Down) -> StartEvent(input, output) {
+  StoppedBeforeStart(reason: format_exit_reason(down.reason))
+}
+
+fn stopped_during_function(down: process.Down) -> FinishEvent(output) {
+  StoppedDuringFunction(reason: format_exit_reason(down.reason))
 }
 
 /// The body of an owner process: make the subject for later requests, then
@@ -667,11 +705,9 @@ fn serve_owner(
   request: OwnerRequest(input, output),
 ) -> Nil {
   case request {
-    RunRequest(run: run, input: input, reply: reply) -> {
-      send(
-        reply,
-        OwnerReply(requests: requests, result: run_catching(run, input)),
-      )
+    RunRequest(run: run, input: input, started: started, reply: reply) -> {
+      send(started, requests)
+      send(reply, run_catching(run, input))
       serve_owner(requests, receive_forever(requests))
     }
     StopRequest -> Nil

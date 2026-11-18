@@ -30,6 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
   `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
   `types.teardown_hook_name`.
+- `types.ScopeLost(set_up:, scope:, reason:)`, a variant of
+  `types.TeardownFailure` for a scope whose owner process stopped after
+  its set-up hooks, and `types.SetUpHook` (`BeforeAllHook`,
+  `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
+  `types.set_up_hook_name`. The BDD and Gherkin reporters show it as
+  `lost scope of <set-up hook> in <scope>` and
+  `the owner process exited: <reason>`. The JSON reporter gives it as
+  `{"kind": "scope_lost", "hook": "before_all", "scope": [...],
+  "message": "<reason>"}`, and each failed tear-down hook now has
+  `"kind": "hook_failed"`.
+- `sandbox.OwnerLost(reason)`: `run_in_owner` gives it when the owner had
+  stopped before it started the function, so the function did not run.
 - `types.is_failure(status)`, the one check for a failure status
   (`Failed`, `SetupFailed`, `TimedOut`). The runner, the BDD reporter and
   `types.failed` use it.
@@ -437,9 +449,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   monitors the owner and records `hook crashed in <scope>: <reason>`. The
   next hook of the scope runs in a new owner process.
 - An owner process that stops while the tests of its scope run is now
-  reported as a tear-down failure, for example
-  `before_all process exited in <group>: <reason>`. The tear-down hooks of
-  the scope then run in a new owner process.
+  reported as a lost scope, `types.ScopeLost`, not as a failure of a
+  tear-down hook. The tests of the scope that did not start yet do not
+  run: each one is `SetupFailed` with
+  `before_all process exited in <group>: <reason>` or
+  `before_all_suites process exited: <reason>`. The tear-down hooks of the
+  scope run in a new owner process.
+- A tear-down hook always runs when the owner of its scope stops just
+  before the hook starts. Before, the hook was reported as crashed and did
+  not run. `run_in_owner` now knows if the owner started the function, and
+  the runner runs the hook again in a new owner.
 - The `after_each` and `after_each_test` hooks now run when the test
   process stops, for example when a linked process crashes. Before, a
   test process that stopped skipped them. They run in a new process with

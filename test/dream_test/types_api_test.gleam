@@ -149,6 +149,18 @@ pub fn tests() {
       ])
       |> or_fail_with("each hook should have its builder name")
     }),
+
+    it("set_up_hook_name gives the name of each set-up hook of a scope", fn() {
+      [
+        types.BeforeAllHook,
+        types.BeforeEachSuiteHook,
+        types.BeforeAllSuitesHook,
+      ]
+      |> list.map(types.set_up_hook_name)
+      |> should
+      |> be_equal(["before_all", "before_each_suite", "before_all_suites"])
+      |> or_fail_with("each set-up hook should have its builder name")
+    }),
   ])
 }
 

@@ -3,7 +3,8 @@
 
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox.{
-  type OwnerResult, OwnerCaught, OwnerExited, OwnerReturned, OwnerTimedOut,
+  type OwnerResult, OwnerCaught, OwnerExited, OwnerLost, OwnerReturned,
+  OwnerTimedOut,
 }
 import dream_test/unit.{describe, it}
 import gleam/erlang/atom.{type Atom}
@@ -85,6 +86,42 @@ pub fn tests() {
       |> or_fail_with("expected the owner to be alive")
     }),
 
+    it("an owner that stopped before the function gives OwnerLost", fn() {
+      let ran = process.new_subject()
+      case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
+        OwnerReturned(owner: owner, value: _) -> {
+          process.sleep(100)
+          #(
+            summary(sandbox.run_in_owner(
+              Some(owner),
+              1000,
+              fn(_nil) { process.send(ran, "ran") },
+              Nil,
+            )),
+            process.receive(ran, 0),
+          )
+        }
+        other -> #(summary(other), Error(Nil))
+      }
+      |> should
+      |> be_equal(#(Lost("Boom"), Error(Nil)))
+      |> or_fail_with("expected OwnerLost and a function that did not run")
+    }),
+
+    it("an owner that check_owner saw stop times out on the next call", fn() {
+      case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
+        OwnerReturned(owner: owner, value: _) -> {
+          process.sleep(100)
+          let _checked = sandbox.check_owner(owner)
+          summary(sandbox.run_in_owner(Some(owner), 20, start_crash, Nil))
+        }
+        other -> summary(other)
+      }
+      |> should
+      |> be_equal(TimedOut)
+      |> or_fail_with("expected OwnerTimedOut for an owner that was checked")
+    }),
+
     it("check_owner gives the exit reason of an owner that stopped", fn() {
       case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
         OwnerReturned(owner: owner, value: _) -> {
@@ -106,6 +143,7 @@ type Summary(output) {
   Caught(reason: String)
   TimedOut
   Exited(reason: String)
+  Lost(reason: String)
 }
 
 fn summary(result: OwnerResult(input, output)) -> Summary(output) {
@@ -120,6 +158,7 @@ fn summary(result: OwnerResult(input, output)) -> Summary(output) {
     }
     OwnerTimedOut -> TimedOut
     OwnerExited(reason: reason) -> Exited(reason)
+    OwnerLost(reason: reason) -> Lost(reason)
   }
 }
 

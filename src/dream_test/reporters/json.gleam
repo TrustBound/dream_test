@@ -13,13 +13,22 @@
 ////   `pending`, `timed_out`, `setup_failed`), and `teardown_failed`, the
 ////   number of tear-down hooks that failed
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
-//// - `teardown_failures`: one object for each tear-down hook that failed,
-////   in the order that the hooks ran: `hook` (`"after_each_test"`,
-////   `"after_each"`, `"after_all"`, `"after_each_suite"` or
-////   `"after_all_suites"`), `scope` (a list of names: the full test name
-////   for `after_each` and `after_each_test`, the group path for `after_all`,
-////   the suite name for `after_each_suite`, `[]` for `after_all_suites`)
-////   and `message`
+//// - `teardown_failures`: one object for each tear-down hook that failed
+////   and each lost scope, in the order that they happened. Each object
+////   has `kind`, `hook`, `scope` and `message`:
+////   - `kind` `"hook_failed"`: a tear-down hook failed. `hook` is
+////     `"after_each_test"`, `"after_each"`, `"after_all"`,
+////     `"after_each_suite"` or `"after_all_suites"`. `scope` is a list of
+////     names: the full test name for `after_each` and `after_each_test`,
+////     the group path for `after_all`, the suite name for
+////     `after_each_suite`, `[]` for `after_all_suites`. `message` is the
+////     error message or the crash text.
+////   - `kind` `"scope_lost"`: the owner process of a scope stopped while
+////     its tests ran. `hook` is the set-up hook that started the owner:
+////     `"before_all"`, `"before_each_suite"` or `"before_all_suites"`.
+////     `scope` is the group path for `before_all`, the suite name for
+////     `before_each_suite`, `[]` for `before_all_suites`. `message` is the
+////     exit reason of the owner.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
 //// count and no `teardown_failures` list: a failed tear-down hook was a
@@ -63,8 +72,8 @@ import dream_test/types.{
   type TeardownFailure, type TestKind, type TestResult, BooleanFailure,
   CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
   Failed, GherkinScenario, Integration, OptionFailure, Passed, Pending,
-  ResultFailure, SetupFailed, Skipped, SnapshotFailure, StringMatchFailure,
-  TimedOut, Unit,
+  ResultFailure, ScopeLost, SetupFailed, Skipped, SnapshotFailure,
+  StringMatchFailure, TeardownFailure, TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -308,10 +317,35 @@ fn build_summary_json(counts: summary.Counts) -> Json {
 }
 
 fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
+  case failure {
+    TeardownFailure(hook: hook, scope: scope, message: message) ->
+      teardown_failure_object(
+        "hook_failed",
+        types.teardown_hook_name(hook),
+        scope,
+        message,
+      )
+    ScopeLost(set_up: set_up, scope: scope, reason: reason) ->
+      teardown_failure_object(
+        "scope_lost",
+        types.set_up_hook_name(set_up),
+        scope,
+        reason,
+      )
+  }
+}
+
+fn teardown_failure_object(
+  kind: String,
+  hook: String,
+  scope: List(String),
+  message: String,
+) -> Json {
   json.object([
-    #("hook", json.string(types.teardown_hook_name(failure.hook))),
-    #("scope", json.array(failure.scope, json.string)),
-    #("message", json.string(failure.message)),
+    #("kind", json.string(kind)),
+    #("hook", json.string(hook)),
+    #("scope", json.array(scope, json.string)),
+    #("message", json.string(message)),
   ])
 }
 

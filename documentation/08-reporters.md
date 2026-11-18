@@ -83,7 +83,9 @@ pub fn main() {
 The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `duration_ms`, `system`, `summary`, `tests` and `teardown_failures`:
 
 - `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), and `teardown_failed` counts the tear-down hooks that failed.
-- `teardown_failures` has one object for each tear-down hook that failed, in the order that the hooks ran: `hook` (for example `"after_all"`), `scope` (the full test name, the group path, the suite name, or `[]` for `after_all_suites`) and `message`.
+- `teardown_failures` has one object for each tear-down hook that failed and each lost scope, in the order that they happened. Each object has `kind`, `hook`, `scope` and `message`:
+  - `"kind": "hook_failed"`: a tear-down hook failed. `hook` is the hook (for example `"after_all"`), `scope` is the full test name, the group path, the suite name, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
+  - `"kind": "scope_lost"`: the owner process of a scope stopped while its tests ran. `hook` is the set-up hook that started the owner (`"before_all"`, `"before_each_suite"` or `"before_all_suites"`), `scope` is the group path, the suite name, or `[]` for the whole run, and `message` is the exit reason of the owner.
 - Version `1.0` put a failed tear-down hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
 
 ### Progress reporter (during the run)
