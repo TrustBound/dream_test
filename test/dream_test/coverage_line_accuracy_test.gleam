@@ -7,6 +7,7 @@
 //// a child node because the module names of `.gleam` files start at the
 //// `src` folder of the working directory, and each project needs its own.
 
+import dream_test/child_timeout.{suite_with_child_timeout}
 import dream_test/coverage
 import dream_test/coverage/report
 import dream_test/coverage_child_support.{
@@ -139,4 +140,5 @@ pub fn tests() {
       |> or_fail_with("expected no marked fixture files")
     }),
   ])
+  |> suite_with_child_timeout
 }

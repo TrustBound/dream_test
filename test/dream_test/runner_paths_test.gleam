@@ -2,6 +2,7 @@
 //// failures, silent, filters with hooks, suite hooks and suite info.
 
 import coverage_fixtures/sample
+import dream_test/child_timeout.{with_child_timeout}
 import dream_test/coverage.{type CoverageConfig}
 import dream_test/coverage_project_support.{with_fixture_lock}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -29,7 +30,8 @@ pub fn tests() {
       |> should
       |> be_equal(1)
       |> or_fail_with("a tear-down failure should give exit status 1")
-    }),
+    })
+      |> with_child_timeout,
 
     it("exit_on_failure returns the results when every test passes", fn() {
       runner.new([describe("root", [it("passes", fn() { Ok(AssertionOk) })])])

@@ -6,6 +6,7 @@
 //// The tests that change DREAM_TEST_COVERAGE do it in a child node, because
 //// environment variables belong to the whole BEAM.
 
+import dream_test/child_timeout.{suite_with_child_timeout}
 import dream_test/coverage
 import dream_test/coverage_child_support.{run_in_child}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -365,4 +366,5 @@ pub fn tests() {
       ),
     ]),
   ])
+  |> suite_with_child_timeout
 }

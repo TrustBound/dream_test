@@ -3,6 +3,7 @@
 //// embedded-mode test and the dev-folder test run in a child node, because
 //// they need a BEAM in embedded mode or a different working directory.
 
+import dream_test/child_timeout.{with_child_timeout}
 import dream_test/coverage.{
   type CoverageError, type CoverageSession, AlreadyInstrumented, BadBeamFile,
   CompilerNotLoaded, DebugInfoUnreadable, EmbeddedMode, EncryptedDebugInfo,
@@ -170,7 +171,8 @@ pub fn tests() {
           ),
         )
         |> or_fail_with("expected the dev module to be looked up as tool")
-      }),
+      })
+        |> with_child_timeout,
       it("returns OnLoadFailed when the on_load function fails", fn() {
         let source_directory = project("on_load")
         add_source(
@@ -239,7 +241,8 @@ pub fn tests() {
           ),
         )
         |> or_fail_with("expected EmbeddedMode")
-      }),
+      })
+        |> with_child_timeout,
     ]),
 
     group("module gets no line counters", [

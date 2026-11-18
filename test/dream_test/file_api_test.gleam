@@ -1,3 +1,4 @@
+import dream_test/child_timeout.{with_child_timeout}
 import dream_test/file.{
   type FileError, FileSystemError, IsDirectory, NoSpace, NotFound,
   PermissionDenied, delete, delete_files_matching, error_to_string, read, write,
@@ -153,7 +154,8 @@ pub fn tests() {
       |> should
       |> be_equal(Error(NoSpace(path)))
       |> or_fail_with("expected NoSpace for the file on the full disk")
-    }),
+    })
+      |> with_child_timeout,
 
     it("error_to_string formats NotFound", fn() {
       error_to_string(NotFound("/x"))

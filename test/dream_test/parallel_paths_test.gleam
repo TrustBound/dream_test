@@ -500,38 +500,67 @@ type Watch {
   WaitUntilGone(reply: Subject(Nil))
 }
 
+/// What a watch process gets: a message from a test, or the exit of the
+/// process that started it or of the process that it watches.
+type WatchEvent {
+  FromTest(Watch)
+  OwnerGone
+  WatchedGone
+}
+
 /// Start a watch process under a new name. The name is registered before
-/// this function returns, so the tests can always send to it.
+/// this function returns, so the tests can always send to it. The watch
+/// process stops when the process that started it exits, so it never
+/// outlives its test.
 fn start_watch() -> Name(Watch) {
+  let owner = process.self()
   let name = process.new_name("dream_test_watch")
-  let pid = process.spawn_unlinked(fn() { watch(name, None, None) })
+  let pid =
+    process.spawn_unlinked(fn() {
+      let monitor = process.monitor(owner)
+      process.new_selector()
+      |> process.select_map(process.named_subject(name), FromTest)
+      |> process.select_specific_monitor(monitor, fn(_down) { OwnerGone })
+      |> watch(None, None)
+    })
   let assert Ok(Nil) = process.register(pid, name)
   name
 }
 
 fn watch(
-  name: Name(Watch),
+  selector: process.Selector(WatchEvent),
   started: option.Option(Pid),
   waiting: option.Option(Subject(Nil)),
 ) -> Nil {
   case started, waiting {
     Some(pid), Some(reply) -> {
-      wait_until_gone(pid)
-      process.send(reply, Nil)
+      let monitor = process.monitor(pid)
+      let selector =
+        process.select_specific_monitor(selector, monitor, fn(_down) {
+          WatchedGone
+        })
+      wait_until_gone(selector, reply)
     }
     _, _ ->
-      case process.receive_forever(process.named_subject(name)) {
-        Started(pid) -> watch(name, Some(pid), waiting)
-        WaitUntilGone(reply) -> watch(name, started, Some(reply))
+      case process.selector_receive_forever(selector) {
+        FromTest(Started(pid)) -> watch(selector, Some(pid), waiting)
+        FromTest(WaitUntilGone(reply)) -> watch(selector, started, Some(reply))
+        OwnerGone | WatchedGone -> Nil
       }
   }
 }
 
-fn wait_until_gone(pid: Pid) -> Nil {
-  let monitor = process.monitor(pid)
-  process.new_selector()
-  |> process.select_specific_monitor(monitor, fn(_down) { Nil })
-  |> process.selector_receive_forever
+/// Answer `reply` when the watched process exits. Stop without an answer
+/// when the owner exits first.
+fn wait_until_gone(
+  selector: process.Selector(WatchEvent),
+  reply: Subject(Nil),
+) -> Nil {
+  case process.selector_receive_forever(selector) {
+    WatchedGone -> process.send(reply, Nil)
+    OwnerGone -> Nil
+    FromTest(_) -> wait_until_gone(selector, reply)
+  }
 }
 
 /// Tell `watch` which process this test is, then never return.
