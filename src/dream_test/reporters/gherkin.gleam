@@ -12,10 +12,12 @@
 //// - to write the report using a custom function (`report`)
 
 import dream_test/reporters/summary
+import dream_test/reporters/teardown
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
-  GherkinScenario, Passed, Pending, SetupFailed, Skipped, TimedOut,
+  type AssertionFailure, type RunReport, type Status, type TestResult,
+  EqualityFailure, Failed, GherkinScenario, Passed, Pending, SetupFailed,
+  Skipped, TimedOut,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -37,7 +39,7 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// gherkin_reporter.format(sample_results())
+/// gherkin_reporter.format(sample_report())
 /// |> should
 /// |> match_snapshot("./test/snapshots/gherkin_format_report.snap")
 /// |> or_fail_with("expected formatted report snapshot match")
@@ -45,14 +47,24 @@ import gleam/string
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to format
+/// - `report`: The run report to format: the test results and the
+///   tear-down failures
 ///
 /// ## Returns
 ///
 /// The formatted report as a `String`.
-pub fn format(results results: List(TestResult)) -> String {
-  let summary_text = summary.format(results)
-  string.concat([format_scenarios(results), "\n", summary_text])
+pub fn format(report report: RunReport) -> String {
+  let summary_text = summary.format(report)
+  let teardown_text = case types.report_teardown_failures(report) {
+    [] -> ""
+    failures -> "\n" <> teardown.format(failures)
+  }
+  string.concat([
+    format_scenarios(types.report_tests(report)),
+    teardown_text,
+    "\n",
+    summary_text,
+  ])
 }
 
 /// Format test results as Gherkin feature and scenario lines, with no
@@ -100,7 +112,8 @@ pub fn format(results results: List(TestResult)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to format
+/// - `report`: The run report to format: the test results and the
+///   tear-down failures
 ///
 /// ## Returns
 ///
@@ -117,25 +130,25 @@ pub fn format_scenarios(results results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// let results = runner.new([tests()]) |> runner.run()
-/// gherkin_reporter.report(results, io.print)
+/// let report = runner.new([tests()]) |> runner.run()
+/// gherkin_reporter.report(report, io.print)
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `results`: List of test results from the runner
+/// - `report`: The run report from `runner.run`
 /// - `write`: Function that handles the formatted output string
 ///
 /// ## Returns
 ///
-/// Returns the input results unchanged, enabling pipeline composition.
+/// Returns the input report unchanged, enabling pipeline composition.
 ///
 pub fn report(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format(results))
-  results
+) -> RunReport {
+  write(format(report))
+  report
 }
 
 /// Check if a TestResult is from a Gherkin test.

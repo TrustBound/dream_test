@@ -80,6 +80,12 @@ pub fn main() {
 }
 ```
 
+The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `duration_ms`, `system`, `summary`, `tests` and `teardown_failures`:
+
+- `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), and `teardown_failed` counts the tear-down hooks that failed.
+- `teardown_failures` has one object for each tear-down hook that failed, in the order that the hooks ran: `hook` (for example `"after_all"`), `scope` (the full test name, the group path, the suite name, or `[]` for `after_all_suites`) and `message`.
+- Version `1.0` put a failed tear-down hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
+
 ### Progress reporter (during the run)
 
 Use progress output when you want compact logs, especially for large suites.
@@ -140,7 +146,10 @@ fn sample_results() -> List(types.TestResult) {
 pub fn tests() {
   describe("BDD formatting", [
     it("format returns a report string", fn() {
-      let report = bdd.format(sample_results())
+      let report =
+        bdd.format(
+          types.run_report(tests: sample_results(), teardown_failures: []),
+        )
 
       report
       |> should
@@ -156,7 +165,7 @@ pub fn tests() {
 Dream Test currently supports **custom reporting** in two practical ways:
 
 - **Custom output routing**: decide where runner output goes (stdout, stderr, file, in-memory buffer).
-- **Custom post-run reporters**: write your own formatter over `List(TestResult)` and print it after `runner.run()`.
+- **Custom post-run reporters**: write your own formatter over the `types.RunReport` that `runner.run()` gives, and print it.
 
 Note: the runner’s built-in “attach” points are intentionally small today:
 
@@ -240,19 +249,20 @@ fn example_suite() {
 }
 ```
 
-#### Custom post-run reporter (format `List(TestResult)`)
+#### Custom post-run reporter (format a `RunReport`)
 
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
-write a pure formatter over `List(TestResult)` and run it after `runner.run()`.
+write a pure formatter over the `types.RunReport` that `runner.run()` gives. Read the tests with `types.report_tests` and the failed tear-down hooks with `types.report_teardown_failures`.
 
-##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/parallel
 import dream_test/runner
 import dream_test/types.{
-  type Status, type TestResult, Failed, Pending, SetupFailed, Skipped, TimedOut,
+  type RunReport, type Status, type TestResult, Failed, Pending, SetupFailed,
+  Skipped, TimedOut,
 }
 import dream_test/unit.{describe, it}
 import gleam/int
@@ -260,7 +270,9 @@ import gleam/io
 import gleam/list
 import gleam/string
 
-pub fn render_my_report(results: List(TestResult)) -> String {
+pub fn render_my_report(report: RunReport) -> String {
+  let results = types.report_tests(report)
+  let teardown_failed = list.length(types.report_teardown_failures(report))
   let total = list.length(results)
   let failed = count(results, Failed)
   let timed_out = count(results, TimedOut)
@@ -276,7 +288,9 @@ pub fn render_my_report(results: List(TestResult)) -> String {
     int.to_string(passed),
     " passed; ",
     int.to_string(failed + timed_out + setup_failed),
-    " failed\n",
+    " failed; ",
+    int.to_string(teardown_failed),
+    " tear-down failed\n",
   ])
 }
 
@@ -298,12 +312,12 @@ fn count_loop(results: List(TestResult), wanted: Status, n: Int) -> Int {
 
 Then call it from your runner `main()`:
 
-##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L48-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L53-L56"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn main() {
-  let results = runner.new([tests()]) |> runner.run()
-  io.print(render_my_report(results))
+  let report = runner.new([tests()]) |> runner.run()
+  io.print(render_my_report(report))
 }
 ```
 

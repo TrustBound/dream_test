@@ -36,6 +36,7 @@ pub fn tests() {
         runner.new([suite])
         |> runner.max_concurrency(1)
         |> runner.run()
+        |> types.report_tests
       let t_serial = timing.now_ms() - t_serial_start
 
       let t_par_start = timing.now_ms()
@@ -43,6 +44,7 @@ pub fn tests() {
         runner.new([suite])
         |> runner.max_concurrency(4)
         |> runner.run()
+        |> types.report_tests
       let t_par = timing.now_ms() - t_par_start
 
       let _serial_names = list.map(serial_results, fn(r) { r.name })

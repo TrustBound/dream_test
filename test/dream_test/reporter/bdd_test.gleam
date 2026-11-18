@@ -4,6 +4,7 @@ import dream_test/reporters/json
 import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, group, it}
+import fixtures/test_results.{report_of, report_with_cleanup_failure}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -178,7 +179,7 @@ pub fn tests() {
   describe("dream_test/reporters/bdd", [
     group("format", [
       it("includes test names", fn() {
-        let out = bdd.format(sample_results())
+        let out = bdd.format(report_of(sample_results()))
         case string.contains(out, "t1") && string.contains(out, "t2") {
           True -> Ok(types.AssertionOk)
           False ->
@@ -235,7 +236,7 @@ pub fn tests() {
           <> "\n"
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n"
 
-        bdd.format(results)
+        bdd.format(report_of(results))
         |> should
         |> be_equal(expected)
         |> or_fail_with("bdd.format should render a basic BDD-style report")
@@ -277,8 +278,68 @@ pub fn tests() {
     ]),
 
     group("render", [
+      it("writes the tear-down failures before the summary", fn() {
+        bdd.render(
+          config(False, reporter_types.BddFull),
+          report_with_cleanup_failure([
+            result_of(["root"], "adds", types.Passed, [], types.Unit),
+          ]),
+        )
+        |> should
+        |> be_equal(
+          "root\n"
+          <> "  ✓ adds\n"
+          <> "\n"
+          <> "Tear-down failures:\n"
+          <> "  after_all in root\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+        )
+        |> or_fail_with("the tear-down failures should have their own section")
+      }),
+
+      it("writes the tear-down failures in colour", fn() {
+        bdd.render(
+          config(True, reporter_types.BddFailuresOnly),
+          report_with_cleanup_failure([]),
+        )
+        |> should
+        |> be_equal(
+          "\n"
+          <> "\u{1b}[1m\u{1b}[31mTear-down failures:\u{1b}[0m\u{1b}[0m\n"
+          <> "  \u{1b}[31mafter_all in root\u{1b}[0m\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m tear-down failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",
+        )
+        |> or_fail_with("the tear-down section should have colour")
+      }),
+
+      it("writes the tear-down failures in failures-only mode", fn() {
+        bdd.render(
+          config(False, reporter_types.BddFailuresOnly),
+          report_with_cleanup_failure([
+            result_of(["root"], "adds", types.Passed, [], types.Unit),
+          ]),
+        )
+        |> should
+        |> be_equal(
+          "\n"
+          <> "Tear-down failures:\n"
+          <> "  after_all in root\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+        )
+        |> or_fail_with("failures-only mode should show tear-down failures")
+      }),
+
       it("writes every status without colour", fn() {
-        bdd.render(config(False, reporter_types.BddFull), every_status())
+        bdd.render(
+          config(False, reporter_types.BddFull),
+          report_of(every_status()),
+        )
         |> should
         |> be_equal(
           "s\n"
@@ -317,7 +378,10 @@ pub fn tests() {
       }),
 
       it("writes every status with colour", fn() {
-        bdd.render(config(True, reporter_types.BddFull), every_status())
+        bdd.render(
+          config(True, reporter_types.BddFull),
+          report_of(every_status()),
+        )
         |> should
         |> be_equal(
           "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
@@ -358,7 +422,7 @@ pub fn tests() {
       it("writes only the failures in failures_only mode", fn() {
         bdd.render(
           config(False, reporter_types.BddFailuresOnly),
-          every_status(),
+          report_of(every_status()),
         )
         |> should
         |> be_equal(
@@ -381,7 +445,10 @@ pub fn tests() {
       }),
 
       it("writes only the summary in summary_only mode", fn() {
-        bdd.render(config(False, reporter_types.BddSummaryOnly), every_status())
+        bdd.render(
+          config(False, reporter_types.BddSummaryOnly),
+          report_of(every_status()),
+        )
         |> should
         |> be_equal(
           "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
@@ -390,7 +457,10 @@ pub fn tests() {
       }),
 
       it("writes Feature and Scenario for Gherkin results", fn() {
-        bdd.render(config(False, reporter_types.BddFull), gherkin_results())
+        bdd.render(
+          config(False, reporter_types.BddFull),
+          report_of(gherkin_results()),
+        )
         |> should
         |> be_equal(
           "Feature: Cart\n"
@@ -417,17 +487,41 @@ pub fn tests() {
       }),
     ]),
 
+    group("format with tear-down failures", [
+      it("format writes the tear-down failures before the summary", fn() {
+        bdd.format(
+          report_with_cleanup_failure([
+            result_of(["root"], "adds", types.Passed, [], types.Unit),
+          ]),
+        )
+        |> should
+        |> be_equal(
+          "root\n"
+          <> "  ✓ adds\n"
+          <> "\n"
+          <> "Tear-down failures:\n"
+          <> "  after_all in root\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+        )
+        |> or_fail_with("format should show the tear-down failures")
+      }),
+    ]),
+
     group("format", [
       it("writes every failure payload", fn() {
-        bdd.format([
-          result_of(
-            ["p"],
-            "payloads",
-            types.Failed,
-            every_payload(),
-            types.Unit,
-          ),
-        ])
+        bdd.format(
+          report_of([
+            result_of(
+              ["p"],
+              "payloads",
+              types.Failed,
+              every_payload(),
+              types.Unit,
+            ),
+          ]),
+        )
         |> should
         |> be_equal(
           "p\n"
@@ -478,15 +572,18 @@ pub fn tests() {
       }),
 
       it("writes every failure payload with colour", fn() {
-        bdd.render(config(True, reporter_types.BddFailuresOnly), [
-          result_of(
-            ["p"],
-            "payloads",
-            types.Failed,
-            every_payload(),
-            types.Unit,
-          ),
-        ])
+        bdd.render(
+          config(True, reporter_types.BddFailuresOnly),
+          report_of([
+            result_of(
+              ["p"],
+              "payloads",
+              types.Failed,
+              every_payload(),
+              types.Unit,
+            ),
+          ]),
+        )
         |> should
         |> be_equal(
           "\u{001B}[1m\u{001B}[36mp\u{001B}[0m\u{001B}[0m\n"
@@ -537,18 +634,22 @@ pub fn tests() {
       }),
 
       it("writes a test with no group at the top level", fn() {
-        bdd.format([result_of([], "alone", types.Passed, [], types.Unit)])
+        bdd.format(
+          report_of([result_of([], "alone", types.Passed, [], types.Unit)]),
+        )
         |> should
         |> be_equal("✓ alone\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n")
         |> or_fail_with("a test with no group should have no indent")
       }),
 
       it("sorts a group before the tests of a longer path", fn() {
-        bdd.format([
-          result_of(["a", "b"], "c", types.Passed, [], types.Unit),
-          result_of(["a"], "b", types.Passed, [], types.Unit),
-          result_of(["a"], "b", types.Skipped, [], types.Unit),
-        ])
+        bdd.format(
+          report_of([
+            result_of(["a", "b"], "c", types.Passed, [], types.Unit),
+            result_of(["a"], "b", types.Passed, [], types.Unit),
+            result_of(["a"], "b", types.Skipped, [], types.Unit),
+          ]),
+        )
         |> should
         |> be_equal(
           "a\n"
@@ -563,7 +664,7 @@ pub fn tests() {
       }),
 
       it("writes Gherkin results with one summary", fn() {
-        bdd.format(gherkin_results())
+        bdd.format(report_of(gherkin_results()))
         |> should
         |> be_equal(
           "Feature: Cart\n"
@@ -580,10 +681,12 @@ pub fn tests() {
       }),
 
       it("writes unit and Gherkin results together", fn() {
-        bdd.format([
-          result_of(["Math"], "adds", types.Passed, [], types.Unit),
-          ..gherkin_results()
-        ])
+        bdd.format(
+          report_of([
+            result_of(["Math"], "adds", types.Passed, [], types.Unit),
+            ..gherkin_results()
+          ]),
+        )
         |> should
         |> be_equal(
           "Math\n"
@@ -602,12 +705,14 @@ pub fn tests() {
       }),
 
       it("shows the duration of a slow test", fn() {
-        bdd.format([
-          types.TestResult(
-            ..result_of(["s"], "slow", types.Passed, [], types.Unit),
-            duration_ms: 1500,
-          ),
-        ])
+        bdd.format(
+          report_of([
+            types.TestResult(
+              ..result_of(["s"], "slow", types.Passed, [], types.Unit),
+              duration_ms: 1500,
+            ),
+          ]),
+        )
         |> should
         |> be_equal(
           "s\n  ✓ slow (1.5s)\n\nSummary: 1 run, 0 failed, 1 passed in 1.5s\n",
@@ -617,24 +722,26 @@ pub fn tests() {
     ]),
 
     it("format_summary_only writes the skipped count without colour", fn() {
-      bdd.format_summary_only([
-        types.TestResult(
-          name: "later",
-          groups: ["suite"],
-          status: types.Skipped,
-          duration_ms: 0,
-          tags: [],
-          failures: [],
-          kind: types.Unit,
-        ),
-      ])
+      bdd.format_summary_only(
+        report_of([
+          types.TestResult(
+            name: "later",
+            groups: ["suite"],
+            status: types.Skipped,
+            duration_ms: 0,
+            tags: [],
+            failures: [],
+            kind: types.Unit,
+          ),
+        ]),
+      )
       |> should
       |> be_equal("Summary: 1 run, 0 failed, 0 passed, 1 skipped in 0ms\n")
       |> or_fail_with("an uncoloured summary should have no ANSI codes")
     }),
 
     it("format_summary_only returns a non-empty summary", fn() {
-      let out = bdd.format_summary_only(sample_results())
+      let out = bdd.format_summary_only(report_of(sample_results()))
       case out == "" {
         True ->
           Ok(
@@ -672,14 +779,15 @@ pub fn tests() {
 
     it("report does not crash", fn() {
       let write = fn(_s: String) { Nil }
-      bdd.report(sample_results(), write)
+      bdd.report(report_of(sample_results()), write)
       Ok(types.AssertionOk)
     }),
 
     it("bdd.color renders ANSI escapes", fn() {
       let reporter = bdd.new() |> bdd.color()
       let report = case reporter {
-        reporter_types.Bdd(config) -> bdd.render(config, sample_results())
+        reporter_types.Bdd(config) ->
+          bdd.render(config, report_of(sample_results()))
         _ -> ""
       }
 

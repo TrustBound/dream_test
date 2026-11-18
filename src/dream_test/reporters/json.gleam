@@ -9,8 +9,21 @@
 //// - `timestamp_ms`: when the report was created
 //// - `duration_ms`: total duration (sum of test durations)
 //// - `system`: `os`, `otp_version`, `gleam_version`
-//// - `summary`: counts by status
+//// - `summary`: counts by status (`total`, `passed`, `failed`, `skipped`,
+////   `pending`, `timed_out`, `setup_failed`), and `teardown_failed`, the
+////   number of tear-down hooks that failed
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
+//// - `teardown_failures`: one object for each tear-down hook that failed,
+////   in the order that the hooks ran: `hook` (`"after_each_test"`,
+////   `"after_each"`, `"after_all"`, `"after_each_suite"` or
+////   `"after_all_suites"`), `scope` (a list of names: the full test name
+////   for `after_each` and `after_each_test`, the group path for `after_all`,
+////   the suite name for `after_each_suite`, `[]` for `after_all_suites`)
+////   and `message`
+////
+//// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
+//// count and no `teardown_failures` list: a failed tear-down hook was a
+//// test with a name such as `<after_all>` in `tests`.
 ////
 //// ## Usage
 ////
@@ -46,11 +59,12 @@
 import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
-  type AssertionFailure, type FailurePayload, type Status, type TestKind,
-  type TestResult, BooleanFailure, CollectionFailure, ComparisonFailure,
-  CustomMatcherFailure, EqualityFailure, Failed, GherkinScenario, Integration,
-  OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
-  SnapshotFailure, StringMatchFailure, TimedOut, Unit,
+  type AssertionFailure, type FailurePayload, type RunReport, type Status,
+  type TeardownFailure, type TestKind, type TestResult, BooleanFailure,
+  CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
+  Failed, GherkinScenario, Integration, OptionFailure, Passed, Pending,
+  ResultFailure, SetupFailed, Skipped, SnapshotFailure, StringMatchFailure,
+  TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -80,12 +94,12 @@ pub fn pretty(
 /// Render JSON output for a completed run.
 pub fn render(
   config config: reporter_types.JsonReporterConfig,
-  results results: List(TestResult),
+  report report: RunReport,
 ) -> String {
   let reporter_types.JsonReporterConfig(pretty: pretty) = config
   case pretty {
-    True -> format_pretty(results)
-    False -> format(results)
+    True -> format_pretty(report)
+    False -> format(report)
   }
 }
 
@@ -95,7 +109,7 @@ pub fn render(
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode into the JSON report
+/// - `report`: The run report to encode into the JSON report
 ///
 /// ## Returns
 ///
@@ -116,13 +130,13 @@ pub fn render(
 /// }
 ///
 /// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   json.format(results)
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   json.format(report)
 /// }
 /// ```
 ///
-pub fn format(results results: List(TestResult)) -> String {
-  build_report_json(results)
+pub fn format(report report: RunReport) -> String {
+  build_report_json(report)
   |> json.to_string
 }
 
@@ -132,7 +146,7 @@ pub fn format(results results: List(TestResult)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode into the JSON report
+/// - `report`: The run report to encode into the JSON report
 ///
 /// ## Returns
 ///
@@ -153,13 +167,13 @@ pub fn format(results results: List(TestResult)) -> String {
 /// }
 ///
 /// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   json.format_pretty(results)
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   json.format_pretty(report)
 /// }
 /// ```
 ///
-pub fn format_pretty(results results: List(TestResult)) -> String {
-  build_report_json(results)
+pub fn format_pretty(report report: RunReport) -> String {
+  build_report_json(report)
   |> json.to_string
   |> prettify_json
 }
@@ -171,12 +185,12 @@ pub fn format_pretty(results results: List(TestResult)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode and write
+/// - `report`: The run report to encode and write
 /// - `write`: Output sink for the JSON string (for example `io.print`)
 ///
 /// ## Returns
 ///
-/// Returns the input `results` unchanged, enabling pipeline composition.
+/// Returns the input `report` unchanged, enabling pipeline composition.
 ///
 /// ## Example
 ///
@@ -194,16 +208,16 @@ pub fn format_pretty(results results: List(TestResult)) -> String {
 /// }
 ///
 /// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   results |> json.report(io.print)
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   report |> json.report(io.print)
 /// }
 /// ```
 pub fn report(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format(results))
-  results
+) -> RunReport {
+  write(format(report))
+  report
 }
 
 /// Print test results as pretty-printed JSON using a provided writer function.
@@ -212,12 +226,12 @@ pub fn report(
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode and write
+/// - `report`: The run report to encode and write
 /// - `write`: Output sink for the JSON string (for example `io.print`)
 ///
 /// ## Returns
 ///
-/// Returns the input `results` unchanged, enabling pipeline composition.
+/// Returns the input `report` unchanged, enabling pipeline composition.
 ///
 /// ## Example
 ///
@@ -235,33 +249,40 @@ pub fn report(
 /// }
 ///
 /// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   results |> json.report_pretty(io.print)
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   report |> json.report_pretty(io.print)
 /// }
 /// ```
 ///
 pub fn report_pretty(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format_pretty(results))
-  results
+) -> RunReport {
+  write(format_pretty(report))
+  report
 }
 
 // ============================================================================
 // JSON Building
 // ============================================================================
 
-fn build_report_json(results: List(TestResult)) -> Json {
-  let counts = summary.count(results)
+fn build_report_json(report: RunReport) -> Json {
+  let counts = summary.count(report)
 
   json.object([
-    #("version", json.string("1.0")),
+    #("version", json.string("2.0")),
     #("timestamp_ms", json.int(get_timestamp_ms())),
     #("duration_ms", json.int(counts.duration_ms)),
     #("system", build_system_json()),
     #("summary", build_summary_json(counts)),
-    #("tests", json.array(results, build_test_json)),
+    #("tests", json.array(types.report_tests(report), build_test_json)),
+    #(
+      "teardown_failures",
+      json.array(
+        types.report_teardown_failures(report),
+        build_teardown_failure_json,
+      ),
+    ),
   ])
 }
 
@@ -282,6 +303,15 @@ fn build_summary_json(counts: summary.Counts) -> Json {
     #("pending", json.int(counts.pending)),
     #("timed_out", json.int(counts.timed_out)),
     #("setup_failed", json.int(counts.setup_failed)),
+    #("teardown_failed", json.int(counts.teardown_failed)),
+  ])
+}
+
+fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
+  json.object([
+    #("hook", json.string(types.teardown_hook_name(failure.hook))),
+    #("scope", json.array(failure.scope, json.string)),
+    #("message", json.string(failure.message)),
   ])
 }
 

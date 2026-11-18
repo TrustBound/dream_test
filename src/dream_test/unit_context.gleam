@@ -322,6 +322,10 @@ pub fn skip(
 }
 
 /// Run once before any tests and produce/transform the context.
+///
+/// It runs in the runner process, so a resource that it starts lives for all
+/// the tests of the scope. No timeout applies to it. If it returns `Error`
+/// or crashes, all tests under this scope become `SetupFailed`.
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
@@ -336,6 +340,9 @@ pub fn before_each(
 }
 
 /// Run after each test for cleanup.
+///
+/// If it returns `Error` or crashes, the status of the test does not change:
+/// the run report gets a `types.TeardownFailure`, and the run fails.
 pub fn after_each(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
@@ -343,6 +350,10 @@ pub fn after_each(
 }
 
 /// Run once after all tests for cleanup.
+///
+/// It runs in the runner process, with no timeout. Every `after_all` hook
+/// runs, also after one fails. A failure goes into the tear-down failures of
+/// the run report, and the run fails.
 pub fn after_all(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {

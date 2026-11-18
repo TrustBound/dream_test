@@ -20,7 +20,9 @@ fn sample_results() -> List(types.TestResult) {
 pub fn tests() {
   describe("Gherkin formatting", [
     it("format returns a report string", fn() {
-      gherkin_reporter.format(sample_results())
+      gherkin_reporter.format(
+        types.run_report(tests: sample_results(), teardown_failures: []),
+      )
       |> should
       |> match_snapshot("./test/snapshots/gherkin_format_report.snap")
       |> or_fail_with("expected formatted report snapshot match")

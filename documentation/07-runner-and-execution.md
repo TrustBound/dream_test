@@ -177,6 +177,12 @@ about what is running.
 - `before_each_suite` / `after_each_suite` receive `types.SuiteInfo`.
 - `before_all_suites` / `after_all_suites` receive the full list of `SuiteInfo` after filtering.
 
+**Failures and where the hooks run**:
+
+- A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
+- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining tear-down hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
+- The suite-level hooks run in the runner process, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. No timeout applies to them. The per-test hooks run in their own process with the test timeout.
+
 `source` is best-effort:
 
 - Unit discovery suites use the **module name**.
@@ -248,11 +254,12 @@ Most users should not call `dream_test/parallel` directly. It’s public so adva
 ```gleam
 import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 import dream_test/parallel
+import dream_test/types
 import dream_test/unit.{describe, it}
 
 pub fn tests() {
   describe("Parallel executor", [
-    it("can run a suite and return a list of results", fn() {
+    it("can run a suite and return a report of the results", fn() {
       let suite =
         describe("Suite", [
           it("a", fn() { Ok(succeed()) }),
@@ -260,6 +267,7 @@ pub fn tests() {
         ])
 
       parallel.run_root_parallel(parallel.default_config(), suite)
+      |> types.report_tests
       |> should
       |> have_length(2)
       |> or_fail_with("expected two results")

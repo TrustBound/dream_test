@@ -32,7 +32,10 @@ pub fn tests() {
           ]),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [_r] = results
 
       file.read(log_path)

@@ -16,7 +16,10 @@ pub fn tests() {
           |> with_tags(["group"]),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(r.status, r.tags)
@@ -34,7 +37,10 @@ pub fn tests() {
           }),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       r.status |> should |> be_equal(Passed) |> or_fail_with("test should pass")
@@ -46,7 +52,10 @@ pub fn tests() {
           skip("skipped", fn(_n: Int) { panic as "should not run" }),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(r.name, r.status, r.failures)

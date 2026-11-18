@@ -80,7 +80,12 @@ fn colour_report() {
 fn render_failure_for(error: CoverageError) -> String {
   coverage_reporter.render_failure(
     error: error,
-    outcome: RunOutcome(passed: 3, failed: 0, exit_on_failure: True),
+    outcome: RunOutcome(
+      passed: 3,
+      failed: 0,
+      teardown_failed: 0,
+      exit_on_failure: True,
+    ),
   )
 }
 

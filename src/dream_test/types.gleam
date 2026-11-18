@@ -310,10 +310,13 @@ pub type CoverageSummary {
 ///
 /// ## Example
 ///
-/// After running suites, you get a list of these:
+/// After running suites, the run report has one of these for each test:
 ///
 /// ```gleam
-/// let results = runner.new([example_suite()]) |> runner.run()
+/// let results =
+///   runner.new([example_suite()])
+///   |> runner.run()
+///   |> types.report_tests
 /// ```
 ///
 pub type TestResult {
@@ -518,4 +521,237 @@ pub fn status_from_failures(
     [] -> Passed
     _ -> Failed
   }
+}
+
+/// Whether a status means that the test failed: `Failed`, `SetupFailed` or
+/// `TimedOut`.
+///
+/// The runner, the reporters and `failed` use this one check.
+///
+/// ## Parameters
+///
+/// - `status`: the status of a test
+///
+/// ## Returns
+///
+/// `True` for `Failed`, `SetupFailed` and `TimedOut`, `False` for `Passed`,
+/// `Skipped` and `Pending`.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.is_failure(types.SetupFailed)
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("SetupFailed should be a failure")
+/// ```
+pub fn is_failure(status status: Status) -> Bool {
+  case status {
+    Failed -> True
+    SetupFailed -> True
+    TimedOut -> True
+    Passed -> False
+    Skipped -> False
+    Pending -> False
+  }
+}
+
+/// A tear-down hook. A `TeardownFailure` names the hook that failed.
+///
+/// Each variant is the hook of the builder function with the same name:
+///
+/// - `AfterEachTestHook`: `runner.after_each_test`
+/// - `AfterEachHook`: `unit.after_each` (and the same hook of the other DSLs)
+/// - `AfterAllHook`: `unit.after_all` (and the same hook of the other DSLs)
+/// - `AfterEachSuiteHook`: `runner.after_each_suite`
+/// - `AfterAllSuitesHook`: `runner.after_all_suites`
+pub type TeardownHook {
+  AfterEachTestHook
+  AfterEachHook
+  AfterAllHook
+  AfterEachSuiteHook
+  AfterAllSuitesHook
+}
+
+/// The name of a tear-down hook, as reporters show it.
+///
+/// ## Parameters
+///
+/// - `hook`: the tear-down hook
+///
+/// ## Returns
+///
+/// The name of the builder function of the hook, for example
+/// `"after_all"` for `AfterAllHook`.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.teardown_hook_name(types.AfterEachSuiteHook)
+/// |> should
+/// |> be_equal("after_each_suite")
+/// |> or_fail_with("expected the builder name")
+/// ```
+pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
+  case hook {
+    AfterEachTestHook -> "after_each_test"
+    AfterEachHook -> "after_each"
+    AfterAllHook -> "after_all"
+    AfterEachSuiteHook -> "after_each_suite"
+    AfterAllSuitesHook -> "after_all_suites"
+  }
+}
+
+/// A tear-down hook that returned `Error` or crashed.
+///
+/// A tear-down failure does not change the status of a test. The run keeps
+/// it in its own list, and the run fails.
+///
+/// ## Fields
+///
+/// - `hook`: which tear-down hook failed
+/// - `scope`: where it ran. For `AfterEachTestHook` and `AfterEachHook`,
+///   the full name of the test. For `AfterAllHook`, the group path. For
+///   `AfterEachSuiteHook`, the suite name. For `AfterAllSuitesHook`, `[]`.
+/// - `message`: the error message of the hook, or the crash text
+///
+/// ## Example
+///
+/// ```gleam
+/// types.TeardownFailure(
+///   hook: types.AfterAllHook,
+///   scope: ["Database"],
+///   message: "could not drop the test schema",
+/// )
+/// ```
+pub type TeardownFailure {
+  TeardownFailure(hook: TeardownHook, scope: List(String), message: String)
+}
+
+/// The result of a run: the result of each test, and the tear-down hooks
+/// that failed.
+///
+/// `runner.run` and `parallel.run_root_parallel` give a `RunReport`, and the
+/// reporters take one. Use `run_report` to make one, `report_tests` and
+/// `report_teardown_failures` to read it, and `failed` to check it.
+pub opaque type RunReport {
+  RunReport(tests: List(TestResult), teardown_failures: List(TeardownFailure))
+}
+
+/// Make a `RunReport`.
+///
+/// The runner makes the report of a run. Make one yourself to test a
+/// reporter, or in a custom runner.
+///
+/// ## Parameters
+///
+/// - `tests`: the result of each test, in the order of the run
+/// - `teardown_failures`: the tear-down hooks that failed, in the order
+///   that they ran
+///
+/// ## Returns
+///
+/// A `RunReport` with these tests and tear-down failures.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [])
+/// |> types.failed
+/// |> should
+/// |> be_equal(False)
+/// |> or_fail_with("an empty run should not fail")
+/// ```
+pub fn run_report(
+  tests tests: List(TestResult),
+  teardown_failures teardown_failures: List(TeardownFailure),
+) -> RunReport {
+  RunReport(tests: tests, teardown_failures: teardown_failures)
+}
+
+/// The result of each test of a run, in the order of the run.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// The test results. Tear-down failures are not test results.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [])
+/// |> types.report_tests
+/// |> should
+/// |> be_equal([])
+/// |> or_fail_with("an empty run should have no tests")
+/// ```
+pub fn report_tests(report report: RunReport) -> List(TestResult) {
+  report.tests
+}
+
+/// The tear-down hooks that failed in a run, in the order that they ran.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// The tear-down failures, or `[]` when every tear-down hook succeeded.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [])
+/// |> types.report_teardown_failures
+/// |> should
+/// |> be_equal([])
+/// |> or_fail_with("an empty run should have no tear-down failures")
+/// ```
+pub fn report_teardown_failures(
+  report report: RunReport,
+) -> List(TeardownFailure) {
+  report.teardown_failures
+}
+
+/// Whether a run failed: a test has a failure status (see `is_failure`), or
+/// a tear-down hook failed.
+///
+/// `runner.exit_on_failure` stops the BEAM with status 1 when this is
+/// `True`.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// `True` when a test is `Failed`, `SetupFailed` or `TimedOut`, or when the
+/// report has a tear-down failure.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [
+///   types.TeardownFailure(
+///     hook: types.AfterAllSuitesHook,
+///     scope: [],
+///     message: "could not stop the pool",
+///   ),
+/// ])
+/// |> types.failed
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("a tear-down failure should fail the run")
+/// ```
+pub fn failed(report report: RunReport) -> Bool {
+  !list.is_empty(report.teardown_failures)
+  || list.any(report.tests, has_failure_status)
+}
+
+fn has_failure_status(result: TestResult) -> Bool {
+  is_failure(result.status)
 }

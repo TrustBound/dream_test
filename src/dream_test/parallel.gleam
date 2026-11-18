@@ -15,11 +15,12 @@
 //// ```gleam
 //// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 //// import dream_test/parallel
+//// import dream_test/types
 //// import dream_test/unit.{describe, it}
 ////
 //// pub fn tests() {
 ////   describe("Parallel executor", [
-////     it("can run a suite and return a list of results", fn() {
+////     it("can run a suite and return a report of the results", fn() {
 ////       let suite =
 ////         describe("Suite", [
 ////           it("a", fn() { Ok(succeed()) }),
@@ -27,6 +28,7 @@
 ////         ])
 ////
 ////       parallel.run_root_parallel(parallel.default_config(), suite)
+////       |> types.report_tests
 ////       |> should
 ////       |> have_length(2)
 ////       |> or_fail_with("expected two results")
@@ -39,11 +41,12 @@ import dream_test/reporters/progress
 import dream_test/sandbox
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type AssertionResult, type Node, type Status,
-  type TestInfo, type TestKind, type TestResult, type TestSuite, AfterAll,
-  AfterEach, AssertionFailed, AssertionFailure, AssertionOk, AssertionSkipped,
-  BeforeAll, BeforeEach, Failed, Group, Passed, Root, SetupFailed, Skipped, Test,
-  TestResult, TimedOut, Unit,
+  type AssertionFailure, type AssertionResult, type Node, type RunReport,
+  type Status, type TeardownFailure, type TeardownHook, type TestInfo,
+  type TestKind, type TestResult, type TestSuite, AfterAll, AfterAllHook,
+  AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed, AssertionFailure,
+  AssertionOk, AssertionSkipped, BeforeAll, BeforeEach, Failed, Group, Passed,
+  Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
@@ -119,10 +122,12 @@ pub type RunRootParallelWithReporterConfig(context) {
 /// Result of `run_root_parallel_with_reporter`.
 ///
 /// This is returned as a semantic type (not a tuple) so callers can use named
-/// fields and avoid positional destructuring.
+/// fields and avoid positional destructuring. A tear-down failure is not a
+/// test result, so it is in `teardown_failures`, not in `results`.
 pub type RunRootParallelWithReporterResult {
   RunRootParallelWithReporterResult(
     results: List(TestResult),
+    teardown_failures: List(TeardownFailure),
     completed: Int,
     progress_reporter: Option(progress.ProgressReporter),
   )
@@ -144,8 +149,23 @@ type ExecuteNodeConfig(context) {
     progress_output: Option(ProgressOutput),
     total: Int,
     completed: Int,
-    results_rev: List(TestResult),
+    collected: Collected,
   )
+}
+
+/// What a run has collected so far, newest first: the test results and the
+/// tear-down failures.
+type Collected {
+  Collected(
+    results_rev: List(TestResult),
+    teardown_failures_rev: List(TeardownFailure),
+  )
+}
+
+/// What one test gives: its result, and the `after_each` and
+/// `after_each_test` hooks that failed after it, in the order that they ran.
+type TestOutcome {
+  TestOutcome(result: TestResult, teardown_failures: List(TeardownFailure))
 }
 
 /// Where the progress lines of a run go: the progress reporter, and the
@@ -166,7 +186,7 @@ fn progress_output(
 }
 
 type IndexedResult {
-  IndexedResult(index: Int, result: TestResult)
+  IndexedResult(index: Int, outcome: TestOutcome)
 }
 
 /// A worker that the loop started and that has not given a result yet. The
@@ -205,7 +225,7 @@ type RunParallelLoopConfig(context) {
     pending: List(#(Int, TestCase(context))),
     running: List(RunningWorker(context)),
     pending_emit: List(IndexedResult),
-    emitted_rev: List(TestResult),
+    emitted_rev: List(TestOutcome),
     next_emit_index: Int,
     progress_output: Option(ProgressOutput),
     total: Int,
@@ -253,7 +273,7 @@ type WaitForResultConfig(context) {
 /// exited before it sent its result, for example when a process outside
 /// dream_test killed it.
 type WorkerMessage {
-  WorkerFinished(index: Int, result: TestResult)
+  WorkerFinished(index: Int, outcome: TestOutcome)
   WorkerDown(down: Down)
 }
 
@@ -267,11 +287,12 @@ type WorkerMessage {
 /// ```gleam
 /// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 /// import dream_test/parallel
+/// import dream_test/types
 /// import dream_test/unit.{describe, it}
 ///
 /// pub fn tests() {
 ///   describe("Parallel executor", [
-///     it("can run a suite and return a list of results", fn() {
+///     it("can run a suite and return a report of the results", fn() {
 ///       let suite =
 ///         describe("Suite", [
 ///           it("a", fn() { Ok(succeed()) }),
@@ -279,6 +300,7 @@ type WorkerMessage {
 ///         ])
 ///
 ///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       |> types.report_tests
 ///       |> should
 ///       |> have_length(2)
 ///       |> or_fail_with("expected two results")
@@ -307,11 +329,12 @@ pub fn default_config() -> ParallelConfig {
 /// ```gleam
 /// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 /// import dream_test/parallel
+/// import dream_test/types
 /// import dream_test/unit.{describe, it}
 ///
 /// pub fn tests() {
 ///   describe("Parallel executor", [
-///     it("can run a suite and return a list of results", fn() {
+///     it("can run a suite and return a report of the results", fn() {
 ///       let suite =
 ///         describe("Suite", [
 ///           it("a", fn() { Ok(succeed()) }),
@@ -319,6 +342,7 @@ pub fn default_config() -> ParallelConfig {
 ///         ])
 ///
 ///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       |> types.report_tests
 ///       |> should
 ///       |> have_length(2)
 ///       |> or_fail_with("expected two results")
@@ -334,11 +358,13 @@ pub fn default_config() -> ParallelConfig {
 ///
 /// ## Returns
 ///
-/// A list of `TestResult` values, in deterministic (declaration) order.
+/// A `types.RunReport` with the `TestResult` of each test, in deterministic
+/// (declaration) order, and the `after_each` and `after_all` hooks that
+/// failed, in the order that they ran.
 pub fn run_root_parallel(
   config config: ParallelConfig,
   suite suite: TestSuite(context),
-) -> List(TestResult) {
+) -> RunReport {
   let Root(seed: seed, name: name, tags: tags, children: children) = suite
   let executor_input =
     ExecuteNodeConfig(
@@ -354,11 +380,14 @@ pub fn run_root_parallel(
       progress_output: None,
       total: 0,
       completed: 0,
-      results_rev: [],
+      collected: empty_collected(),
     )
 
-  let #(results_rev, _completed) = execute_node(executor_input)
-  list.reverse(results_rev)
+  let #(collected, _completed) = execute_node(executor_input)
+  types.run_report(
+    tests: list.reverse(collected.results_rev),
+    teardown_failures: list.reverse(collected.teardown_failures_rev),
+  )
 }
 
 /// Run a single suite while driving a reporter.
@@ -403,6 +432,7 @@ pub fn run_root_parallel(
 ///     )
 ///   let parallel.RunRootParallelWithReporterResult(
 ///     results: results,
+///     teardown_failures: _teardown_failures,
 ///     completed: completed_after_suite,
 ///     progress_reporter: _progress_reporter,
 ///   ) = parallel_result
@@ -423,6 +453,8 @@ pub fn run_root_parallel(
 ///
 /// A `RunRootParallelWithReporterResult` containing:
 /// - `results`: this suite’s results, in deterministic (declaration) order
+/// - `teardown_failures`: this suite’s `after_each`, `after_each_test` and
+///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
 pub fn run_root_parallel_with_reporter(
@@ -454,12 +486,13 @@ pub fn run_root_parallel_with_reporter(
       progress_output: progress_output(progress_reporter, write),
       total: total,
       completed: completed,
-      results_rev: [],
+      collected: empty_collected(),
     )
 
-  let #(results_rev, completed_after_suite) = execute_node(executor_input)
+  let #(collected, completed_after_suite) = execute_node(executor_input)
   RunRootParallelWithReporterResult(
-    results: list.reverse(results_rev),
+    results: list.reverse(collected.results_rev),
+    teardown_failures: list.reverse(collected.teardown_failures_rev),
     completed: completed_after_suite,
     progress_reporter: progress_reporter,
   )
@@ -471,7 +504,7 @@ pub fn run_root_parallel_with_reporter(
 
 fn execute_node(
   executor_input: ExecuteNodeConfig(context),
-) -> #(List(TestResult), Int) {
+) -> #(Collected, Int) {
   let ExecuteNodeConfig(
     config: config,
     scope: scope,
@@ -485,7 +518,7 @@ fn execute_node(
     progress_output: progress_output,
     total: total,
     completed: completed,
-    results_rev: base_results_rev,
+    collected: base_collected,
   ) = executor_input
 
   case node {
@@ -536,15 +569,19 @@ fn execute_node(
               list.reverse(group_results_rev),
             )
 
-          let final_rev =
-            run_after_all_chain(
-              group_scope,
-              ctx2,
-              hooks.after_all,
-              group_results_rev,
-            )
+          let teardown_failures_rev =
+            run_after_all_chain(group_scope, ctx2, hooks.after_all, [])
 
-          #(list.append(final_rev, base_results_rev), completed_after_failures)
+          #(
+            add_collected(
+              Collected(
+                results_rev: group_results_rev,
+                teardown_failures_rev: teardown_failures_rev,
+              ),
+              base_collected,
+            ),
+            completed_after_failures,
+          )
         }
 
         True -> {
@@ -553,7 +590,7 @@ fn execute_node(
           let combined_after_each =
             list.append(hooks.after_each, inherited_after_each)
 
-          let #(group_results_rev, completed_after_tests) =
+          let #(group_outcomes_rev, completed_after_tests) =
             run_tests_in_group(
               config,
               group_scope,
@@ -570,7 +607,7 @@ fn execute_node(
               completed,
             )
 
-          let #(after_group_rev, completed_after_groups) =
+          let #(after_groups, completed_after_groups) =
             run_child_groups_sequentially(
               config,
               group_scope,
@@ -584,24 +621,65 @@ fn execute_node(
               progress_output,
               total,
               completed_after_tests,
-              group_results_rev,
+              collected_from_outcomes_rev(group_outcomes_rev),
             )
 
-          let final_rev =
-            run_after_all_chain(
-              group_scope,
-              ctx2,
-              hooks.after_all,
-              after_group_rev,
-            )
+          let teardown_failures_rev =
+            run_after_all_chain(group_scope, ctx2, hooks.after_all, [])
 
-          #(list.append(final_rev, base_results_rev), completed_after_groups)
+          #(
+            add_collected(
+              Collected(
+                results_rev: [],
+                teardown_failures_rev: teardown_failures_rev,
+              ),
+              add_collected(after_groups, base_collected),
+            ),
+            completed_after_groups,
+          )
         }
       }
     }
 
-    _ -> #(base_results_rev, completed)
+    _ -> #(base_collected, completed)
   }
+}
+
+fn empty_collected() -> Collected {
+  Collected(results_rev: [], teardown_failures_rev: [])
+}
+
+/// Put `newer` in front of `older`. Both lists are newest first.
+fn add_collected(newer: Collected, older: Collected) -> Collected {
+  Collected(
+    results_rev: list.append(newer.results_rev, older.results_rev),
+    teardown_failures_rev: list.append(
+      newer.teardown_failures_rev,
+      older.teardown_failures_rev,
+    ),
+  )
+}
+
+/// The results and tear-down failures of test outcomes that are newest
+/// first.
+fn collected_from_outcomes_rev(outcomes_rev: List(TestOutcome)) -> Collected {
+  Collected(
+    results_rev: list.map(outcomes_rev, outcome_result),
+    teardown_failures_rev: list.flat_map(
+      outcomes_rev,
+      outcome_teardown_failures_rev,
+    ),
+  )
+}
+
+fn outcome_result(outcome: TestOutcome) -> TestResult {
+  outcome.result
+}
+
+fn outcome_teardown_failures_rev(
+  outcome: TestOutcome,
+) -> List(TeardownFailure) {
+  list.reverse(outcome.teardown_failures)
 }
 
 fn fail_tests_due_to_before_all(
@@ -815,7 +893,7 @@ fn run_tests_in_group(
   progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
-) -> #(List(TestResult), Int) {
+) -> #(List(TestOutcome), Int) {
   let ParallelConfig(max_concurrency: max_concurrency, default_timeout_ms: _) =
     config
   case max_concurrency <= 1 {
@@ -871,7 +949,7 @@ fn run_tests_parallel(
   progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
-) -> #(List(TestResult), Int) {
+) -> #(List(TestOutcome), Int) {
   let subject = new_subject()
   let indexed = index_tests(tests, 0, [])
   let ParallelConfig(max_concurrency: max_concurrency, default_timeout_ms: _) =
@@ -914,7 +992,7 @@ fn index_tests(
 
 fn run_parallel_loop(
   loop: RunParallelLoopConfig(context),
-) -> #(List(TestResult), Int) {
+) -> #(List(TestOutcome), Int) {
   let RunParallelLoopConfig(
     config: config,
     subject: subject,
@@ -989,14 +1067,14 @@ fn run_parallel_loop(
               completed: completed2,
             ),
           )
-        Some(IndexedResult(_, result)) ->
+        Some(IndexedResult(_, outcome)) ->
           run_parallel_loop(
             RunParallelLoopConfig(
               ..loop,
               pending: pending2,
               running: running3,
               pending_emit: remaining_emit,
-              emitted_rev: [result, ..emitted_rev],
+              emitted_rev: [outcome, ..emitted_rev],
               next_emit_index: next_emit_index + 1,
               completed: completed2,
             ),
@@ -1009,14 +1087,14 @@ fn run_parallel_loop(
 fn emit_all_results(
   pending_emit: List(IndexedResult),
   next_index: Int,
-  acc_rev: List(TestResult),
-) -> List(TestResult) {
+  acc_rev: List(TestOutcome),
+) -> List(TestOutcome) {
   let #(maybe_ready, remaining) =
     take_indexed_result(next_index, pending_emit, [])
   case maybe_ready {
     None -> list.reverse(acc_rev)
-    Some(IndexedResult(_, result)) ->
-      emit_all_results(remaining, next_index + 1, [result, ..acc_rev])
+    Some(IndexedResult(_, outcome)) ->
+      emit_all_results(remaining, next_index + 1, [outcome, ..acc_rev])
   }
 }
 
@@ -1067,7 +1145,7 @@ fn run_test_worker(
   index: Int,
   test_case: TestCase(context),
 ) -> Nil {
-  let result =
+  let outcome =
     execute_one_test_node(
       input.config,
       input.scope,
@@ -1080,7 +1158,7 @@ fn run_test_worker(
       input.failures_rev,
       test_case,
     )
-  send(input.subject, WorkerFinished(index: index, result: result))
+  send(input.subject, WorkerFinished(index: index, outcome: outcome))
 }
 
 fn worker_crash_result(
@@ -1088,21 +1166,23 @@ fn worker_crash_result(
   inherited_tags: List(String),
   test_case: TestCase(context),
   reason: String,
-) -> TestResult {
-  TestResult(
-    name: test_case.name,
-    groups: scope,
-    status: Failed,
-    duration_ms: 0,
-    tags: list.append(inherited_tags, test_case.tags),
-    failures: [
-      hook_failure(
-        "crash",
-        "worker crashed in " <> string.join(scope, " > ") <> ": " <> reason,
-      ),
-    ],
-    kind: test_case.kind,
-  )
+) -> TestOutcome {
+  let result =
+    TestResult(
+      name: test_case.name,
+      groups: scope,
+      status: Failed,
+      duration_ms: 0,
+      tags: list.append(inherited_tags, test_case.tags),
+      failures: [
+        hook_failure(
+          "crash",
+          "worker crashed in " <> string.join(scope, " > ") <> ": " <> reason,
+        ),
+      ],
+      kind: test_case.kind,
+    )
+  TestOutcome(result: result, teardown_failures: [])
 }
 
 /// Wait for the next result of a worker. There is no deadline here: each
@@ -1117,9 +1197,9 @@ fn wait_for_result(
     |> select_worker_monitors(input.running)
     |> selector_receive_forever()
   let #(still_running, new_results) = case message {
-    WorkerFinished(index: index, result: result) -> #(
+    WorkerFinished(index: index, outcome: outcome) -> #(
       remove_finished_worker(input.running, index, []),
-      [IndexedResult(index: index, result: result)],
+      [IndexedResult(index: index, outcome: outcome)],
     )
     WorkerDown(down: down) ->
       remove_down_worker(input, input.running, down, [], [])
@@ -1185,7 +1265,7 @@ fn remove_down_worker(
       remove_down_worker(input, rest, down, kept_rev, [
         IndexedResult(
           index: worker.index,
-          result: worker_crash_result(
+          outcome: worker_crash_result(
             input.scope,
             input.inherited_tags,
             worker.test_case,
@@ -1200,7 +1280,7 @@ fn remove_down_worker(
 }
 
 fn indexed_result_value(indexed_result: IndexedResult) -> TestResult {
-  indexed_result.result
+  indexed_result.outcome.result
 }
 
 fn emit_test_finished_progress(
@@ -1275,7 +1355,7 @@ fn execute_one_test_node(
   after_each_hooks: List(fn(context) -> Result(Nil, String)),
   failures_rev: List(AssertionFailure),
   test_case: TestCase(context),
-) -> TestResult {
+) -> TestOutcome {
   let TestCase(
     name: name,
     tags: tags,
@@ -1332,37 +1412,41 @@ fn execute_one_test_node(
     }
   }
 
-  let #(status_after_suite, failures_after_suite) =
+  let test_name = types.full_name(scope, name)
+  let after_each_failures_rev =
     run_after_each_list(
       config,
       scope,
+      test_name,
       ctx_after_setup,
       after_each_hooks,
-      status,
-      failures,
+      [],
     )
 
-  let #(final_status, final_failures) =
+  let teardown_failures_rev =
     run_runner_after_each_list(
       config,
       scope,
+      test_name,
       info,
       ctx_after_setup,
       runner_after_each_test,
-      status_after_suite,
-      failures_after_suite,
+      after_each_failures_rev,
     )
 
   let duration = timing.now_ms() - start
 
-  TestResult(
-    name: name,
-    groups: scope,
-    status: final_status,
-    duration_ms: duration,
-    tags: all_tags,
-    failures: list.reverse(final_failures),
-    kind: kind,
+  TestOutcome(
+    result: TestResult(
+      name: name,
+      groups: scope,
+      status: status,
+      duration_ms: duration,
+      tags: all_tags,
+      failures: list.reverse(failures),
+      kind: kind,
+    ),
+    teardown_failures: list.reverse(teardown_failures_rev),
   )
 }
 
@@ -1382,12 +1466,12 @@ fn run_tests_sequentially(
   progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
-  acc_rev: List(TestResult),
-) -> #(List(TestResult), Int) {
+  acc_rev: List(TestOutcome),
+) -> #(List(TestOutcome), Int) {
   case tests {
     [] -> #(acc_rev, completed)
     [test_case, ..rest] -> {
-      let result =
+      let outcome =
         execute_one_test_node(
           config,
           scope,
@@ -1402,8 +1486,12 @@ fn run_tests_sequentially(
         )
 
       let next_completed =
-        emit_test_finished_progress(progress_output, completed, total, result)
-
+        emit_test_finished_progress(
+          progress_output,
+          completed,
+          total,
+          outcome.result,
+        )
       run_tests_sequentially(
         config,
         scope,
@@ -1418,7 +1506,7 @@ fn run_tests_sequentially(
         progress_output,
         total,
         next_completed,
-        [result, ..acc_rev],
+        [outcome, ..acc_rev],
       )
     }
   }
@@ -1439,12 +1527,12 @@ fn run_child_groups_sequentially(
   progress_output: Option(ProgressOutput),
   total: Int,
   completed: Int,
-  acc_rev: List(TestResult),
-) -> #(List(TestResult), Int) {
+  collected: Collected,
+) -> #(Collected, Int) {
   case groups {
-    [] -> #(acc_rev, completed)
+    [] -> #(collected, completed)
     [group_node, ..rest] -> {
-      let #(next_rev, next_completed) =
+      let #(next_collected, next_completed) =
         execute_node(ExecuteNodeConfig(
           config: config,
           scope: scope,
@@ -1458,7 +1546,7 @@ fn run_child_groups_sequentially(
           progress_output: progress_output,
           total: total,
           completed: completed,
-          results_rev: acc_rev,
+          collected: collected,
         ))
       run_child_groups_sequentially(
         config,
@@ -1473,37 +1561,51 @@ fn run_child_groups_sequentially(
         progress_output,
         total,
         next_completed,
-        next_rev,
+        next_collected,
       )
     }
   }
 }
 
+/// Run every `after_all` hook of a group, also after one fails, and give
+/// the failures newest first, in front of `failures_rev`.
 fn run_after_all_chain(
   scope: List(String),
   context: context,
   hooks: List(fn(context) -> Result(Nil, String)),
-  acc_rev: List(TestResult),
-) -> List(TestResult) {
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
   case hooks {
-    [] -> acc_rev
+    [] -> failures_rev
     [hook, ..rest] ->
-      case run_hook_in_process(scope, hook, context) {
-        Ok(_) -> run_after_all_chain(scope, context, rest, acc_rev)
-        Error(message) -> {
-          let result =
-            TestResult(
-              name: "<after_all>",
-              groups: scope,
-              status: Failed,
-              duration_ms: 0,
-              tags: [],
-              failures: [hook_failure("after_all", message)],
-              kind: Unit,
-            )
-          [result, ..acc_rev]
-        }
-      }
+      run_after_all_chain(
+        scope,
+        context,
+        rest,
+        add_teardown_failure(
+          run_hook_in_process(scope, hook, context),
+          AfterAllHook,
+          scope,
+          failures_rev,
+        ),
+      )
+  }
+}
+
+/// Put a failure of a tear-down hook in front of `failures_rev`. A hook
+/// that succeeded adds nothing.
+fn add_teardown_failure(
+  hook_result: Result(Nil, String),
+  hook: TeardownHook,
+  scope: List(String),
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  case hook_result {
+    Ok(Nil) -> failures_rev
+    Error(message) -> [
+      TeardownFailure(hook: hook, scope: scope, message: message),
+      ..failures_rev
+    ]
   }
 }
 
@@ -1589,33 +1691,33 @@ fn run_before_each_list(
   }
 }
 
+/// Run every `after_each` hook of a test, also after one fails, and give
+/// the failures newest first, in front of `failures_rev`. A failure does
+/// not change the status of the test.
 fn run_after_each_list(
   config: ParallelConfig,
   scope: List(String),
+  test_name: List(String),
   context: context,
   hooks: List(fn(context) -> Result(Nil, String)),
-  status: Status,
-  failures_rev: List(AssertionFailure),
-) -> #(Status, List(AssertionFailure)) {
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
   case hooks {
-    [] -> #(status, failures_rev)
+    [] -> failures_rev
     [hook, ..rest] ->
-      case run_hook(config, scope, hook, context) {
-        Ok(_) ->
-          run_after_each_list(
-            config,
-            scope,
-            context,
-            rest,
-            status,
-            failures_rev,
-          )
-        Error(message) ->
-          run_after_each_list(config, scope, context, rest, Failed, [
-            hook_failure("after_each", message),
-            ..failures_rev
-          ])
-      }
+      run_after_each_list(
+        config,
+        scope,
+        test_name,
+        context,
+        rest,
+        add_teardown_failure(
+          run_hook(config, scope, hook, context),
+          AfterEachHook,
+          test_name,
+          failures_rev,
+        ),
+      )
   }
 }
 
@@ -1655,47 +1757,40 @@ fn run_runner_before_each_list(
   }
 }
 
+/// Run every runner `after_each_test` hook of a test, also after one
+/// fails, and give the failures newest first, in front of `failures_rev`.
+/// A failure does not change the status of the test.
 fn run_runner_after_each_list(
   config: ParallelConfig,
   scope: List(String),
+  test_name: List(String),
   info: TestInfo,
   context: context,
   hooks: List(fn(TestInfo, context) -> Result(Nil, String)),
-  status: Status,
-  failures_rev: List(AssertionFailure),
-) -> #(Status, List(AssertionFailure)) {
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
   case hooks {
-    [] -> #(status, failures_rev)
+    [] -> failures_rev
     [hook, ..rest] ->
-      case
-        run_hook(
-          config,
-          scope,
-          call_runner_hook,
-          RunnerHookCall(hook: hook, info: info, context: context),
-        )
-      {
-        Ok(_) ->
-          run_runner_after_each_list(
+      run_runner_after_each_list(
+        config,
+        scope,
+        test_name,
+        info,
+        context,
+        rest,
+        add_teardown_failure(
+          run_hook(
             config,
             scope,
-            info,
-            context,
-            rest,
-            status,
-            failures_rev,
-          )
-        Error(message) ->
-          run_runner_after_each_list(
-            config,
-            scope,
-            info,
-            context,
-            rest,
-            Failed,
-            [hook_failure("after_each_test", message), ..failures_rev],
-          )
-      }
+            call_runner_hook,
+            RunnerHookCall(hook: hook, info: info, context: context),
+          ),
+          AfterEachTestHook,
+          test_name,
+          failures_rev,
+        ),
+      )
   }
 }
 

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `types.RunReport`, the result of a run: the test results and the
+  tear-down hooks that failed. Make one with `types.run_report(tests:,
+  teardown_failures:)`, read it with `types.report_tests` and
+  `types.report_teardown_failures`, and check it with `types.failed`.
+  `RunReport` is opaque, so it can grow without a breaking change.
+- `types.TeardownFailure(hook:, scope:, message:)` and
+  `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
+  `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
+  `types.teardown_hook_name`.
+- `types.is_failure(status)`, the one check for a failure status
+  (`Failed`, `SetupFailed`, `TimedOut`). The runner, the BDD reporter and
+  `types.failed` use it.
+- `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
+  `Tear-down failures:` section that the BDD and Gherkin reporters show.
 - `sandbox.run_catching(run:, input:)` runs a function in the calling
   process and gives `Ok(value)`, or `Error("class:reason")` when the
   function crashes. No new process starts, so a resource that the function
@@ -80,6 +94,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING: one rule for every hook failure. A failed set-up hook
+  (`before_all_suites`, `before_each_suite`, `before_all`, `before_each`,
+  `before_each_test`) gives `SetupFailed` to each test that it serves. A
+  failed tear-down hook (`after_each_test`, `after_each`, `after_all`,
+  `after_each_suite`, `after_all_suites`) does not change a test status,
+  all the remaining tear-down hooks still run, and the failure goes into
+  the tear-down list of the run report. The run then fails.
+  - Before: `before_all_suites` and `before_each_suite` failures gave
+    `Failed`. After: `SetupFailed`.
+  - Before: an `after_each` or `after_each_test` failure changed the test
+    status to `Failed`, also for `TimedOut`, `Skipped` and `SetupFailed`.
+    After: the status stays, and the report has
+    `TeardownFailure(hook: AfterEachHook, scope: <full test name>, ...)`.
+  - Before: an `after_all`, `after_each_suite` or `after_all_suites`
+    failure added a fake test (`<after_all>`, `<after_each_suite>`,
+    `<after_all_suites>`) that changed the test count, and the later hooks
+    of the same kind did not run. After: no fake test, every hook runs,
+    and the report has one `TeardownFailure` for each failure.
+- BREAKING: `runner.run` returns `types.RunReport`, not
+  `List(TestResult)`. Before: `let results = runner.run(builder)`. After:
+  `let results = runner.run(builder) |> types.report_tests`.
+- BREAKING: `runner.has_failures` is removed. Before:
+  `runner.has_failures(results)`. After: `types.failed(report)`, which is
+  also `True` for a tear-down failure.
+- BREAKING: `parallel.run_root_parallel` returns `types.RunReport`, not
+  `List(TestResult)`, and `parallel.RunRootParallelWithReporterResult` has
+  a new field `teardown_failures`. Before: `run_root_parallel(config,
+  suite) |> list.length`. After: `run_root_parallel(config, suite) |>
+  types.report_tests |> list.length`.
+- BREAKING: the reporter functions that format a whole run take a
+  `types.RunReport`: `bdd.render`, `bdd.format`, `bdd.report`,
+  `bdd.format_summary_only`, `json.render`, `json.format`,
+  `json.format_pretty`, `json.report`, `json.report_pretty`,
+  `gherkin.format` and `gherkin.report`. The `report` functions return the
+  report. The new `summary.count`, `summary.format` and
+  `summary.format_in_color` take a `RunReport` too.
+  Before: `bdd.format(results)`. After: `bdd.format(report)`, or
+  `bdd.format(types.run_report(tests: results, teardown_failures: []))`.
+- BREAKING: the JSON schema version is `2.0`. `summary` has a new count
+  `teardown_failed`, and the object has a new list `teardown_failures` of
+  `{"hook", "scope", "message"}` objects. Fake tests such as `<after_all>`
+  are no longer in `tests`.
+- BREAKING: `progress.RunFinishedProgress` has a new field
+  `teardown_failures`. The last progress line says
+  `done, 1 tear-down failed` when a tear-down hook failed.
+- The BDD and Gherkin reporters show a `Tear-down failures:` section
+  before the summary, and the summary line adds `N tear-down failed`.
+  `summary.Counts` has a new field `teardown_failed`, and
+  `coverage.RunOutcome` has a new field `teardown_failed`.
+- `exit_on_failure` stops with status 1 when a tear-down hook failed, also
+  when every test passed.
 - BREAKING: group `before_all` and `after_all` hooks run in the runner
   process, not in a sandbox process, so no timeout applies to them. Before:
   a `before_all` that ran longer than the timeout gave `SetupFailed` with

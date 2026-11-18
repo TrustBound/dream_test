@@ -350,9 +350,11 @@ pub fn skip(
 
 /// Run once before any tests in the current suite/group.
 ///
-/// - Runs in a sandboxed process.
-/// - If it returns `Error("message")`, all tests under this scope become
-///   `SetupFailed`.
+/// - Runs in the runner process, so a resource that it starts (for example
+///   a pool that links to the caller, or an ETS table) lives for all the
+///   tests of the scope. No timeout applies to it.
+/// - If it returns `Error("message")` or crashes, all tests under this
+///   scope become `SetupFailed`, and the `after_all` hooks still run.
 ///
 /// ## Example
 ///
@@ -525,7 +527,10 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 /// Run after each test in the current scope.
 ///
 /// This is useful for cleanup that must always run (even after assertion
-/// failures).
+/// failures). Every `after_each` hook runs, also after one fails. If it
+/// returns `Error("message")` or crashes, the status of the test does not
+/// change: the run report gets a `types.TeardownFailure` with hook
+/// `AfterEachHook`, and the run fails.
 ///
 /// ## Example
 ///
@@ -609,6 +614,12 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 }
 
 /// Run once after all tests in the current scope.
+///
+/// It runs in the runner process, with no timeout, so it can stop a
+/// resource that `before_all` started. Every `after_all` hook runs, also
+/// after one fails. If it returns `Error("message")` or crashes, the run
+/// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
+/// group path as scope, and the run fails. No test result is added.
 ///
 /// ## Example
 ///

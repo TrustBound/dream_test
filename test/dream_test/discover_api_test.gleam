@@ -116,6 +116,7 @@ pub fn tests() {
       |> discover.to_suites()
       |> runner.new()
       |> runner.run()
+      |> types.report_tests
       |> list.map(summary)
       |> should
       |> be_equal([
@@ -145,6 +146,7 @@ pub fn tests() {
       |> list.wrap()
       |> runner.new()
       |> runner.run()
+      |> types.report_tests
       |> list.map(fn(result) {
         #(types.full_name(result.groups, result.name), result.status)
       })

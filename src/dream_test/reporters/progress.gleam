@@ -74,7 +74,7 @@ pub fn new() -> ProgressReporter {
 pub type ProgressEvent {
   RunStartedProgress(total: Int)
   TestFinishedProgress(completed: Int, total: Int, result: TestResult)
-  RunFinishedProgress(completed: Int, total: Int)
+  RunFinishedProgress(completed: Int, total: Int, teardown_failures: Int)
 }
 
 /// The text that updates the progress bar for one point of a run.
@@ -112,8 +112,14 @@ pub fn line(
       "\r" <> render_line(columns, 0, total, "")
     TestFinishedProgress(completed: completed, total: total, result: result) ->
       "\r" <> render_line(columns, completed, total, format_result_name(result))
-    RunFinishedProgress(completed: completed, total: total) ->
-      "\r" <> render_line(columns, completed, total, "done") <> "\n"
+    RunFinishedProgress(
+      completed: completed,
+      total: total,
+      teardown_failures: teardown_failures,
+    ) ->
+      "\r"
+      <> render_line(columns, completed, total, done_label(teardown_failures))
+      <> "\n"
   }
 }
 
@@ -178,7 +184,11 @@ pub fn handle_event(
     reporter_types.RunFinished(completed: completed, total: total, results: _) ->
       Some(line(
         reporter,
-        RunFinishedProgress(completed: completed, total: total),
+        RunFinishedProgress(
+          completed: completed,
+          total: total,
+          teardown_failures: 0,
+        ),
       ))
   }
 }
@@ -234,6 +244,15 @@ pub fn render(
 
     // Hook events do not affect the progress bar.
     _ -> render_line(cols, 0, 1, "")
+  }
+}
+
+/// `done` at the end of a run, with the number of tear-down failures when
+/// a tear-down hook failed.
+fn done_label(teardown_failures: Int) -> String {
+  case teardown_failures {
+    0 -> "done"
+    count -> "done, " <> int.to_string(count) <> " tear-down failed"
   }
 }
 

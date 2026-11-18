@@ -59,9 +59,10 @@ import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
 import dream_test/sandbox
 import dream_test/types.{
-  type AssertionFailure, type Node, type TestResult, type TestSuite, AfterAll,
-  AfterEach, BeforeAll, BeforeEach, Failed, Group, Passed, Root, SetupFailed,
-  Test, TimedOut, Unit,
+  type AssertionFailure, type Node, type RunReport, type TeardownFailure,
+  type TeardownHook, type TestResult, type TestSuite, AfterAll,
+  AfterAllSuitesHook, AfterEach, AfterEachSuiteHook, BeforeAll, BeforeEach,
+  Group, Passed, Root, SetupFailed, TeardownFailure, Test,
 }
 import gleam/io
 import gleam/list
@@ -400,7 +401,10 @@ pub fn default_timeout_ms(
   )
 }
 
-/// Exit the BEAM with status 1 if any tests fail.
+/// Exit the BEAM with status 1 if the run fails.
+///
+/// The run fails when a test is `Failed`, `SetupFailed` or `TimedOut`, when
+/// a tear-down hook fails (see `types.failed`), or when coverage fails.
 ///
 /// Useful for CI pipelines.
 ///
@@ -696,8 +700,11 @@ pub fn before_each_test(
 
 /// Register a runner-level hook that runs after each test.
 ///
-/// The hook receives `types.TestInfo` and the current context value.
-/// If it returns `Error("...")`, the test is marked `Failed`.
+/// The hook receives `types.TestInfo` and the current context value. It runs
+/// in its own process with the test timeout. Every `after_each_test` hook
+/// runs, also after one fails. If it returns `Error("...")` or crashes, the
+/// status of the test does not change: the run report gets a
+/// `types.TeardownFailure` with hook `AfterEachTestHook`, and the run fails.
 pub fn after_each_test(
   builder builder: RunBuilder(ctx),
   hook hook: fn(types.TestInfo, ctx) -> Result(Nil, String),
@@ -710,9 +717,12 @@ pub fn after_each_test(
 
 /// Register a runner-level hook that runs before each suite.
 ///
-/// The hook receives `types.SuiteInfo` for the suite about to run.
-/// If it returns `Error("...")`, all tests in that suite are marked `Failed`
-/// and the suite is skipped.
+/// The hook receives `types.SuiteInfo` for the suite about to run. It runs
+/// in the runner process, so a resource that it starts lives until a later
+/// hook stops it. No timeout applies to it.
+/// If it returns `Error("...")` or crashes, all tests in that suite are
+/// marked `SetupFailed`, the suite does not run, and `after_each_suite`
+/// still runs.
 pub fn before_each_suite(
   builder builder: RunBuilder(ctx),
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -727,8 +737,11 @@ pub fn before_each_suite(
 
 /// Register a runner-level hook that runs after each suite.
 ///
-/// The hook receives `types.SuiteInfo` for the suite that just ran.
-/// If it returns `Error("...")`, a synthetic failure result is appended.
+/// The hook receives `types.SuiteInfo` for the suite that just ran. It runs
+/// in the runner process, with no timeout. Every `after_each_suite` hook
+/// runs, also after one fails. If it returns `Error("...")` or crashes, the
+/// run report gets a `types.TeardownFailure` with hook `AfterEachSuiteHook`
+/// and the suite name as scope, and the run fails.
 pub fn after_each_suite(
   builder builder: RunBuilder(ctx),
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -741,9 +754,12 @@ pub fn after_each_suite(
 
 /// Register a runner-level hook that runs before all suites.
 ///
-/// The hook receives the full list of `SuiteInfo` after filtering.
-/// If it returns `Error("...")`, all selected tests are marked `Failed`
-/// and the run short-circuits.
+/// The hook receives the full list of `SuiteInfo` after filtering. It runs
+/// in the runner process, so a resource that it starts (for example a pool
+/// that links to the caller) lives until `after_all_suites` stops it. No
+/// timeout applies to it.
+/// If it returns `Error("...")` or crashes, all selected tests are marked
+/// `SetupFailed`, no suite runs, and `after_all_suites` still runs.
 pub fn before_all_suites(
   builder builder: RunBuilder(ctx),
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
@@ -758,8 +774,11 @@ pub fn before_all_suites(
 
 /// Register a runner-level hook that runs after all suites.
 ///
-/// The hook receives the full list of `SuiteInfo` after filtering.
-/// If it returns `Error("...")`, a synthetic failure result is appended.
+/// The hook receives the full list of `SuiteInfo` after filtering. It runs
+/// in the runner process, with no timeout. Every `after_all_suites` hook
+/// runs, also after one fails. If it returns `Error("...")` or crashes, the
+/// run report gets a `types.TeardownFailure` with hook `AfterAllSuitesHook`
+/// and scope `[]`, and the run fails.
 pub fn after_all_suites(
   builder builder: RunBuilder(ctx),
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
@@ -770,7 +789,7 @@ pub fn after_all_suites(
   )
 }
 
-/// Run all suites and return a list of `TestResult`.
+/// Run all suites and return a `types.RunReport`.
 ///
 /// If a progress reporter is attached, the runner will emit progress output during
 /// the run. Results reporters print at the end of the run.
@@ -810,8 +829,12 @@ pub fn after_all_suites(
 ///
 /// ## Returns
 ///
-/// A list of `TestResult` values, in deterministic order.
-pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
+/// A `types.RunReport`: the `TestResult` of each test, in deterministic
+/// order, and the tear-down hooks that failed. Read it with
+/// `types.report_tests` and `types.report_teardown_failures`, and check it
+/// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
+/// when `types.failed(report)` is `True`.
+pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
   let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
   let total = count_total_tests(selected_runs)
   let suite_runs_with_infos = suite_runs_with_infos(selected_runs, [])
@@ -841,7 +864,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   let before_all_result =
     run_suite_level_hooks(builder.runner_before_all_suites, suite_infos, [])
 
-  let #(results, completed2, progress_reporter1) = case before_all_result {
+  let #(collected, completed2) = case before_all_result {
     Ok(_) ->
       run_suites_with_hooks(
         suite_runs_with_infos,
@@ -854,11 +877,11 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
         builder.runner_after_each_suite,
         builder.runner_before_each_test,
         builder.runner_after_each_test,
-        [],
+        Collected(tests: [], teardown_failures: []),
       )
     Error(message) -> {
-      let failures =
-        build_failed_results_from_suites(
+      let setup_failures =
+        setup_failed_results_from_suites(
           suite_infos,
           "before_all_suites",
           message,
@@ -869,54 +892,69 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
           output,
           completed1,
           total,
-          failures,
+          setup_failures,
         )
-      let results_with_after_all =
-        apply_after_all_suites_hooks(
-          builder.runner_after_all_suites,
-          suite_infos,
-          failures,
-        )
-      #(results_with_after_all, completed_after_failures, progress_reporter0)
+      #(
+        Collected(tests: setup_failures, teardown_failures: []),
+        completed_after_failures,
+      )
     }
   }
 
-  let final_results = case before_all_result {
-    Ok(_) ->
-      apply_after_all_suites_hooks(
-        builder.runner_after_all_suites,
-        suite_infos,
-        results,
-      )
-    Error(_) -> results
-  }
+  let after_all_failures =
+    run_suite_teardown_hooks(
+      builder.runner_after_all_suites,
+      suite_infos,
+      [],
+      AfterAllSuitesHook,
+      [],
+    )
 
-  case progress_reporter1 {
+  let report =
+    types.run_report(
+      tests: collected.tests,
+      teardown_failures: list.append(
+        collected.teardown_failures,
+        after_all_failures,
+      ),
+    )
+
+  case progress_reporter0 {
     None -> Nil
     Some(progress_reporter) ->
       write_progress_event(
         progress_reporter,
-        progress.RunFinishedProgress(completed: completed2, total: total),
+        progress.RunFinishedProgress(
+          completed: completed2,
+          total: total,
+          teardown_failures: list.length(types.report_teardown_failures(report)),
+        ),
         output,
       )
   }
 
-  write_results_reporters(builder.results_reporters, final_results, output)
+  write_results_reporters(builder.results_reporters, report, output)
 
   let coverage_succeeded =
     finish_coverage(
       coverage_state,
       output,
-      run_outcome(final_results, builder.should_exit_on_failure),
+      run_outcome(report, builder.should_exit_on_failure),
     )
 
   maybe_exit_on_failure(
     builder.should_exit_on_failure,
-    final_results,
+    report,
     coverage_succeeded,
   )
 
-  final_results
+  report
+}
+
+/// The test results and the tear-down failures of the suites that ran so
+/// far, in the order of the run.
+type Collected {
+  Collected(tests: List(TestResult), teardown_failures: List(TeardownFailure))
 }
 
 /// Each suite run with the `SuiteInfo` of its suite, so the hooks of a
@@ -1088,6 +1126,50 @@ fn run_suite_level_hook(
   }
 }
 
+/// Run every suite-level tear-down hook, also after one fails, and give the
+/// failures in the order that the hooks ran.
+fn run_suite_teardown_hooks(
+  hooks: List(fn(input) -> Result(Nil, String)),
+  input: input,
+  scope: List(String),
+  hook_kind: TeardownHook,
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  case hooks {
+    [] -> list.reverse(failures_rev)
+    [hook, ..rest] ->
+      run_suite_teardown_hooks(
+        rest,
+        input,
+        scope,
+        hook_kind,
+        add_teardown_failure(
+          run_suite_level_hook(hook, input, scope),
+          hook_kind,
+          scope,
+          failures_rev,
+        ),
+      )
+  }
+}
+
+/// Put a failure of a tear-down hook in front of `failures_rev`. A hook
+/// that succeeded adds nothing.
+fn add_teardown_failure(
+  hook_result: Result(Nil, String),
+  hook_kind: TeardownHook,
+  scope: List(String),
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  case hook_result {
+    Ok(Nil) -> failures_rev
+    Error(message) -> [
+      TeardownFailure(hook: hook_kind, scope: scope, message: message),
+      ..failures_rev
+    ]
+  }
+}
+
 /// `hook crashed: <reason>` for a hook of the whole run, and
 /// `hook crashed in <suite>: <reason>` for a hook of one suite.
 fn suite_hook_crash_message(scope: List(String), reason: String) -> String {
@@ -1108,134 +1190,132 @@ fn run_suites_with_hooks(
   after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
   runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
-  acc: List(TestResult),
-) -> #(List(TestResult), Int, Option(progress.ProgressReporter)) {
+  collected: Collected,
+) -> #(Collected, Int) {
   case suite_runs {
-    [] -> #(acc, completed, progress_reporter)
+    [] -> #(collected, completed)
     [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
-      let before_result =
-        run_suite_level_hooks(before_each_suite_hooks, suite_info, [
-          suite_info.name,
-        ])
-      case before_result {
-        Error(message) -> {
-          let failures =
-            build_failed_results_from_tests(
-              suite_info.tests,
-              "before_each_suite",
-              message,
-            )
-          let completed_after_failures =
-            emit_test_finished_progress_results(
-              progress_reporter,
-              output,
-              completed,
-              total,
-              failures,
-            )
-          let acc_with_failures = list.append(acc, failures)
-          let acc_after_after_each =
-            apply_after_each_suite_hooks(
-              after_each_suite_hooks,
-              suite_info,
-              acc_with_failures,
-            )
-          run_suites_with_hooks(
-            rest,
-            default_config,
-            progress_reporter,
-            output,
-            total,
-            completed_after_failures,
-            before_each_suite_hooks,
-            after_each_suite_hooks,
-            runner_before_each_test,
-            runner_after_each_test,
-            acc_after_after_each,
-          )
-        }
-        Ok(_) -> {
-          let suite_config = suite_run_config(default_config, override)
-          let parallel_result =
-            parallel.run_root_parallel_with_reporter(
-              parallel.RunRootParallelWithReporterConfig(
-                config: suite_config,
-                suite: suite,
-                progress_reporter: progress_reporter,
-                write: output_out(output),
-                total: total,
-                completed: completed,
-                runner_before_each_test: runner_before_each_test,
-                runner_after_each_test: runner_after_each_test,
-              ),
-            )
-          let parallel.RunRootParallelWithReporterResult(
-            results: results,
-            completed: completed_after_suite,
-            progress_reporter: next_progress_reporter,
-          ) = parallel_result
-          let acc_with_results = list.append(acc, results)
-          let acc_after_after_each =
-            apply_after_each_suite_hooks(
-              after_each_suite_hooks,
-              suite_info,
-              acc_with_results,
-            )
-          run_suites_with_hooks(
-            rest,
-            default_config,
-            next_progress_reporter,
-            output,
-            total,
-            completed_after_suite,
-            before_each_suite_hooks,
-            after_each_suite_hooks,
-            runner_before_each_test,
-            runner_after_each_test,
-            acc_after_after_each,
-          )
-        }
-      }
+      let #(suite_collected, completed_after_suite) =
+        run_one_suite(
+          suite,
+          override,
+          suite_info,
+          default_config,
+          progress_reporter,
+          output,
+          total,
+          completed,
+          before_each_suite_hooks,
+          runner_before_each_test,
+          runner_after_each_test,
+        )
+      let after_each_failures =
+        run_suite_teardown_hooks(
+          after_each_suite_hooks,
+          suite_info,
+          [suite_info.name],
+          AfterEachSuiteHook,
+          [],
+        )
+      run_suites_with_hooks(
+        rest,
+        default_config,
+        progress_reporter,
+        output,
+        total,
+        completed_after_suite,
+        before_each_suite_hooks,
+        after_each_suite_hooks,
+        runner_before_each_test,
+        runner_after_each_test,
+        Collected(
+          tests: list.append(collected.tests, suite_collected.tests),
+          teardown_failures: list.flatten([
+            collected.teardown_failures,
+            suite_collected.teardown_failures,
+            after_each_failures,
+          ]),
+        ),
+      )
     }
   }
 }
 
-fn apply_after_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+/// Run `before_each_suite`, then the tests of one suite. A failed
+/// `before_each_suite` hook gives `SetupFailed` to every test of the suite.
+fn run_one_suite(
+  suite: TestSuite(ctx),
+  override: Option(parallel.ParallelConfig),
   suite_info: types.SuiteInfo,
-  results: List(TestResult),
-) -> List(TestResult) {
-  case run_suite_level_hooks(hooks, suite_info, [suite_info.name]) {
-    Ok(_) -> results
-    Error(message) ->
-      list.append(results, [
-        after_each_suite_failure_result(suite_info, message),
-      ])
+  default_config: parallel.ParallelConfig,
+  progress_reporter: Option(progress.ProgressReporter),
+  output: Output,
+  total: Int,
+  completed: Int,
+  before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
+  runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+) -> #(Collected, Int) {
+  let before_result =
+    run_suite_level_hooks(before_each_suite_hooks, suite_info, [
+      suite_info.name,
+    ])
+  case before_result {
+    Error(message) -> {
+      let setup_failures =
+        setup_failed_results_from_tests(
+          suite_info.tests,
+          "before_each_suite",
+          message,
+        )
+      #(
+        Collected(tests: setup_failures, teardown_failures: []),
+        emit_test_finished_progress_results(
+          progress_reporter,
+          output,
+          completed,
+          total,
+          setup_failures,
+        ),
+      )
+    }
+    Ok(_) -> {
+      let parallel.RunRootParallelWithReporterResult(
+        results: results,
+        teardown_failures: teardown_failures,
+        completed: completed_after_tests,
+        progress_reporter: _progress_reporter,
+      ) =
+        parallel.run_root_parallel_with_reporter(
+          parallel.RunRootParallelWithReporterConfig(
+            config: suite_run_config(default_config, override),
+            suite: suite,
+            progress_reporter: progress_reporter,
+            write: output_out(output),
+            total: total,
+            completed: completed,
+            runner_before_each_test: runner_before_each_test,
+            runner_after_each_test: runner_after_each_test,
+          ),
+        )
+      #(
+        Collected(tests: results, teardown_failures: teardown_failures),
+        completed_after_tests,
+      )
+    }
   }
 }
 
-fn apply_after_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
-  results: List(TestResult),
-) -> List(TestResult) {
-  case run_suite_level_hooks(hooks, suites, []) {
-    Ok(_) -> results
-    Error(message) ->
-      list.append(results, [after_all_suites_failure_result(message)])
-  }
-}
-
-fn build_failed_results_from_suites(
+fn setup_failed_results_from_suites(
   suites: List(types.SuiteInfo),
   operator: String,
   message: String,
 ) -> List(TestResult) {
-  build_failed_results_from_suites_rev(suites, operator, message, [])
+  setup_failed_results_from_suites_rev(suites, operator, message, [])
   |> list.reverse()
 }
 
-fn build_failed_results_from_suites_rev(
+fn setup_failed_results_from_suites_rev(
   suites: List(types.SuiteInfo),
   operator: String,
   message: String,
@@ -1244,11 +1324,11 @@ fn build_failed_results_from_suites_rev(
   case suites {
     [] -> acc_rev
     [suite, ..rest] ->
-      build_failed_results_from_suites_rev(
+      setup_failed_results_from_suites_rev(
         rest,
         operator,
         message,
-        build_failed_results_from_tests_rev(
+        setup_failed_results_from_tests_rev(
           suite.tests,
           operator,
           message,
@@ -1258,16 +1338,16 @@ fn build_failed_results_from_suites_rev(
   }
 }
 
-fn build_failed_results_from_tests(
+fn setup_failed_results_from_tests(
   tests: List(types.TestInfo),
   operator: String,
   message: String,
 ) -> List(TestResult) {
-  build_failed_results_from_tests_rev(tests, operator, message, [])
+  setup_failed_results_from_tests_rev(tests, operator, message, [])
   |> list.reverse()
 }
 
-fn build_failed_results_from_tests_rev(
+fn setup_failed_results_from_tests_rev(
   tests: List(types.TestInfo),
   operator: String,
   message: String,
@@ -1276,14 +1356,14 @@ fn build_failed_results_from_tests_rev(
   case tests {
     [] -> acc_rev
     [test_info, ..rest] ->
-      build_failed_results_from_tests_rev(rest, operator, message, [
-        failed_result_for_test_info(test_info, operator, message),
+      setup_failed_results_from_tests_rev(rest, operator, message, [
+        setup_failed_result_for_test_info(test_info, operator, message),
         ..acc_rev
       ])
   }
 }
 
-fn failed_result_for_test_info(
+fn setup_failed_result_for_test_info(
   info: types.TestInfo,
   operator: String,
   message: String,
@@ -1298,39 +1378,11 @@ fn failed_result_for_test_info(
   types.TestResult(
     name: name,
     groups: groups,
-    status: Failed,
+    status: SetupFailed,
     duration_ms: 0,
     tags: tags,
     failures: [hook_failure(operator, message)],
     kind: kind,
-  )
-}
-
-fn after_all_suites_failure_result(message: String) -> TestResult {
-  types.TestResult(
-    name: "<after_all_suites>",
-    groups: [],
-    status: Failed,
-    duration_ms: 0,
-    tags: [],
-    failures: [hook_failure("after_all_suites", message)],
-    kind: Unit,
-  )
-}
-
-fn after_each_suite_failure_result(
-  suite_info: types.SuiteInfo,
-  message: String,
-) -> TestResult {
-  let types.SuiteInfo(name: name, tests: _tests, source: _source) = suite_info
-  types.TestResult(
-    name: "<after_each_suite>",
-    groups: [name],
-    status: Failed,
-    duration_ms: 0,
-    tags: [],
-    failures: [hook_failure("after_each_suite", message)],
-    kind: Unit,
   )
 }
 
@@ -1403,11 +1455,11 @@ fn discard_output(_text: String) -> Nil {
 
 fn maybe_exit_on_failure(
   should_exit: Bool,
-  results: List(TestResult),
+  report: RunReport,
   coverage_succeeded: Bool,
 ) -> Nil {
   let should_stop =
-    should_exit && { has_failures(results) || !coverage_succeeded }
+    should_exit && { types.failed(report) || !coverage_succeeded }
   case should_stop {
     True -> {
       let _ = stop_with_status(1)
@@ -1710,12 +1762,14 @@ fn write_coverage_error(
 }
 
 fn run_outcome(
-  results: List(TestResult),
+  report: RunReport,
   exit_on_failure: Bool,
 ) -> coverage_reporter.RunOutcome {
+  let tests = types.report_tests(report)
   coverage_reporter.RunOutcome(
-    passed: list.count(results, is_passed),
-    failed: list.count(results, is_failure),
+    passed: list.count(tests, is_passed),
+    failed: list.count(tests, is_failure),
+    teardown_failed: list.length(types.report_teardown_failures(report)),
     exit_on_failure: exit_on_failure,
   )
 }
@@ -1725,12 +1779,7 @@ fn is_passed(result: TestResult) -> Bool {
 }
 
 fn is_failure(result: TestResult) -> Bool {
-  case result.status {
-    Failed -> True
-    SetupFailed -> True
-    TimedOut -> True
-    _ -> False
-  }
+  types.is_failure(result.status)
 }
 
 fn write_progress_event(
@@ -1743,33 +1792,33 @@ fn write_progress_event(
 
 fn write_results_reporters(
   reporters: List(reporter_types.ResultsReporter),
-  results: List(TestResult),
+  report: RunReport,
   output: Output,
 ) -> Nil {
-  write_results_reporters_loop(reporters, results, output_out(output))
+  write_results_reporters_loop(reporters, report, output_out(output))
 }
 
 fn write_results_reporters_loop(
   reporters: List(reporter_types.ResultsReporter),
-  results: List(TestResult),
+  report: RunReport,
   write: fn(String) -> Nil,
 ) -> Nil {
   case reporters {
     [] -> Nil
     [reporter, ..rest] -> {
-      write(render_results_reporter(reporter, results))
-      write_results_reporters_loop(rest, results, write)
+      write(render_results_reporter(reporter, report))
+      write_results_reporters_loop(rest, report, write)
     }
   }
 }
 
 fn render_results_reporter(
   reporter: reporter_types.ResultsReporter,
-  results: List(TestResult),
+  report: RunReport,
 ) -> String {
   case reporter {
-    reporter_types.Bdd(config) -> bdd.render(config, results)
-    reporter_types.Json(config) -> json.render(config, results)
+    reporter_types.Bdd(config) -> bdd.render(config, report)
+    reporter_types.Json(config) -> json.render(config, report)
   }
 }
 
@@ -1858,65 +1907,6 @@ fn append_suite_runs_with_override(
   suites: List(TestSuite(ctx)),
 ) -> List(SuiteRun(ctx)) {
   list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
-}
-
-/// Return `True` if the list contains any failing statuses.
-///
-/// This treats `Failed`, `SetupFailed`, and `TimedOut` as failures.
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/runner
-/// import dream_test/unit.{describe, it}
-///
-/// pub fn tests() {
-///   describe("has_failures", [
-///     it("passes", fn() { Ok(succeed()) }),
-///   ])
-/// }
-///
-/// fn failing_suite() {
-///   describe("failing suite", [
-///     it("fails", fn() {
-///       1
-///       |> should
-///       |> be_equal(2)
-///       |> or_fail_with("intentional failure for has_failures example")
-///     }),
-///   ])
-/// }
-///
-/// pub fn main() {
-///   let results = runner.new([failing_suite()]) |> runner.run()
-///
-///   results
-///   |> runner.has_failures()
-///   |> should
-///   |> be_equal(True)
-///   |> or_fail_with("expected failures to be present")
-/// }
-/// ```
-///
-/// ## Parameters
-///
-/// - `results`: list of `TestResult` values returned by `runner.run`
-///
-/// ## Returns
-///
-/// `True` when any result has status `Failed`, `SetupFailed`, or `TimedOut`.
-pub fn has_failures(results results: List(TestResult)) -> Bool {
-  case results {
-    [] -> False
-    [r, ..rest] ->
-      case r.status {
-        Failed -> True
-        SetupFailed -> True
-        TimedOut -> True
-        _ -> has_failures(rest)
-      }
-  }
 }
 
 /// What `init:stop/1` gives back: the atom `ok`. The BEAM stops after the

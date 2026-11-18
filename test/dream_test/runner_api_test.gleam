@@ -20,7 +20,10 @@ pub fn tests() {
   describe("dream_test/runner", [
     it("runs suites and returns results", fn() {
       let suite = describe("s", [it("t", fn() { Ok(AssertionOk) })])
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
       r.status |> should |> be_equal(Passed) |> or_fail_with("test should pass")
     }),
@@ -36,6 +39,7 @@ pub fn tests() {
         runner.new([suite])
         |> runner.filter_tests(is_smoke)
         |> runner.run()
+        |> types.report_tests
 
       let assert [r] = results
       r.name
@@ -70,6 +74,7 @@ pub fn tests() {
         |> runner.add_suites([ok_suite])
         |> runner.add_suites_with_config(timeout_config, [slow_suite])
         |> runner.run()
+        |> types.report_tests
 
       let assert [r1, r2] = results
 
@@ -143,6 +148,7 @@ pub fn tests() {
           runner.new([suite_a, suite_b])
           |> runner.max_concurrency(4)
           |> runner.run()
+          |> types.report_tests
         let t_parallel = timing.now_ms() - t_parallel_start
 
         let seq_config =
@@ -155,6 +161,7 @@ pub fn tests() {
           |> runner.add_suites_with_config(seq_config, [suite_b])
           |> runner.max_concurrency(4)
           |> runner.run()
+          |> types.report_tests
         let t_mixed = timing.now_ms() - t_mixed_start
 
         case t_mixed > t_parallel + 200 {

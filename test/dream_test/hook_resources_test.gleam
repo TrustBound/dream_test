@@ -9,8 +9,9 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{
-  type AssertionResult, type Status, type TestResult, AssertionFailure,
-  AssertionOk, Failed, Passed,
+  type AssertionResult, type Status, type TestResult, AfterAllSuitesHook,
+  AfterEachSuiteHook, AssertionFailure, AssertionOk, Passed, SetupFailed,
+  TeardownFailure,
 }
 import dream_test/unit.{describe, it}
 import dream_test/unit_context
@@ -68,6 +69,7 @@ pub fn tests() {
       |> runner.before_all_suites(fn(_suites) { start_named_pool(pool_name) })
       |> runner.after_all_suites(fn(_suites) { stop_named_pool(pool_name) })
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([#("uses the pool", Passed)])
@@ -76,60 +78,70 @@ pub fn tests() {
       )
     }),
 
-    it("a before_all_suites hook that crashes fails the tests", fn() {
+    it("a before_all_suites hook that crashes gives SetupFailed", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.before_all_suites(fn(_suites) { erlang_error(boom()) })
       |> runner.run()
+      |> types.report_tests
       |> failures
       |> should
       |> be_equal([
-        #("a", Failed, [#("before_all_suites", "hook crashed: error:boom")]),
+        #("a", SetupFailed, [
+          #("before_all_suites", "hook crashed: error:boom"),
+        ]),
       ])
       |> or_fail_with("a crash in before_all_suites should fail the tests")
     }),
 
-    it("a before_each_suite hook that crashes fails the tests", fn() {
+    it("a before_each_suite hook that crashes gives SetupFailed", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.before_each_suite(fn(_suite) { erlang_error(boom()) })
       |> runner.run()
+      |> types.report_tests
       |> failures
       |> should
       |> be_equal([
-        #("a", Failed, [
+        #("a", SetupFailed, [
           #("before_each_suite", "hook crashed in suite: error:boom"),
         ]),
       ])
       |> or_fail_with("a crash in before_each_suite should fail the tests")
     }),
 
-    it("an after_each_suite hook that crashes is reported", fn() {
+    it("an after_each_suite hook that crashes is a tear-down failure", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_each_suite(fn(_suite) { erlang_error(boom()) })
       |> runner.run()
-      |> failures
+      |> types.report_teardown_failures
       |> should
       |> be_equal([
-        #("a", Passed, []),
-        #("<after_each_suite>", Failed, [
-          #("after_each_suite", "hook crashed in suite: error:boom"),
-        ]),
+        TeardownFailure(
+          hook: AfterEachSuiteHook,
+          scope: ["suite"],
+          message: "hook crashed in suite: error:boom",
+        ),
       ])
-      |> or_fail_with("a crash in after_each_suite should be reported")
+      |> or_fail_with(
+        "a crash in after_each_suite should be a tear-down failure",
+      )
     }),
 
-    it("an after_all_suites hook that crashes is reported", fn() {
+    it("an after_all_suites hook that crashes is a tear-down failure", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_all_suites(fn(_suites) { erlang_error(boom()) })
       |> runner.run()
-      |> failures
+      |> types.report_teardown_failures
       |> should
       |> be_equal([
-        #("a", Passed, []),
-        #("<after_all_suites>", Failed, [
-          #("after_all_suites", "hook crashed: error:boom"),
-        ]),
+        TeardownFailure(
+          hook: AfterAllSuitesHook,
+          scope: [],
+          message: "hook crashed: error:boom",
+        ),
       ])
-      |> or_fail_with("a crash in after_all_suites should be reported")
+      |> or_fail_with(
+        "a crash in after_all_suites should be a tear-down failure",
+      )
     }),
   ])
 }
@@ -259,7 +271,9 @@ fn passing_test() -> Result(AssertionResult, String) {
 }
 
 fn run_suite(suite: types.TestSuite(context)) -> List(TestResult) {
-  runner.new([suite]) |> runner.run()
+  runner.new([suite])
+  |> runner.run()
+  |> types.report_tests
 }
 
 fn statuses(results: List(TestResult)) -> List(#(String, Status)) {

@@ -24,6 +24,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> types.report_tests
       |> list.map(full_name)
       |> should
       |> be_equal([

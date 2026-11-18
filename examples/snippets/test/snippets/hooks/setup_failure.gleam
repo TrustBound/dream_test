@@ -23,6 +23,7 @@ pub fn tests() {
         parallel.default_config(),
         setup_failure_tests(),
       )
+      |> types.report_tests
       |> list.map(fn(result) { result.status })
       |> should
       |> be_equal([SetupFailed])

@@ -1,4 +1,4 @@
-//// Black-box tests of runner paths: has_failures, exit_on_failure without
+//// Black-box tests of runner paths: exit_on_failure without
 //// failures, silent, filters with hooks, suite hooks and suite info.
 
 import coverage_fixtures/sample
@@ -8,51 +8,27 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/types.{
-  type Status, type TestResult, AssertionOk, Failed, Passed, Root, SetupFailed,
-  Skipped, Test, TimedOut, Unit,
+  type Status, type TestResult, AssertionOk, Passed, Root, Test, Unit,
 }
 import dream_test/unit.{describe, it}
-import fixtures/test_results.{make_test}
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 
+@external(erlang, "dream_test_coverage_test_ffi", "run_main_in_new_vm")
+fn run_main_in_new_vm(module: String, function: String) -> #(Int, String)
+
 pub fn tests() {
   describe("dream_test/runner paths", [
-    it("has_failures is False for no results", fn() {
-      runner.has_failures([])
+    it("exit_on_failure stops with status 1 for a tear-down failure only", fn() {
+      run_main_in_new_vm(
+        "dream_test@coverage_runner_mains",
+        "teardown_failure_with_exit_on_failure",
+      ).0
       |> should
-      |> be_equal(False)
-      |> or_fail_with("no results should have no failures")
-    }),
-
-    it("has_failures is False for passed and skipped results", fn() {
-      runner.has_failures([make_test("a", Passed), make_test("b", Skipped)])
-      |> should
-      |> be_equal(False)
-      |> or_fail_with("passed and skipped results are not failures")
-    }),
-
-    it("has_failures is True for a failed result after a passed one", fn() {
-      runner.has_failures([make_test("a", Passed), make_test("b", Failed)])
-      |> should
-      |> be_equal(True)
-      |> or_fail_with("a failed result is a failure")
-    }),
-
-    it("has_failures is True for a setup failure", fn() {
-      runner.has_failures([make_test("a", SetupFailed)])
-      |> should
-      |> be_equal(True)
-      |> or_fail_with("a setup failure is a failure")
-    }),
-
-    it("has_failures is True for a timeout", fn() {
-      runner.has_failures([make_test("a", TimedOut)])
-      |> should
-      |> be_equal(True)
-      |> or_fail_with("a timeout is a failure")
+      |> be_equal(1)
+      |> or_fail_with("a tear-down failure should give exit status 1")
     }),
 
     it("exit_on_failure returns the results when every test passes", fn() {
@@ -60,6 +36,7 @@ pub fn tests() {
       |> runner.exit_on_failure()
       |> runner.silent()
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([Passed])
@@ -74,6 +51,7 @@ pub fn tests() {
       |> runner.filter_tests(fn(info) { info.name == "keep" })
       |> runner.silent()
       |> runner.run()
+      |> types.report_tests
       |> full_names
       |> should
       |> be_equal([["kept", "keep"]])
@@ -92,6 +70,7 @@ pub fn tests() {
       |> runner.filter_tests(fn(info) { info.name == "keep" })
       |> runner.silent()
       |> runner.run()
+      |> types.report_tests
       |> full_names
       |> should
       |> be_equal([["root", "inner", "keep"]])
@@ -113,6 +92,7 @@ pub fn tests() {
       |> runner.filter_tests(fn(info) { info.name == "keep" })
       |> runner.silent()
       |> runner.run()
+      |> types.report_tests
       |> full_names
       |> should
       |> be_equal([["root", "keep"]])
@@ -127,6 +107,7 @@ pub fn tests() {
         |> runner.before_all_suites(fn(_suites) { record(calls, "second") })
         |> runner.silent()
         |> runner.run()
+        |> types.report_tests
 
       received(calls)
       |> should
@@ -142,6 +123,7 @@ pub fn tests() {
         |> runner.after_all_suites(fn(_suites) { record(calls, "second") })
         |> runner.silent()
         |> runner.run()
+        |> types.report_tests
 
       received(calls)
       |> should
@@ -197,6 +179,7 @@ pub fn tests() {
           ),
         )
         |> runner.run()
+        |> types.report_tests
 
       received(lines)
       |> list.map(after_bar)
@@ -210,6 +193,7 @@ pub fn tests() {
       |> runner.progress_reporter(progress.new())
       |> runner.silent()
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([Passed])
@@ -288,6 +272,7 @@ pub fn tests() {
         }),
       )
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> fn(result) { #(result, received(errors)) }
       |> should
@@ -327,6 +312,7 @@ fn fixture_coverage_run(
         }),
       )
       |> runner.run()
+      |> types.report_tests
     #(statuses(results), received(errors))
   })
 }
@@ -354,6 +340,7 @@ fn suite_source(sources: List(Option(String))) -> String {
     })
     |> runner.silent()
     |> runner.run()
+    |> types.report_tests
   case received(seen) {
     [source] -> source
     other -> string.inspect(other)

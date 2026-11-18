@@ -28,7 +28,10 @@ pub fn tests() {
         ])
 
       // Act
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> test_types.report_tests
 
       // Assert
       case results {
@@ -60,7 +63,10 @@ pub fn tests() {
         ])
 
       // Act
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> test_types.report_tests
 
       // Assert
       case results {
@@ -335,6 +341,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.failures })
       |> should
       |> be_equal([
@@ -364,6 +371,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.failures })
       |> should
       |> be_equal([
@@ -403,6 +411,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.status })
       |> should
       |> be_equal([test_types.Passed])
@@ -469,6 +478,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.status })
       |> should
       |> be_equal([test_types.Passed])
@@ -499,6 +509,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.status })
       |> should
       |> be_equal([test_types.Passed])
@@ -522,6 +533,7 @@ pub fn tests() {
 
         runner.new([suite])
         |> runner.run()
+        |> test_types.report_tests
         |> list.map(fn(result) { result.status })
         |> should
         |> be_equal([test_types.Passed])
@@ -556,6 +568,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.failures })
       |> should
       |> be_equal([
@@ -584,6 +597,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.failures })
       |> should
       |> be_equal([
@@ -607,6 +621,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(fn(result) { result.failures })
       |> should
       |> be_equal([
@@ -636,6 +651,7 @@ fn run_parsed(
         )),
       ])
       |> runner.run()
+      |> test_types.report_tests
     Error(_) -> []
   }
 }
@@ -655,6 +671,7 @@ fn run_file(
         )),
       ])
       |> runner.run()
+      |> test_types.report_tests
     Error(_) -> []
   }
 }

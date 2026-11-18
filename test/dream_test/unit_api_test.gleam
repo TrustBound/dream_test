@@ -20,7 +20,10 @@ pub fn tests() {
           |> with_tags(["smoke"]),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(
@@ -49,7 +52,10 @@ pub fn tests() {
           |> with_tags(["group"]),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       r.tags
@@ -72,7 +78,10 @@ pub fn tests() {
           }),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       r.status
@@ -88,7 +97,10 @@ pub fn tests() {
           it("should not run", fn() { panic as "should not run" }),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(r.status, r.failures)
@@ -111,7 +123,10 @@ pub fn tests() {
       let suite =
         describe("root", [skip("skipped", fn() { panic as "should not run" })])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(r.name, r.status, r.failures)
@@ -129,6 +144,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([Passed])
@@ -144,6 +160,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([Passed])
@@ -157,7 +174,10 @@ pub fn tests() {
           it("should not run", fn() { panic as "should not run" }),
         ])
 
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
 
       #(r.status, r.failures)
@@ -184,6 +204,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> types.report_tests
       |> statuses
       |> should
       |> be_equal([Passed])

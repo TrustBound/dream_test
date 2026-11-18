@@ -2,6 +2,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/gherkin
 import dream_test/types
 import dream_test/unit.{describe, group, it}
+import fixtures/test_results.{report_of, report_with_cleanup_failure}
 import gleam/option.{type Option, None, Some}
 
 fn scenario(
@@ -104,7 +105,7 @@ Feature: Unknown Feature
     }),
 
     it("format emits some text for a list (even if empty)", fn() {
-      let out = gherkin.format([])
+      let out = gherkin.format(report_of([]))
       case out == "" {
         True ->
           Ok(
@@ -120,7 +121,7 @@ Feature: Unknown Feature
 
     it("report does not crash", fn() {
       let write = fn(_s: String) { Nil }
-      gherkin.report([], write)
+      gherkin.report(report_of([]), write)
       Ok(types.AssertionOk)
     }),
 
@@ -132,8 +133,28 @@ Feature: Unknown Feature
     }),
 
     group("format", [
+      it("writes the tear-down failures before the summary", fn() {
+        gherkin.format(
+          report_with_cleanup_failure([
+            scenario(["Cart"], "adds", types.Passed, []),
+          ]),
+        )
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: adds ✓\n"
+          <> "\n"
+          <> "Tear-down failures:\n"
+          <> "  after_all in root\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+        )
+        |> or_fail_with("the tear-down failures should have their own section")
+      }),
+
       it("writes every status and the failures", fn() {
-        gherkin.format(every_status())
+        gherkin.format(report_of(every_status()))
         |> should
         |> be_equal(
           "Feature: Cart\n"
@@ -161,7 +182,7 @@ Feature: Unknown Feature
       }),
 
       it("writes a placeholder feature for a result with no group", fn() {
-        gherkin.format([scenario([], "alone", types.Passed, [])])
+        gherkin.format(report_of([scenario([], "alone", types.Passed, [])]))
         |> should
         |> be_equal(
           "Feature: Unknown Feature\n"
@@ -196,12 +217,14 @@ Feature: Unknown Feature
       }),
 
       it("shows the duration of a slow scenario", fn() {
-        gherkin.format([
-          types.TestResult(
-            ..scenario(["F"], "slow", types.Passed, []),
-            duration_ms: 1500,
-          ),
-        ])
+        gherkin.format(
+          report_of([
+            types.TestResult(
+              ..scenario(["F"], "slow", types.Passed, []),
+              duration_ms: 1500,
+            ),
+          ]),
+        )
         |> should
         |> be_equal(
           "Feature: F\n"

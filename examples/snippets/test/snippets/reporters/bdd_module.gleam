@@ -35,7 +35,10 @@ fn first_result(results: List(a)) -> Result(a, String) {
 pub fn tests() {
   describe("BDD reporter module", [
     it("report writes output", fn() {
-      bdd.report([passing_result()], write_bdd_report_to_file)
+      bdd.report(
+        types.run_report(tests: [passing_result()], teardown_failures: []),
+        write_bdd_report_to_file,
+      )
 
       use text <- result.try(
         file.read("test/tmp/bdd_report.txt")

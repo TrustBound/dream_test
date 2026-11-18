@@ -10,13 +10,14 @@
 import dream_test/reporters/ansi
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/reporters/summary
+import dream_test/reporters/teardown
 import dream_test/reporters/types as reporter_types
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type Status, type TestResult, BooleanFailure,
-  CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
-  Failed, OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
-  SnapshotFailure, StringMatchFailure, TimedOut,
+  type AssertionFailure, type RunReport, type Status, type TestResult,
+  BooleanFailure, CollectionFailure, ComparisonFailure, CustomMatcherFailure,
+  EqualityFailure, Failed, OptionFailure, Passed, Pending, ResultFailure,
+  SetupFailed, Skipped, SnapshotFailure, StringMatchFailure, TimedOut,
 }
 import gleam/list
 import gleam/option.{Some}
@@ -107,28 +108,35 @@ pub fn failures_only(
   }
 }
 
-/// Render the end-of-run BDD output for the given results.
+/// Render the end-of-run BDD output for a run report.
+///
+/// The output has the test results, then the failures (full mode), then a
+/// `Tear-down failures:` section when a tear-down hook failed (full and
+/// failures-only modes), then the summary line.
 pub fn render(
   config config: reporter_types.BddReporterConfig,
-  results results: List(TestResult),
+  report report: RunReport,
 ) -> String {
   let reporter_types.BddReporterConfig(color: color, mode: mode) = config
-  render_bdd_sections(color, mode, results)
+  render_bdd_sections(color, mode, report)
 }
 
 fn render_bdd_sections(
   color: Bool,
   mode: reporter_types.BddOutputMode,
-  results: List(TestResult),
+  report: RunReport,
 ) -> String {
-  let summary = format_summary(color, results)
+  let summary = format_summary(color, report)
+  let results = types.report_tests(report)
+  let teardown_text =
+    format_teardown_section(color, types.report_teardown_failures(report))
 
   case mode {
     reporter_types.BddSummaryOnly -> summary
     reporter_types.BddFailuresOnly -> {
       let failures = filter_failures(results, [])
       let failures_text = format_all_results(color, failures, [], "")
-      string.concat([failures_text, "\n", summary])
+      string.concat([failures_text, teardown_text, "\n", summary])
     }
     reporter_types.BddFull -> {
       let results_text = format_all_results(color, results, [], "")
@@ -141,7 +149,7 @@ fn render_bdd_sections(
           <> "\n"
           <> format_all_results(color, failures, [], "")
       }
-      string.concat([results_text, failures_text, "\n", summary])
+      string.concat([results_text, failures_text, teardown_text, "\n", summary])
     }
   }
 }
@@ -153,7 +161,7 @@ fn filter_failures(
   case results {
     [] -> list.reverse(acc_rev)
     [result, ..rest] -> {
-      case is_failure_status(result.status) {
+      case types.is_failure(result.status) {
         True -> filter_failures(rest, [result, ..acc_rev])
         False -> filter_failures(rest, acc_rev)
       }
@@ -161,19 +169,23 @@ fn filter_failures(
   }
 }
 
-fn is_failure_status(status: Status) -> Bool {
-  case status {
-    Failed -> True
-    SetupFailed -> True
-    TimedOut -> True
-    _ -> False
+fn format_summary(color: Bool, report: RunReport) -> String {
+  case color {
+    True -> summary.format_in_color(report)
+    False -> summary.format(report)
   }
 }
 
-fn format_summary(color: Bool, results: List(TestResult)) -> String {
-  case color {
-    True -> summary.format_in_color(results)
-    False -> summary.format(results)
+/// The tear-down section with a blank line before it, or `""` when no
+/// tear-down hook failed.
+fn format_teardown_section(
+  color: Bool,
+  failures: List(types.TeardownFailure),
+) -> String {
+  case failures, color {
+    [], _ -> ""
+    _, True -> "\n" <> teardown.format_in_color(failures)
+    _, False -> "\n" <> teardown.format(failures)
   }
 }
 
@@ -195,7 +207,8 @@ fn format_failures_header(color: Bool) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to format
+/// - `report`: The run report to format: the test results and the
+///   tear-down failures
 ///
 /// ## Returns
 ///
@@ -204,7 +217,7 @@ fn format_failures_header(color: Bool) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// let report = bdd.format(sample_results())
+/// let report = bdd.format(sample_report())
 ///
 /// report
 /// |> should
@@ -212,17 +225,20 @@ fn format_failures_header(color: Bool) -> String {
 /// |> or_fail_with("expected formatted report snapshot match")
 /// ```
 ///
-pub fn format(results results: List(TestResult)) -> String {
+pub fn format(report report: RunReport) -> String {
   // Split results by kind
-  let #(gherkin_results, unit_results) = partition_by_kind(results)
+  let #(gherkin_results, unit_results) =
+    partition_by_kind(types.report_tests(report))
 
   // Format each group with appropriate reporter
   let unit_text = format_unit_results(False, unit_results)
   let gherkin_text = gherkin_reporter.format_scenarios(gherkin_results)
 
   // Combine with single summary
-  let summary_text = summary.format(results)
-  string.concat([unit_text, gherkin_text, "\n", summary_text])
+  let summary_text = summary.format(report)
+  let teardown_text =
+    format_teardown_section(False, types.report_teardown_failures(report))
+  string.concat([unit_text, gherkin_text, teardown_text, "\n", summary_text])
 }
 
 fn partition_by_kind(
@@ -287,19 +303,19 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
 ///
 /// ## Parameters
 ///
-/// - `results`: List of test results from the runner
+/// - `report`: The run report from `runner.run`
 /// - `write`: Function that handles the formatted output string
 ///
 /// ## Returns
 ///
-/// Returns the input results unchanged, enabling pipeline composition.
+/// Returns the input report unchanged, enabling pipeline composition.
 ///
 pub fn report(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format(results))
-  results
+) -> RunReport {
+  write(format(report))
+  report
 }
 
 /// Format a single test result as BDD output, suitable for streaming.
@@ -447,7 +463,7 @@ pub fn format_incremental_parts_with_test_indent(
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to summarize
+/// - `report`: The run report to summarize
 ///
 /// ## Returns
 ///
@@ -463,8 +479,8 @@ pub fn format_incremental_parts_with_test_indent(
 /// |> match_snapshot("./test/snapshots/bdd_format_summary_only.snap")
 /// |> or_fail_with("expected summary snapshot match")
 /// ```
-pub fn format_summary_only(results results: List(TestResult)) -> String {
-  summary.format(results)
+pub fn format_summary_only(report report: RunReport) -> String {
+  summary.format(report)
 }
 
 fn format_all_results(

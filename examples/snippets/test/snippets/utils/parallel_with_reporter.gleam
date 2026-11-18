@@ -44,6 +44,7 @@ pub fn main() {
     )
   let parallel.RunRootParallelWithReporterResult(
     results: results,
+    teardown_failures: _teardown_failures,
     completed: completed_after_suite,
     progress_reporter: _progress_reporter,
   ) = parallel_result

@@ -2,7 +2,8 @@ import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/parallel
 import dream_test/runner
 import dream_test/types.{
-  type Status, type TestResult, Failed, Pending, SetupFailed, Skipped, TimedOut,
+  type RunReport, type Status, type TestResult, Failed, Pending, SetupFailed,
+  Skipped, TimedOut,
 }
 import dream_test/unit.{describe, it}
 import gleam/int
@@ -10,7 +11,9 @@ import gleam/io
 import gleam/list
 import gleam/string
 
-pub fn render_my_report(results: List(TestResult)) -> String {
+pub fn render_my_report(report: RunReport) -> String {
+  let results = types.report_tests(report)
+  let teardown_failed = list.length(types.report_teardown_failures(report))
   let total = list.length(results)
   let failed = count(results, Failed)
   let timed_out = count(results, TimedOut)
@@ -26,7 +29,9 @@ pub fn render_my_report(results: List(TestResult)) -> String {
     int.to_string(passed),
     " passed; ",
     int.to_string(failed + timed_out + setup_failed),
-    " failed\n",
+    " failed; ",
+    int.to_string(teardown_failed),
+    " tear-down failed\n",
   ])
 }
 
@@ -46,8 +51,8 @@ fn count_loop(results: List(TestResult), wanted: Status, n: Int) -> Int {
 }
 
 pub fn main() {
-  let results = runner.new([tests()]) |> runner.run()
-  io.print(render_my_report(results))
+  let report = runner.new([tests()]) |> runner.run()
+  io.print(render_my_report(report))
 }
 
 fn example_suite() {
@@ -63,7 +68,7 @@ pub fn tests() {
       parallel.run_root_parallel(parallel.default_config(), example_suite())
       |> render_my_report
       |> should
-      |> be_equal("MyReport: 2 total; 2 passed; 0 failed\n")
+      |> be_equal("MyReport: 2 total; 2 passed; 0 failed; 0 tear-down failed\n")
       |> or_fail_with("expected the report line for two passing tests")
     }),
   ])

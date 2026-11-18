@@ -4,6 +4,7 @@ import dream_test/reporters/json
 import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, group, it}
+import fixtures/test_results.{report_of, report_with_cleanup_failure}
 import gleam/option.{None, Some}
 import gleam/string
 
@@ -114,7 +115,7 @@ fn sample_results() -> List(types.TestResult) {
 pub fn tests() {
   describe("dream_test/reporters/json", [
     it("format emits JSON containing the test name", fn() {
-      let out = json.format(sample_results())
+      let out = json.format(report_of(sample_results()))
       case string.contains(out, "\"t1\"") {
         True -> Ok(types.AssertionOk)
         False ->
@@ -129,7 +130,7 @@ pub fn tests() {
     }),
 
     it("format_pretty emits JSON containing the test name", fn() {
-      let out = json.format_pretty(sample_results())
+      let out = json.format_pretty(report_of(sample_results()))
       case string.contains(out, "\"t1\"") {
         True -> Ok(types.AssertionOk)
         False ->
@@ -145,8 +146,8 @@ pub fn tests() {
 
     it("report and report_pretty do not crash", fn() {
       let write = fn(_s: String) { Nil }
-      json.report(sample_results(), write)
-      json.report_pretty(sample_results(), write)
+      json.report(report_of(sample_results()), write)
+      json.report_pretty(report_of(sample_results()), write)
       Ok(types.AssertionOk)
     }),
 
@@ -172,21 +173,27 @@ pub fn tests() {
 
     group("render", [
       it("writes compact JSON when pretty is off", fn() {
-        json.render(reporter_types.JsonReporterConfig(pretty: False), [
-          result_of("passes", types.Passed, [], types.Unit),
-        ])
+        json.render(
+          reporter_types.JsonReporterConfig(pretty: False),
+          report_of([
+            result_of("passes", types.Passed, [], types.Unit),
+          ]),
+        )
         |> after("\"summary\":")
         |> should
         |> be_equal(
-          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}]}",
+          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
         )
         |> or_fail_with("compact JSON should have no spaces or new lines")
       }),
 
       it("writes indented JSON when pretty is on", fn() {
-        json.render(reporter_types.JsonReporterConfig(pretty: True), [
-          result_of("passes", types.Passed, [], types.Unit),
-        ])
+        json.render(
+          reporter_types.JsonReporterConfig(pretty: True),
+          report_of([
+            result_of("passes", types.Passed, [], types.Unit),
+          ]),
+        )
         |> after("\"summary\": ")
         |> should
         |> be_equal(
@@ -197,7 +204,8 @@ pub fn tests() {
           <> "    \"skipped\": 0,\n"
           <> "    \"pending\": 0,\n"
           <> "    \"timed_out\": 0,\n"
-          <> "    \"setup_failed\": 0\n"
+          <> "    \"setup_failed\": 0,\n"
+          <> "    \"teardown_failed\": 0\n"
           <> "  },\n"
           <> "  \"tests\": [\n"
           <> "    {\n"
@@ -212,7 +220,8 @@ pub fn tests() {
           <> "      \"kind\": \"unit\",\n"
           <> "      \"failures\": []\n"
           <> "    }\n"
-          <> "  ]\n"
+          <> "  ],\n"
+          <> "  \"teardown_failures\": []\n"
           <> "}",
         )
         |> or_fail_with("pretty JSON should have one field on each line")
@@ -220,42 +229,76 @@ pub fn tests() {
     ]),
 
     group("format", [
-      it("counts every status in the summary", fn() {
-        json.format(every_status())
+      it("writes schema version 2.0", fn() {
+        json.format(report_of([]))
+        |> between("\"version\":", ",")
+        |> should
+        |> be_equal("\"2.0\"")
+        |> or_fail_with("the schema version should be 2.0")
+      }),
+
+      it("counts the tear-down failures in the summary", fn() {
+        json.format(report_with_cleanup_failure([]))
         |> between("\"summary\":", ",\"tests\"")
         |> should
         |> be_equal(
-          "{\"total\":6,\"passed\":1,\"failed\":1,\"skipped\":1,\"pending\":1,\"timed_out\":1,\"setup_failed\":1}",
+          "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":1}",
+        )
+        |> or_fail_with("the summary should count the tear-down failures")
+      }),
+
+      it("writes every tear-down failure after the tests", fn() {
+        json.format(report_with_cleanup_failure([]))
+        |> after("\"tests\":")
+        |> should
+        |> be_equal(
+          "[],\"teardown_failures\":[{\"hook\":\"after_all\",\"scope\":[\"root\"],\"message\":\"no cleanup\"}]}",
+        )
+        |> or_fail_with(
+          "each tear-down failure should have its hook, scope and message",
+        )
+      }),
+
+      it("counts every status in the summary", fn() {
+        json.format(report_of(every_status()))
+        |> between("\"summary\":", ",\"tests\"")
+        |> should
+        |> be_equal(
+          "{\"total\":6,\"passed\":1,\"failed\":1,\"skipped\":1,\"pending\":1,\"timed_out\":1,\"setup_failed\":1,\"teardown_failed\":0}",
         )
         |> or_fail_with("the summary should count each status")
       }),
 
       it("writes the status and kind of every test", fn() {
-        json.format(every_status())
+        json.format(report_of(every_status()))
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"integration\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}]}",
+          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"integration\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
         )
         |> or_fail_with("each test should have its status and kind")
       }),
 
       it("writes the fields of every failure payload", fn() {
-        json.format([
-          result_of("payloads", types.Failed, every_payload(), types.Unit),
-        ])
+        json.format(
+          report_of([
+            result_of("payloads", types.Failed, every_payload(), types.Unit),
+          ]),
+        )
         |> after("\"failures\":")
         |> should
         |> be_equal(
-          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}]}",
+          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}],\"teardown_failures\":[]}",
         )
         |> or_fail_with("each payload should have its own fields")
       }),
 
       it("keeps escaped characters in pretty output", fn() {
-        json.format_pretty([
-          result_of("say \"hi\"\n{a, b}: [c]", types.Passed, [], types.Unit),
-        ])
+        json.format_pretty(
+          report_of([
+            result_of("say \"hi\"\n{a, b}: [c]", types.Passed, [], types.Unit),
+          ]),
+        )
         |> between("\"name\": ", ",\n")
         |> should
         |> be_equal("\"say \\\"hi\\\"\\n{a, b}: [c]\"")
@@ -265,7 +308,7 @@ pub fn tests() {
       it(
         "writes unknown as the Gleam version without the gleam_stdlib application",
         fn() {
-          without_gleam_stdlib_application(fn() { json.format([]) })
+          without_gleam_stdlib_application(fn() { json.format(report_of([])) })
           |> between("\"gleam_version\":", "}")
           |> should
           |> be_equal("\"unknown\"")

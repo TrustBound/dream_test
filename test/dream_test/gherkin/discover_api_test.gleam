@@ -103,7 +103,10 @@ pub fn tests() {
           |> discover.to_suite("Features")
 
         // Act
-        let run_results = runner.new([suite]) |> runner.run()
+        let run_results =
+          runner.new([suite])
+          |> runner.run()
+          |> test_types.report_tests
 
         // Assert: at least one result is tagged parse-error
         let tags = case run_results {
@@ -186,6 +189,7 @@ pub fn tests() {
 
       runner.new([suite])
       |> runner.run()
+      |> test_types.report_tests
       |> list.map(result_status)
       |> should
       |> be_equal([test_types.Passed])

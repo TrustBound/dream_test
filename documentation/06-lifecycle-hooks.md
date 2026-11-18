@@ -253,7 +253,10 @@ pub fn main() {
 
 ### Hook failure behavior (important for reliability)
 
-If a hook fails, Dream Test records that failure and fails the affected tests.
+A hook fails when it returns `Error(message)` or crashes. What happens next depends on the kind of hook:
+
+- **Set-up hook** (`before_all`, `before_each`, `before_each_test`, `before_each_suite`, `before_all_suites`): each test that it serves gets the status `SetupFailed`, and its body does not run. The tear-down hooks of the levels that started still run.
+- **Tear-down hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining tear-down hooks still run. The run report keeps the failure in its own list (`types.report_teardown_failures`), the reporters show it, and the run fails.
 
 #### Report a setup error <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -290,6 +293,53 @@ pub fn main() {
   |> runner.run()
 }
 ```
+
+#### Report a tear-down error <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/hooks/teardown_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/runner
+import dream_test/types.{AfterAllHook, Passed, TeardownFailure}
+import dream_test/unit.{after_all, describe, it}
+import gleam/list
+
+pub fn cleanup_failure_tests() {
+  describe("Database", [
+    after_all(fn() { Error("could not drop the test schema") }),
+    it("saves a user", fn() { Ok(succeed()) }),
+  ])
+}
+
+pub fn tests() {
+  describe("Tear-down failure example", [
+    it("keeps the status of the test", fn() {
+      runner.new([cleanup_failure_tests()])
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(fn(result) { result.status })
+      |> should
+      |> be_equal([Passed])
+      |> or_fail_with("expected the test to stay Passed")
+    }),
+    it("puts the failure in the tear-down list of the report", fn() {
+      runner.new([cleanup_failure_tests()])
+      |> runner.run()
+      |> types.report_teardown_failures
+      |> should
+      |> be_equal([
+        TeardownFailure(
+          hook: AfterAllHook,
+          scope: ["Database"],
+          message: "could not drop the test schema",
+        ),
+      ])
+      |> or_fail_with("expected one tear-down failure")
+    }),
+  ])
+}
+```
+
+The BDD and Gherkin reporters show the failure in a `Tear-down failures:` section after the test results. The summary line counts it, for example `1 tear-down failed`. The JSON reporter writes it in `teardown_failures`.
 
 ### Where hooks run
 

@@ -26,6 +26,7 @@ import dream_test/reporters/coverage.{RunOutcome} as coverage_reporter
 import dream_test/unit.{describe, group, it}
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/string
 
 fn cart_and_types_report() {
   report.new([
@@ -154,7 +155,7 @@ fn green(text: String) -> String {
 }
 
 fn passing_outcome() {
-  RunOutcome(passed: 3, failed: 0, exit_on_failure: True)
+  RunOutcome(passed: 3, failed: 0, teardown_failed: 0, exit_on_failure: True)
 }
 
 fn render_failure_for(error: CoverageError) -> String {
@@ -1201,7 +1202,12 @@ pub fn tests() {
       it("names failed tests together with a coverage error", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
-          outcome: RunOutcome(passed: 3, failed: 2, exit_on_failure: True),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 2,
+            teardown_failed: 0,
+            exit_on_failure: True,
+          ),
         )
         |> should
         |> be_equal(
@@ -1213,10 +1219,53 @@ pub fn tests() {
         )
         |> or_fail_with("expected the block with failed tests")
       }),
+      it("names tear-down failures together with a coverage error", fn() {
+        coverage_reporter.render_failure(
+          error: NoSourceFiles("lib"),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 0,
+            teardown_failed: 1,
+            exit_on_failure: True,
+          ),
+        )
+        |> should
+        |> be_equal(
+          "\nCoverage failed\n"
+          <> "  Found no .gleam or .erl files in the source directory \"lib\".\n"
+          <> "  Reason: the directory exists, but coverage has nothing in it to measure.\n"
+          <> "  Fix: set the directory that holds your code with coverage.source_directory(...).\n"
+          <> "\nTests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed and coverage did not complete.\n",
+        )
+        |> or_fail_with("expected the block with a tear-down failure")
+      }),
+      it("names failed tests and tear-down failures together", fn() {
+        coverage_reporter.render_failure(
+          error: NoSourceFiles("lib"),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 2,
+            teardown_failed: 1,
+            exit_on_failure: True,
+          ),
+        )
+        |> string.split("\n\n")
+        |> list.last
+        |> should
+        |> be_equal(Ok(
+          "Tests: 3 passed, 2 failed, 1 tear-down failed. Exit status 1, because tests failed and coverage did not complete.\n",
+        ))
+        |> or_fail_with("expected the failed tests and the tear-down failures")
+      }),
       it("says the exit status is unchanged without exit_on_failure", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
-          outcome: RunOutcome(passed: 3, failed: 0, exit_on_failure: False),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 0,
+            teardown_failed: 0,
+            exit_on_failure: False,
+          ),
         )
         |> should
         |> be_equal(
@@ -1276,7 +1325,12 @@ pub fn tests() {
             minimum_percent: 50.0,
             lines_needed: 3,
           ),
-          outcome: RunOutcome(passed: 3, failed: 1, exit_on_failure: True),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 1,
+            teardown_failed: 0,
+            exit_on_failure: True,
+          ),
         )
         |> should
         |> be_equal(

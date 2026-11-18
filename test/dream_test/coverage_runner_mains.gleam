@@ -11,6 +11,7 @@ import dream_test/coverage_fixture_server
 import dream_test/file
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
+import dream_test/types
 import dream_test/unit.{before_all, describe, it}
 import gleam/result
 
@@ -230,4 +231,19 @@ pub fn server_coverage_merged() -> Nil {
     |> runner.exit_on_failure()
     |> runner.run()
   Nil
+}
+
+/// A run where every test passes and an `after_all_suites` hook fails,
+/// with `exit_on_failure` and no coverage.
+pub fn teardown_failure_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.after_all_suites(fail_teardown)
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+fn fail_teardown(_suites: List(types.SuiteInfo)) -> Result(Nil, String) {
+  Error("the pool did not stop")
 }

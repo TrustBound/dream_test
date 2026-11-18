@@ -214,12 +214,34 @@ pub fn tests() {
         with_terminal_columns(30, fn() {
           progress.line(
             progress.new(),
-            progress.RunFinishedProgress(completed: 2, total: 2),
+            progress.RunFinishedProgress(
+              completed: 2,
+              total: 2,
+              teardown_failures: 0,
+            ),
           )
         })
         |> should
         |> be_equal("\r2/2 [█████████████] 100% done \n")
         |> or_fail_with("the last line should end with a new line")
+      }),
+
+      it("names the tear-down failures on the last line", fn() {
+        with_terminal_columns(60, fn() {
+          progress.line(
+            progress.new(),
+            progress.RunFinishedProgress(
+              completed: 2,
+              total: 2,
+              teardown_failures: 1,
+            ),
+          )
+        })
+        |> should
+        |> be_equal(
+          "\r2/2 [███████████████████████] 100% done, 1 tear-down failed \n",
+        )
+        |> or_fail_with("the last line should count the tear-down failures")
       }),
     ]),
 

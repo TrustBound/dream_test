@@ -7,33 +7,38 @@
 //// ```gleam
 //// import dream_test/reporters/summary
 ////
-//// summary.format(results)
+//// summary.format(report)
 //// // -> "Summary: 3 run, 1 failed, 2 passed in 12ms\n"
 //// ```
 ////
 //// The line always has the run, failed and passed counts. It adds the
-//// skipped, pending, timed out and setup failed counts, in that order, only
-//// when they are not zero.
+//// skipped, pending, timed out, setup failed and tear-down failed counts, in
+//// that order, only when they are not zero.
 
 import dream_test/reporters/ansi
 import dream_test/timing
 import dream_test/types.{
-  type TestResult, Failed, Passed, Pending, SetupFailed, Skipped, TimedOut,
+  type RunReport, type TestResult, Failed, Passed, Pending, SetupFailed, Skipped,
+  TimedOut,
 }
 import gleam/int
 import gleam/list
 import gleam/string
 
-/// The number of tests with each status, and the sum of their durations.
+/// The number of tests with each status, the number of tear-down failures,
+/// and the sum of the test durations.
 ///
 /// `run` is the number of results. The six status counts add up to `run`.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// summary.count([passed_result, failed_result])
+/// summary.count(types.run_report(
+///   tests: [passed_result, failed_result],
+///   teardown_failures: [],
+/// ))
 /// // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
-/// //    timed_out: 0, setup_failed: 0, duration_ms: 0)
+/// //    timed_out: 0, setup_failed: 0, teardown_failed: 0, duration_ms: 0)
 /// ```
 pub type Counts {
   Counts(
@@ -51,37 +56,45 @@ pub type Counts {
     timed_out: Int,
     /// Results with status `SetupFailed`
     setup_failed: Int,
+    /// Tear-down hooks that failed. They are not test results, so they are
+    /// not part of `run`.
+    teardown_failed: Int,
     /// Sum of the `duration_ms` of all results
     duration_ms: Int,
   )
 }
 
-/// Count the results by status and add up their durations.
+/// Count the test results by status, count the tear-down failures, and add
+/// up the test durations.
 ///
 /// ## Parameters
 ///
-/// - `results`: the test results of a run
+/// - `report`: the report of a run
 ///
 /// ## Returns
 ///
-/// The `Counts` of the results.
+/// The `Counts` of the report.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let counts = summary.count(results)
+/// let counts = summary.count(report)
 /// counts.failed
 /// // -> 1
 /// ```
-pub fn count(results results: List(TestResult)) -> Counts {
-  list.fold(results, empty_counts(), add_result)
+pub fn count(report report: RunReport) -> Counts {
+  let counts = list.fold(types.report_tests(report), empty_counts(), add_result)
+  Counts(
+    ..counts,
+    teardown_failed: list.length(types.report_teardown_failures(report)),
+  )
 }
 
 /// Format the summary line without colour.
 ///
 /// ## Parameters
 ///
-/// - `results`: the test results of a run
+/// - `report`: the report of a run
 ///
 /// ## Returns
 ///
@@ -90,23 +103,23 @@ pub fn count(results results: List(TestResult)) -> Counts {
 /// ## Example
 ///
 /// ```gleam
-/// summary.format(results)
+/// summary.format(report)
 /// // -> "Summary: 4 run, 1 failed, 2 passed, 1 skipped in 12ms\n"
 /// ```
-pub fn format(results results: List(TestResult)) -> String {
-  format_counts(count(results), False)
+pub fn format(report report: RunReport) -> String {
+  format_counts(count(report), False)
 }
 
 /// Format the summary line with ANSI colour codes.
 ///
 /// The word `Summary:` is bold cyan. The run count and the duration are
 /// cyan, the failed count is red and the passed count is green. The skipped
-/// and pending counts are yellow, the timed out and setup failed counts are
-/// red, and their labels are dim.
+/// and pending counts are yellow, the timed out, setup failed and tear-down
+/// failed counts are red, and their labels are dim.
 ///
 /// ## Parameters
 ///
-/// - `results`: the test results of a run
+/// - `report`: the report of a run
 ///
 /// ## Returns
 ///
@@ -115,10 +128,10 @@ pub fn format(results results: List(TestResult)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// io.print(summary.format_in_color(results))
+/// io.print(summary.format_in_color(report))
 /// ```
-pub fn format_in_color(results results: List(TestResult)) -> String {
-  format_counts(count(results), True)
+pub fn format_in_color(report report: RunReport) -> String {
+  format_counts(count(report), True)
 }
 
 fn empty_counts() -> Counts {
@@ -130,6 +143,7 @@ fn empty_counts() -> Counts {
     pending: 0,
     timed_out: 0,
     setup_failed: 0,
+    teardown_failed: 0,
     duration_ms: 0,
   )
 }
@@ -182,6 +196,7 @@ fn format_extra_counts(counts: Counts, color: Bool) -> String {
     ExtraCount(counts.pending, " pending", ansi.yellow, color),
     ExtraCount(counts.timed_out, " timed out", ansi.red, color),
     ExtraCount(counts.setup_failed, " setup failed", ansi.red, color),
+    ExtraCount(counts.teardown_failed, " tear-down failed", ansi.red, color),
   ]
   |> list.filter(is_not_zero)
   |> list.map(format_extra_count)
