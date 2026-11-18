@@ -318,12 +318,12 @@ fn coverage_config() {
 
 `coverage.exclude` removes files that match a pattern, for example generated code. `coverage.exclude_with_reason` also records why. `coverage.require_exclusion_reasons()` fails the run when a pattern or a marker has no reason. An exclusion is never silent: a count line follows the total. `coverage.show_excluded()` adds an `Excluded` column with each reason.
 
-#### Exclude files with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_exclusions.gleam#L17-L23"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Exclude files with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_exclusions.gleam#L28-L34"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
   coverage.new()
-  |> coverage.exclude("src/app/internal/**")
+  |> coverage.exclude_with_reason("src/app/internal/**", "debug helpers")
   |> coverage.exclude_with_reason("src/app/generated/**", "generated code")
   |> coverage.require_exclusion_reasons()
   |> coverage.show_excluded()
@@ -474,7 +474,7 @@ pub fn main() {
 
 `coverage.start` and `coverage.finish` measure any code, for example under another test runner. `dream_test/reporters/coverage` renders the table, and `dream_test/coverage/report` reads the numbers:
 
-#### Measure without the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_start_finish.gleam#L18-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Measure without the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_start_finish.gleam#L19-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_table() -> String {
