@@ -1027,6 +1027,42 @@ Scenario: S
         |> be_equal("The file ends here, but expected a Feature line.")
         |> or_fail_with("expected one kind")
       }),
+      it(
+        "parse_string gives MissingFeature for only comments and empty lines",
+        fn() {
+          parser.parse_string("# language: en\n\n# a comment\n")
+          |> should
+          |> be_equal(
+            Error(ParseError(line: 4, problem: parser.MissingFeature)),
+          )
+          |> or_fail_with("expected a missing Feature error")
+        },
+      ),
+      it("parse_string gives UnexpectedLine for text without a Feature", fn() {
+        parser.parse_string("not gherkin\n")
+        |> should
+        |> be_equal(
+          Error(ParseError(
+            line: 1,
+            problem: parser.UnexpectedLine("not gherkin", [TagLine, FeatureLine]),
+          )),
+        )
+        |> or_fail_with("expected an unexpected line error")
+      }),
+      it(
+        "parse_string gives UnexpectedEndOfFile for tags without a Feature",
+        fn() {
+          parser.parse_string("@a\n")
+          |> should
+          |> be_equal(
+            Error(ParseError(
+              line: 2,
+              problem: parser.UnexpectedEndOfFile([TagLine, FeatureLine]),
+            )),
+          )
+          |> or_fail_with("expected an end of file error")
+        },
+      ),
       it("parse_string gives MissingFeature for an empty file", fn() {
         parser.parse_string("")
         |> should

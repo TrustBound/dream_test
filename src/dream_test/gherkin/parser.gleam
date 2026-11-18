@@ -97,7 +97,12 @@ pub type TokenKind {
 /// ```
 ///
 pub type ParseProblem {
-  /// The file has no `Feature:` line.
+  /// The file holds only empty lines and comments (a `# language: en`
+  /// line included). The official Gherkin parser accepts such a file as an
+  /// empty document. dream_test rejects it, so that a wrong file does not
+  /// pass with no tests. A file with any other line before its `Feature:`
+  /// line gives `UnexpectedLine`, and a file with tags and no `Feature:`
+  /// line gives `UnexpectedEndOfFile`.
   MissingFeature
   /// The grammar does not permit this line at this position.
   UnexpectedLine(text: String, expected: List(TokenKind))
