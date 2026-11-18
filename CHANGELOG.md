@@ -479,6 +479,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- The progress line of a run with no tests shows `0/0` and `100%`.
+  Before, it showed `0/1` and `0%`.
 - Pretty JSON keeps a string that starts with a combining mark, such as
   a test name that starts with U+0301. Before, the mark joined the
   opening quote, and the rest of the output had the wrong layout.

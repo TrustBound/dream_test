@@ -74,11 +74,11 @@ pub fn tests() {
         |> or_fail_with("the line should be 20 columns wide")
       }),
 
-      it("shows a total of 0 as 0/1", fn() {
+      it("shows a total of 0 as 0/0 with nothing left to run", fn() {
         progress.render(30, progress.RunStartedProgress(total: 0))
         |> should
-        |> be_equal("0/1 [░░░░░░░░░░░░░░░░░░░░] 0% ")
-        |> or_fail_with("a total of 0 should show as 0/1")
+        |> be_equal("0/0 [" <> string.repeat("█", 18) <> "] 100% ")
+        |> or_fail_with("a total of 0 should show as 0/0 and 100%")
       }),
 
       it("shows no more completed tests than the total", fn() {

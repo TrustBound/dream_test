@@ -170,12 +170,9 @@ fn render_line(
   total: Int,
   label: String,
 ) -> String {
-  let safe_total = case total <= 0 {
-    True -> 1
-    False -> total
-  }
+  let safe_total = int.max(total, 0)
   let safe_completed = clamp_range(completed, 0, safe_total)
-  let percent = safe_completed * 100 / safe_total
+  let percent = percent_done(safe_completed, safe_total)
 
   let counter =
     int.to_string(safe_completed) <> "/" <> int.to_string(safe_total)
@@ -195,6 +192,15 @@ fn render_line(
 
   let raw = prefix <> bar <> suffix
   pad_or_truncate(raw, columns)
+}
+
+/// The percent of the tests that completed. With no tests, nothing is
+/// left to run, so it is 100.
+fn percent_done(completed: Int, total: Int) -> Int {
+  case total {
+    0 -> 100
+    _ -> completed * 100 / total
+  }
 }
 
 fn render_bar(width: Int, percent: Int) -> String {
