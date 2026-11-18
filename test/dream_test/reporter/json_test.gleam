@@ -265,13 +265,14 @@ pub fn tests() {
             set_up: types.BeforeAllHook,
             scope: ["root"],
             reason: "Boom",
+            not_run: [["root", "b"], ["root", "c"]],
           ),
         ])
         |> json.format
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\"}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}",
         )
         |> or_fail_with("a stopped set-up should have its own kind")
       }),

@@ -28,7 +28,9 @@
 ////     `"before_all"`, `"before_each_suite"` or `"before_all_suites"`.
 ////     `scope` is the group path for `before_all`, the suite name for
 ////     `before_each_suite`, `[]` for `before_all_suites`. `message` is the
-////     exit reason of the process.
+////     exit reason of the process. Only this kind has `not_run`: the
+////     tests that had not started when the set-up stopped, so they were
+////     not run. Each one is its `full_name` list, as in `tests`.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
 //// count and no `teardown_failures` list: a failed tear-down hook was a
@@ -319,34 +321,39 @@ fn build_summary_json(counts: summary.Counts) -> Json {
 fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
   case failure {
     TeardownFailure(hook: hook, scope: scope, message: message) ->
-      teardown_failure_object(
+      json.object(teardown_failure_fields(
         "hook_failed",
         types.teardown_hook_name(hook),
         scope,
         message,
-      )
-    SetupStopped(set_up: set_up, scope: scope, reason: reason) ->
-      teardown_failure_object(
-        "setup_stopped",
-        types.set_up_hook_name(set_up),
-        scope,
-        reason,
+      ))
+    SetupStopped(set_up: set_up, scope: scope, reason: reason, not_run: not_run) ->
+      json.object(
+        list.append(
+          teardown_failure_fields(
+            "setup_stopped",
+            types.set_up_hook_name(set_up),
+            scope,
+            reason,
+          ),
+          [#("not_run", json.array(not_run, json.array(_, json.string)))],
+        ),
       )
   }
 }
 
-fn teardown_failure_object(
+fn teardown_failure_fields(
   kind: String,
   hook: String,
   scope: List(String),
   message: String,
-) -> Json {
-  json.object([
+) -> List(#(String, Json)) {
+  [
     #("kind", json.string(kind)),
     #("hook", json.string(hook)),
     #("scope", json.array(scope, json.string)),
     #("message", json.string(message)),
-  ])
+  ]
 }
 
 fn build_test_json(result: TestResult) -> Json {

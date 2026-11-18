@@ -137,9 +137,12 @@ pub type RunRootParallelWithReporterConfig(context) {
 /// The executor checks each outer set-up before each test and each group
 /// starts. After the process of a set-up stopped, no test or hook of the
 /// suite starts: each test that did not start is `SetupFailed` with the
-/// failure of `types.setup_stopped_failure`, for example
+/// failure `not run: the set-up from <set-up hook> in "<scope>" stopped
+/// (<reason>)`, for example
 /// `not run: the set-up from before_each_suite in "suite" stopped (<reason>)`,
-/// with the operator `<set-up hook>`. Tests that started finish, and the
+/// with the operator `<set-up hook>`. The executor records the full name of
+/// each of these tests in the `not_run` of the outermost stopped set-up,
+/// after the names that it had already. Tests that started finish, and the
 /// `after_all` hooks of the groups that started still run. The executor
 /// does not report the stopped set-up as a tear-down failure: the caller
 /// owns the set-up, so the caller reports it once, for example as
@@ -152,8 +155,10 @@ pub type RunRootParallelWithReporterConfig(context) {
 ///   `Ok(Nil)` while it is alive, or `Error(reason)` after it stopped. The
 ///   executor does not call `check_owner` again after it gave `Error`.
 ///   With `sandbox.Owner`, use `sandbox.check_owner`.
-/// - `SetupStopped(set_up, scope, reason)`: the process of the set-up
-///   exited with `reason`.
+/// - `SetupStopped(set_up, scope, reason, not_run)`: the process of the
+///   set-up exited with `reason`. `not_run` is the full name of each test
+///   that was not run because of it (see `types.full_name`), in the order
+///   of the run. Give `[]` for a set-up that no test was skipped for yet.
 ///
 /// `set_up` is the set-up hook of the scope. `scope` is `[]` for the whole
 /// run, or the names of the scope, for example `[suite name]`.
@@ -163,7 +168,12 @@ pub type OuterSetup {
     scope: List(String),
     check_owner: fn() -> Result(Nil, String),
   )
-  SetupStopped(set_up: SetUpHook, scope: List(String), reason: String)
+  SetupStopped(
+    set_up: SetUpHook,
+    scope: List(String),
+    reason: String,
+    not_run: List(List(String)),
+  )
 }
 
 /// Result of `run_root_parallel_with_reporter`.
@@ -395,7 +405,9 @@ type ScopeOwner(context) {
   OwnerAlive(scope: List(String), owner: GroupOwner(context))
   /// The owner stopped with `reason`. The tests of the scope that have not
   /// started do not run, and its `after_all` hooks run in a new owner.
-  OwnerGone(scope: List(String), reason: String)
+  /// `not_run` is the full name of each test that it did not run, in the
+  /// order of the run.
+  OwnerGone(scope: List(String), reason: String, not_run: List(List(String)))
 }
 
 /// The owners of the scopes around a test: the outer set-ups of the
@@ -632,7 +644,7 @@ pub fn run_root_parallel_with_reporter(
     )
 
   let #(collected, completed_after_suite, owners_after_suite) =
-    execute_or_fail_group(executor_input, stopped_setup_failure(owners))
+    execute_or_fail_group(executor_input)
   RunRootParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
@@ -851,7 +863,8 @@ fn checked_outer_setup(
 ) -> OuterSetup {
   case checked {
     Ok(Nil) -> scope
-    Error(reason) -> SetupStopped(set_up: set_up, scope: names, reason: reason)
+    Error(reason) ->
+      SetupStopped(set_up: set_up, scope: names, reason: reason, not_run: [])
   }
 }
 
@@ -870,39 +883,165 @@ fn checked_owner(
 ) -> ScopeOwner(context) {
   case checked {
     Ok(_alive) -> OwnerAlive(scope: scope, owner: owner)
-    Error(reason) -> OwnerGone(scope: scope, reason: reason)
+    Error(reason) -> OwnerGone(scope: scope, reason: reason, not_run: [])
   }
 }
 
-/// The outermost set-up whose process stopped, as the failure of a test
-/// that does not run because of it. The outer set-ups are outside the
-/// group scopes.
-fn stopped_setup_failure(owners: Owners(context)) -> Option(AssertionFailure) {
+/// A set-up whose process stopped, as the tests that it skips see it.
+type Stop {
+  Stop(
+    set_up: SetUpHook,
+    scope: List(String),
+    reason: String,
+    not_run: List(List(String)),
+  )
+}
+
+/// The outermost set-up whose process stopped: the failure of each test
+/// that does not run because of it, and the function that records those
+/// tests in it. The outer set-ups are outside the group scopes.
+type StoppedSetup(context) {
+  StoppedSetup(
+    failure: AssertionFailure,
+    record_not_run: fn(List(List(String))) -> Owners(context),
+  )
+}
+
+/// An item of a list and the items around it: the items before it, newest
+/// first, and the items after it.
+type Found(item, value) {
+  Found(before_rev: List(item), value: value, after: List(item))
+}
+
+fn stopped_setup(owners: Owners(context)) -> Option(StoppedSetup(context)) {
   case
-    list.find_map(owners.outer, stopped_outer_failure),
-    list.find_map(owners.groups, stopped_group_failure)
+    find_first(owners.outer, outer_stop, []),
+    find_first(owners.groups, group_stop, [])
   {
-    Ok(failure), _ | Error(Nil), Ok(failure) -> Some(failure)
+    Ok(found), _ ->
+      Some(
+        StoppedSetup(
+          failure: not_run_failure(found.value),
+          record_not_run: fn(names) {
+            Owners(
+              ..owners,
+              outer: rebuild(
+                found,
+                SetupStopped(
+                  set_up: found.value.set_up,
+                  scope: found.value.scope,
+                  reason: found.value.reason,
+                  not_run: list.append(found.value.not_run, names),
+                ),
+              ),
+            )
+          },
+        ),
+      )
+    Error(Nil), Ok(found) ->
+      Some(
+        StoppedSetup(
+          failure: not_run_failure(found.value),
+          record_not_run: fn(names) {
+            Owners(
+              ..owners,
+              groups: rebuild(
+                found,
+                OwnerGone(
+                  scope: found.value.scope,
+                  reason: found.value.reason,
+                  not_run: list.append(found.value.not_run, names),
+                ),
+              ),
+            )
+          },
+        ),
+      )
     Error(Nil), Error(Nil) -> None
   }
 }
 
-fn stopped_outer_failure(scope: OuterSetup) -> Result(AssertionFailure, Nil) {
-  case scope {
-    SetupStopped(set_up: set_up, scope: names, reason: reason) ->
-      Ok(types.setup_stopped_failure(set_up:, scope: names, reason:))
+/// The first item of `items` that `pick` gives `Ok` for.
+fn find_first(
+  items: List(item),
+  pick: fn(item) -> Result(value, Nil),
+  before_rev: List(item),
+) -> Result(Found(item, value), Nil) {
+  case items {
+    [] -> Error(Nil)
+    [item, ..rest] -> found_or_next(pick(item), item, rest, pick, before_rev)
+  }
+}
+
+fn found_or_next(
+  picked: Result(value, Nil),
+  item: item,
+  rest: List(item),
+  pick: fn(item) -> Result(value, Nil),
+  before_rev: List(item),
+) -> Result(Found(item, value), Nil) {
+  case picked {
+    Ok(value) -> Ok(Found(before_rev: before_rev, value: value, after: rest))
+    Error(Nil) -> find_first(rest, pick, [item, ..before_rev])
+  }
+}
+
+/// The list of `found` with `replacement` in place of the item found.
+fn rebuild(found: Found(item, value), replacement: item) -> List(item) {
+  list.append(list.reverse(found.before_rev), [replacement, ..found.after])
+}
+
+fn outer_stop(setup: OuterSetup) -> Result(Stop, Nil) {
+  case setup {
+    SetupStopped(set_up: set_up, scope: scope, reason: reason, not_run: not_run) ->
+      Ok(Stop(set_up: set_up, scope: scope, reason: reason, not_run: not_run))
     SetupRunning(..) -> Error(Nil)
   }
 }
 
-fn stopped_group_failure(
-  owner: ScopeOwner(context),
-) -> Result(AssertionFailure, Nil) {
+fn group_stop(owner: ScopeOwner(context)) -> Result(Stop, Nil) {
   case owner {
-    OwnerGone(scope: scope, reason: reason) ->
-      Ok(types.setup_stopped_failure(set_up: BeforeAllHook, scope:, reason:))
+    OwnerGone(scope: scope, reason: reason, not_run: not_run) ->
+      Ok(Stop(
+        set_up: BeforeAllHook,
+        scope: scope,
+        reason: reason,
+        not_run: not_run,
+      ))
     OwnerAlive(..) -> Error(Nil)
   }
+}
+
+/// The failure of a test that was not run because `stop` stopped:
+/// `not run: the set-up from <set-up hook> in "<scope>" stopped (<reason>)`,
+/// without `in "<scope>"` for the whole run. The operator is the name of
+/// the set-up hook.
+fn not_run_failure(stop: Stop) -> AssertionFailure {
+  let name = types.set_up_hook_name(stop.set_up)
+  AssertionFailure(
+    operator: name,
+    message: "not run: the set-up from "
+      <> name
+      <> quoted_scope(stop.scope)
+      <> " stopped ("
+      <> stop.reason
+      <> ")",
+    payload: None,
+  )
+}
+
+/// ` in "<scope>"` for a scope, with its names joined by ` > `, or `""`
+/// for the whole run.
+fn quoted_scope(scope: List(String)) -> String {
+  case scope {
+    [] -> ""
+    _ -> " in \"" <> string.join(scope, " > ") <> "\""
+  }
+}
+
+/// The full name of each result, in order.
+fn full_names(results: List(TestResult)) -> List(List(String)) {
+  list.map(results, fn(result) { types.full_name(result.groups, result.name) })
 }
 
 fn empty_collected() -> Collected {
@@ -1181,7 +1320,7 @@ fn before_all_result(
       )
     OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
       BeforeAllRan(
-        owner: Some(OwnerGone(scope: scope, reason: reason)),
+        owner: Some(OwnerGone(scope: scope, reason: reason, not_run: [])),
         context: context,
       )
   }
@@ -1200,9 +1339,9 @@ fn finish_group_scope(
 ) -> List(TeardownFailure) {
   case owner, hooks {
     None, _ -> run_after_all_hooks(config, scope, None, context, hooks, [])
-    Some(OwnerGone(scope: _, reason: reason)), _ ->
+    Some(OwnerGone(scope: _, reason: reason, not_run: not_run)), _ ->
       run_after_all_hooks(config, scope, None, context, hooks, [
-        group_setup_stopped(scope, reason),
+        group_setup_stopped(scope, reason, not_run),
       ])
     Some(OwnerAlive(scope: _, owner: alive)), [] ->
       stop_checked_owner(scope, sandbox.check_owner(alive))
@@ -1237,12 +1376,21 @@ fn stop_checked_owner(
       sandbox.stop_owner(owner)
       []
     }
-    Error(reason) -> [group_setup_stopped(scope, reason)]
+    Error(reason) -> [group_setup_stopped(scope, reason, [])]
   }
 }
 
-fn group_setup_stopped(scope: List(String), reason: String) -> TeardownFailure {
-  types.SetupStopped(set_up: BeforeAllHook, scope: scope, reason: reason)
+fn group_setup_stopped(
+  scope: List(String),
+  reason: String,
+  not_run: List(List(String)),
+) -> TeardownFailure {
+  types.SetupStopped(
+    set_up: BeforeAllHook,
+    scope: scope,
+    reason: reason,
+    not_run: not_run,
+  )
 }
 
 /// Run every `after_all` hook of a group, also after one fails, and give
@@ -1368,7 +1516,7 @@ fn after_all_result(
       )
     OwnerLost(reason: reason) ->
       run_after_all_chain(config, scope, None, context, [hook, ..rest], [
-        group_setup_stopped(scope, reason),
+        group_setup_stopped(scope, reason, []),
         ..failures_rev
       ])
   }
@@ -1423,10 +1571,7 @@ fn run_child_groups_sequentially(
           owners: refresh_owners(owners),
         )
       let #(next_collected, next_completed, next_owners) =
-        execute_or_fail_group(
-          node_config,
-          stopped_setup_failure(node_config.owners),
-        )
+        execute_or_fail_group(node_config)
       run_child_groups_sequentially(
         config,
         scope,
@@ -1448,21 +1593,21 @@ fn run_child_groups_sequentially(
 }
 
 /// Run a child group while the process of each set-up around it is alive.
-/// After one stopped, the group does not start: no hook of it runs, and
-/// each of its tests is `SetupFailed` with `stopped`.
+/// After one stopped, the group does not start: no hook of it runs, each
+/// of its tests is `SetupFailed`, and the outermost stopped set-up records
+/// them as not run.
 fn execute_or_fail_group(
   node_config: ExecuteNodeConfig(context),
-  stopped: Option(AssertionFailure),
 ) -> #(Collected, Int, Owners(context)) {
-  case stopped {
+  case stopped_setup(node_config.owners) {
     None -> execute_node(node_config)
-    Some(failure) -> {
+    Some(stopped) -> {
       let results_rev =
         fail_group_nodes(
           node_config.scope,
           node_config.inherited_tags,
           [node_config.node],
-          [failure],
+          [stopped.failure],
           [],
         )
       #(
@@ -1476,7 +1621,7 @@ fn execute_or_fail_group(
           node_config.total,
           list.reverse(results_rev),
         ),
-        node_config.owners,
+        stopped.record_not_run(full_names(list.reverse(results_rev))),
       )
     }
   }
@@ -1588,7 +1733,8 @@ fn start_tests_up_to_limit(
 }
 
 /// Start the next test while the owner of each scope is alive. After an
-/// owner stopped, no test that waits starts: each one is `SetupFailed`.
+/// owner stopped, no test that waits starts: each one is `SetupFailed`,
+/// and the outermost stopped set-up records it as not run.
 fn start_or_fail_next(
   group: GroupRun(context),
   state: LoopState(context),
@@ -1597,13 +1743,21 @@ fn start_or_fail_next(
   now: Int,
 ) -> LoopState(context) {
   let #(index, test_case) = next
-  case stopped_setup_failure(state.owners) {
-    Some(failure) ->
+  case stopped_setup(state.owners) {
+    Some(stopped) -> {
+      let results = not_run_results(group, stopped.failure, [next, ..rest], [])
       add_results(
         group,
-        LoopState(..state, pending: []),
-        not_run_results(group, failure, [next, ..rest], []),
+        LoopState(
+          ..state,
+          pending: [],
+          owners: stopped.record_not_run(
+            full_names(list.map(results, indexed_result_value)),
+          ),
+        ),
+        results,
       )
+    }
     None ->
       start_tests_up_to_limit(
         group,

@@ -367,6 +367,7 @@ pub fn tests() {
                 set_up: BeforeAllHook,
                 scope: ["first"],
                 reason: "killed",
+                not_run: [["first", "a"]],
               ),
             ],
           ),
@@ -423,6 +424,7 @@ pub fn tests() {
                   set_up: BeforeAllHook,
                   scope: ["root"],
                   reason: "killed",
+                  not_run: [["root", "a"], ["root", "inner", "b"]],
                 ),
               ],
             ),
@@ -456,7 +458,12 @@ pub fn tests() {
       |> be_equal(#(
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            SetupStopped(set_up: BeforeAllHook, scope: ["root"], reason: "Boom"),
+            SetupStopped(
+              set_up: BeforeAllHook,
+              scope: ["root"],
+              reason: "Boom",
+              not_run: [],
+            ),
           ]),
         ),
         Ok("after_all ran"),
@@ -481,7 +488,12 @@ pub fn tests() {
       |> be_equal(
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            SetupStopped(set_up: BeforeAllHook, scope: ["root"], reason: "Boom"),
+            SetupStopped(
+              set_up: BeforeAllHook,
+              scope: ["root"],
+              reason: "Boom",
+              not_run: [],
+            ),
           ]),
         ),
       )
@@ -534,6 +546,7 @@ pub fn tests() {
                   set_up: BeforeAllHook,
                   scope: ["root"],
                   reason: "Boom",
+                  not_run: [["root", "b"]],
                 ),
               ],
             ),
@@ -585,6 +598,7 @@ pub fn tests() {
                 set_up: BeforeAllHook,
                 scope: ["root"],
                 reason: "Boom",
+                not_run: [["root", "first", "c"], ["root", "second", "d"]],
               ),
             ],
           ),
@@ -636,6 +650,7 @@ pub fn tests() {
                 set_up: BeforeAllHook,
                 scope: ["root"],
                 reason: "Boom",
+                not_run: [["root", "inner", "c"]],
               ),
             ],
           ),
@@ -757,6 +772,7 @@ pub fn tests() {
                   set_up: BeforeAllSuitesHook,
                   scope: [],
                   reason: "killed",
+                  not_run: [["suite", "a"]],
                 ),
               ],
             ),
@@ -796,6 +812,7 @@ pub fn tests() {
                   set_up: BeforeEachSuiteHook,
                   scope: ["suite"],
                   reason: "killed",
+                  not_run: [["suite", "a"]],
                 ),
               ],
             ),
@@ -847,7 +864,12 @@ pub fn tests() {
       |> be_equal(
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            SetupStopped(set_up: BeforeAllSuitesHook, scope: [], reason: "Boom"),
+            SetupStopped(
+              set_up: BeforeAllSuitesHook,
+              scope: [],
+              reason: "Boom",
+              not_run: [],
+            ),
           ]),
         ),
       )
@@ -903,6 +925,7 @@ pub fn tests() {
                   set_up: BeforeAllSuitesHook,
                   scope: [],
                   reason: "Boom",
+                  not_run: [["second", "b"]],
                 ),
               ],
             ),
@@ -938,6 +961,7 @@ pub fn tests() {
               set_up: BeforeEachSuiteHook,
               scope: ["suite"],
               reason: "Boom",
+              not_run: [],
             ),
           ]),
         ),
@@ -974,6 +998,7 @@ pub fn tests() {
               set_up: BeforeEachSuiteHook,
               scope: ["suite"],
               reason: "Boom",
+              not_run: [],
             ),
           ]),
         ),
@@ -1024,6 +1049,7 @@ pub fn tests() {
                   set_up: BeforeAllSuitesHook,
                   scope: [],
                   reason: "Boom",
+                  not_run: [["suite", "b"]],
                 ),
               ],
             ),
@@ -1078,6 +1104,7 @@ pub fn tests() {
                   set_up: BeforeAllSuitesHook,
                   scope: [],
                   reason: "Boom",
+                  not_run: [["suite", "inner", "c"]],
                 ),
               ],
             ),
@@ -1132,6 +1159,7 @@ pub fn tests() {
                   set_up: BeforeEachSuiteHook,
                   scope: ["suite"],
                   reason: "Boom",
+                  not_run: [["suite", "b"]],
                 ),
               ],
             ),
@@ -1183,11 +1211,13 @@ pub fn tests() {
                 set_up: BeforeEachSuiteHook,
                 scope: ["suite"],
                 reason: "Boom",
+                not_run: [],
               ),
               SetupStopped(
                 set_up: BeforeAllSuitesHook,
                 scope: [],
                 reason: "Boom",
+                not_run: [["suite", "b"]],
               ),
             ],
           ),

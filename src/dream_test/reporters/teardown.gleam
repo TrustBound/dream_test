@@ -9,16 +9,12 @@
 //// ```gleam
 //// import dream_test/reporters/teardown
 ////
-//// teardown.format(report)
+//// teardown.format(types.report_teardown_failures(report))
 //// // -> "Tear-down failures:\n  after_all in Database\n    could not drop the schema\n"
 //// ```
 
 import dream_test/reporters/ansi
-import dream_test/types.{
-  type RunReport, type SetUpHook, type TestResult, SetupFailed, SetupStopped,
-  TeardownFailure,
-}
-import gleam/int
+import dream_test/types.{type TeardownFailure, SetupStopped, TeardownFailure}
 import gleam/list
 import gleam/string
 
@@ -28,34 +24,36 @@ import gleam/string
 /// scope is left out for a hook of the whole run), and a line with the
 /// message. A set-up that stopped (`SetupStopped`) has the line
 /// `<set-up hook> in "<scope>" stopped: the process that keeps its set-up
-/// alive exited with <reason>.`, and the line `<count> tests in "<scope>"
-/// that had not started were not run.` The second line is left out when no
-/// test was not run. For the whole run, `in "<scope>"` is left out.
+/// alive exited with <reason>.` For the whole run, `in "<scope>"` is left
+/// out. When the set-up did not run some tests, the line
+/// `These tests had not started and were not run:` follows, then the full
+/// name of each test, with its names joined by ` > `.
 ///
 /// ## Parameters
 ///
-/// - `report`: the run report. Its tests give the number of tests that a
-///   stopped set-up did not run.
+/// - `failures`: the tear-down failures of the run, for example from
+///   `types.report_teardown_failures`
 ///
 /// ## Returns
 ///
-/// A header line and the lines of each failure, or `""` when the report
-/// has no tear-down failure.
+/// A header line and the lines of each failure, or `""` when `failures` is
+/// empty.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// teardown.format(types.run_report(tests: [], teardown_failures: [
-///   types.TeardownFailure(
-///     hook: types.AfterAllHook,
-///     scope: ["Database"],
-///     message: "could not drop the schema",
+/// teardown.format([
+///   types.SetupStopped(
+///     set_up: types.BeforeAllHook,
+///     scope: ["root"],
+///     reason: "Boom",
+///     not_run: [["root", "b"], ["root", "c"]],
 ///   ),
-/// ]))
-/// // -> "Tear-down failures:\n  after_all in Database\n    could not drop the schema\n"
+/// ])
+/// // -> "Tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
 /// ```
-pub fn format(report report: RunReport) -> String {
-  format_section(report, False)
+pub fn format(failures failures: List(TeardownFailure)) -> String {
+  format_section(failures, False)
 }
 
 /// Format the tear-down failures of a run with ANSI colour codes.
@@ -65,26 +63,26 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Parameters
 ///
-/// - `report`: the run report
+/// - `failures`: the tear-down failures of the run
 ///
 /// ## Returns
 ///
-/// A header line and the lines of each failure, or `""` when the report
-/// has no tear-down failure.
+/// A header line and the lines of each failure, or `""` when `failures` is
+/// empty.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// io.print(teardown.format_in_color(report))
+/// io.print(teardown.format_in_color(types.report_teardown_failures(report)))
 /// ```
-pub fn format_in_color(report report: RunReport) -> String {
-  format_section(report, True)
+pub fn format_in_color(failures failures: List(TeardownFailure)) -> String {
+  format_section(failures, True)
 }
 
-fn format_section(report: RunReport, color: Bool) -> String {
-  case types.report_teardown_failures(report) {
+fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
+  case failures {
     [] -> ""
-    failures ->
+    _ ->
       string.concat([
         ansi.apply_if(
           color,
@@ -92,40 +90,18 @@ fn format_section(report: RunReport, color: Bool) -> String {
           ansi.apply_if(color, ansi.red, "Tear-down failures:"),
         ),
         "\n",
-        format_failures(failures, types.report_tests(report), color, ""),
+        ..list.map(failures, format_failure(color, _))
       ])
   }
 }
 
-fn format_failures(
-  failures: List(types.TeardownFailure),
-  tests: List(TestResult),
-  color: Bool,
-  accumulated: String,
-) -> String {
-  case failures {
-    [] -> accumulated
-    [failure, ..rest] ->
-      format_failures(
-        rest,
-        tests,
-        color,
-        accumulated <> format_failure(color, tests, failure),
-      )
-  }
-}
-
-fn format_failure(
-  color: Bool,
-  tests: List(TestResult),
-  failure: types.TeardownFailure,
-) -> String {
+fn format_failure(color: Bool, failure: TeardownFailure) -> String {
   case failure {
     TeardownFailure(hook: hook, scope: scope, message: message) ->
       failure_lines(color, with_scope(types.teardown_hook_name(hook), scope), [
         message,
       ])
-    SetupStopped(set_up: set_up, scope: scope, reason: reason) ->
+    SetupStopped(set_up: set_up, scope: scope, reason: reason, not_run: not_run) ->
       failure_lines(
         color,
         types.set_up_hook_name(set_up)
@@ -133,7 +109,7 @@ fn format_failure(
           <> " stopped: the process that keeps its set-up alive exited with "
           <> reason
           <> ".",
-        not_run_lines(scope, count_not_run(tests, set_up, scope, reason)),
+        not_run_lines(not_run),
       )
   }
 }
@@ -148,33 +124,16 @@ fn failure_lines(color: Bool, title: String, details: List(String)) -> String {
   ])
 }
 
-/// The tests that a stopped set-up did not run: each one is `SetupFailed`
-/// with the failure of `types.setup_stopped_failure`.
-fn count_not_run(
-  tests: List(TestResult),
-  set_up: SetUpHook,
-  scope: List(String),
-  reason: String,
-) -> Int {
-  let failures = [
-    types.setup_stopped_failure(set_up: set_up, scope: scope, reason: reason),
-  ]
-  list.count(tests, fn(test_result) {
-    test_result.status == SetupFailed && test_result.failures == failures
-  })
-}
-
-fn not_run_lines(scope: List(String), count: Int) -> List(String) {
-  case count {
-    0 -> []
-    1 -> [
-      "1 test" <> quoted_scope(scope) <> " that had not started was not run.",
-    ]
+/// The lines that name the tests that a stopped set-up did not run, or no
+/// line when it did not skip a test.
+fn not_run_lines(not_run: List(List(String))) -> List(String) {
+  case not_run {
+    [] -> []
     _ -> [
-      int.to_string(count)
-      <> " tests"
-      <> quoted_scope(scope)
-      <> " that had not started were not run.",
+      "These tests had not started and were not run:",
+      ..list.map(not_run, fn(full_name) {
+        "  " <> string.join(full_name, " > ")
+      })
     ]
   }
 }

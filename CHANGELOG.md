@@ -30,20 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
   `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
   `types.teardown_hook_name`.
-- `types.SetupStopped(set_up:, scope:, reason:)`, a variant of
+- `types.SetupStopped(set_up:, scope:, reason:, not_run:)`, a variant of
   `types.TeardownFailure` for a set-up that stopped: the process that
-  keeps its set-up alive exited while or after its set-up hooks ran. Also
-  `types.SetUpHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
-  `BeforeAllSuitesHook`) with `types.set_up_hook_name`, and
-  `types.setup_stopped_failure(set_up:, scope:, reason:)`, the failure of
-  each test that was not run. The BDD and Gherkin reporters show a
-  stopped set-up as
-  `before_all in "<scope>" stopped: the process that keeps its set-up alive exited with <reason>.`
-  and `<count> tests in "<scope>" that had not started were not run.`
-  (the second line only when tests were not run). The JSON reporter gives
-  it as `{"kind": "setup_stopped", "hook": "before_all", "scope": [...],
-  "message": "<reason>"}`, and each failed tear-down hook now has
-  `"kind": "hook_failed"`.
+  keeps its set-up alive exited while or after its set-up hooks ran.
+  `not_run` is the full name of each test that had not started and was
+  not run (see `types.full_name`). The runner records each test at the
+  moment that it skips it. Also `types.SetUpHook` (`BeforeAllHook`,
+  `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
+  `types.set_up_hook_name`. The BDD and Gherkin reporters show a stopped
+  set-up as
+  `before_all in "<scope>" stopped: the process that keeps its set-up alive exited with <reason>.`,
+  then `These tests had not started and were not run:` and the full name
+  of each test, for example `root > b` (the list only when tests were not
+  run). The JSON reporter gives it as `{"kind": "setup_stopped", "hook":
+  "before_all", "scope": [...], "message": "<reason>", "not_run":
+  [["root", "b"], ...]}`, with each test as its `full_name` list, and each
+  failed tear-down hook now has `"kind": "hook_failed"`.
 - `sandbox.OwnerLost(reason)`: `run_in_owner` gives it when the owner had
   stopped before it started the function, so the function did not run.
 - `types.is_failure(status)`, the one check for a failure status
@@ -51,8 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.failed` use it.
 - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
   `Tear-down failures:` section that the BDD and Gherkin reporters show.
-  Each function takes a `types.RunReport`, so it can count the tests that
-  a stopped set-up did not run.
+  Each function takes the list of tear-down failures, for example
+  `types.report_teardown_failures(report)`.
 - `sandbox.run_catching(run:, input:)` runs a function in the calling
   process and gives `Ok(value)`, or `Error("class:reason")` when the
   function crashes. No new process starts, so a resource that the function
@@ -219,10 +221,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OuterSetup` is a set-up around the suite that keeps its resources
   alive in a process, for example the `before_all_suites` or
   `before_each_suite` set-up: `SetupRunning(set_up:, scope:,
-  check_owner:)` or `SetupStopped(set_up:, scope:, reason:)`. The
-  executor checks each one before each test and each group starts. After
-  a set-up stopped, the tests of the suite that did not start are
-  `SetupFailed` and no hook of the suite starts. Before:
+  check_owner:)` or `SetupStopped(set_up:, scope:, reason:, not_run:)`.
+  The executor checks each one before each test and each group starts.
+  After a set-up stopped, the tests of the suite that did not start are
+  `SetupFailed`, no hook of the suite starts, and the executor adds the
+  full name of each of these tests to `not_run` of the outermost stopped
+  set-up. Before:
   `RunRootParallelWithReporterConfig(config:, suite:, progress_reporter:,
   write:, total:, completed:, runner_before_each_test:,
   runner_after_each_test:)`. After: add `outer_setups: []` to the config,

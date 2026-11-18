@@ -161,34 +161,6 @@ pub fn tests() {
       |> be_equal(["before_all", "before_each_suite", "before_all_suites"])
       |> or_fail_with("each set-up hook should have its builder name")
     }),
-
-    it("setup_stopped_failure names the set-up hook, scope and reason", fn() {
-      [
-        types.setup_stopped_failure(
-          set_up: types.BeforeAllHook,
-          scope: ["root", "pool"],
-          reason: "Boom",
-        ),
-        types.setup_stopped_failure(
-          set_up: types.BeforeAllSuitesHook,
-          scope: [],
-          reason: "killed",
-        ),
-      ]
-      |> list.map(fn(failure) { #(failure.operator, failure.message) })
-      |> should
-      |> be_equal([
-        #(
-          "before_all",
-          "not run: the set-up from before_all in \"root > pool\" stopped (Boom)",
-        ),
-        #(
-          "before_all_suites",
-          "not run: the set-up from before_all_suites stopped (killed)",
-        ),
-      ])
-      |> or_fail_with("the failure should say why the test was not run")
-    }),
   ])
 }
 

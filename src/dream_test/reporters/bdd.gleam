@@ -180,8 +180,9 @@ fn format_summary(color: Bool, report: RunReport) -> String {
 fn format_teardown_section(color: Bool, report: RunReport) -> String {
   case types.report_teardown_failures(report), color {
     [], _ -> ""
-    _, True -> "\n" <> teardown.format_in_color(report)
-    _, False -> "\n" <> teardown.format(report)
+    _, True ->
+      "\n" <> teardown.format_in_color(types.report_teardown_failures(report))
+    _, False -> "\n" <> teardown.format(types.report_teardown_failures(report))
   }
 }
 

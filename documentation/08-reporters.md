@@ -85,7 +85,7 @@ The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `dur
 - `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), and `teardown_failed` counts the tear-down hooks that failed.
 - `teardown_failures` has one object for each tear-down hook that failed and each set-up that stopped, in the order that they happened. Each object has `kind`, `hook`, `scope` and `message`:
   - `"kind": "hook_failed"`: a tear-down hook failed. `hook` is the hook (for example `"after_all"`), `scope` is the full test name, the group path, the suite name, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
-  - `"kind": "setup_stopped"`: the process that keeps a set-up alive exited while its tests ran. `hook` is the set-up hook (`"before_all"`, `"before_each_suite"` or `"before_all_suites"`), `scope` is the group path, the suite name, or `[]` for the whole run, and `message` is the exit reason of the process.
+  - `"kind": "setup_stopped"`: the process that keeps a set-up alive exited while its tests ran. `hook` is the set-up hook (`"before_all"`, `"before_each_suite"` or `"before_all_suites"`), `scope` is the group path, the suite name, or `[]` for the whole run, `message` is the exit reason of the process, and `not_run` is the tests that had not started and were not run, each one as its `full_name` list, for example `[["root", "b"], ["root", "c"]]`.
 - Version `1.0` put a failed tear-down hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
 
 ### Progress reporter (during the run)

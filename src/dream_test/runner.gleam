@@ -1165,7 +1165,9 @@ type SuiteScopeOwner(input) {
   SuiteOwnerAlive(owner: SuiteOwner(input))
   /// The owner stopped with `reason`. The suites of the scope that have
   /// not started do not run, and its tear-down hooks run in a new owner.
-  SuiteOwnerGone(reason: String)
+  /// `not_run` is the full name of each test that it did not run, in the
+  /// order of the run.
+  SuiteOwnerGone(reason: String, not_run: List(List(String)))
 }
 
 fn alive_suite_owner(
@@ -1194,7 +1196,7 @@ fn checked_suite_owner(
 ) -> SuiteScopeOwner(input) {
   case checked {
     Ok(alive) -> SuiteOwnerAlive(owner: alive)
-    Error(reason) -> SuiteOwnerGone(reason: reason)
+    Error(reason) -> SuiteOwnerGone(reason: reason, not_run: [])
   }
 }
 
@@ -1259,7 +1261,7 @@ fn suite_set_up_result(
         message: suite_hook_timeout_message(rest.scope),
       )
     OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
-      SuiteSetUpRan(owner: Some(SuiteOwnerGone(reason: reason)))
+      SuiteSetUpRan(owner: Some(SuiteOwnerGone(reason: reason, not_run: [])))
   }
 }
 
@@ -1273,9 +1275,9 @@ fn finish_suite_scope(
 ) -> List(TeardownFailure) {
   case owner, tear_down.hooks {
     None, _ -> run_suite_teardown(tear_down, None, [])
-    Some(SuiteOwnerGone(reason: reason)), _ ->
+    Some(SuiteOwnerGone(reason: reason, not_run: not_run)), _ ->
       run_suite_teardown(tear_down, None, [
-        suite_setup_stopped(tear_down, reason),
+        suite_setup_stopped(tear_down, reason, not_run),
       ])
     Some(SuiteOwnerAlive(owner: alive)), [] ->
       stop_checked_suite_owner(tear_down, sandbox.check_owner(alive))
@@ -1307,15 +1309,21 @@ fn stop_checked_suite_owner(
       sandbox.stop_owner(owner)
       []
     }
-    Error(reason) -> [suite_setup_stopped(tear_down, reason)]
+    Error(reason) -> [suite_setup_stopped(tear_down, reason, [])]
   }
 }
 
 fn suite_setup_stopped(
   tear_down: SuiteTearDown(input),
   reason: String,
+  not_run: List(List(String)),
 ) -> TeardownFailure {
-  SetupStopped(set_up: tear_down.set_up, scope: tear_down.scope, reason: reason)
+  SetupStopped(
+    set_up: tear_down.set_up,
+    scope: tear_down.scope,
+    reason: reason,
+    not_run: not_run,
+  )
 }
 
 /// Run every suite-level tear-down hook, also after one fails, and give
@@ -1399,7 +1407,7 @@ fn suite_tear_down_result(
       )
     OwnerLost(reason: reason) ->
       run_suite_teardown_hooks(tear_down, [hook, ..rest], None, [
-        suite_setup_stopped(tear_down, reason),
+        suite_setup_stopped(tear_down, reason, []),
         ..failures_rev
       ])
   }
@@ -1528,7 +1536,7 @@ fn run_suite_in_run(
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   case all_suites_owner {
-    Some(SuiteOwnerGone(reason: _)) ->
+    Some(SuiteOwnerGone(..)) ->
       run_suite_after_run_setup_stopped(suite_run, all_suites_owner)
     _ ->
       run_one_suite(
@@ -1557,7 +1565,11 @@ fn run_suite_after_run_setup_stopped(
       teardown_failures: result.teardown_failures,
     ),
     result.completed,
-    all_suites_owner,
+    stopped_suite_owner(
+      all_suites_owner,
+      BeforeAllSuitesHook,
+      result.outer_setups,
+    ),
   )
 }
 
@@ -1692,8 +1704,13 @@ fn outer_setup(
         check_suite_owner(alive)
       }),
     ]
-    Some(SuiteOwnerGone(reason: reason)) -> [
-      parallel.SetupStopped(set_up: set_up, scope: scope, reason: reason),
+    Some(SuiteOwnerGone(reason: reason, not_run: not_run)) -> [
+      parallel.SetupStopped(
+        set_up: set_up,
+        scope: scope,
+        reason: reason,
+        not_run: not_run,
+      ),
     ]
   }
 }
@@ -1705,26 +1722,32 @@ fn check_suite_owner(owner: SuiteOwner(input)) -> Result(Nil, String) {
 
 /// The owner after the executor ran: gone when the executor saw the
 /// set-up `set_up` stopped. The check of the executor took the down message of
-/// the owner, so its reason comes from `outer_setups`.
+/// the owner, so its reason comes from `outer_setups`, with the tests that
+/// the executor did not run because of it.
 fn stopped_suite_owner(
   owner: Option(SuiteScopeOwner(input)),
   set_up: SetUpHook,
   outer_setups: List(parallel.OuterSetup),
 ) -> Option(SuiteScopeOwner(input)) {
-  case owner, list.find_map(outer_setups, stopped_reason(_, set_up)) {
-    Some(_), Ok(reason) -> Some(SuiteOwnerGone(reason: reason))
+  case owner, list.find_map(outer_setups, stopped_owner(_, set_up)) {
+    Some(_), Ok(gone) -> Some(gone)
     _, _ -> owner
   }
 }
 
-fn stopped_reason(
+fn stopped_owner(
   outer_setup: parallel.OuterSetup,
   set_up: SetUpHook,
-) -> Result(String, Nil) {
+) -> Result(SuiteScopeOwner(input), Nil) {
   case outer_setup {
-    parallel.SetupStopped(set_up: stopped, scope: _, reason: reason)
+    parallel.SetupStopped(
+      set_up: stopped,
+      scope: _,
+      reason: reason,
+      not_run: not_run,
+    )
       if stopped == set_up
-    -> Ok(reason)
+    -> Ok(SuiteOwnerGone(reason: reason, not_run: not_run))
     _ -> Error(Nil)
   }
 }

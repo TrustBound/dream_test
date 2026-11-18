@@ -26,7 +26,12 @@ pub fn tests() {
         unit.group("inner", [it("b", passing_test)]),
       ])
       |> run_in_setups([
-        SetupStopped(set_up: BeforeAllSuitesHook, scope: [], reason: "Boom"),
+        SetupStopped(
+          set_up: BeforeAllSuitesHook,
+          scope: [],
+          reason: "Boom",
+          not_run: [["first", "z"]],
+        ),
       ])
       |> summary
       |> with_report(reports)
@@ -47,7 +52,16 @@ pub fn tests() {
               ),
             ]),
           ],
-          setups: [#(BeforeAllSuitesHook, Stopped("Boom"))],
+          setups: [
+            #(
+              BeforeAllSuitesHook,
+              Stopped("Boom", [
+                ["first", "z"],
+                ["suite", "a"],
+                ["suite", "inner", "b"],
+              ]),
+            ),
+          ],
         ),
         Error(Nil),
       ))
@@ -75,7 +89,7 @@ pub fn tests() {
               ),
             ]),
           ],
-          setups: [#(BeforeEachSuiteHook, Stopped("Boom"))],
+          setups: [#(BeforeEachSuiteHook, Stopped("Boom", [["suite", "a"]]))],
         ),
       )
       |> or_fail_with("a failed check should make the set-up stopped")
@@ -101,11 +115,17 @@ pub fn tests() {
     it("the outermost stopped set-up is the failure of a test", fn() {
       describe("suite", [it("a", passing_test)])
       |> run_in_setups([
-        SetupStopped(set_up: BeforeAllSuitesHook, scope: [], reason: "outer"),
+        SetupStopped(
+          set_up: BeforeAllSuitesHook,
+          scope: [],
+          reason: "outer",
+          not_run: [],
+        ),
         SetupStopped(
           set_up: BeforeEachSuiteHook,
           scope: ["suite"],
           reason: "inner",
+          not_run: [],
         ),
       ])
       |> summary
@@ -121,8 +141,8 @@ pub fn tests() {
             ]),
           ],
           setups: [
-            #(BeforeAllSuitesHook, Stopped("outer")),
-            #(BeforeEachSuiteHook, Stopped("inner")),
+            #(BeforeAllSuitesHook, Stopped("outer", [["suite", "a"]])),
+            #(BeforeEachSuiteHook, Stopped("inner", [])),
           ],
         ),
       )
@@ -161,7 +181,9 @@ pub fn tests() {
                 ),
               ]),
             ],
-            setups: [#(BeforeAllSuitesHook, Stopped("killed"))],
+            setups: [
+              #(BeforeAllSuitesHook, Stopped("killed", [["suite", "b"]])),
+            ],
           ),
         )
         |> or_fail_with("b should not start after the set-up stopped")
@@ -180,7 +202,7 @@ type Summary {
 
 type SetupState {
   Running
-  Stopped(reason: String)
+  Stopped(reason: String, not_run: List(List(String)))
 }
 
 fn run_in_setups(
@@ -243,9 +265,9 @@ fn test_summary(
 fn setup_summary(setup: OuterSetup) -> #(types.SetUpHook, SetupState) {
   case setup {
     SetupRunning(set_up: set_up, scope: _, check_owner: _) -> #(set_up, Running)
-    SetupStopped(set_up: set_up, scope: _, reason: reason) -> #(
+    SetupStopped(set_up: set_up, scope: _, reason: reason, not_run: not_run) -> #(
       set_up,
-      Stopped(reason),
+      Stopped(reason, not_run),
     )
   }
 }
