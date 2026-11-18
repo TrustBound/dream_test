@@ -479,6 +479,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- Pretty JSON keeps a string that starts with a combining mark, such as
+  a test name that starts with U+0301. Before, the mark joined the
+  opening quote, and the rest of the output had the wrong layout.
 - A process that a test starts and links to its test process, such as
   the actor of `process.start_counter` or `process.start_actor`, stops
   when the test ends, as the `dream_test/process` docs say. The test

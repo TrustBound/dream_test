@@ -469,7 +469,18 @@ fn kind_to_string(kind: TestKind) -> String {
 // ============================================================================
 
 fn prettify_json(input: String) -> String {
-  prettify_chars(string.to_graphemes(input), 0, False, "")
+  prettify_chars(codepoint_strings(input), 0, False, "")
+}
+
+/// The code points of `input`, each one as a string. Graphemes would join
+/// a quote with a combining mark after it, so the quote would not open or
+/// close the JSON string.
+fn codepoint_strings(input: String) -> List(String) {
+  list.map(string.to_utf_codepoints(input), codepoint_string)
+}
+
+fn codepoint_string(codepoint: UtfCodepoint) -> String {
+  string.from_utf_codepoints([codepoint])
 }
 
 fn prettify_chars(

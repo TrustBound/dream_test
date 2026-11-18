@@ -343,6 +343,21 @@ pub fn tests() {
       }),
 
       it(
+        "keeps a string that starts with a combining mark in pretty output",
+        fn() {
+          json.format_pretty(
+            report_of([
+              result_of("\u{0301}a, b", types.Passed, [], types.Unit),
+            ]),
+          )
+          |> between("\"name\": ", ",\n")
+          |> should
+          |> be_equal("\"\u{0301}a, b\"")
+          |> or_fail_with("a combining mark should not join the quote")
+        },
+      ),
+
+      it(
         "writes unknown as the Gleam version without the gleam_stdlib application",
         fn() {
           without_gleam_stdlib_application(fn() { json.format(report_of([])) })
