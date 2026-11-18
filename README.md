@@ -108,6 +108,8 @@ Dream Test splits reporting into:
 9. [Snapshot Testing](documentation/09-snapshot-testing.md)
 10. [Gherkin BDD](documentation/10-gherkin-bdd.md)
 11. [Utilities](documentation/11-utilities.md)
+12. [Coverage Badge on GitHub](documentation/12-coverage-badge.md)
+13. [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) — from Dream Test 2.x
 
 ## Unit Tests
 

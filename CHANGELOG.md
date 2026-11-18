@@ -11,7 +11,7 @@ Dream Test 3.0.0 adds built-in line coverage. It also gives the hooks of
 each scope one owner process, follows the official Gherkin grammar, and
 gives each Gherkin scenario one typed state value in place of the `world`
 store. This release has breaking changes. Read
-[Upgrading from 2.x](#upgrading-from-2x) before you update.
+[Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) before you update.
 
 ### Breaking changes
 
@@ -148,238 +148,32 @@ store. This release has breaking changes. Read
 
 ### Upgrading from 2.x
 
-Each item gives the 2.x code and the 3.0.0 code. Code that uses only
-`unit`, `unit_context`, `runner` with its default reporters, and Gherkin
-features without the `world` store needs the step-definition changes only.
+Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
+2.x code and the same code for 3.0.0 for each change below.
 
-#### Runner and run report
-
-- **`runner.run` returns a report.** Before:
-  `let results = runner.run(builder)`. After:
-  `let results = runner.run(builder) |> types.report_tests`.
-- **`runner.has_failures` is removed.** Before:
-  `runner.has_failures(results)`. After: `types.failed(report)`.
-- **`parallel.run_root_parallel` returns a report.** Before:
-  `parallel.run_root_parallel(config, suite) |> list.length`. After:
-  `parallel.run_root_parallel(config, suite) |> types.report_tests |> list.length`.
-- **`RunRootParallelWithReporterConfig` has `outer_setups`.** Before:
-  `RunRootParallelWithReporterConfig(config:, suite:, progress_reporter:, write:, total:, completed:, runner_before_each_test:, runner_after_each_test:)`.
-  After: add `outer_setups: []`. A pattern that takes
-  `RunRootParallelWithReporterResult(results:, completed:, progress_reporter:)`
-  apart adds `teardown_failures: _, outer_setups: _`.
-- **`exit_on_failure` stops with `init:stop(1)`.** The exit status is
-  still 1, and the output is written before the BEAM stops. Before, the
-  BEAM stopped inside `runner.run`, so `io.println("done")` after
-  `runner.run(builder)` never ran for a failed run. After, code after
-  `runner.run` can run until `main` returns or the shutdown stops it. Do
-  not put work after `runner.run` that must not run when tests fail: check
-  `types.failed(report)` first.
-- **`types.Root` holds the group fields.** Only code that builds a root by
-  hand changes. Before:
-  `types.Root(seed: Nil, tree: types.Group(name: "app", tags: [], children: children))`.
-  After: `types.Root(seed: Nil, name: "app", tags: [], children: children)`.
-- **`TestResult` and `TestInfo` hold `groups`.** Before:
-  `TestResult(name: "adds", full_name: ["Cart", "adds"], ..)` and
-  `info.full_name`. After: `TestResult(name: "adds", groups: ["Cart"], ..)`
-  and `types.full_name(info.groups, info.name)`. The JSON report still
-  writes `full_name` as the full list.
-- **`Node` hooks and tests hold a `Callback`.** Only code that builds
-  `types.Node` values by hand changes. Before:
-  `types.BeforeAll(fn(_context) { setup() })`. After:
-  `types.BeforeAll(types.NoInput(setup))`, or
-  `types.BeforeAll(types.WithInput(setup_with_context))`.
-- **`types.ModuleCoverage` and `types.CoverageSummary` are removed.**
-  Nothing in 2.x filled them. Before: `types.CoverageSummary(by_module: [])`.
-  After: `runner.coverage(coverage.new())` with
-  `import dream_test/coverage`.
-
-#### Hooks and processes
-
-- **A failed suite-level set-up hook gives `SetupFailed`.** Before: a
-  failed `before_all_suites` or `before_each_suite` hook gave `Failed` to
-  its tests. After: `SetupFailed`. Update a test that matches on the
-  status, for example `Failed -> ..` becomes `SetupFailed -> ..`.
-- **A failed `before_all` hook gives `SetupFailed`.** Before: the tests of
-  its group were `Failed`. After: `SetupFailed`. The failure is still
-  `before_all` with the hook message.
-- **A failed `after_each` or `after_each_test` hook keeps the test
-  status.** Before: the test became `Failed`, also when it was `TimedOut`,
-  `Skipped` or `SetupFailed`. After: the status stays, and
-  `types.report_teardown_failures(report)` has
-  `TeardownFailure(hook: AfterEachHook, groups: <full test name>, ..)`.
-- **A failed `after_all`, `after_each_suite` or `after_all_suites` hook
-  adds no fake test.** Before: `results` had a test named `<after_all>`,
-  `<after_each_suite>` or `<after_all_suites>`, the test count grew by
-  one, and the later hooks of the same kind did not run. After: every
-  hook runs, and the report has one `TeardownFailure` for each failure.
-  Code that looked for `<after_all>` in the results reads
-  `types.report_teardown_failures(report)`.
-- **A failed tear-down hook fails the run.** Before: a run with only a
-  failed `after_all` hook and passing tests exited 1 because of the fake
-  test. After: it exits 1 because `types.failed(report)` is `True`.
-- **Hooks share a process with their scope.** Before: each hook and each
-  test body ran in its own process, so a pool or an ETS table that a
-  `before_all` or `before_each` hook started stopped before the tests ran,
-  and `process.self()` in a body and in its hooks gave different pids.
-  After: the `before_all` and `after_all` hooks of a group run in one
-  owner process of the group, the suite hooks in one owner process of the
-  suite, and the run hooks in one owner process of the run. A test runs
-  its hooks and its body in one process, so `process.self()` is the same
-  in each. A test process that stops during the body gives `Failed` with
-  `crash: worker crashed in <group>: <reason>`. Before:
-  `crash: killed`.
-- **A body past its timeout is `TimedOut`.** Before: a sequential run
-  (`max_concurrency` 1) gave `Failed`, and a parallel run gave `TimedOut`
-  or `Failed`. After: always `TimedOut`, with the failure
-  `timeout: test timed out`. The timeout counts from the start of the
-  body, and each hook has its own timeout.
-
-#### Sandbox
-
-- **`run_isolated` takes the function and its input.** Before:
-  `sandbox.run_isolated(config, fn() { double(21) })`. After:
-  `sandbox.run_isolated(config, double, 21)`. A function with no data
-  takes `Nil`: `sandbox.run_isolated(config, loop_forever, Nil)`.
-
-#### Reporters
-
-- **Reporter functions take a `RunReport`.** Before:
-  `bdd.format(results)`. After: `bdd.format(report)`, or
-  `bdd.format(types.run_report(tests: results, teardown_failures: []))`.
-  The same change applies to the other `bdd`, `json` and `gherkin`
-  functions that format a whole run.
-- **JSON schema `2.0`.** Before: `"version": "1.0"`, and a failed
-  `after_all` hook was a test named `<after_all>` in `tests`. After:
-  `"version": "2.0"`, `summary` has the count `teardown_failed`, and the
-  object has the list `teardown_failures`. A failed tear-down hook is
-  `{"kind": "hook_failed", "hook": "after_all", "groups": [...], "message": "..."}`,
-  and a stopped set-up is
-  `{"kind": "setup_stopped", "hook": "before_all", "groups": [...], "message": "<reason>", "not_run": [["root", "b"]]}`.
-  A tool that reads the JSON report must accept the new version.
-- **Summary order.** Before: `1 setup failed, 1 timed out, 1 pending,
-  1 skipped`. After: `1 skipped, 1 pending, 1 timed out, 1 setup failed`.
-  Update tests or tools that compare the exact summary text.
-- **Progress events.** Before:
-  `progress.handle_event(reporter, reporter_types.RunStarted(total: 4))`
-  gave `Some(text)`, and
-  `progress.render(30, reporter_types.RunStarted(total: 10))` gave the
-  text. After: `progress.line(reporter, progress.RunStartedProgress(total: 4))`
-  gives `text`, and
-  `progress.render(30, progress.RunStartedProgress(total: 10))` gives the
-  text.
-
-#### Gherkin step definitions
-
-- **The registry has a typed initial state.** Before: `steps.new()`.
-  After: `steps.new(initial: 0)`, of type `StepRegistry(Int)`. A function
-  that gives a registry, a `FeatureConfig` or a `RunnableDiscovery` names
-  the state type, for example `fn steps() -> StepRegistry(Int)`.
-- **`world` is removed.** Before:
-  `fn step_add(context: StepContext) { put(context.world, "cart", get_or(context.world, "cart", 0) + 1) Ok(succeed()) }`.
-  After: `fn step_add(cart: Int, _context: StepContext) { Ok(cart + 1) }`.
-  Use a record as the state when a scenario keeps more than one value.
-- **`given` and `when` steps return the state.** Before:
-  `fn step_add(context: StepContext) -> Result(AssertionResult, String)`.
-  After: `fn step_add(cart: Int, context: StepContext) -> Result(Int, String)`.
-- **`then` steps get the state and return an assertion.** Before:
-  `fn step_total(context: StepContext) -> Result(AssertionResult, String)`
-  that read the total from `context.world`. After:
-  `fn step_total(cart: Int, context: StepContext) -> Result(AssertionResult, String)`.
-- **`when_` and `then_` are renamed.** Before:
-  `|> steps.when_("I add {int} items", add) |> steps.then_("the cart has {int} items", total)`.
-  After:
-  `|> steps.when("I add {int} items", add) |> steps.then("the cart has {int} items", total)`.
-- **`StepContext` has `scenario_id`.** Before:
-  `world.scenario_id(context.world)`. After: `context.scenario_id`.
-- **`steps.step` is removed.** Before:
-  `|> steps.step("I add {int} items", add)`. After:
-  `|> steps.when("I add {int} items", add)`. To use one pattern in two
-  phases, register it in each phase.
-- **`find_step` takes a phase.** Before:
-  `steps.find_step(registry, Given, "I have 3 items")`. After:
-  `steps.find_step(registry, GivenPhase, "I have 3 items")`. Resolve an
-  `And`, `But` or `*` step with `types.resolve_phase` first.
-- **`step_trie` takes a phase.** Before:
-  `step_trie.insert(trie, "Given", "I have {int} items", handler)` gave a
-  trie. After:
-  `step_trie.insert(trie, GivenPhase, "I have {int} items", handler)` gives
-  `Ok(trie)`, or `Error(message)` for a second handler of the same phase
-  and pattern.
-- **A duplicate pattern is an error.** Before: a second
-  `|> steps.given("I have {int} items", other)` replaced the first without
-  a message. After: each scenario that uses the registry fails with
-  `Duplicate step definition: Given "I have {int} items" is already defined. ...`.
-  Remove the second definition. `steps.validate(registry)` lists each
-  duplicate.
-- **`InlineStep` has a typed keyword.** Before:
-  `InlineStep(keyword: "When", text: "I add 3")`. After:
-  `InlineStep(keyword: gherkin_types.When, text: "I add 3")`. The `given`,
-  `when`, `then`, `and` and `but` helpers do not change.
-- **`with_registry` gives a `RunnableDiscovery`.** The usual call
-  `discover.features("test/*.feature") |> discover.with_registry(steps) |> discover.to_suite("features")`
-  does not change. Before: `let d: FeatureDiscovery = discover.with_registry(found, steps)`.
-  After: `let d: RunnableDiscovery(Int) = discover.with_registry(found, steps)`.
-  Code that called `to_suite` without `with_registry` must add the call.
-
-#### Gherkin parser and syntax tree
-
-- **`Scenario Outline` is a `Scenario` with `Examples`.** Before:
-  `ScenarioOutline(name: "O", tags: [], steps: steps, examples: table)`.
-  After:
-  `Scenario(keyword: KeywordScenarioOutline, name: "O", description: None, tags: [], steps: steps, examples: [Examples(name: "", description: None, tags: [], table: Some(table))])`.
-  A `case` on `Scenario` has one branch.
-- **`Background` has a name and a description.** Before:
-  `Background(steps: steps)`. After:
-  `Background(name: "", description: None, steps: steps)`.
-- **`Feature` has `rules`.** Before: `Feature(name: "F", ..)` with no
-  `rules`. After: add `rules: []`.
-- **`Step` has two argument fields.** Before:
-  `Step(keyword: Given, text: "a", argument: Some(DataTable(rows: rows)))`.
-  After:
-  `Step(keyword: Given, text: "a", doc_string: None, data_table: Some(DataTable(rows: rows)))`.
-  Step definitions do not change: they still read `context.table` and
-  `context.doc_string`.
-- **`StepKeyword` has `Asterisk`.** A `case` on `StepKeyword` adds a
-  branch, for example `Asterisk -> "*"`.
-- **`resolve_keyword` is removed.** Before: `resolve_keyword(And, Given)`
-  gave `Given`. After:
-  `resolve_phase(keyword: And, previous: Some(GivenPhase))` gives
-  `Ok(GivenPhase)`.
-- **Typed parse errors.** Before: `parser.parse_string(text)` gave
-  `Error("line 3: ...")`. After: it gives `Error(ParseError(..))`, and
-  `parser.parse_error_to_string(error)` gives the text. For
-  `parser.parse_file` and `LoadResult.errors`, use
-  `parser.feature_file_error_to_string(error)`. Its text starts with the
-  path: `test/cart.feature: line 3: ...`.
-- **The grammar is strict.** Before: text after the steps of a scenario, a
-  Background after a scenario, or a step after an `Examples` table was
-  ignored. After: each one is an `UnexpectedLine` error that names the
-  line. Move or remove the line.
-- **Error messages start with `line N:`.** Before:
-  `DocString is not closed`. After:
-  `line 7: The DocString that starts on line 7 is not closed`. Update
-  tests that compare parse error text.
-- **The first step needs Given, When or Then.** Before: `And a` as the
-  first step of a Background ran as a Given step. After: it is the error
-  `line 3: "And a" has no step before it. ...`. Change the first `And`,
-  `But` or `*` to `Given`, `When` or `Then`.
-- **Descriptions keep their whitespace.** Before:
-  `Some("First line\nSecond line")`. After:
-  `Some("  First line\n\n  Second line")`.
-- **`Examples` row tests have the row label in their name.** Before: each
-  row test was named `Adding items`, and only its id had `(Example 1)`.
-  After: `Adding items (Example 1)`, or
-  `Adding items (Bulk, Example 1)` for an `Examples: Bulk` section. Update
-  name filters and tests that compare result names.
-- **An outline with no `Examples` runs one time.** Before: a
-  `Scenario Outline` with no `Examples` made no tests. After: it makes one
-  test. Add an `Examples` table or remove the outline.
-- **Tags are read as Gherkin reads them.** Before: `@a b` gave the tag
-  `a`, and `@a@b` gave one tag. After: `@a b` is a `TagContainsWhitespace`
-  error, and `@a@b` gives `a` and `b`.
-- **Only the `en` language.** Before: `# language: fr` was a comment.
-  After: it is an `UnsupportedLanguage` error. Remove the line or use
-  `# language: en`.
+- Gherkin steps get and return a typed scenario state. `world` is removed.
+- `steps.new` takes the initial state. `steps.step` is removed.
+- `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
+- `StepContext` has `scenario_id` in place of `world`.
+- A pattern registered two times in one phase is an error.
+- `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
+- `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
+- `runner.has_failures` is now `types.failed`.
+- `exit_on_failure` stops with `init:stop(1)`: code after `runner.run` can run.
+- `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
+- `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
+- `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
+- A failed set-up hook gives `SetupFailed`. A timeout is always `TimedOut`.
+- A failed tear-down hook goes into the run report, not into the results.
+- Hooks run in one owner process of their scope.
+- Reporter functions that format a whole run take a `RunReport`.
+- The JSON report has schema version `2.0`.
+- The summary line lists skipped, pending, timed out, setup failed.
+- `progress.handle_event` and the reporter event types are removed.
+- The Gherkin syntax tree changed: `Scenario`, `Step`, `Background`, `Feature`.
+- Parse errors are typed, and the parser follows the official grammar.
+- `sandbox.run_isolated` takes the function and its input.
+- `types.ModuleCoverage` and `types.CoverageSummary` are removed.
 
 ### Added
 

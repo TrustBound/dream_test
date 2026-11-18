@@ -80,8 +80,8 @@ is a `when` step for a scenario whose state is an `Int`.
 
 ## Breaking changes
 
-Each item has a before and after example in
-[Upgrading from 2.x](../CHANGELOG.md#upgrading-from-2x).
+Each item has a 2.x and a 3.0.0 example in
+[Upgrading to 3.0.0](../documentation/13-upgrading-to-3.md).
 
 - `runner.run` and `parallel.run_root_parallel` return `types.RunReport`, and
   the reporter functions that format a whole run take one.
@@ -120,4 +120,5 @@ Each item has a before and after example in
 - `src/dream_test/gherkin/parser.gleam`
 - `src/dream_test/gherkin/steps.gleam`
 - `documentation/12-coverage-badge.md`
+- `documentation/13-upgrading-to-3.md`
 - `CHANGELOG.md`
