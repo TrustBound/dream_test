@@ -45,12 +45,13 @@ import dream_test/sandbox.{
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type RunReport, type Status, type TeardownFailure, type TeardownHook,
-  type TestInfo, type TestKind, type TestResult, type TestSuite, AfterAll,
-  AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed,
-  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeAllHook,
-  BeforeEach, Failed, Group, Passed, Root, ScopeLost, SetupFailed, Skipped,
-  TeardownFailure, Test, TestResult, TimedOut,
+  type RunReport, type SetUpHook, type Status, type TeardownFailure,
+  type TeardownHook, type TestInfo, type TestKind, type TestResult,
+  type TestSuite, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
+  AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
+  AssertionSkipped, BeforeAll, BeforeAllHook, BeforeEach, Failed, Group, Passed,
+  Root, ScopeLost, SetupFailed, Skipped, TeardownFailure, Test, TestResult,
+  TimedOut,
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
@@ -110,6 +111,11 @@ pub type ParallelConfig {
 ///
 /// This is an advanced API intended for building custom runners that want to
 /// drive a reporter while executing a single suite.
+///
+/// `enclosing_scopes` are the scopes around the suite whose set-up hooks
+/// keep resources in an owner process, outermost first: for example the
+/// `before_all_suites` scope of the whole run and the `before_each_suite`
+/// scope of the suite. Give `[]` when the suite has no such scope.
 pub type RunRootParallelWithReporterConfig(context) {
   RunRootParallelWithReporterConfig(
     config: ParallelConfig,
@@ -122,7 +128,43 @@ pub type RunRootParallelWithReporterConfig(context) {
       fn(TestInfo, context) -> Result(context, String),
     ),
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    enclosing_scopes: List(EnclosingScope),
   )
+}
+
+/// A scope around a suite whose set-up hooks keep their resources in an
+/// owner process, for `run_root_parallel_with_reporter`.
+///
+/// The executor checks each enclosing scope before each test and each
+/// group starts. After the owner of a scope stopped, no test or hook of
+/// the suite starts: each test that did not start is `SetupFailed` with
+/// the failure `<set-up hook> process exited in <scope>: <reason>` (only
+/// `<set-up hook> process exited: <reason>` when `scope` is `[]`), with
+/// the operator `<set-up hook>`. Tests that started finish, and the
+/// `after_all` hooks of the groups that started still run. The executor
+/// does not report the loss as a tear-down failure: the caller owns the
+/// scope, so the caller reports it once, for example as
+/// `types.ScopeLost`, and runs its tear-down hooks.
+///
+/// ## Variants
+///
+/// - `EnclosingScopeAlive(set_up, scope, check_owner)`: the owner was alive
+///   at the last check. `check_owner` checks it again and gives `Ok(Nil)`
+///   while it is alive, or `Error(reason)` after it stopped. The executor
+///   does not call `check_owner` again after it gave `Error`. With
+///   `sandbox.Owner`, use `sandbox.check_owner`.
+/// - `EnclosingScopeLost(set_up, scope, reason)`: the owner stopped with
+///   `reason`.
+///
+/// `set_up` is the set-up hook of the scope. `scope` is `[]` for the whole
+/// run, or the names of the scope, for example `[suite name]`.
+pub type EnclosingScope {
+  EnclosingScopeAlive(
+    set_up: SetUpHook,
+    scope: List(String),
+    check_owner: fn() -> Result(Nil, String),
+  )
+  EnclosingScopeLost(set_up: SetUpHook, scope: List(String), reason: String)
 }
 
 /// Result of `run_root_parallel_with_reporter`.
@@ -130,12 +172,18 @@ pub type RunRootParallelWithReporterConfig(context) {
 /// This is returned as a semantic type (not a tuple) so callers can use named
 /// fields and avoid positional destructuring. A tear-down failure is not a
 /// test result, so it is in `teardown_failures`, not in `results`.
+///
+/// `enclosing_scopes` are the scopes of the config in the same order, as
+/// the executor saw them last. A scope whose owner stopped during the run
+/// is `EnclosingScopeLost`, and its `check_owner` will not tell again: use
+/// this list, not `check_owner`, to learn that the scope is lost.
 pub type RunRootParallelWithReporterResult {
   RunRootParallelWithReporterResult(
     results: List(TestResult),
     teardown_failures: List(TeardownFailure),
     completed: Int,
     progress_reporter: Option(progress.ProgressReporter),
+    enclosing_scopes: List(EnclosingScope),
   )
 }
 
@@ -156,8 +204,8 @@ type ExecuteNodeConfig(context) {
     total: Int,
     completed: Int,
     collected: Collected,
-    /// The owners of the enclosing group scopes, outermost first.
-    owners: List(ScopeOwner(context)),
+    /// The owners of the scopes around the node.
+    owners: Owners(context),
   )
 }
 
@@ -323,9 +371,9 @@ type LoopState(context) {
     emitted_rev: List(TestOutcome),
     next_emit_index: Int,
     completed: Int,
-    /// The owners of the scopes of the group, outermost first. A test
-    /// starts only while every owner is alive.
-    owners: List(ScopeOwner(context)),
+    /// The owners of the scopes of the group. A test starts only while
+    /// every owner is alive.
+    owners: Owners(context),
   )
 }
 
@@ -349,6 +397,12 @@ type ScopeOwner(context) {
   /// The owner stopped with `reason`. The tests of the scope that have not
   /// started do not run, and its `after_all` hooks run in a new owner.
   OwnerGone(scope: List(String), reason: String)
+}
+
+/// The owners of the scopes around a test: the enclosing scopes of the
+/// suite, then the group scopes, each list outermost first.
+type Owners(context) {
+  Owners(enclosing: List(EnclosingScope), groups: List(ScopeOwner(context)))
 }
 
 /// Default executor configuration.
@@ -455,7 +509,7 @@ pub fn run_root_parallel(
       total: 0,
       completed: 0,
       collected: empty_collected(),
-      owners: [],
+      owners: Owners(enclosing: [], groups: []),
     )
 
   let #(collected, _completed, _owners) = execute_node(executor_input)
@@ -503,13 +557,17 @@ pub fn run_root_parallel(
 ///         write: ignore,
 ///         total: total,
 ///         completed: completed,
+///         runner_before_each_test: [],
+///         runner_after_each_test: [],
+///         enclosing_scopes: [],
 ///       ),
 ///     )
 ///   let parallel.RunRootParallelWithReporterResult(
 ///     results: results,
 ///     teardown_failures: _teardown_failures,
-///     completed: completed_after_suite,
+///     completed: _completed_after_suite,
 ///     progress_reporter: _progress_reporter,
+///     enclosing_scopes: _enclosing_scopes,
 ///   ) = parallel_result
 ///   results
 /// }
@@ -523,6 +581,11 @@ pub fn run_root_parallel(
 /// - `write`: output sink for any progress output (typically `io.print`)
 /// - `total`: total number of tests in the overall run (across all suites)
 /// - `completed`: number of tests already completed before this suite starts
+/// - `runner_before_each_test` and `runner_after_each_test`: hooks that run
+///   around each test, outside its `before_each` and `after_each` hooks
+/// - `enclosing_scopes`: the scopes around the suite whose owner process
+///   holds resources, outermost first. After the owner of one stopped, no
+///   test or hook of the suite starts (see `EnclosingScope`)
 ///
 /// ## Returns
 ///
@@ -532,6 +595,8 @@ pub fn run_root_parallel(
 ///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
+/// - `enclosing_scopes`: the enclosing scopes as the executor saw them last;
+///   a scope whose owner stopped is `EnclosingScopeLost`
 pub fn run_root_parallel_with_reporter(
   config config: RunRootParallelWithReporterConfig(context),
 ) -> RunRootParallelWithReporterResult {
@@ -544,9 +609,11 @@ pub fn run_root_parallel_with_reporter(
     completed: completed,
     runner_before_each_test: runner_before_each_test,
     runner_after_each_test: runner_after_each_test,
+    enclosing_scopes: enclosing_scopes,
   ) = config
 
   let Root(seed: seed, name: name, tags: tags, children: children) = suite
+  let owners = refresh_owners(Owners(enclosing: enclosing_scopes, groups: []))
   let executor_input =
     ExecuteNodeConfig(
       config: executor_config,
@@ -562,16 +629,17 @@ pub fn run_root_parallel_with_reporter(
       total: total,
       completed: completed,
       collected: empty_collected(),
-      owners: [],
+      owners: owners,
     )
 
-  let #(collected, completed_after_suite, _owners) =
-    execute_node(executor_input)
+  let #(collected, completed_after_suite, owners_after_suite) =
+    execute_or_fail_group(executor_input, lost_scope_failure(owners))
   RunRootParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
     completed: completed_after_suite,
     progress_reporter: progress_reporter,
+    enclosing_scopes: owners_after_suite.enclosing,
   )
 }
 
@@ -581,7 +649,7 @@ pub fn run_root_parallel_with_reporter(
 
 fn execute_node(
   executor_input: ExecuteNodeConfig(context),
-) -> #(Collected, Int, List(ScopeOwner(context))) {
+) -> #(Collected, Int, Owners(context)) {
   let ExecuteNodeConfig(
     config: config,
     scope: scope,
@@ -675,9 +743,12 @@ fn execute_node(
             list.append(hooks.after_each, inherited_after_each)
 
           let scope_owners =
-            list.append(
-              owners,
-              option.values([alive_owner(group_scope, owner)]),
+            Owners(
+              ..owners,
+              groups: list.append(
+                owners.groups,
+                option.values([alive_owner(group_scope, owner)]),
+              ),
             )
           let #(group_outcomes_rev, completed_after_tests, owners_after_tests) =
             run_tests_in_group(
@@ -719,7 +790,7 @@ fn execute_node(
             )
 
           let #(outer_owners, own_owner) =
-            list.split(owners_after_groups, list.length(owners))
+            list.split(owners_after_groups.groups, list.length(owners.groups))
           let teardown_failures_rev =
             finish_group_scope(
               config,
@@ -738,7 +809,7 @@ fn execute_node(
               add_collected(after_groups, base_collected),
             ),
             completed_after_groups,
-            outer_owners,
+            Owners(..owners_after_groups, groups: outer_owners),
           )
         }
       }
@@ -760,11 +831,34 @@ fn alive_owner(
 }
 
 /// Look again at each owner that was alive. The check takes the down
-/// message of a stopped owner, so its reason is kept in `OwnerGone`.
-fn refresh_owners(
-  owners: List(ScopeOwner(context)),
-) -> List(ScopeOwner(context)) {
-  list.map(owners, refresh_owner)
+/// message of a stopped owner, so its reason is kept in `OwnerGone` and
+/// `EnclosingScopeLost`.
+fn refresh_owners(owners: Owners(context)) -> Owners(context) {
+  Owners(
+    enclosing: list.map(owners.enclosing, refresh_enclosing_scope),
+    groups: list.map(owners.groups, refresh_owner),
+  )
+}
+
+fn refresh_enclosing_scope(scope: EnclosingScope) -> EnclosingScope {
+  case scope {
+    EnclosingScopeAlive(set_up: set_up, scope: names, check_owner: check) ->
+      checked_enclosing_scope(scope, set_up, names, check())
+    EnclosingScopeLost(..) -> scope
+  }
+}
+
+fn checked_enclosing_scope(
+  scope: EnclosingScope,
+  set_up: SetUpHook,
+  names: List(String),
+  checked: Result(Nil, String),
+) -> EnclosingScope {
+  case checked {
+    Ok(Nil) -> scope
+    Error(reason) ->
+      EnclosingScopeLost(set_up: set_up, scope: names, reason: reason)
+  }
 }
 
 fn refresh_owner(owner: ScopeOwner(context)) -> ScopeOwner(context) {
@@ -787,26 +881,58 @@ fn checked_owner(
 }
 
 /// The outermost scope whose owner stopped, as the failure of a test that
-/// does not run because of it.
-fn lost_scope_failure(
-  owners: List(ScopeOwner(context)),
-) -> Option(AssertionFailure) {
-  case list.find(owners, is_gone) {
-    Ok(OwnerGone(scope: scope, reason: reason)) ->
-      Some(hook_failure("before_all", owner_exited_message(scope, reason)))
-    _ -> None
+/// does not run because of it. The enclosing scopes are outside the group
+/// scopes.
+fn lost_scope_failure(owners: Owners(context)) -> Option(AssertionFailure) {
+  case
+    list.find_map(owners.enclosing, lost_enclosing_failure),
+    list.find_map(owners.groups, lost_group_failure)
+  {
+    Ok(failure), _ | Error(Nil), Ok(failure) -> Some(failure)
+    Error(Nil), Error(Nil) -> None
   }
 }
 
-fn is_gone(owner: ScopeOwner(context)) -> Bool {
+fn lost_enclosing_failure(
+  scope: EnclosingScope,
+) -> Result(AssertionFailure, Nil) {
+  case scope {
+    EnclosingScopeLost(set_up: set_up, scope: names, reason: reason) ->
+      Ok(scope_lost_failure(set_up, names, reason))
+    EnclosingScopeAlive(..) -> Error(Nil)
+  }
+}
+
+fn lost_group_failure(
+  owner: ScopeOwner(context),
+) -> Result(AssertionFailure, Nil) {
   case owner {
-    OwnerGone(..) -> True
-    OwnerAlive(..) -> False
+    OwnerGone(scope: scope, reason: reason) ->
+      Ok(scope_lost_failure(BeforeAllHook, scope, reason))
+    OwnerAlive(..) -> Error(Nil)
   }
 }
 
-fn owner_exited_message(scope: List(String), reason: String) -> String {
-  "before_all process exited in " <> string.join(scope, " > ") <> ": " <> reason
+/// The failure of a test that did not start because the owner of `scope`
+/// stopped: `<set-up hook> process exited in <scope>: <reason>`, or
+/// `<set-up hook> process exited: <reason>` for the scope `[]`.
+fn scope_lost_failure(
+  set_up: SetUpHook,
+  scope: List(String),
+  reason: String,
+) -> AssertionFailure {
+  let name = types.set_up_hook_name(set_up)
+  hook_failure(
+    name,
+    name <> " process exited" <> scope_suffix(scope) <> ": " <> reason,
+  )
+}
+
+fn scope_suffix(scope: List(String)) -> String {
+  case scope {
+    [] -> ""
+    _ -> " in " <> string.join(scope, " > ")
+  }
 }
 
 fn empty_collected() -> Collected {
@@ -1278,8 +1404,8 @@ fn run_child_groups_sequentially(
   total: Int,
   completed: Int,
   collected: Collected,
-  owners: List(ScopeOwner(context)),
-) -> #(Collected, Int, List(ScopeOwner(context))) {
+  owners: Owners(context),
+) -> #(Collected, Int, Owners(context)) {
   case groups {
     [] -> #(collected, completed, owners)
     [group_node, ..rest] -> {
@@ -1331,7 +1457,7 @@ fn run_child_groups_sequentially(
 fn execute_or_fail_group(
   node_config: ExecuteNodeConfig(context),
   lost: Option(AssertionFailure),
-) -> #(Collected, Int, List(ScopeOwner(context))) {
+) -> #(Collected, Int, Owners(context)) {
   case lost {
     None -> execute_node(node_config)
     Some(failure) -> {
@@ -1371,8 +1497,8 @@ fn run_tests_in_group(
   group: GroupRun(context),
   tests: List(TestCase(context)),
   completed: Int,
-  owners: List(ScopeOwner(context)),
-) -> #(List(TestOutcome), Int, List(ScopeOwner(context))) {
+  owners: Owners(context),
+) -> #(List(TestOutcome), Int, Owners(context)) {
   run_loop(
     group,
     LoopState(
@@ -1405,7 +1531,7 @@ fn index_tests(
 fn run_loop(
   group: GroupRun(context),
   state: LoopState(context),
-) -> #(List(TestOutcome), Int, List(ScopeOwner(context))) {
+) -> #(List(TestOutcome), Int, Owners(context)) {
   let started =
     emit_ready(start_tests_up_to_limit(group, state, timing.now_ms()))
   case started.running {

@@ -206,6 +206,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a new field `teardown_failures`. Before: `run_root_parallel(config,
   suite) |> list.length`. After: `run_root_parallel(config, suite) |>
   types.report_tests |> list.length`.
+- BREAKING: `parallel.RunRootParallelWithReporterConfig` has a new field
+  `enclosing_scopes: List(parallel.EnclosingScope)`, and
+  `parallel.RunRootParallelWithReporterResult` has a new field
+  `enclosing_scopes` that gives the same scopes after the run. An
+  `EnclosingScope` is a scope around the suite whose owner process holds
+  resources, for example the `before_all_suites` or `before_each_suite`
+  scope: `EnclosingScopeAlive(set_up:, scope:, check_owner:)` or
+  `EnclosingScopeLost(set_up:, scope:, reason:)`. The executor checks
+  each one before each test and each group starts. After an owner
+  stopped, the tests of the suite that did not start are `SetupFailed`
+  and no hook of the suite starts. Before:
+  `RunRootParallelWithReporterConfig(config:, suite:, progress_reporter:,
+  write:, total:, completed:, runner_before_each_test:,
+  runner_after_each_test:)`. After: add `enclosing_scopes: []` to the
+  config, and `enclosing_scopes: _enclosing_scopes` to a pattern that
+  takes the result apart.
+- When the owner of the whole run (`before_all_suites`) or of a suite
+  (`before_each_suite`) stops while the tests of a suite run, the tests of
+  that suite that did not start do not run. Before, they ran, and only the
+  later suites stopped. Each one is `SetupFailed` with
+  `before_all_suites process exited: <reason>` or
+  `before_each_suite process exited in <suite>: <reason>`, and the loss is
+  reported once as `types.ScopeLost`.
 - BREAKING: the reporter functions that format a whole run take a
   `types.RunReport`: `bdd.render`, `bdd.format`, `bdd.report`,
   `bdd.format_summary_only`, `json.render`, `json.format`,
@@ -452,7 +475,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported as a lost scope, `types.ScopeLost`, not as a failure of a
   tear-down hook. The tests of the scope that did not start yet do not
   run: each one is `SetupFailed` with
-  `before_all process exited in <group>: <reason>` or
+  `before_all process exited in <group>: <reason>`,
+  `before_each_suite process exited in <suite>: <reason>` or
   `before_all_suites process exited: <reason>`. The tear-down hooks of the
   scope run in a new owner process.
 - A tear-down hook always runs when the owner of its scope stops just

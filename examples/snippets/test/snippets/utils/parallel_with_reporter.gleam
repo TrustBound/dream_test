@@ -33,6 +33,7 @@ pub fn main() {
         completed: completed,
         runner_before_each_test: [],
         runner_after_each_test: [],
+        enclosing_scopes: [],
       ),
     )
   let parallel.RunRootParallelWithReporterResult(
@@ -40,6 +41,7 @@ pub fn main() {
     teardown_failures: teardown_failures,
     completed: completed_after_suite,
     progress_reporter: _progress_reporter,
+    enclosing_scopes: _enclosing_scopes,
   ) = parallel_result
 
   progress.line(

@@ -812,6 +812,192 @@ pub fn tests() {
       |> or_fail_with("after_each_suite should run after the scope is lost")
     }),
 
+    it(
+      "the tests that have not started in the suite of a lost run do not run",
+      fn() {
+        let reports = process.new_subject()
+        runner.new([
+          describe("suite", [
+            it("a", fn() {
+              process.sleep(30)
+              Ok(AssertionOk)
+            }),
+            it("b", fn() {
+              process.send(reports, "b ran")
+              Ok(AssertionOk)
+            }),
+          ]),
+        ])
+        |> runner.max_concurrency(1)
+        |> runner.before_all_suites(fn(_suites) {
+          start_linked_crash()
+          Ok(Nil)
+        })
+        |> run_builder_bounded
+        |> result_and_report(reports)
+        |> should
+        |> be_equal(#(
+          SandboxCompleted(
+            RunSummary(
+              tests: [
+                #("a", Passed, []),
+                #("b", SetupFailed, [
+                  #(
+                    "before_all_suites",
+                    "before_all_suites process exited: Boom",
+                  ),
+                ]),
+              ],
+              teardown_failures: [
+                ScopeLost(
+                  set_up: BeforeAllSuitesHook,
+                  scope: [],
+                  reason: "Boom",
+                ),
+              ],
+            ),
+          ),
+          Error(Nil),
+        ))
+        |> or_fail_with("b should not run after the run scope is lost")
+      },
+    ),
+
+    it("a group in the suite of a lost run does not run its before_all", fn() {
+      let reports = process.new_subject()
+      runner.new([
+        describe("suite", [
+          it("a", fn() {
+            process.sleep(30)
+            Ok(AssertionOk)
+          }),
+          unit.group("inner", [
+            unit.before_all(fn() {
+              process.send(reports, "inner before_all ran")
+              Ok(Nil)
+            }),
+            it("c", passing_test),
+          ]),
+        ]),
+      ])
+      |> runner.before_all_suites(fn(_suites) {
+        start_linked_crash()
+        Ok(Nil)
+      })
+      |> run_builder_bounded
+      |> result_and_report(reports)
+      |> should
+      |> be_equal(#(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", Passed, []),
+              #("c", SetupFailed, [
+                #("before_all_suites", "before_all_suites process exited: Boom"),
+              ]),
+            ],
+            teardown_failures: [
+              ScopeLost(set_up: BeforeAllSuitesHook, scope: [], reason: "Boom"),
+            ],
+          ),
+        ),
+        Error(Nil),
+      ))
+      |> or_fail_with("the inner group should not start in a lost run scope")
+    }),
+
+    it("the tests that have not started in a lost suite scope do not run", fn() {
+      let reports = process.new_subject()
+      runner.new([
+        describe("suite", [
+          it("a", fn() {
+            process.sleep(30)
+            Ok(AssertionOk)
+          }),
+          it("b", fn() {
+            process.send(reports, "b ran")
+            Ok(AssertionOk)
+          }),
+        ]),
+      ])
+      |> runner.max_concurrency(1)
+      |> runner.before_each_suite(fn(_suite) {
+        start_linked_crash()
+        Ok(Nil)
+      })
+      |> run_builder_bounded
+      |> result_and_report(reports)
+      |> should
+      |> be_equal(#(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", Passed, []),
+              #("b", SetupFailed, [
+                #(
+                  "before_each_suite",
+                  "before_each_suite process exited in suite: Boom",
+                ),
+              ]),
+            ],
+            teardown_failures: [
+              ScopeLost(
+                set_up: BeforeEachSuiteHook,
+                scope: ["suite"],
+                reason: "Boom",
+              ),
+            ],
+          ),
+        ),
+        Error(Nil),
+      ))
+      |> or_fail_with("b should not run after the suite scope is lost")
+    }),
+
+    it("the run scope is the outermost lost scope", fn() {
+      runner.new([
+        describe("suite", [
+          it("a", fn() {
+            process.sleep(30)
+            Ok(AssertionOk)
+          }),
+          it("b", passing_test),
+        ]),
+      ])
+      |> runner.max_concurrency(1)
+      |> runner.before_all_suites(fn(_suites) {
+        start_linked_crash()
+        Ok(Nil)
+      })
+      |> runner.before_each_suite(fn(_suite) {
+        start_linked_crash()
+        Ok(Nil)
+      })
+      |> run_builder_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", Passed, []),
+              #("b", SetupFailed, [
+                #("before_all_suites", "before_all_suites process exited: Boom"),
+              ]),
+            ],
+            teardown_failures: [
+              ScopeLost(
+                set_up: BeforeEachSuiteHook,
+                scope: ["suite"],
+                reason: "Boom",
+              ),
+              ScopeLost(set_up: BeforeAllSuitesHook, scope: [], reason: "Boom"),
+            ],
+          ),
+        ),
+      )
+      |> or_fail_with("b should fail with the loss of the run scope")
+    }),
+
     it("an after_all_suites hook that crashes is a tear-down failure", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_all_suites(fn(_suites) { erlang_error(boom()) })

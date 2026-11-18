@@ -71,6 +71,7 @@ import dream_test/types.{
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 /// Lightweight information about a test, used for filtering what runs.
@@ -1435,60 +1436,27 @@ fn run_suites_with_hooks(
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   let checked_owner = refresh_suite_owner(all_suites_owner)
-  case suite_runs, checked_owner {
-    [], _ -> #(collected, completed, checked_owner)
-    _, Some(SuiteOwnerGone(reason: reason)) -> {
-      let setup_failures =
-        setup_failed_results_from_suites(
-          list.map(suite_runs, suite_run_info),
-          "before_all_suites",
-          suite_scope_message("before_all_suites process exited", [])
-            <> ": "
-            <> reason,
+  case suite_runs {
+    [] -> #(collected, completed, checked_owner)
+    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
+      let suite_run =
+        SuiteTests(
+          suite: suite,
+          config: suite_run_config(default_config, override),
+          info: suite_info,
+          progress_reporter: progress_reporter,
+          output: output,
+          total: total,
+          completed: completed,
+          runner_before_each_test: runner_before_each_test,
+          runner_after_each_test: runner_after_each_test,
         )
-      #(
-        Collected(
-          tests: list.append(collected.tests, setup_failures),
-          teardown_failures: collected.teardown_failures,
-        ),
-        emit_test_finished_progress_results(
-          progress_reporter,
-          output,
-          completed,
-          total,
-          setup_failures,
-        ),
-        checked_owner,
-      )
-    }
-    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest],
-      _
-    -> {
-      let suite_config = suite_run_config(default_config, override)
-      let #(suite_owner, suite_collected, completed_after_suite) =
-        run_one_suite(
-          suite,
-          suite_config,
-          suite_info,
-          progress_reporter,
-          output,
-          total,
-          completed,
+      let #(suite_collected, completed_after_suite, owner_after_suite) =
+        run_suite_in_run(
+          suite_run,
           before_each_suite_hooks,
-          runner_before_each_test,
-          runner_after_each_test,
-        )
-      let after_each_failures =
-        finish_suite_scope(
-          SuiteTearDown(
-            hooks: after_each_suite_hooks,
-            input: suite_info,
-            scope: [suite_info.name],
-            timeout_ms: suite_config.default_timeout_ms,
-            hook_kind: AfterEachSuiteHook,
-            set_up: BeforeEachSuiteHook,
-          ),
-          alive_suite_owner(suite_owner),
+          after_each_suite_hooks,
+          checked_owner,
         )
       run_suites_with_hooks(
         rest,
@@ -1503,93 +1471,244 @@ fn run_suites_with_hooks(
         runner_after_each_test,
         Collected(
           tests: list.append(collected.tests, suite_collected.tests),
-          teardown_failures: list.flatten([
+          teardown_failures: list.append(
             collected.teardown_failures,
             suite_collected.teardown_failures,
-            after_each_failures,
-          ]),
+          ),
         ),
-        checked_owner,
+        owner_after_suite,
       )
     }
   }
 }
 
-fn suite_run_info(
-  suite_run: #(SuiteRun(ctx), types.SuiteInfo),
-) -> types.SuiteInfo {
-  suite_run.1
+/// What stays the same while the tests of one suite run.
+type SuiteTests(ctx) {
+  SuiteTests(
+    suite: TestSuite(ctx),
+    config: parallel.ParallelConfig,
+    info: types.SuiteInfo,
+    progress_reporter: Option(progress.ProgressReporter),
+    output: Output,
+    total: Int,
+    completed: Int,
+    runner_before_each_test: List(
+      fn(types.TestInfo, ctx) -> Result(ctx, String),
+    ),
+    runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+  )
 }
 
-/// Run `before_each_suite`, then the tests of one suite. A failed
-/// `before_each_suite` hook gives `SetupFailed` to every test of the suite.
-fn run_one_suite(
-  suite: TestSuite(ctx),
-  suite_config: parallel.ParallelConfig,
-  suite_info: types.SuiteInfo,
-  progress_reporter: Option(progress.ProgressReporter),
-  output: Output,
-  total: Int,
-  completed: Int,
+/// Run one suite in the scope of the whole run. After the owner of the
+/// run stopped, no suite-level hook runs.
+fn run_suite_in_run(
+  suite_run: SuiteTests(ctx),
   before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
-  runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
-) -> #(Option(SuiteOwner(types.SuiteInfo)), Collected, Int) {
+  after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
+) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
+  case all_suites_owner {
+    Some(SuiteOwnerGone(reason: _)) ->
+      run_suite_in_lost_run(suite_run, all_suites_owner)
+    _ ->
+      run_one_suite(
+        suite_run,
+        before_each_suite_hooks,
+        after_each_suite_hooks,
+        all_suites_owner,
+      )
+  }
+}
+
+/// Run a suite after the owner of the whole run stopped. No suite-level
+/// hook runs, and the executor gives `SetupFailed` to each test.
+fn run_suite_in_lost_run(
+  suite_run: SuiteTests(ctx),
+  all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
+) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
+  let result =
+    run_suite_tests(
+      suite_run,
+      enclosing_scope(BeforeAllSuitesHook, [], all_suites_owner),
+    )
+  #(
+    Collected(
+      tests: result.results,
+      teardown_failures: result.teardown_failures,
+    ),
+    result.completed,
+    all_suites_owner,
+  )
+}
+
+/// Run `before_each_suite`, then the tests of one suite, then
+/// `after_each_suite`. A failed `before_each_suite` hook gives
+/// `SetupFailed` to every test of the suite. The executor checks the owner
+/// of the whole run and the owner of the suite before each test starts.
+fn run_one_suite(
+  suite_run: SuiteTests(ctx),
+  before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
+) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
+  let suite_scope = [suite_run.info.name]
   let #(owner, before_result) =
     run_suite_level_hooks(
       SuiteSetUp(
         hooks: before_each_suite_hooks,
-        input: suite_info,
-        scope: [suite_info.name],
-        timeout_ms: suite_config.default_timeout_ms,
+        input: suite_run.info,
+        scope: suite_scope,
+        timeout_ms: suite_run.config.default_timeout_ms,
       ),
       None,
     )
-  case before_result {
+  let #(tests_collected, completed_after_tests, all_owner, suite_owner) = case
+    before_result
+  {
     Error(message) -> {
       let setup_failures =
         setup_failed_results_from_tests(
-          suite_info.tests,
+          suite_run.info.tests,
           "before_each_suite",
           message,
         )
       #(
-        owner,
         Collected(tests: setup_failures, teardown_failures: []),
         emit_test_finished_progress_results(
-          progress_reporter,
-          output,
-          completed,
-          total,
+          suite_run.progress_reporter,
+          suite_run.output,
+          suite_run.completed,
+          suite_run.total,
           setup_failures,
         ),
+        all_suites_owner,
+        alive_suite_owner(owner),
       )
     }
     Ok(_) -> {
-      let parallel.RunRootParallelWithReporterResult(
-        results: results,
-        teardown_failures: teardown_failures,
-        completed: completed_after_tests,
-        progress_reporter: _progress_reporter,
-      ) =
-        parallel.run_root_parallel_with_reporter(
-          parallel.RunRootParallelWithReporterConfig(
-            config: suite_config,
-            suite: suite,
-            progress_reporter: progress_reporter,
-            write: output_out(output),
-            total: total,
-            completed: completed,
-            runner_before_each_test: runner_before_each_test,
-            runner_after_each_test: runner_after_each_test,
+      let suite_owner = alive_suite_owner(owner)
+      let result =
+        run_suite_tests(
+          suite_run,
+          list.append(
+            enclosing_scope(BeforeAllSuitesHook, [], all_suites_owner),
+            enclosing_scope(BeforeEachSuiteHook, suite_scope, suite_owner),
           ),
         )
       #(
-        owner,
-        Collected(tests: results, teardown_failures: teardown_failures),
-        completed_after_tests,
+        Collected(
+          tests: result.results,
+          teardown_failures: result.teardown_failures,
+        ),
+        result.completed,
+        lost_suite_owner(
+          all_suites_owner,
+          BeforeAllSuitesHook,
+          result.enclosing_scopes,
+        ),
+        lost_suite_owner(
+          suite_owner,
+          BeforeEachSuiteHook,
+          result.enclosing_scopes,
+        ),
       )
     }
+  }
+  let after_each_failures =
+    finish_suite_scope(
+      SuiteTearDown(
+        hooks: after_each_suite_hooks,
+        input: suite_run.info,
+        scope: suite_scope,
+        timeout_ms: suite_run.config.default_timeout_ms,
+        hook_kind: AfterEachSuiteHook,
+        set_up: BeforeEachSuiteHook,
+      ),
+      suite_owner,
+    )
+  #(
+    Collected(
+      tests: tests_collected.tests,
+      teardown_failures: list.append(
+        tests_collected.teardown_failures,
+        after_each_failures,
+      ),
+    ),
+    completed_after_tests,
+    all_owner,
+  )
+}
+
+/// Run the tests of one suite in the executor, inside `enclosing_scopes`.
+fn run_suite_tests(
+  suite_run: SuiteTests(ctx),
+  enclosing_scopes: List(parallel.EnclosingScope),
+) -> parallel.RunRootParallelWithReporterResult {
+  parallel.run_root_parallel_with_reporter(
+    parallel.RunRootParallelWithReporterConfig(
+      config: suite_run.config,
+      suite: suite_run.suite,
+      progress_reporter: suite_run.progress_reporter,
+      write: output_out(suite_run.output),
+      total: suite_run.total,
+      completed: suite_run.completed,
+      runner_before_each_test: suite_run.runner_before_each_test,
+      runner_after_each_test: suite_run.runner_after_each_test,
+      enclosing_scopes: enclosing_scopes,
+    ),
+  )
+}
+
+/// The suite-level scope of `owner` as the executor sees it: no scope when
+/// it has no owner.
+fn enclosing_scope(
+  set_up: SetUpHook,
+  scope: List(String),
+  owner: Option(SuiteScopeOwner(input)),
+) -> List(parallel.EnclosingScope) {
+  case owner {
+    None -> []
+    Some(SuiteOwnerAlive(owner: alive)) -> [
+      parallel.EnclosingScopeAlive(
+        set_up: set_up,
+        scope: scope,
+        check_owner: fn() { check_suite_owner(alive) },
+      ),
+    ]
+    Some(SuiteOwnerGone(reason: reason)) -> [
+      parallel.EnclosingScopeLost(set_up: set_up, scope: scope, reason: reason),
+    ]
+  }
+}
+
+fn check_suite_owner(owner: SuiteOwner(input)) -> Result(Nil, String) {
+  sandbox.check_owner(owner)
+  |> result.replace(Nil)
+}
+
+/// The owner after the executor ran: gone when the executor saw the scope
+/// of `set_up` lost. The check of the executor took the down message of
+/// the owner, so its reason comes from `enclosing_scopes`.
+fn lost_suite_owner(
+  owner: Option(SuiteScopeOwner(input)),
+  set_up: SetUpHook,
+  enclosing_scopes: List(parallel.EnclosingScope),
+) -> Option(SuiteScopeOwner(input)) {
+  case owner, list.find_map(enclosing_scopes, lost_reason(_, set_up)) {
+    Some(_), Ok(reason) -> Some(SuiteOwnerGone(reason: reason))
+    _, _ -> owner
+  }
+}
+
+fn lost_reason(
+  scope: parallel.EnclosingScope,
+  set_up: SetUpHook,
+) -> Result(String, Nil) {
+  case scope {
+    parallel.EnclosingScopeLost(set_up: lost, scope: _, reason: reason)
+      if lost == set_up
+    -> Ok(reason)
+    _ -> Error(Nil)
   }
 }
 
