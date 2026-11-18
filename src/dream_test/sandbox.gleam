@@ -432,10 +432,61 @@ fn handle_worker_message(message: WorkerMessage(a)) -> SandboxResult(a) {
   }
 }
 
-/// Handle timeout by killing the worker and returning timeout result.
+/// Handle timeout by killing the worker, waiting until it has exited, and
+/// returning timeout result.
 fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
-  kill(worker_pid)
+  kill_and_wait(worker_pid)
   SandboxTimedOut
+}
+
+/// Kill a process and wait until it has exited.
+///
+/// `process.kill` only sends the kill signal. `kill_and_wait` returns when
+/// the process is gone: its ETS tables are deleted, its registered name is
+/// free, and the processes that link to it got the exit signal. Use it
+/// before code that needs what the killed process held, for example a
+/// tear-down hook that makes a table with the same name.
+///
+/// A process that has exited already is not an error.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/unit.{describe, it}
+/// import gleam/erlang/process
+///
+/// pub fn tests() {
+///   describe("kill_and_wait", [
+///     it("returns when the process is gone", fn() {
+///       let pid = process.spawn_unlinked(process.sleep_forever)
+///       sandbox.kill_and_wait(pid)
+///
+///       process.is_alive(pid)
+///       |> should
+///       |> be_equal(False)
+///       |> or_fail_with("expected the process to be gone")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `pid`: the process to kill
+///
+/// ## Returns
+///
+/// `Nil`, after the process has exited.
+pub fn kill_and_wait(pid pid: Pid) -> Nil {
+  let pid_monitor = monitor(pid)
+  kill(pid)
+  let _down =
+    new_selector()
+    |> select_specific_monitor(pid_monitor, format_down_reason)
+    |> selector_receive_forever
+  Nil
 }
 
 /// Default configuration with a 5 second timeout.
@@ -489,6 +540,13 @@ pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
 ///
 /// Get an owner from `run_in_owner`, and stop it with `stop_owner`. The
 /// value is opaque, so only an owner that answered can be used again.
+///
+/// Any process can use an owner value, and it can use the same value
+/// again after the owner stopped: each call watches the owner process
+/// itself, so a call never waits for an owner that is gone. The exit
+/// reason of an owner that stopped is known only once, and only in the
+/// process that started the owner. A later call, or a call in another
+/// process, gives the reason `Noproc` ("no process").
 pub opaque type Owner(input, output) {
   Owner(
     pid: Pid,
@@ -518,7 +576,8 @@ pub opaque type Owner(input, output) {
 ///   `Some(owner)`: the owner stopped after the function before, for
 ///   example because a process that links to it crashed. Run the function
 ///   again with `None` to run it in a new owner. `reason` is the exit
-///   reason as text.
+///   reason as text, or `"Noproc"` when the exit was told before (see
+///   `Owner`).
 pub type OwnerResult(input, output) {
   OwnerReturned(owner: Owner(input, output), value: output)
   OwnerCaught(owner: Owner(input, output), reason: String)
@@ -619,67 +678,115 @@ pub fn run_in_owner(
   let reply = new_subject()
   let request =
     RunRequest(run: run, input: input, started: started, reply: reply)
-  let #(pid, owner_monitor) = send_owner_request(owner, request)
+  let watch = send_owner_request(owner, request)
   let selector =
     new_selector()
     |> select_map(started, FunctionStarted)
-    |> select_specific_monitor(owner_monitor, stopped_before_start)
+    |> select_watch(watch, stopped_before_start)
   case selector_receive(selector, timeout_ms) {
     Ok(FunctionStarted(requests: requests)) ->
-      wait_for_function(
-        Owner(pid: pid, monitor: owner_monitor, requests: requests),
-        reply,
-        timeout_ms,
-      )
-    Ok(StoppedBeforeStart(reason: reason)) -> OwnerLost(reason: reason)
-    Error(Nil) -> time_out_owner(pid, owner_monitor)
+      wait_for_function(watch, requests, reply, timeout_ms)
+    Ok(StoppedBeforeStart(reason: reason)) -> {
+      forget_owner(watch)
+      OwnerLost(reason: reason)
+    }
+    Error(Nil) -> time_out_owner(watch)
   }
+}
+
+/// The monitors of one call to an owner. `owner_monitor` is the monitor
+/// that the process which started the owner made, and only that process
+/// gets its down message. `call_monitor` is new for this call, so the
+/// calling process always gets a down message when the owner is gone.
+type Watch {
+  Watch(pid: Pid, owner_monitor: Monitor, call_monitor: Monitor)
+}
+
+/// Select the down message of both monitors of a call.
+fn select_watch(
+  selector: Selector(message),
+  watch: Watch,
+  mapping: fn(process.Down) -> message,
+) -> Selector(message) {
+  selector
+  |> select_specific_monitor(watch.owner_monitor, mapping)
+  |> select_specific_monitor(watch.call_monitor, mapping)
+}
+
+/// Remove the monitor of a call to an owner that is still alive.
+fn end_call(watch: Watch) -> Nil {
+  demonitor_process(watch.call_monitor)
+}
+
+/// Remove both monitors of a call to an owner that is gone, with their
+/// down messages.
+fn forget_owner(watch: Watch) -> Nil {
+  demonitor_process(watch.owner_monitor)
+  demonitor_process(watch.call_monitor)
 }
 
 /// Wait for the function that the owner started, until `timeout_ms`.
 fn wait_for_function(
-  owner: Owner(input, output),
+  watch: Watch,
+  requests: Subject(OwnerRequest(input, output)),
   reply: Subject(Result(output, String)),
   timeout_ms: Int,
 ) -> OwnerResult(input, output) {
   let selector =
     new_selector()
     |> select_map(reply, FunctionFinished)
-    |> select_specific_monitor(owner.monitor, stopped_during_function)
+    |> select_watch(watch, stopped_during_function)
   case selector_receive(selector, timeout_ms) {
-    Ok(FunctionFinished(result: Ok(value))) ->
-      OwnerReturned(owner: owner, value: value)
-    Ok(FunctionFinished(result: Error(reason))) ->
-      OwnerCaught(owner: owner, reason: reason)
-    Ok(StoppedDuringFunction(reason: reason)) -> OwnerExited(reason: reason)
-    Error(Nil) -> time_out_owner(owner.pid, owner.monitor)
+    Ok(FunctionFinished(result: result)) -> {
+      end_call(watch)
+      finished(
+        Owner(pid: watch.pid, monitor: watch.owner_monitor, requests: requests),
+        result,
+      )
+    }
+    Ok(StoppedDuringFunction(reason: reason)) -> {
+      forget_owner(watch)
+      OwnerExited(reason: reason)
+    }
+    Error(Nil) -> time_out_owner(watch)
   }
 }
 
-/// Kill an owner that did not answer in time.
-fn time_out_owner(
-  pid: Pid,
-  owner_monitor: Monitor,
+/// The result of a function that returned or crashed in an owner that is
+/// still alive.
+fn finished(
+  owner: Owner(input, output),
+  result: Result(output, String),
 ) -> OwnerResult(input, output) {
-  kill(pid)
-  demonitor_process(owner_monitor)
+  case result {
+    Ok(value) -> OwnerReturned(owner: owner, value: value)
+    Error(reason) -> OwnerCaught(owner: owner, reason: reason)
+  }
+}
+
+/// Kill an owner that did not answer in time, and wait until it has
+/// exited, so that what it held is free before the caller goes on.
+fn time_out_owner(watch: Watch) -> OwnerResult(input, output) {
+  kill_and_wait(watch.pid)
+  forget_owner(watch)
   OwnerTimedOut
 }
 
 /// Give the request to the owner, or start a new owner with it. Gives the
-/// process and the monitor of the owner.
+/// monitors of the call.
 fn send_owner_request(
   owner: Option(Owner(input, output)),
   request: OwnerRequest(input, output),
-) -> #(Pid, Monitor) {
+) -> Watch {
   case owner {
     Some(Owner(pid: pid, monitor: owner_monitor, requests: requests)) -> {
+      let call_monitor = monitor(pid)
       send(requests, request)
-      #(pid, owner_monitor)
+      Watch(pid: pid, owner_monitor: owner_monitor, call_monitor: call_monitor)
     }
     None -> {
       let pid = spawn_unlinked(fn() { start_owner(request) })
-      #(pid, monitor(pid))
+      Watch(pid: pid, owner_monitor: monitor(pid), call_monitor: monitor(pid))
     }
   }
 }
@@ -768,21 +875,36 @@ fn serve_owner(
 /// ## Returns
 ///
 /// `Ok(owner)` when the owner is alive, or `Error(reason)` with the exit
-/// reason as text when it stopped. After `Error`, do not use the owner
-/// again.
+/// reason as text when it stopped. The reason is `"Noproc"` when the exit
+/// was told before or the caller is not the process that started the
+/// owner (see `Owner`). After `Error`, `run_in_owner` with the owner gives
+/// `OwnerLost`, and `stop_owner` returns at once.
 pub fn check_owner(
   owner owner: Owner(input, output),
 ) -> Result(Owner(input, output), String) {
-  let selector =
-    new_selector()
-    |> select_specific_monitor(owner.monitor, owner_down_reason)
-  case selector_receive(selector, 0) {
-    Ok(reason) -> Error(reason)
-    Error(Nil) -> Ok(owner)
+  case process.is_alive(owner.pid) {
+    True -> Ok(owner)
+    False -> Error(wait_for_exit(owner))
   }
 }
 
-fn owner_down_reason(down: process.Down) -> String {
+/// Wait until an owner has exited, and give its exit reason as text.
+fn wait_for_exit(owner: Owner(input, output)) -> String {
+  let watch =
+    Watch(
+      pid: owner.pid,
+      owner_monitor: owner.monitor,
+      call_monitor: monitor(owner.pid),
+    )
+  let reason =
+    new_selector()
+    |> select_watch(watch, format_down_reason)
+    |> selector_receive_forever
+  forget_owner(watch)
+  reason
+}
+
+fn format_down_reason(down: process.Down) -> String {
   format_exit_reason(down.reason)
 }
 
@@ -792,7 +914,8 @@ fn owner_down_reason(down: process.Down) -> String {
 /// deleted, and a process that links to it and traps exits, such as a
 /// supervisor, gets the exit signal and stops. When `stop_owner` returns,
 /// the owner has exited, so a later scope can make a table with the same
-/// name. An owner that stopped already is not an error.
+/// name. An owner that stopped already is not an error, and any process can
+/// stop an owner.
 ///
 /// ## Example
 ///
@@ -838,9 +961,6 @@ fn owner_down_reason(down: process.Down) -> String {
 /// `Nil`, after the owner has exited.
 pub fn stop_owner(owner owner: Owner(input, output)) -> Nil {
   send(owner.requests, StopRequest)
-  let selector =
-    new_selector()
-    |> select_specific_monitor(owner.monitor, owner_down_reason)
-  let _reason = selector_receive_forever(selector)
+  let _reason = wait_for_exit(owner)
   Nil
 }

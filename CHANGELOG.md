@@ -328,7 +328,15 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     process runs functions one after another with a timeout for each, and
     stays alive between them, so a pool or an ETS table that one function
     starts lives for the next function. `sandbox.OwnerLost(reason)` says
-    that the owner stopped before it started the function
+    that the owner stopped before it started the function. Any process can
+    use an owner, and an owner that stopped is never waited for: after
+    `check_owner` gives `Error`, `run_in_owner` gives `OwnerLost` and
+    `stop_owner` returns at once. When a function times out, the owner is
+    killed and `run_in_owner` returns only after the owner has exited
+  - `sandbox.kill_and_wait(pid)` kills a process and returns when it has
+    exited, so its ETS tables and its registered name are free. The runner
+    uses it for each process that times out, so a tear-down hook never
+    starts while the process that timed out still holds a resource
   - `sandbox.run_catching(run:, input:)` runs a function in the calling
     process and gives `Ok(value)`, or `Error("class:reason")` when the
     function crashes
@@ -468,6 +476,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- `sandbox.run_isolated` gives `SandboxTimedOut` only after the process
+  that timed out has exited, so what it held is free when the call
+  returns.
 - The capture helpers of `dream_test/gherkin/steps` (`get_int`,
   `get_float`, `get_string`, `get_word`) give an error that names the
   capture. Before: `Capture at index is not an integer` and

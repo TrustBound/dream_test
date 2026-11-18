@@ -12,6 +12,26 @@ import gleam/string
 
 pub fn tests() {
   describe("dream_test/sandbox", [
+    it("kill_and_wait returns when the process is gone", fn() {
+      let table = atom.create("dream_test_kill_and_wait_table")
+      let ready = process.new_subject()
+      let pid = process.spawn_unlinked(fn() { hold_table(table, ready) })
+      let _ = process.receive(ready, 60_000)
+      sandbox.kill_and_wait(pid)
+      #(process.is_alive(pid), table_exists(table))
+      |> should
+      |> be_equal(#(False, False))
+      |> or_fail_with("expected the process and its table to be gone")
+    }),
+    it("kill_and_wait returns for a process that is gone already", fn() {
+      let pid = process.spawn_unlinked(fn() { Nil })
+      sandbox.kill_and_wait(pid)
+      sandbox.kill_and_wait(pid)
+      process.is_alive(pid)
+      |> should
+      |> be_equal(False)
+      |> or_fail_with("expected the process to be gone")
+    }),
     it("returns SandboxCompleted on success", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 100, show_crash_reports: False)
@@ -213,3 +233,16 @@ fn erlang_error(reason: Atom) -> Nil
 fn own_pid(_input: Nil) -> process.Pid {
   process.self()
 }
+
+/// Make a named table, say that it is ready, then wait forever.
+fn hold_table(name: Atom, ready: process.Subject(Nil)) -> Nil {
+  let _table = new_named_table(name)
+  process.send(ready, Nil)
+  process.sleep_forever()
+}
+
+@external(erlang, "dream_test_hook_resource_test_ffi", "new_named_table")
+fn new_named_table(name: Atom) -> Nil
+
+@external(erlang, "dream_test_hook_resource_test_ffi", "table_exists")
+fn table_exists(name: Atom) -> Bool

@@ -54,7 +54,7 @@ import dream_test/types.{
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
-  demonitor_process, kill, monitor, new_selector, new_subject, select,
+  demonitor_process, monitor, new_selector, new_subject, select,
   select_specific_monitor, selector_receive, send, spawn_unlinked,
 }
 import gleam/int
@@ -2039,7 +2039,8 @@ fn remove_down_worker(
   }
 }
 
-/// Kill each process whose step is past its deadline.
+/// Kill each process whose step is past its deadline, and wait until it has
+/// exited, so its tear-down steps start only when what it held is free.
 fn expire_workers(
   running: List(RunningWorker(context)),
   now: Int,
@@ -2049,7 +2050,7 @@ fn expire_workers(
   case running {
     [] -> #(list.reverse(kept_rev), results)
     [worker, ..rest] if worker.deadline_ms <= now -> {
-      kill(worker.pid)
+      sandbox.kill_and_wait(worker.pid)
       demonitor_process(worker.monitor)
       let #(next_kept_rev, next_results) =
         after_step_end(worker, StepTimedOut, kept_rev, results)

@@ -8,8 +8,9 @@ import dream_test/sandbox.{
 }
 import dream_test/unit.{describe, it}
 import gleam/erlang/atom.{type Atom}
-import gleam/erlang/process.{type Name}
+import gleam/erlang/process.{type Name, type Pid, type Subject}
 import gleam/option.{None, Some}
+import gleam/result
 
 pub fn tests() {
   describe("sandbox owner processes", [
@@ -41,6 +42,42 @@ pub fn tests() {
       |> be_equal(TimedOut)
       |> or_fail_with("expected OwnerTimedOut")
     }),
+
+    it("an owner that timed out has exited when run_in_owner returns", fn() {
+      let pids = process.new_subject()
+      let result = sandbox.run_in_owner(None, 20, send_self_then_block, pids)
+      #(summary(result), result.map(process.receive(pids, 0), process.is_alive))
+      |> should
+      |> be_equal(#(TimedOut, Ok(False)))
+      |> or_fail_with("expected the owner to be gone after OwnerTimedOut")
+    }),
+
+    it(
+      "an owner that is busy with another call times out before it starts",
+      fn() {
+        // Another process makes the owner run a function that never returns.
+        // A call from this process then cannot start, so it times out, and
+        // the other call sees the owner killed.
+        let running = process.new_subject()
+        let results = process.new_subject()
+        case sandbox.run_in_owner(None, 1000, give_one, running) {
+          OwnerReturned(owner: owner, value: _) -> {
+            process.spawn(fn() {
+              block_in_other_process(owner, running, results)
+            })
+            let _ = process.receive(running, 60_000)
+            #(
+              summary(sandbox.run_in_owner(Some(owner), 20, give_one, running)),
+              process.receive(results, 60_000),
+            )
+          }
+          other -> #(summary(other), Error(Nil))
+        }
+        |> should
+        |> be_equal(#(TimedOut, Ok(Exited("killed"))))
+        |> or_fail_with("expected a time-out, and the other call to see it")
+      },
+    ),
 
     it("an owner that is killed during the function exits", fn() {
       sandbox.run_in_owner(None, 1000, kill_self, Nil)
@@ -109,24 +146,72 @@ pub fn tests() {
       |> or_fail_with("expected OwnerLost and a function that did not run")
     }),
 
-    it("an owner that check_owner saw stop times out on the next call", fn() {
+    it(
+      "an owner that check_owner saw stop gives OwnerLost on the next call",
+      fn() {
+        let crash = process.new_name("dream_test_crash")
+        case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
+          OwnerReturned(owner: owner, value: _) -> {
+            crash_owner(crash)
+            let _checked = sandbox.check_owner(owner)
+            summary(sandbox.run_in_owner(
+              Some(owner),
+              60_000,
+              start_linked_crash,
+              crash,
+            ))
+          }
+          other -> summary(other)
+        }
+        |> should
+        |> be_equal(Lost("Noproc"))
+        |> or_fail_with("expected OwnerLost for an owner that was checked")
+      },
+    ),
+
+    it("stop_owner returns for an owner that check_owner saw stop", fn() {
+      sandbox.run_isolated(
+        sandbox.SandboxConfig(timeout_ms: 60_000, show_crash_reports: False),
+        check_then_stop_crashed_owner,
+        process.new_name("dream_test_crash"),
+      )
+      |> should
+      |> be_equal(sandbox.SandboxCompleted(Error("Boom")))
+      |> or_fail_with("expected stop_owner to return after check_owner")
+    }),
+
+    it("check_owner in another process sees an owner that stopped", fn() {
       let crash = process.new_name("dream_test_crash")
       case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
         OwnerReturned(owner: owner, value: _) -> {
           crash_owner(crash)
-          let _checked = sandbox.check_owner(owner)
-          summary(sandbox.run_in_owner(
-            Some(owner),
-            20,
-            start_linked_crash,
-            crash,
-          ))
+          sandbox.run_isolated(
+            sandbox.SandboxConfig(timeout_ms: 60_000, show_crash_reports: False),
+            check_then_stop,
+            owner,
+          )
         }
-        other -> summary(other)
+        _other -> sandbox.SandboxCrashed("did not start")
       }
       |> should
-      |> be_equal(TimedOut)
-      |> or_fail_with("expected OwnerTimedOut for an owner that was checked")
+      |> be_equal(sandbox.SandboxCompleted(Error("Noproc")))
+      |> or_fail_with("expected the other process to see the stop")
+    }),
+
+    it("stop_owner in another process stops the owner", fn() {
+      let name = atom.create("dream_test_other_process_stop_table")
+      case sandbox.run_in_owner(None, 1000, make_table, name) {
+        OwnerReturned(owner: owner, value: _) ->
+          sandbox.run_isolated(
+            sandbox.SandboxConfig(timeout_ms: 60_000, show_crash_reports: False),
+            stop_then_check_table,
+            #(owner, name),
+          )
+        _other -> sandbox.SandboxCrashed("did not start")
+      }
+      |> should
+      |> be_equal(sandbox.SandboxCompleted(False))
+      |> or_fail_with("expected the table of the owner to be gone")
     }),
 
     it("check_owner gives the exit reason of an owner that stopped", fn() {
@@ -180,6 +265,26 @@ fn check_then_stop(owner: sandbox.Owner(input, output)) -> Result(Nil, String) {
   }
 }
 
+/// Start an owner, make it stop, then check it and stop it. Gives the
+/// result of the check.
+fn check_then_stop_crashed_owner(crash: Name(Crash)) -> Result(Nil, String) {
+  case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
+    OwnerReturned(owner: owner, value: _) -> {
+      crash_owner(crash)
+      let checked = check_then_stop(owner)
+      sandbox.stop_owner(owner)
+      checked
+    }
+    _other -> Error("did not start")
+  }
+}
+
+fn stop_then_check_table(input: #(sandbox.Owner(Atom, Bool), Atom)) -> Bool {
+  let #(owner, name) = input
+  sandbox.stop_owner(owner)
+  table_exists(name)
+}
+
 fn double(number: Int) -> Int {
   number * 2
 }
@@ -196,6 +301,34 @@ fn crash_or_double(number: Int) -> Int {
 fn block_forever(number: Int) -> Int {
   process.sleep_forever()
   number * 2
+}
+
+/// Run a function in the owner that says it is running and never returns,
+/// then send what the call gave.
+fn block_in_other_process(
+  owner: sandbox.Owner(Subject(Nil), Int),
+  running: Subject(Nil),
+  other: Subject(Summary(Int)),
+) -> Nil {
+  sandbox.run_in_owner(Some(owner), 60_000, say_running_then_block, running)
+  |> summary
+  |> process.send(other, _)
+}
+
+fn give_one(_running: Subject(Nil)) -> Int {
+  1
+}
+
+fn say_running_then_block(running: Subject(Nil)) -> Int {
+  process.send(running, Nil)
+  process.sleep_forever()
+  0
+}
+
+/// Send the pid of the owner, then never return.
+fn send_self_then_block(pids: Subject(Pid)) -> Nil {
+  process.send(pids, process.self())
+  process.sleep_forever()
 }
 
 fn kill_self(_input: Nil) -> Nil {

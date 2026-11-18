@@ -15,6 +15,7 @@ import dream_test/types.{
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, group, it, skip,
 }
+import dream_test/unit_context
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{type Name, type Pid, type Subject}
 import gleam/list
@@ -379,6 +380,27 @@ pub fn tests() {
       )
     }),
 
+    it("a timed-out test process has exited before its after_each runs", fn() {
+      // before_each gives the pid of the test process to the after_each
+      // hook. The body never returns, so the test times out, and the
+      // after_each hook runs in a new process. It must not see the old
+      // process alive: that process could still own a table or a name.
+      unit_context.describe("root", process.self(), [
+        unit_context.before_each(test_process),
+        unit_context.it("hangs", hang_with_context),
+        unit_context.after_each(fail_if_alive),
+      ])
+      |> list.wrap
+      |> runner.new
+      |> runner.default_timeout_ms(20)
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_teardown_failures
+      |> should
+      |> be_equal([])
+      |> or_fail_with("the timed-out test process should be gone")
+    }),
+
     it("a test with its own timeout times out while another runs on", fn() {
       // The runner hook holds each worker for 30ms before the bodies start.
       // The 20ms deadline of "short" counts from the start of its body.
@@ -485,6 +507,21 @@ fn timed_test(
 
 fn pass() -> Result(AssertionResult, String) {
   Ok(AssertionOk)
+}
+
+fn test_process(_pid: Pid) -> Result(Pid, String) {
+  Ok(process.self())
+}
+
+fn hang_with_context(_pid: Pid) -> Result(AssertionResult, String) {
+  block_forever()
+}
+
+fn fail_if_alive(pid: Pid) -> Result(Nil, String) {
+  case process.is_alive(pid) {
+    True -> Error("the test process is still alive")
+    False -> Ok(Nil)
+  }
 }
 
 /// A body that never returns, so its test can only time out.
