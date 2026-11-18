@@ -320,8 +320,8 @@ pub fn report(
 
 /// Format a single test result as BDD output, suitable for streaming.
 ///
-/// This is designed to be used with `ReporterEvent.TestFinished` so that BDD
-/// output can be printed as tests complete.
+/// Call it with each `TestResult` as the test finishes, so that BDD output
+/// can be printed as tests complete.
 ///
 /// - `previous_path` should be the describe-path (all but the leaf test name)
 ///   of the previously printed result.

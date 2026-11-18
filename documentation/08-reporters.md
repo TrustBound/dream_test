@@ -323,10 +323,11 @@ pub fn main() {
 
 #### Driving the progress reporter manually (advanced)
 
-If you’re building a custom tool that already receives `ReporterEvent` values, you can reuse
-the built-in progress renderer:
+If you’re building a custom tool, you can reuse the built-in progress renderer:
 
-- `progress.handle_event(progress.new(), event)` returns `Option(String)`
+- `progress.line(progress.new(), event)` returns the text for one `progress.ProgressEvent`:
+  `RunStartedProgress`, `TestFinishedProgress` or `RunFinishedProgress`
+- `progress.render(columns, event)` returns the bar for a fixed width, with no carriage return
 - You decide where to write it, and when (or whether) to print it
 
 This is intentionally **not** the common path; most users should attach progress via

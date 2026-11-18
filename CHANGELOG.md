@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `progress.line` and `progress.ProgressEvent`. `progress.line` gives the
   text of the progress bar for the start of a run, a finished test, or the
   end of a run. It always gives a line, because `ProgressEvent` has no hook
-  events. The runner now uses it in place of `progress.handle_event`.
+  events. The runner uses it.
 - `sandbox.run_in_owner`, `sandbox.check_owner` and `sandbox.stop_owner`
   with the types `sandbox.Owner` and `sandbox.OwnerResult`. An owner
   process runs functions one after another with a timeout for each, and
@@ -105,6 +105,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING: the old progress event API is removed:
+  `reporters/types.ReporterEvent` (`RunStarted`, `TestFinished`,
+  `HookStarted`, `HookFinished`, `RunFinished`),
+  `reporters/types.HookKind`, `reporters/types.HookOutcome` and
+  `progress.handle_event`. The runner never sent these events, and
+  `RunFinished` always gave 0 tear-down failures. Before:
+  `progress.handle_event(reporter, reporter_types.RunStarted(total: 4))`
+  gave `Some(text)`. After:
+  `progress.line(reporter, progress.RunStartedProgress(total: 4))` gives
+  `text`.
+- BREAKING: `progress.render(columns, event)` takes a
+  `progress.ProgressEvent` in place of a `ReporterEvent`. The last line now
+  counts the tear-down failures, the same as `progress.line`. Before:
+  `progress.render(30, reporter_types.RunStarted(total: 10))`. After:
+  `progress.render(30, progress.RunStartedProgress(total: 10))`.
 - BREAKING (only for code that builds `types.Node` values directly): the
   `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and
   `AfterAll` is a `types.Callback`, not a function. Before:

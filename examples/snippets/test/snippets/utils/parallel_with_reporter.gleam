@@ -1,22 +1,15 @@
 import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
-import dream_test/reporters/types as reporter_types
 import dream_test/types.{type TestSuite}
 import dream_test/unit.{describe, it}
-import gleam/option.{type Option, None, Some}
+import gleam/list
+import gleam/option.{Some}
 
 pub fn suite() -> TestSuite(Nil) {
   describe("suite", [
     it("passes", fn() { Ok(succeed()) }),
   ])
-}
-
-fn write_if_some(text: Option(String), write: fn(String) -> Nil) {
-  case text {
-    Some(s) -> write(s)
-    None -> Nil
-  }
 }
 
 pub fn main() {
@@ -26,8 +19,8 @@ pub fn main() {
   let reporter = progress.new()
   let write = fn(_s: String) { Nil }
 
-  progress.handle_event(reporter, reporter_types.RunStarted(total: total))
-  |> write_if_some(write)
+  progress.line(reporter, progress.RunStartedProgress(total: total))
+  |> write
 
   let parallel_result =
     parallel.run_root_parallel_with_reporter(
@@ -44,20 +37,20 @@ pub fn main() {
     )
   let parallel.RunRootParallelWithReporterResult(
     results: results,
-    teardown_failures: _teardown_failures,
+    teardown_failures: teardown_failures,
     completed: completed_after_suite,
     progress_reporter: _progress_reporter,
   ) = parallel_result
 
-  progress.handle_event(
+  progress.line(
     reporter,
-    reporter_types.RunFinished(
+    progress.RunFinishedProgress(
       completed: completed_after_suite,
       total: total,
-      results: results,
+      teardown_failures: list.length(teardown_failures),
     ),
   )
-  |> write_if_some(write)
+  |> write
 
   results
 }
