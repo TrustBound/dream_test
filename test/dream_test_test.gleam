@@ -23,6 +23,7 @@ pub fn main() {
   |> runner.coverage(
     coverage.new()
     |> coverage.show_missing()
+    |> coverage.minimum_percent(100.0)
     |> coverage.json_path("build/coverage/coverage.json")
     |> coverage.merge_lcov(coverage_child_measure.parts_pattern),
   )
