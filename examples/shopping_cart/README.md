@@ -77,9 +77,9 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
-### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
 Each scenario starts from `cart_world.initial()` and passes one `CartWorld` value from step to step. A `given` or `when` step returns a new `CartWorld`. A `then` step reads it.
+
+### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub type CartWorld {
