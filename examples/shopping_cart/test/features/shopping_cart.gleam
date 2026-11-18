@@ -8,12 +8,13 @@ import dream_test/gherkin/steps
 import dream_test/types.{type TestSuite}
 import steps/assertions
 import steps/cart
+import steps/cart_world
 import steps/checkout
 import steps/discount
 
 pub fn tests() -> TestSuite(Nil) {
   let registry =
-    steps.new()
+    steps.new(initial: cart_world.initial())
     |> cart.register()
     |> discount.register()
     |> checkout.register()

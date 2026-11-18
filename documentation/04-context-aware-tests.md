@@ -168,10 +168,10 @@ pub fn main() {
 
 ### Important Gleam detail: when type inference needs help
 
-In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.world`.
+In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.captures`.
 Gleam can only allow record-field access when it knows the record type, so sometimes you need a minimal type hint:
 
-- `fn my_step(context: StepContext) { ... context.world ... }`
+- `fn my_step(cart: Cart, context: StepContext) { ... context.captures ... }`
 
 That’s not “extra ceremony” — it’s the smallest annotation needed for record field access.
 

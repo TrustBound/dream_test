@@ -14,30 +14,31 @@ At a high level, you describe behavior using a small vocabulary:
   - **When**: the action
   - **Then**: the expected outcome
 
-In Dream Test, you write Gherkin either as standard `.feature` files or directly in Gleam, and you implement behavior by mapping step text to handler functions (a “step registry”).
+In Dream Test, you write Gherkin either as standard `.feature` files or directly in Gleam, and you implement behavior by mapping step text to step functions (a “step registry”).
 
 Unit tests are great for “input → output.” Gherkin is for “a sequence of behavior over time.”
 
 This chapter explains Dream Test’s Gherkin layer as an engineering tool:
 
-- It’s for scenarios with shared per-scenario state (“the world”)
+- It’s for scenarios where each step changes or checks one scenario state
 - It’s for readable specs you can share with product/QA
 - It’s for reusing step definitions across many scenarios
 
 ### Mental model
 
 - A **scenario** is a test.
-- Each scenario runs with its own `StepContext`:
-  - `context.world` is per-scenario state (isolated)
-  - `context.captures` holds placeholder captures from the step text
-- A **step registry** maps text patterns to handler functions.
+- Each feature has one **state type** that you choose, for example `Int` or a `Cart` record. The step registry gets its initial value: `steps.new(initial: 0)`.
+- Each scenario starts from the initial value in its own process. The state is an immutable value, so scenarios cannot share it.
+- A **step registry** maps text patterns to step definitions:
+  - an `Action` gets the state and returns the new state, or an error
+  - a `Check` gets the state and returns an assertion result. It cannot change the state.
 
 Dream Test includes a Gherkin DSL that lets you write scenarios with **Given/When/Then** structure.
 
 ### When to use Gherkin
 
 - You want tests that are readable by non-engineers (product, QA, support).
-- You want to model behavior as scenarios with a shared “world” state.
+- You want to model behavior as scenarios where each step changes or checks a state.
 - You want to reuse step definitions across many scenarios.
 
 If your tests are mostly “function input → output”, the unit DSL (`describe` / `it`) is usually simpler.
@@ -46,19 +47,30 @@ If your tests are mostly “function input → output”, the unit DSL (`describ
 
 - **Feature**: a suite of scenarios
 - **Scenario**: a list of steps (Given/When/Then/And/But/`*`)
-- **Step registry**: maps step patterns to handlers, one phase (Given, When or Then) for each definition
-- **World**: per-scenario state (isolated between scenarios)
+- **Step registry**: maps step patterns to definitions, one phase (Given, When or Then) for each definition, and holds the initial state
+- **State**: the value that each step gets from the step before it
 - **Captures**: placeholder values parsed from step text
 
-### Step handlers and `StepContext` (the “context” you were missing)
+### Step definitions and `StepContext`
 
-Each step handler receives a `StepContext` record. The two fields you use most often are:
+Each step function gets two arguments: the scenario state and a `StepContext` record.
 
-- `context.world`: a per-scenario key/value store (isolated between scenarios)
+- `Action(run)`: `run(state, context)` returns `Ok(new_state)`, or `Error(message)` to fail the scenario.
+- `Check(run)`: `run(state, context)` returns an assertion result, like a unit test body. The next step gets the same state.
+
+The `StepContext` fields:
+
 - `context.captures`: the placeholder captures extracted from the step text
+- `context.table`: the DataTable of the step, if any
+- `context.doc_string`: the DocString of the step, if any
+- `context.scenario_id`: the id of the scenario, for example `"Shopping Cart::Adding items"`
 
-Important Gleam detail: when you access record fields like `context.world`, Gleam needs to know the record type.
+When a step fails, the steps after it do not run.
+
+Important Gleam detail: when you access record fields like `context.captures`, Gleam needs to know the record type.
 That’s why the examples annotate `context: StepContext` (it’s the minimal type hint needed for record field access).
+
+The capture helpers (`get_int`, `get_float`, `get_string`, `get_word`) return a `Result`. Pass the error on with `use value <- result.try(get_int(context.captures, 0))`. Then a wrong capture fails the scenario with a message such as `Capture 0 is the word "apples", not an integer`. Do not use `result.unwrap`: the scenario then runs with a wrong value.
 
 ### Inline Gherkin (the “hero” example)
 
@@ -66,30 +78,25 @@ That’s why the examples annotate `context: StepContext` (it’s the minimal ty
 
 ```gleam
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_int}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-fn step_have_items(context: StepContext) {
-  let count = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "cart", count)
-  Ok(succeed())
+fn step_have_items(_cart: Int, context: StepContext) {
+  get_int(context.captures, 0)
 }
 
-fn step_add_items(context: StepContext) {
-  let current = get_or(context.world, "cart", 0)
-  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "cart", current + to_add)
-  Ok(succeed())
+fn step_add_items(cart: Int, context: StepContext) {
+  use to_add <- result.try(get_int(context.captures, 0))
+  Ok(cart + to_add)
 }
 
-fn step_should_have(context: StepContext) {
-  let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  get_or(context.world, "cart", 0)
+fn step_should_have(cart: Int, context: StepContext) {
+  use expected <- result.try(get_int(context.captures, 0))
+  cart
   |> should
   |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
@@ -97,10 +104,10 @@ fn step_should_have(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    steps.new()
-    |> steps.given("I have {int} items in my cart", step_have_items)
-    |> steps.when_("I add {int} more items", step_add_items)
-    |> steps.then_("I should have {int} items total", step_should_have)
+    steps.new(initial: 0)
+    |> steps.given("I have {int} items in my cart", Action(step_have_items))
+    |> steps.when_("I add {int} more items", Action(step_add_items))
+    |> steps.then_("I should have {int} items total", Check(step_should_have))
 
   feature("Shopping Cart", steps, [
     scenario("Adding items to cart", [
@@ -124,7 +131,7 @@ pub fn main() {
 What to notice in this example:
 
 - The step registry is built once and shared by scenarios.
-- `context.world` is per-scenario state, so scenarios don’t leak into each other.
+- The state is an `Int`. Each scenario starts from `0`, so scenarios don’t leak into each other.
 - `context.captures` turns step text into typed values (via helpers like `get_int`).
 
 ### Placeholders (`{int}`, `{float}`, `{string}`, `{word}`)
@@ -137,55 +144,62 @@ Typed helpers like `get_int` parse the capture into the right type.
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, get_float, get_int, get_string, get_word,
+  type StepContext, Action, Check, get_float, get_int, get_string, get_word,
 }
-import dream_test/gherkin/world.{put}
-import dream_test/matchers.{succeed}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
+pub type Values {
+  Values(int: Int, float: Float, string: String, word: String)
+}
+
 // {int} captures integers
-fn step_int(context: StepContext) {
-  let value = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "int", value)
-  Ok(succeed())
+fn step_int(values: Values, context: StepContext) {
+  use value <- result.try(get_int(context.captures, 0))
+  Ok(Values(..values, int: value))
 }
 
 // {float} captures decimals (works with $ prefix too)
-fn step_float(context: StepContext) {
-  let value = get_float(context.captures, 0) |> result.unwrap(0.0)
-  put(context.world, "float", value)
-  Ok(succeed())
+fn step_float(values: Values, context: StepContext) {
+  use value <- result.try(get_float(context.captures, 0))
+  Ok(Values(..values, float: value))
 }
 
 // {string} captures quoted strings
-fn step_string(context: StepContext) {
-  let value = get_string(context.captures, 0) |> result.unwrap("")
-  put(context.world, "string", value)
-  Ok(succeed())
+fn step_string(values: Values, context: StepContext) {
+  use value <- result.try(get_string(context.captures, 0))
+  Ok(Values(..values, string: value))
 }
 
 // {word} captures a single unquoted word
-fn step_word(context: StepContext) {
-  let value = get_word(context.captures, 0) |> result.unwrap("")
-  put(context.world, "word", value)
-  Ok(succeed())
+fn step_word(values: Values, context: StepContext) {
+  use value <- result.try(get_word(context.captures, 0))
+  Ok(Values(..values, word: value))
 }
 
-fn step_pass(_context) {
-  Ok(succeed())
+fn step_everything_works(values: Values, _context: StepContext) {
+  values
+  |> should
+  |> be_equal(Values(
+    int: 42,
+    float: 19.99,
+    string: "hello world",
+    word: "alice",
+  ))
+  |> or_fail_with("every placeholder should give its value")
 }
 
 pub fn tests() {
   let steps =
-    steps.new()
-    |> steps.given("I have {int} items", step_int)
-    |> steps.given("the price is ${float}", step_float)
-    |> steps.given("the message is {string}", step_string)
-    |> steps.given("the user is {word}", step_word)
-    |> steps.then_("everything works", step_pass)
+    steps.new(initial: Values(int: 0, float: 0.0, string: "", word: ""))
+    |> steps.given("I have {int} items", Action(step_int))
+    |> steps.given("the price is ${float}", Action(step_float))
+    |> steps.given("the message is {string}", Action(step_string))
+    |> steps.given("the user is {word}", Action(step_word))
+    |> steps.then_("everything works", Check(step_everything_works))
 
   feature("Placeholder Types", steps, [
     scenario("Using different placeholders", [
@@ -222,6 +236,7 @@ Rules for the first step:
 - The first step of a Scenario or Scenario Outline must use Given, When or Then, unless a Background step runs before it.
 - When a Background step runs before it, a Scenario can start with `And`, `But` or `*`. That step takes the phase of the last Background step.
 - In a Rule, the Feature Background steps and the Rule Background steps both run before the scenario.
+- The Background steps get the initial state first. The scenario steps then get the state that the last Background step gave.
 
 A `.feature` file that breaks these rules does not parse. The error names the file and the line.
 An inline feature that breaks these rules fails each scenario with the same message, before any step runs.
@@ -238,26 +253,23 @@ import dream_test/gherkin/feature.{
   and, asterisk, background, feature_with_background, given, scenario, then,
   when,
 }
-import dream_test/gherkin/steps.{type StepContext}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 
-fn step_trip(context: StepContext) {
-  put(context.world, "bag", 0)
-  Ok(succeed())
+fn step_trip(_bag: Int, _context: StepContext) {
+  Ok(0)
 }
 
-fn step_pack(context: StepContext) {
-  put(context.world, "bag", get_or(context.world, "bag", 0) + 1)
-  Ok(succeed())
+fn step_pack(bag: Int, _context: StepContext) {
+  Ok(bag + 1)
 }
 
-fn step_close_bag(_context: StepContext) {
-  Ok(succeed())
+fn step_close_bag(bag: Int, _context: StepContext) {
+  Ok(bag)
 }
 
-fn step_bag_has_two(context: StepContext) {
-  get_or(context.world, "bag", 0)
+fn step_bag_has_two(bag: Int, _context: StepContext) {
+  bag
   |> should
   |> be_equal(2)
   |> or_fail_with("expected two things in the bag")
@@ -265,12 +277,12 @@ fn step_bag_has_two(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    steps.new()
-    |> steps.given("I plan a trip", step_trip)
-    |> steps.given("I pack a passport", step_pack)
-    |> steps.given("I pack a toothbrush", step_pack)
-    |> steps.when_("I close the bag", step_close_bag)
-    |> steps.then_("the bag has 2 things", step_bag_has_two)
+    steps.new(initial: 0)
+    |> steps.given("I plan a trip", Action(step_trip))
+    |> steps.given("I pack a passport", Action(step_pack))
+    |> steps.given("I pack a toothbrush", Action(step_pack))
+    |> steps.when_("I close the bag", Action(step_close_bag))
+    |> steps.then_("the bag has 2 things", Check(step_bag_has_two))
 
   feature_with_background(
     "Packing",
@@ -324,47 +336,46 @@ Feature: Shopping Cart
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-fn step_server_running(context: StepContext) {
-  put(context.world, "server_running", True)
-  Ok(succeed())
+pub type Cart {
+  Cart(server_running: Bool, items: Int)
 }
 
-fn step_empty_cart(context: StepContext) {
-  put(context.world, "cart", 0)
-  Ok(succeed())
+fn step_server_running(cart: Cart, _context: StepContext) {
+  Ok(Cart(..cart, server_running: True))
 }
 
-fn step_add_items(context: StepContext) {
-  let current = get_or(context.world, "cart", 0)
-  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "cart", current + to_add)
-  Ok(succeed())
+fn step_empty_cart(cart: Cart, _context: StepContext) {
+  Ok(Cart(..cart, items: 0))
 }
 
-fn step_verify_count(context: StepContext) {
-  let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  get_or(context.world, "cart", 0)
+fn step_add_items(cart: Cart, context: StepContext) {
+  use to_add <- result.try(get_int(context.captures, 0))
+  Ok(Cart(..cart, items: cart.items + to_add))
+}
+
+fn step_verify_count(cart: Cart, context: StepContext) {
+  use expected <- result.try(get_int(context.captures, 0))
+  cart.items
   |> should
   |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
 pub fn tests() {
-  // Define step handlers
+  // Define the steps and the state each scenario starts from
   let steps =
-    steps.new()
-    |> steps.given("the server is running", step_server_running)
-    |> steps.given("the cart is empty", step_empty_cart)
-    |> steps.when_("I add {int} items", step_add_items)
-    |> steps.then_("the cart should have {int} items", step_verify_count)
+    steps.new(initial: Cart(server_running: False, items: 0))
+    |> steps.given("the server is running", Action(step_server_running))
+    |> steps.given("the cart is empty", Action(step_empty_cart))
+    |> steps.when_("I add {int} items", Action(step_add_items))
+    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
 
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -441,32 +452,31 @@ Feature: Stock control
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
-fn step_shop_open(context: StepContext) {
-  put(context.world, "open", True)
-  Ok(succeed())
+pub type Shop {
+  Shop(open: Bool, stock: Int)
 }
 
-fn step_set_stock(context: StepContext) {
-  let count = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "stock", count)
-  Ok(succeed())
+fn step_shop_open(shop: Shop, _context: StepContext) {
+  Ok(Shop(..shop, open: True))
 }
 
-fn step_sell(context: StepContext) {
-  let stock = get_or(context.world, "stock", 0)
-  let sold = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "stock", stock - sold)
-  Ok(succeed())
+fn step_set_stock(shop: Shop, context: StepContext) {
+  use count <- result.try(get_int(context.captures, 0))
+  Ok(Shop(..shop, stock: count))
 }
 
-fn step_check_stock(context: StepContext) {
-  let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  get_or(context.world, "stock", 0)
+fn step_sell(shop: Shop, context: StepContext) {
+  use sold <- result.try(get_int(context.captures, 0))
+  Ok(Shop(..shop, stock: shop.stock - sold))
+}
+
+fn step_check_stock(shop: Shop, context: StepContext) {
+  use expected <- result.try(get_int(context.captures, 0))
+  shop.stock
   |> should
   |> be_equal(expected)
   |> or_fail_with("Stock count mismatch")
@@ -474,11 +484,11 @@ fn step_check_stock(context: StepContext) {
 
 pub fn tests() {
   let steps =
-    steps.new()
-    |> steps.given("the shop is open", step_shop_open)
-    |> steps.given("the stock holds {int} items", step_set_stock)
-    |> steps.when_("I sell {int} items", step_sell)
-    |> steps.then_("the stock holds {int} items", step_check_stock)
+    steps.new(initial: Shop(open: False, stock: 0))
+    |> steps.given("the shop is open", Action(step_shop_open))
+    |> steps.given("the stock holds {int} items", Action(step_set_stock))
+    |> steps.when_("I sell {int} items", Action(step_sell))
+    |> steps.then_("the stock holds {int} items", Check(step_check_stock))
 
   // Each Rule becomes a group named "Rule: <name>".
   // Each Examples row becomes one test, for example
@@ -496,7 +506,7 @@ How the tests get their names and tags:
 - The tags of a test are the Feature tags, then the Rule tags, then the scenario tags, then the `Examples` tags. Tag filters see all of them.
 - The values of an Examples row replace the `<header>` placeholders in the scenario name, the step texts, the DocStrings and the DataTable cells. The headers replace in column order.
 - A scenario with no steps runs no Background steps.
-- A step can have a DataTable and a DocString, in either order. The handler gets them in `context.table` and `context.doc_string`.
+- A step can have a DataTable and a DocString, in either order. The step function gets them in `context.table` and `context.doc_string`.
 
 #### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -522,7 +532,7 @@ pub fn tests() {
       let suite =
         to_test_suite(FeatureConfig(
           feature: feature,
-          step_registry: steps.new(),
+          step_registry: steps.new(initial: Nil),
         ))
 
       runner.new([suite])
@@ -571,47 +581,46 @@ Use discovery when you want real `.feature` files (e.g. written by QA or copied 
 
 ```gleam
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{type StepContext, get_int}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-fn step_server_running(context: StepContext) {
-  put(context.world, "server_running", True)
-  Ok(succeed())
+pub type Cart {
+  Cart(server_running: Bool, items: Int)
 }
 
-fn step_empty_cart(context: StepContext) {
-  put(context.world, "cart", 0)
-  Ok(succeed())
+fn step_server_running(cart: Cart, _context: StepContext) {
+  Ok(Cart(..cart, server_running: True))
 }
 
-fn step_add_items(context: StepContext) {
-  let current = get_or(context.world, "cart", 0)
-  let to_add = get_int(context.captures, 0) |> result.unwrap(0)
-  put(context.world, "cart", current + to_add)
-  Ok(succeed())
+fn step_empty_cart(cart: Cart, _context: StepContext) {
+  Ok(Cart(..cart, items: 0))
 }
 
-fn step_verify_count(context: StepContext) {
-  let expected = get_int(context.captures, 0) |> result.unwrap(0)
-  get_or(context.world, "cart", 0)
+fn step_add_items(cart: Cart, context: StepContext) {
+  use to_add <- result.try(get_int(context.captures, 0))
+  Ok(Cart(..cart, items: cart.items + to_add))
+}
+
+fn step_verify_count(cart: Cart, context: StepContext) {
+  use expected <- result.try(get_int(context.captures, 0))
+  cart.items
   |> should
   |> be_equal(expected)
   |> or_fail_with("Cart count mismatch")
 }
 
 pub fn tests() {
-  // Define step handlers
+  // Define the steps and the state each scenario starts from
   let steps =
-    steps.new()
-    |> steps.given("the server is running", step_server_running)
-    |> steps.given("the cart is empty", step_empty_cart)
-    |> steps.when_("I add {int} items", step_add_items)
-    |> steps.then_("the cart should have {int} items", step_verify_count)
+    steps.new(initial: Cart(server_running: False, items: 0))
+    |> steps.given("the server is running", Action(step_server_running))
+    |> steps.given("the cart is empty", Action(step_empty_cart))
+    |> steps.when_("I add {int} items", Action(step_add_items))
+    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
 
   // Discover and load all .feature files
   discover.features("test/*.feature")

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Typed Gherkin scenario state. `steps.new(initial:)` takes the state that
+  each scenario starts from. A step definition is
+  `steps.Action(fn(state, StepContext) -> Result(state, String))` or
+  `steps.Check(fn(state, StepContext) -> Result(AssertionResult, String))`.
+  `steps.initial_state(registry)` gives the initial state.
+  `StepContext.scenario_id` gives the id of the scenario.
 - `types.Callback(input, output)` (`NoInput` and `WithInput`) and
   `types.call`. A test body or hook in a `Node` keeps the shape that the
   user wrote: `unit.before_all(setup)` stores
@@ -105,6 +111,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING: the Gherkin `world` key/value store is removed, with
+  `dream_test/gherkin/world` (`put`, `get`, `get_or`, `has`, `delete`,
+  `scenario_id`, `new_world`, `cleanup`) and its ETS table. Each scenario
+  made one atom that was never freed. The state is now one typed value that
+  each step gets and an `Action` step returns. Before:
+  `fn step_add(context: StepContext) { put(context.world, "cart", get_or(context.world, "cart", 0) + 1) Ok(succeed()) }`.
+  After: `fn step_add(cart: Int, _context: StepContext) { Ok(cart + 1) }`.
+- BREAKING: `steps.new()` takes the initial scenario state, and
+  `StepRegistry`, `FeatureConfig` and `discover.RunnableDiscovery` take
+  the state type as a type parameter. Before: `steps.new()`. After:
+  `steps.new(initial: 0)`, of type `StepRegistry(Int)`.
+- BREAKING: `steps.given`, `steps.when_` and `steps.then_` take a
+  `StepDefinition(state)` (labelled `definition`) in place of a
+  `StepHandler`. The `StepHandler` type is removed, and `find_step` gives a
+  `StepMatch(StepDefinition(state))`. Before:
+  `steps.then_("I have {int} items", step_should_have)`. After:
+  `steps.then_("I have {int} items", Check(step_should_have))`.
+- BREAKING: `StepContext` has no `world` field. It has a `scenario_id`
+  field. Before: `world.scenario_id(context.world)`. After:
+  `context.scenario_id`.
 - BREAKING: the old progress event API is removed:
   `reporters/types.ReporterEvent` (`RunStarted`, `TestFinished`,
   `HookStarted`, `HookFinished`, `RunFinished`),

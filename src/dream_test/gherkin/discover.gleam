@@ -10,44 +10,43 @@
 ////
 //// ```gleam
 //// import dream_test/gherkin/discover
-//// import dream_test/gherkin/steps.{type StepContext, get_int}
-//// import dream_test/gherkin/world.{get_or, put}
-//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+//// import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import gleam/result
 ////
-//// fn step_server_running(context: StepContext) {
-////   put(context.world, "server_running", True)
-////   Ok(succeed())
+//// pub type Cart {
+////   Cart(server_running: Bool, items: Int)
 //// }
 ////
-//// fn step_empty_cart(context: StepContext) {
-////   put(context.world, "cart", 0)
-////   Ok(succeed())
+//// fn step_server_running(cart: Cart, _context: StepContext) {
+////   Ok(Cart(..cart, server_running: True))
 //// }
 ////
-//// fn step_add_items(context: StepContext) {
-////   let current = get_or(context.world, "cart", 0)
-////   let to_add = get_int(context.captures, 0) |> result.unwrap(0)
-////   put(context.world, "cart", current + to_add)
-////   Ok(succeed())
+//// fn step_empty_cart(cart: Cart, _context: StepContext) {
+////   Ok(Cart(..cart, items: 0))
 //// }
 ////
-//// fn step_verify_count(context: StepContext) {
-////   let expected = get_int(context.captures, 0) |> result.unwrap(0)
-////   get_or(context.world, "cart", 0)
+//// fn step_add_items(cart: Cart, context: StepContext) {
+////   use added <- result.try(get_int(context.captures, 0))
+////   Ok(Cart(..cart, items: cart.items + added))
+//// }
+////
+//// fn step_verify_count(cart: Cart, context: StepContext) {
+////   use expected <- result.try(get_int(context.captures, 0))
+////   cart.items
 ////   |> should
 ////   |> be_equal(expected)
 ////   |> or_fail_with("Cart count mismatch")
 //// }
 ////
 //// pub fn tests() {
-////   // Define step handlers
+////   // Define the steps and the state each scenario starts from
 ////   let steps =
-////     steps.new()
-////     |> steps.given("the server is running", step_server_running)
-////     |> steps.given("the cart is empty", step_empty_cart)
-////     |> steps.when_("I add {int} items", step_add_items)
-////     |> steps.then_("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> steps.given("the server is running", Action(step_server_running))
+////     |> steps.given("the cart is empty", Action(step_empty_cart))
+////     |> steps.when_("I add {int} items", Action(step_add_items))
+////     |> steps.then_("the cart should have {int} items", Check(step_verify_count))
 ////
 ////   // Discover and load all .feature files
 ////   discover.features("test/*.feature")
@@ -99,12 +98,13 @@ pub opaque type FeatureDiscovery {
 /// ```
 ///
 /// This is opaque so callers can’t depend on internal fields that may change.
-pub opaque type RunnableDiscovery {
+/// `state` is the scenario state type of the step registry.
+pub opaque type RunnableDiscovery(state) {
   RunnableDiscovery(
     /// Glob pattern for finding feature files
     pattern: String,
     /// Step definitions used to run the scenarios
-    registry: StepRegistry,
+    registry: StepRegistry(state),
   )
 }
 
@@ -154,20 +154,20 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 
 /// Attach a step registry to the discovery.
 ///
-/// The step registry is the set of step definitions (Given/When/Then handlers)
+/// The step registry is the set of step definitions (Given/When/Then steps)
 /// used to execute scenarios. `to_suite` takes the `RunnableDiscovery` that
 /// this function gives, so a suite cannot exist without step definitions.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// // Define step handlers
+/// // Define the steps and the state each scenario starts from
 /// let steps =
-///   steps.new()
-///   |> steps.given("the server is running", step_server_running)
-///   |> steps.given("the cart is empty", step_empty_cart)
-///   |> steps.when_("I add {int} items", step_add_items)
-///   |> steps.then_("the cart should have {int} items", step_verify_count)
+///   steps.new(initial: Cart(server_running: False, items: 0))
+///   |> steps.given("the server is running", Action(step_server_running))
+///   |> steps.given("the cart is empty", Action(step_empty_cart))
+///   |> steps.when_("I add {int} items", Action(step_add_items))
+///   |> steps.then_("the cart should have {int} items", Check(step_verify_count))
 ///
 /// // Discover and load all .feature files
 /// discover.features("test/*.feature")
@@ -185,8 +185,8 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 /// A `RunnableDiscovery` to pipe into `to_suite`.
 pub fn with_registry(
   discovery discovery: FeatureDiscovery,
-  registry registry: StepRegistry,
-) -> RunnableDiscovery {
+  registry registry: StepRegistry(state),
+) -> RunnableDiscovery(state) {
   RunnableDiscovery(pattern: discovery.pattern, registry: registry)
 }
 
@@ -219,7 +219,7 @@ pub fn with_registry(
 /// A `TestSuite(Nil)` containing one test per discovered scenario, plus failing
 /// tests for any parse errors (tagged `"parse-error"`).
 pub fn to_suite(
-  discovery discovery: RunnableDiscovery,
+  discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
 ) -> TestSuite(Nil) {
   let files = discover_files(discovery.pattern)
@@ -370,7 +370,7 @@ fn parse_error_assertion() -> AssertionResult {
 
 fn features_to_groups(
   features: List(gherkin_types.Feature),
-  registry: StepRegistry,
+  registry: StepRegistry(state),
   acc_rev: List(Node(Nil)),
 ) -> List(Node(Nil)) {
   case features {
@@ -384,7 +384,7 @@ fn features_to_groups(
 
 fn feature_to_group(
   feature: gherkin_types.Feature,
-  registry: StepRegistry,
+  registry: StepRegistry(state),
 ) -> Node(Nil) {
   let config = FeatureConfig(feature: feature, step_registry: registry)
   let feature_suite = to_test_suite(config)

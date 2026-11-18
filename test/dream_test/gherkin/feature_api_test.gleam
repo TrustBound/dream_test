@@ -16,9 +16,9 @@ pub fn tests() {
     it("inline feature() builds a runnable suite", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("a thing", gherkin_step_ok)
-        |> steps.then_("it works", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a thing", steps.Check(gherkin_step_ok))
+        |> steps.then_("it works", steps.Check(gherkin_step_ok))
 
       let suite =
         gfeature.feature("Inline Feature", registry, [
@@ -54,8 +54,8 @@ pub fn tests() {
     it("with_tags adds scenario tags to the resulting test result", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("a thing", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a thing", steps.Check(gherkin_step_ok))
 
       let suite =
         gfeature.feature("Inline Tags", registry, [
@@ -100,8 +100,8 @@ pub fn tests() {
         <> "  | 1 |\n"
         <> "  | 2 |\n"
       let registry =
-        steps.new()
-        |> steps.given("the value is {int}", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("the value is {int}", steps.Check(gherkin_step_ok))
 
       run_parsed(content, registry)
       |> list.map(fn(result) { #(result.kind, result.status) })
@@ -210,9 +210,9 @@ pub fn tests() {
         <> "hello\n"
         <> "\"\"\"\n"
       let registry =
-        steps.new()
-        |> steps.given("a table", expect_table)
-        |> steps.then_("a doc string", expect_doc_string)
+        steps.new(initial: Nil)
+        |> steps.given("a table", steps.Check(expect_table))
+        |> steps.then_("a doc string", steps.Check(expect_doc_string))
 
       run_parsed(content, registry)
       |> list.map(fn(result) { result.failures })
@@ -223,8 +223,11 @@ pub fn tests() {
 
     it("to_test_suite gives a step both its DataTable and its DocString", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a step with both arguments", expect_both_arguments)
+        steps.new(initial: Nil)
+        |> steps.given(
+          "a step with both arguments",
+          steps.Check(expect_both_arguments),
+        )
 
       run_file(
         conformance_directory <> "step_with_datatable_and_docstring.feature",
@@ -239,7 +242,7 @@ pub fn tests() {
     it("to_test_suite puts the example values in the scenario name", fn() {
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
-        steps.new(),
+        steps.new(initial: Nil),
       )
       |> list.map(result_name)
       |> should
@@ -249,8 +252,8 @@ pub fn tests() {
 
     it("to_test_suite puts the example values in the DocString", fn() {
       let registry =
-        steps.new()
-        |> steps.given("the {}", fail_with_doc_string)
+        steps.new(initial: Nil)
+        |> steps.given("the {}", steps.Check(fail_with_doc_string))
 
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
@@ -266,8 +269,8 @@ pub fn tests() {
       "to_test_suite puts the example values in a DocString with a media type",
       fn() {
         let registry =
-          steps.new()
-          |> steps.given("this file:", fail_with_doc_string)
+          steps.new(initial: Nil)
+          |> steps.given("this file:", steps.Check(fail_with_doc_string))
 
         run_file(
           conformance_directory <> "scenario_outline_with_docstring.feature",
@@ -282,8 +285,8 @@ pub fn tests() {
 
     it("to_test_suite puts the example values in the DataTable cells", fn() {
       let registry =
-        steps.new()
-        |> steps.given("the {}", fail_with_table)
+        steps.new(initial: Nil)
+        |> steps.given("the {}", steps.Check(fail_with_table))
 
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
@@ -298,7 +301,7 @@ pub fn tests() {
     it("to_test_suite uses the first column of a repeated example header", fn() {
       run_parsed(
         "Feature: F\n  Scenario Outline: O\n    Given <x>\n    Examples:\n      | x | x |\n      | 1 | 2 |\n",
-        steps.new(),
+        steps.new(initial: Nil),
       )
       |> list.map(result_failure_messages)
       |> should
@@ -311,7 +314,7 @@ pub fn tests() {
       fn() {
         run_parsed(
           "Feature: F\n  Background:\n    Given missing\n  Scenario: S\n",
-          steps.new(),
+          steps.new(initial: Nil),
         )
         |> list.map(result_status)
         |> should
@@ -325,7 +328,7 @@ pub fn tests() {
       fn() {
         run_parsed(
           "Feature: F\n  Background:\n    Given missing\n  Scenario Outline: O\n    Examples:\n      | n |\n      | 1 |\n",
-          steps.new(),
+          steps.new(initial: Nil),
         )
         |> list.map(result_status)
         |> should
@@ -336,7 +339,7 @@ pub fn tests() {
 
     it("a scenario fails with the message of an undefined step", fn() {
       let suite =
-        gfeature.feature("F", steps.new(), [
+        gfeature.feature("F", steps.new(initial: Nil), [
           gfeature.scenario("S", [gfeature.given("missing")]),
         ])
 
@@ -359,9 +362,9 @@ pub fn tests() {
 
     it("a scenario fails with the Error message of a handler", fn() {
       let registry =
-        steps.new()
-        |> steps.given("it breaks", gherkin_step_error)
-        |> steps.then_("never runs", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("it breaks", steps.Check(gherkin_step_error))
+        |> steps.then_("never runs", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -389,8 +392,8 @@ pub fn tests() {
 
     it("a scenario fails with the message of a capture error", fn() {
       let registry =
-        steps.new()
-        |> steps.given("I add {word}", add_an_int_capture)
+        steps.new(initial: Nil)
+        |> steps.given("I add {word}", steps.Check(add_an_int_capture))
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.given("I add apples")]),
@@ -407,12 +410,12 @@ pub fn tests() {
 
     it("feature_with_background runs background and When/And/But steps", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a base", gherkin_step_ok)
-        |> steps.when_("I act", gherkin_step_ok)
-        |> steps.when_("I act more", gherkin_step_ok)
-        |> steps.when_("I do not stop", gherkin_step_ok)
-        |> steps.then_("it works", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a base", steps.Check(gherkin_step_ok))
+        |> steps.when_("I act", steps.Check(gherkin_step_ok))
+        |> steps.when_("I act more", steps.Check(gherkin_step_ok))
+        |> steps.when_("I do not stop", steps.Check(gherkin_step_ok))
+        |> steps.then_("it works", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature_with_background(
           "F",
@@ -486,8 +489,8 @@ pub fn tests() {
 
     it("a hand-built InlineStep runs the handler of its keyword", fn() {
       let registry =
-        steps.new()
-        |> steps.then_("it works", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.then_("it works", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -515,9 +518,9 @@ pub fn tests() {
 
     it("a * step runs the handler of the phase before it", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a trip", gherkin_step_ok)
-        |> steps.given("I pack a passport", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a trip", steps.Check(gherkin_step_ok))
+        |> steps.given("I pack a passport", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -539,9 +542,9 @@ pub fn tests() {
       "a scenario that starts with And continues the last Background step",
       fn() {
         let registry =
-          steps.new()
-          |> steps.given("a base", gherkin_step_ok)
-          |> steps.given("another base", gherkin_step_ok)
+          steps.new(initial: Nil)
+          |> steps.given("a base", steps.Check(gherkin_step_ok))
+          |> steps.given("another base", steps.Check(gherkin_step_ok))
         let suite =
           gfeature.feature_with_background(
             "F",
@@ -562,9 +565,9 @@ pub fn tests() {
 
     it("a parsed scenario that starts with And continues the Background", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a base", gherkin_step_ok)
-        |> steps.given("another base", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a base", steps.Check(gherkin_step_ok))
+        |> steps.given("another base", steps.Check(gherkin_step_ok))
 
       run_parsed(
         "Feature: F\nBackground:\n  Given a base\nScenario: S\n  And another base\n",
@@ -578,8 +581,8 @@ pub fn tests() {
 
     it("an inline scenario that starts with And fails with no Background", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a base", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a base", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.and("a base")]),
@@ -604,8 +607,8 @@ pub fn tests() {
 
     it("an inline Background that starts with But fails the scenario", fn() {
       let registry =
-        steps.new()
-        |> steps.given("a base", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.given("a base", steps.Check(gherkin_step_ok))
       let suite =
         gfeature.feature_with_background(
           "F",
@@ -631,11 +634,156 @@ pub fn tests() {
       |> or_fail_with("a leading But in a Background should fail the scenario")
     }),
 
+    it("an Action gives its state to the next step", fn() {
+      let suite =
+        gfeature.feature("F", counter_registry(), [
+          gfeature.scenario("S", [
+            gfeature.given("the count is 3"),
+            gfeature.when("I add 2"),
+            gfeature.then("the count should be 5"),
+          ]),
+        ])
+
+      run_suites([suite])
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("the state should go from Given to When to Then")
+    }),
+
+    it("each scenario starts from the initial state", fn() {
+      let registry =
+        steps.new(initial: 10)
+        |> steps.then_("the count should be {int}", steps.Check(expect_count))
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.then("the count should be 10")]),
+        ])
+
+      run_suites([suite])
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("the scenario should start from the initial state")
+    }),
+
+    it("two scenarios that run in parallel do not share state", fn() {
+      let suite =
+        gfeature.feature("F", counter_registry(), [
+          gfeature.scenario("First", [
+            gfeature.when("I add 2"),
+            gfeature.then("the count should be 2"),
+          ]),
+          gfeature.scenario("Second", [
+            gfeature.when("I add 3"),
+            gfeature.then("the count should be 3"),
+          ]),
+        ])
+
+      runner.new([suite])
+      |> runner.max_concurrency(2)
+      |> runner.silent
+      |> runner.run()
+      |> test_types.report_tests
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed, test_types.Passed])
+      |> or_fail_with("each scenario should have its own state")
+    }),
+
+    it("a Check that fails gives its message to the scenario", fn() {
+      let suite =
+        gfeature.feature("F", counter_registry(), [
+          gfeature.scenario("S", [
+            gfeature.given("the count is 3"),
+            gfeature.then("the count should be 9"),
+          ]),
+        ])
+
+      run_suites([suite])
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["the count should match"]])
+      |> or_fail_with("the Check message should fail the scenario")
+    }),
+
+    it("the Background state goes to the scenario", fn() {
+      let suite =
+        gfeature.feature_with_background(
+          "F",
+          counter_registry(),
+          gfeature.background([gfeature.given("the count is 4")]),
+          [
+            gfeature.scenario("S", [
+              gfeature.when("I add 1"),
+              gfeature.then("the count should be 5"),
+            ]),
+          ],
+        )
+
+      run_suites([suite])
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("the Background state should reach the scenario")
+    }),
+
+    it("an Action Error fails the scenario and stops it", fn() {
+      let registry =
+        counter_registry()
+        |> steps.when_("the shop is closed", steps.Action(close_shop))
+        |> steps.then_("never runs", steps.Check(check_never_runs))
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [
+            gfeature.when("the shop is closed"),
+            gfeature.then("never runs"),
+          ]),
+        ])
+
+      run_suites([suite])
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["the shop is closed"]])
+      |> or_fail_with("the Action Error should fail the scenario")
+    }),
+
+    it("a step gets the id of its scenario", fn() {
+      let registry =
+        steps.new(initial: 0)
+        |> steps.then_("the id is right", steps.Check(fail_with_scenario_id))
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.then("the id is right")]),
+        ])
+
+      run_suites([suite])
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["F::S"]])
+      |> or_fail_with("the step context should hold the scenario id")
+    }),
+
+    it("a feature suite runs with a unit suite in one runner", fn() {
+      let feature_suite =
+        gfeature.feature("F", counter_registry(), [
+          gfeature.scenario("S", [gfeature.then("the count should be 0")]),
+        ])
+      let unit_suite =
+        describe("U", [it("passes", fn() { Ok(test_types.AssertionOk) })])
+
+      run_suites([feature_suite, unit_suite])
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed, test_types.Passed])
+      |> or_fail_with("both suites should run")
+    }),
+
     it("a registry with a duplicate step definition fails every scenario", fn() {
       let registry =
-        steps.new()
-        |> steps.then_("it works", gherkin_step_ok)
-        |> steps.then_("it works", gherkin_step_ok)
+        steps.new(initial: Nil)
+        |> steps.then_("it works", steps.Check(gherkin_step_ok))
+        |> steps.then_("it works", steps.Check(gherkin_step_ok))
       let suite = gfeature.feature("F", registry, [gfeature.scenario("S", [])])
 
       runner.new([suite])
@@ -657,9 +805,63 @@ pub fn tests() {
   ])
 }
 
+fn run_suites(
+  suites: List(test_types.TestSuite(Nil)),
+) -> List(test_types.TestResult) {
+  runner.new(suites)
+  |> runner.silent
+  |> runner.run()
+  |> test_types.report_tests
+}
+
+fn counter_registry() -> steps.StepRegistry(Int) {
+  steps.new(initial: 0)
+  |> steps.given("the count is {int}", steps.Action(set_count))
+  |> steps.when_("I add {int}", steps.Action(add_to_count))
+  |> steps.then_("the count should be {int}", steps.Check(expect_count))
+}
+
+fn set_count(_count: Int, context: steps.StepContext) -> Result(Int, String) {
+  steps.get_int(context.captures, 0)
+}
+
+fn add_to_count(count: Int, context: steps.StepContext) -> Result(Int, String) {
+  use amount <- result.try(steps.get_int(context.captures, 0))
+  Ok(count + amount)
+}
+
+fn expect_count(
+  count: Int,
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  use expected <- result.try(steps.get_int(context.captures, 0))
+  count
+  |> should
+  |> be_equal(expected)
+  |> or_fail_with("the count should match")
+}
+
+fn close_shop(_count: Int, _context: steps.StepContext) -> Result(Int, String) {
+  Error("the shop is closed")
+}
+
+fn check_never_runs(
+  _count: Int,
+  _context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  Error("this step should not run")
+}
+
+fn fail_with_scenario_id(
+  _count: Int,
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  Error(context.scenario_id)
+}
+
 fn run_parsed(
   content: String,
-  registry: steps.StepRegistry,
+  registry: steps.StepRegistry(Nil),
 ) -> List(test_types.TestResult) {
   case parser.parse_string(content) {
     Ok(feature) ->
@@ -679,7 +881,7 @@ const conformance_directory = "test/fixtures/gherkin_conformance/good/"
 
 fn run_file(
   path: String,
-  registry: steps.StepRegistry,
+  registry: steps.StepRegistry(Nil),
 ) -> List(test_types.TestResult) {
   case parser.parse_file(path) {
     Ok(feature) ->
@@ -696,6 +898,7 @@ fn run_file(
 }
 
 fn expect_both_arguments(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   case context.table, context.doc_string {
@@ -712,6 +915,7 @@ fn expect_both_arguments(
 }
 
 fn fail_with_doc_string(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   case context.doc_string {
@@ -721,6 +925,7 @@ fn fail_with_doc_string(
 }
 
 fn fail_with_table(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   case context.table {
@@ -744,6 +949,7 @@ fn failure_message(failure: test_types.AssertionFailure) -> String {
 }
 
 fn add_an_int_capture(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   use _count <- result.try(steps.get_int(context.captures, 0))
@@ -751,12 +957,14 @@ fn add_an_int_capture(
 }
 
 fn gherkin_step_error(
+  _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Error("boom")
 }
 
 fn expect_table(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   case context.table {
@@ -766,6 +974,7 @@ fn expect_table(
 }
 
 fn expect_doc_string(
+  _state: Nil,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   case context.doc_string {
@@ -775,6 +984,7 @@ fn expect_doc_string(
 }
 
 fn gherkin_step_ok(
+  _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
@@ -805,11 +1015,11 @@ Feature: F
 "
 }
 
-fn rules_registry() -> steps.StepRegistry {
-  steps.new()
-  |> steps.given("feature setup", gherkin_step_ok)
-  |> steps.given("rule setup", gherkin_step_ok)
-  |> steps.then_("done", gherkin_step_ok)
+fn rules_registry() -> steps.StepRegistry(Nil) {
+  steps.new(initial: Nil)
+  |> steps.given("feature setup", steps.Check(gherkin_step_ok))
+  |> steps.given("rule setup", steps.Check(gherkin_step_ok))
+  |> steps.then_("done", steps.Check(gherkin_step_ok))
 }
 
 fn examples_feature() -> String {
@@ -833,9 +1043,9 @@ fn examples_feature() -> String {
 "
 }
 
-fn examples_registry() -> steps.StepRegistry {
-  steps.new()
-  |> steps.given("the value is {int}", gherkin_step_ok)
+fn examples_registry() -> steps.StepRegistry(Nil) {
+  steps.new(initial: Nil)
+  |> steps.given("the value is {int}", steps.Check(gherkin_step_ok))
 }
 
 fn group_and_name(result: test_types.TestResult) -> #(List(String), String) {

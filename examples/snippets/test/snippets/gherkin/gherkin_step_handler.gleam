@@ -1,30 +1,26 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, get_float}
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/gherkin/steps.{type StepContext, Action, Check, get_float}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-// NOTE: We annotate `StepContext` because record field access needs a known type.
-fn step_have_balance(context: StepContext) {
+// The scenario state is the balance. An Action returns the new balance.
+fn step_have_balance(_balance: Float, context: StepContext) {
   // {float} captures the numeric value (even with $ prefix)
-  let balance = get_float(context.captures, 0) |> result.unwrap(0.0)
-  put(context.world, "balance", balance)
-  Ok(succeed())
+  get_float(context.captures, 0)
 }
 
-fn step_withdraw(context: StepContext) {
-  let current = get_or(context.world, "balance", 0.0)
-  let amount = get_float(context.captures, 0) |> result.unwrap(0.0)
-  put(context.world, "balance", current -. amount)
-  Ok(succeed())
+fn step_withdraw(balance: Float, context: StepContext) {
+  use amount <- result.try(get_float(context.captures, 0))
+  Ok(balance -. amount)
 }
 
-fn step_balance_is(context: StepContext) {
-  let expected = get_float(context.captures, 0) |> result.unwrap(0.0)
-  get_or(context.world, "balance", 0.0)
+// A Check gets the balance and returns an assertion result.
+fn step_balance_is(balance: Float, context: StepContext) {
+  use expected <- result.try(get_float(context.captures, 0))
+  balance
   |> should
   |> be_equal(expected)
   |> or_fail_with("Balance mismatch")
@@ -32,13 +28,13 @@ fn step_balance_is(context: StepContext) {
 
 pub fn register(registry) {
   registry
-  |> steps.given("I have a balance of ${float}", step_have_balance)
-  |> steps.when_("I withdraw ${float}", step_withdraw)
-  |> steps.then_("my balance should be ${float}", step_balance_is)
+  |> steps.given("I have a balance of ${float}", Action(step_have_balance))
+  |> steps.when_("I withdraw ${float}", Action(step_withdraw))
+  |> steps.then_("my balance should be ${float}", Check(step_balance_is))
 }
 
 pub fn tests() {
-  let steps = steps.new() |> register()
+  let steps = steps.new(initial: 0.0) |> register()
 
   feature("Bank Account", steps, [
     scenario("Withdrawal", [

@@ -19,7 +19,7 @@ pub fn tests() {
       let suite =
         to_test_suite(FeatureConfig(
           feature: feature,
-          step_registry: steps.new(),
+          step_registry: steps.new(initial: Nil),
         ))
 
       runner.new([suite])

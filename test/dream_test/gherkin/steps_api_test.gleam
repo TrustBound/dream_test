@@ -11,8 +11,11 @@ pub fn tests() {
     it("find_step captures two values for {int} and {word}", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("I have {int} items of {word}", steps_test_handler)
+        steps.new(initial: Nil)
+        |> steps.given(
+          "I have {int} items of {word}",
+          steps.Check(steps_test_handler),
+        )
 
       // Act
       let result =
@@ -32,8 +35,11 @@ pub fn tests() {
     it("get_int extracts captured {int}", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("I have {int} items of {word}", steps_test_handler)
+        steps.new(initial: Nil)
+        |> steps.given(
+          "I have {int} items of {word}",
+          steps.Check(steps_test_handler),
+        )
 
       // Act
       let result =
@@ -53,8 +59,11 @@ pub fn tests() {
     it("get_word extracts captured {word}", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("I have {int} items of {word}", steps_test_handler)
+        steps.new(initial: Nil)
+        |> steps.given(
+          "I have {int} items of {word}",
+          steps.Check(steps_test_handler),
+        )
 
       // Act
       let result =
@@ -74,8 +83,8 @@ pub fn tests() {
     it("get_string extracts {string} without quotes", fn() {
       // Arrange
       let registry =
-        steps.new()
-        |> steps.given("I say {string}", steps_test_handler)
+        steps.new(initial: Nil)
+        |> steps.given("I say {string}", steps.Check(steps_test_handler))
 
       // Act
       let result =
@@ -92,8 +101,16 @@ pub fn tests() {
       }
     }),
 
+    it("initial_state gives the state that new got", fn() {
+      steps.new(initial: 7)
+      |> steps.initial_state
+      |> should
+      |> be_equal(7)
+      |> or_fail_with("the registry should keep the initial state")
+    }),
+
     it("find_step returns Error for undefined steps", fn() {
-      let registry = steps.new()
+      let registry = steps.new(initial: Nil)
       case steps.find_step(registry, gtypes.GivenPhase, "I do not exist") {
         Ok(_) -> Ok(fail_with("expected undefined step error"))
         Error(_msg) -> Ok(test_types.AssertionOk)
@@ -136,22 +153,22 @@ pub fn tests() {
     }),
 
     it("find_step names a Then step in the undefined step error", fn() {
-      steps.find_step(steps.new(), gtypes.ThenPhase, "x")
+      steps.find_step(steps.new(initial: Nil), gtypes.ThenPhase, "x")
       |> should
       |> be_equal(Error("Undefined step: Then x"))
       |> or_fail_with("the error should name the Then phase")
     }),
 
     it("find_step names a When step in the undefined step error", fn() {
-      steps.find_step(steps.new(), gtypes.WhenPhase, "x")
+      steps.find_step(steps.new(initial: Nil), gtypes.WhenPhase, "x")
       |> should
       |> be_equal(Error("Undefined step: When x"))
       |> or_fail_with("the error should name the When phase")
     }),
 
     it("find_step does not match a definition of another phase", fn() {
-      steps.new()
-      |> steps.given("a b", steps_test_handler)
+      steps.new(initial: Nil)
+      |> steps.given("a b", steps.Check(steps_test_handler))
       |> steps.find_step(gtypes.ThenPhase, "a b")
       |> result.map(capture_count_of)
       |> should
@@ -160,9 +177,9 @@ pub fn tests() {
     }),
 
     it("find_step returns the duplicate step definition error", fn() {
-      steps.new()
-      |> steps.given("a b", steps_test_handler)
-      |> steps.given("a b", steps_test_handler)
+      steps.new(initial: Nil)
+      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps.Check(steps_test_handler))
       |> steps.find_step(gtypes.GivenPhase, "a b")
       |> result.map(capture_count_of)
       |> should
@@ -173,10 +190,10 @@ pub fn tests() {
     }),
 
     it("validate returns Ok for a registry without duplicates", fn() {
-      steps.new()
-      |> steps.given("a b", steps_test_handler)
-      |> steps.when_("a b", steps_test_handler)
-      |> steps.then_("a b", steps_test_handler)
+      steps.new(initial: Nil)
+      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.when_("a b", steps.Check(steps_test_handler))
+      |> steps.then_("a b", steps.Check(steps_test_handler))
       |> steps.validate
       |> should
       |> be_equal(Ok(Nil))
@@ -184,11 +201,11 @@ pub fn tests() {
     }),
 
     it("validate gives one line for each duplicate in registration order", fn() {
-      steps.new()
-      |> steps.given("a b", steps_test_handler)
-      |> steps.given("a b", steps_test_handler)
-      |> steps.then_("c", steps_test_handler)
-      |> steps.then_("c", steps_test_handler)
+      steps.new(initial: Nil)
+      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.then_("c", steps.Check(steps_test_handler))
+      |> steps.then_("c", steps.Check(steps_test_handler))
       |> steps.validate
       |> should
       |> be_equal(Error(
@@ -270,11 +287,14 @@ pub fn tests() {
 }
 
 fn steps_test_handler(
+  _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
 }
 
-fn capture_count_of(matched: step_trie.StepMatch(steps.StepHandler)) -> Int {
+fn capture_count_of(
+  matched: step_trie.StepMatch(steps.StepDefinition(Nil)),
+) -> Int {
   steps.capture_count(matched.captures)
 }

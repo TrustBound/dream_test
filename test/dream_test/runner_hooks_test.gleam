@@ -336,8 +336,8 @@ pub fn tests() {
       let _ = file.write(feature_path, content)
 
       let registry =
-        new()
-        |> steps.given("ok", step_ok)
+        new(initial: Nil)
+        |> steps.given("ok", steps.Check(step_ok))
 
       let suite =
         gherkin_discover.features(feature_path)
@@ -409,7 +409,10 @@ fn find_result_by_name(
   }
 }
 
-fn step_ok(_context: StepContext) -> Result(AssertionResult, String) {
+fn step_ok(
+  _state: Nil,
+  _context: StepContext,
+) -> Result(AssertionResult, String) {
   Ok(AssertionOk)
 }
 

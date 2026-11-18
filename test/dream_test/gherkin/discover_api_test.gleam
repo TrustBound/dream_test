@@ -99,7 +99,7 @@ pub fn tests() {
 
         let suite =
           discover.features("./test/tmp/features/discover_bad_suite.feature")
-          |> discover.with_registry(steps.new())
+          |> discover.with_registry(steps.new(initial: Nil))
           |> discover.to_suite("Features")
 
         // Act
@@ -149,7 +149,7 @@ pub fn tests() {
 
       let suite =
         discover.features("./test/tmp/features/discover_name.feature")
-        |> discover.with_registry(steps.new())
+        |> discover.with_registry(steps.new(initial: Nil))
         |> discover.to_suite("Features")
 
       test_names(suite.children)
@@ -165,7 +165,7 @@ pub fn tests() {
 
       let suite =
         discover.features("./test/tmp/features/discover: colon.feature")
-        |> discover.with_registry(steps.new())
+        |> discover.with_registry(steps.new(initial: Nil))
         |> discover.to_suite("Features")
 
       test_sources(suite.children)
@@ -180,7 +180,8 @@ pub fn tests() {
           "./test/tmp/features/discover_good.feature",
           "Feature: Good\n  Scenario: One\n    Given a thing\n",
         )
-      let registry = steps.new() |> steps.given("a thing", step_ok)
+      let registry =
+        steps.new(initial: Nil) |> steps.given("a thing", steps.Check(step_ok))
 
       let suite =
         discover.features("./test/tmp/features/discover_good.feature")
@@ -225,6 +226,7 @@ fn result_status(result: test_types.TestResult) -> test_types.Status {
 }
 
 fn step_ok(
+  _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)

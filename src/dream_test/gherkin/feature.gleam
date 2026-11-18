@@ -10,13 +10,13 @@
 ////
 //// ```gleam
 //// pub fn tests() {
-////   // Define step handlers
+////   // Define the steps and the state each scenario starts from
 ////   let steps =
-////     steps.new()
-////     |> given("the server is running", step_server_running)
-////     |> given("the cart is empty", step_empty_cart)
-////     |> when_("I add {int} items", step_add_items)
-////     |> then_("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> given("the server is running", Action(step_server_running))
+////     |> given("the cart is empty", Action(step_empty_cart))
+////     |> when_("I add {int} items", Action(step_add_items))
+////     |> then_("the cart should have {int} items", Check(step_verify_count))
 ////
 ////   // Parse the .feature file
 ////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -32,11 +32,11 @@
 //// ```gleam
 //// pub fn tests() {
 ////   let steps =
-////     steps.new()
-////     |> given("the server is running", step_server_running)
-////     |> given("the cart is empty", step_empty_cart)
-////     |> when_("I add {int} items", step_add_items)
-////     |> then_("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> given("the server is running", Action(step_server_running))
+////     |> given("the cart is empty", Action(step_empty_cart))
+////     |> when_("I add {int} items", Action(step_add_items))
+////     |> then_("the cart should have {int} items", Check(step_verify_count))
 ////
 ////   let bg = background([given("the server is running")])
 ////
@@ -59,10 +59,10 @@
 
 import dream_test/gherkin/step_trie.{type StepMatch}
 import dream_test/gherkin/steps.{
-  type StepContext, type StepHandler, type StepRegistry, StepContext,
+  type StepContext, type StepDefinition, type StepRegistry, Action, Check,
+  StepContext,
 }
 import dream_test/gherkin/types as gherkin_types
-import dream_test/gherkin/world.{type World}
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
   AssertionFailure, AssertionOk, GherkinScenario, Group, NoInput, Root, Test,
@@ -79,13 +79,14 @@ import gleam/string
 /// Configuration for running a feature.
 ///
 /// Contains the parsed feature and step registry needed to execute it.
+/// `state` is the scenario state type of the step registry.
 ///
-pub type FeatureConfig {
+pub type FeatureConfig(state) {
   FeatureConfig(
     /// The parsed feature to run
     feature: gherkin_types.Feature,
     /// Registry of step definitions
-    step_registry: StepRegistry,
+    step_registry: StepRegistry(state),
   )
 }
 
@@ -161,7 +162,7 @@ pub type InlineStep {
 /// let config = FeatureConfig(feature: feature, step_registry: steps)
 /// to_test_suite(config)
 /// ```
-pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
+pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite(Nil) {
   let feature = config.feature
   let scope =
     ScenarioScope(
@@ -183,11 +184,11 @@ pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
 }
 
 /// What the scenarios of a Feature or a Rule share.
-type ScenarioScope {
+type ScenarioScope(state) {
   ScenarioScope(
     feature_name: String,
     source: Option(String),
-    registry: StepRegistry,
+    registry: StepRegistry(state),
     rule_groups: List(String),
     background_steps: List(gherkin_types.Step),
   )
@@ -203,7 +204,7 @@ fn background_steps(
 }
 
 fn rules_to_nodes(
-  scope: ScenarioScope,
+  scope: ScenarioScope(state),
   rules: List(gherkin_types.Rule),
   nodes_newest_first: List(Node(Nil)),
 ) -> List(Node(Nil)) {
@@ -217,7 +218,10 @@ fn rules_to_nodes(
   }
 }
 
-fn rule_to_node(scope: ScenarioScope, rule: gherkin_types.Rule) -> Node(Nil) {
+fn rule_to_node(
+  scope: ScenarioScope(state),
+  rule: gherkin_types.Rule,
+) -> Node(Nil) {
   let group_name = string.trim_end("Rule: " <> rule.name)
   let rule_scope =
     ScenarioScope(
@@ -236,7 +240,7 @@ fn rule_to_node(scope: ScenarioScope, rule: gherkin_types.Rule) -> Node(Nil) {
 }
 
 fn scenarios_to_nodes(
-  scope: ScenarioScope,
+  scope: ScenarioScope(state),
   scenarios: List(gherkin_types.Scenario),
   nodes_newest_first: List(Node(Nil)),
 ) -> List(Node(Nil)) {
@@ -259,7 +263,7 @@ fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
 }
 
 fn scenario_to_nodes(
-  scope: ScenarioScope,
+  scope: ScenarioScope(state),
   scenario: gherkin_types.Scenario,
 ) -> List(Node(Nil)) {
   case scenario.examples {
@@ -282,7 +286,7 @@ type ScenarioRun {
   ScenarioRun(name: String, tags: List(String), steps: List(gherkin_types.Step))
 }
 
-fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
+fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
   let full_name =
     list.flatten([[scope.feature_name], scope.rule_groups, [run.name]])
   let scenario_id = string.join(full_name, "::")
@@ -315,7 +319,7 @@ fn with_background(
 /// Build the tests of every row of every Examples table. `index` counts the
 /// rows of all tables of the scenario, from 1.
 fn examples_to_nodes(
-  scope: ScenarioScope,
+  scope: ScenarioScope(state),
   scenario: gherkin_types.Scenario,
   examples: List(gherkin_types.Examples),
   index: Int,
@@ -349,7 +353,7 @@ type ExampleRows {
 }
 
 fn rows_to_nodes(
-  scope: ScenarioScope,
+  scope: ScenarioScope(state),
   rows: ExampleRows,
   values: List(List(String)),
   index: Int,
@@ -509,7 +513,7 @@ fn substitute_placeholders(
 fn execute_scenario(
   scenario_id: String,
   steps: List(gherkin_types.Step),
-  registry: StepRegistry,
+  registry: StepRegistry(state),
 ) -> Result(AssertionResult, String) {
   case steps.validate(registry) {
     Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry))
@@ -517,33 +521,34 @@ fn execute_scenario(
   }
 }
 
-/// Find the phase of every step before any step runs, so a step with no
-/// phase fails the scenario before the Background has side effects.
 fn resolve_and_execute(
   scenario_id: String,
   steps: List(gherkin_types.Step),
-  registry: StepRegistry,
+  registry: StepRegistry(state),
 ) -> AssertionResult {
   case resolve_phases(steps, None, []) {
-    Ok(phased_steps) -> execute_in_world(scenario_id, phased_steps, registry)
+    Ok(phased_steps) ->
+      execute_steps(
+        ScenarioExecution(scenario_id: scenario_id, registry: registry),
+        phased_steps,
+        steps.initial_state(registry),
+      )
     Error(message) -> step_failure(message)
   }
 }
 
-fn execute_in_world(
-  scenario_id: String,
-  phased_steps: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
-  registry: StepRegistry,
-) -> AssertionResult {
-  let the_world = world.new_world(scenario_id)
-  let result = execute_steps(phased_steps, registry, the_world)
-  world.cleanup(the_world)
-  result
+/// The data that stays the same for every step of one scenario.
+type ScenarioExecution(state) {
+  ScenarioExecution(scenario_id: String, registry: StepRegistry(state))
 }
 
-/// Pair each step with its phase. The Background steps come first in
-/// `steps`, so the first scenario step takes the phase of the last
-/// Background step.
+/// The result of one step: run the next step with this state, or stop the
+/// scenario with this result.
+type StepOutcome(state) {
+  Continue(state: state)
+  Stop(result: AssertionResult)
+}
+
 fn resolve_phases(
   steps: List(gherkin_types.Step),
   previous: Option(gherkin_types.StepPhase),
@@ -578,55 +583,75 @@ fn no_previous_step_message(step: gherkin_types.Step) -> String {
 }
 
 fn execute_steps(
+  execution: ScenarioExecution(state),
   phased_steps: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
-  registry: StepRegistry,
-  the_world: World,
+  state: state,
 ) -> AssertionResult {
   case phased_steps {
     [] -> AssertionOk
     [#(step, phase), ..rest] ->
       continue_after(
-        execute_step(step, phase, registry, the_world),
+        execution,
+        execute_step(execution, step, phase, state),
         rest,
-        registry,
-        the_world,
       )
   }
 }
 
 fn continue_after(
-  result: AssertionResult,
+  execution: ScenarioExecution(state),
+  outcome: StepOutcome(state),
   rest: List(#(gherkin_types.Step, gherkin_types.StepPhase)),
-  registry: StepRegistry,
-  the_world: World,
 ) -> AssertionResult {
-  case result {
-    AssertionOk -> execute_steps(rest, registry, the_world)
-    failure -> failure
+  case outcome {
+    Continue(state) -> execute_steps(execution, rest, state)
+    Stop(result) -> result
   }
 }
 
 fn execute_step(
+  execution: ScenarioExecution(state),
   step: gherkin_types.Step,
   phase: gherkin_types.StepPhase,
-  registry: StepRegistry,
-  the_world: World,
-) -> AssertionResult {
-  case steps.find_step(registry, phase, step.text) {
-    Ok(match) -> run_handler(match, step, the_world)
-    Error(message) -> step_failure(message)
+  state: state,
+) -> StepOutcome(state) {
+  case steps.find_step(execution.registry, phase, step.text) {
+    Ok(match) ->
+      run_definition(
+        match.handler,
+        build_step_context(execution, match, step),
+        state,
+      )
+    Error(message) -> Stop(step_failure(message))
   }
 }
 
-fn run_handler(
-  match: StepMatch(StepHandler),
-  step: gherkin_types.Step,
-  the_world: World,
-) -> AssertionResult {
-  let context = build_step_context(match, step, the_world)
-  case match.handler(context) {
-    Ok(result) -> result
-    Error(message) -> step_failure(message)
+fn run_definition(
+  definition: StepDefinition(state),
+  context: StepContext,
+  state: state,
+) -> StepOutcome(state) {
+  case definition {
+    Action(run) -> action_outcome(run(state, context))
+    Check(run) -> check_outcome(run(state, context), state)
+  }
+}
+
+fn action_outcome(result: Result(state, String)) -> StepOutcome(state) {
+  case result {
+    Ok(new_state) -> Continue(new_state)
+    Error(message) -> Stop(step_failure(message))
+  }
+}
+
+fn check_outcome(
+  result: Result(AssertionResult, String),
+  state: state,
+) -> StepOutcome(state) {
+  case result {
+    Ok(AssertionOk) -> Continue(state)
+    Ok(failure) -> Stop(failure)
+    Error(message) -> Stop(step_failure(message))
   }
 }
 
@@ -639,18 +664,15 @@ fn step_failure(message: String) -> AssertionResult {
 }
 
 fn build_step_context(
-  match: StepMatch(StepHandler),
+  execution: ScenarioExecution(state),
+  match: StepMatch(StepDefinition(state)),
   step: gherkin_types.Step,
-  the_world: World,
 ) -> StepContext {
-  let table = extract_table_from_step(step)
-  let doc_string = extract_doc_string_from_step(step)
-
   StepContext(
     captures: match.captures,
-    table: table,
-    doc_string: doc_string,
-    world: the_world,
+    table: extract_table_from_step(step),
+    doc_string: extract_doc_string_from_step(step),
+    scenario_id: execution.scenario_id,
   )
 }
 
@@ -693,10 +715,10 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 ///
 /// ```gleam
 /// let steps =
-///   steps.new()
-///   |> given("I have {int} items in my cart", step_have_items)
-///   |> when_("I add {int} more items", step_add_items)
-///   |> then_("I should have {int} items total", step_should_have)
+///   steps.new(initial: 0)
+///   |> given("I have {int} items in my cart", Action(step_have_items))
+///   |> when_("I add {int} more items", Action(step_add_items))
+///   |> then_("I should have {int} items total", Check(step_should_have))
 ///
 /// feature("Shopping Cart", steps, [
 ///   scenario("Adding items to cart", [
@@ -709,7 +731,7 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 /// ```
 pub fn feature(
   name name: String,
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   scenarios scenarios: List(InlineScenario),
 ) -> TestSuite(Nil) {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
@@ -925,7 +947,7 @@ pub fn background(
 /// ```
 pub fn feature_with_background(
   name name: String,
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   background_steps background_steps: List(gherkin_types.Step),
   scenarios scenarios: List(InlineScenario),
 ) -> TestSuite(Nil) {

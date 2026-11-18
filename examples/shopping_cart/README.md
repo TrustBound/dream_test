@@ -59,7 +59,7 @@ Feature: Shopping Cart
 
 Define features directly in Gleam:
 
-#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/features/shopping_cart.gleam#L24-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/features/shopping_cart.gleam#L25-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
   feature_with_background("Shopping Cart (inline)", registry, bg, [
@@ -77,17 +77,47 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
-### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L19-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+Each scenario starts from `cart_world.initial()` and passes one `CartWorld` value from step to step. An `Action` step returns a new `CartWorld`. A `Check` step reads it.
 
 ```gleam
-pub fn register(registry: StepRegistry) -> StepRegistry {
+pub type CartWorld {
+  CartWorld(
+    /// The cart that the steps change
+    cart: cart_types.Cart,
+    /// What happened at checkout
+    checkout: Checkout,
+    /// The error of the last cart operation that failed, if any
+    last_error: Option(String),
+  )
+}
+
+/// What happened at checkout.
+pub type Checkout {
+  NotCheckedOut
+  CheckedOut(result: cart_types.CheckoutResult)
+  CheckoutFailed(reason: String)
+}
+```
+
+### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L18-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.given("I have an empty cart", step_empty_cart)
-  |> steps.given("I add {int} {word} to the cart", step_add_product)
-  |> steps.when_("I add {int} {word} to the cart", step_add_product)
-  |> steps.when_("I try to add {int} {word} to the cart", step_try_add_product)
-  |> steps.when_("I update the {word} quantity to {int}", step_update_quantity)
-  |> steps.when_("I remove {word} from the cart", step_remove_product)
+  |> steps.given("I have an empty cart", Action(step_empty_cart))
+  |> steps.given("I add {int} {word} to the cart", Action(step_add_product))
+  |> steps.when_("I add {int} {word} to the cart", Action(step_add_product))
+  |> steps.when_(
+    "I try to add {int} {word} to the cart",
+    Action(step_try_add_product),
+  )
+  |> steps.when_(
+    "I update the {word} quantity to {int}",
+    Action(step_update_quantity),
+  )
+  |> steps.when_("I remove {word} from the cart", Action(step_remove_product))
 }
 ```
 

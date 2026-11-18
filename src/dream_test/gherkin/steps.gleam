@@ -2,18 +2,50 @@
 ////
 //// Use this module to:
 ////
-//// - Build a `StepRegistry` by registering patterns and handlers.
+//// - Build a `StepRegistry(state)` with the state type of your feature, its
+////   initial value, and one step definition for each pattern.
 //// - Match step text against registered patterns (including typed placeholders).
 //// - Extract typed captures (`{int}`, `{float}`, `{string}`, `{word}`, `{}`).
+////
+//// ## Scenario state
+////
+//// Each feature has one state type that you choose, for example a record with
+//// a cart and a checkout result. `new(initial:)` gets its initial value. Each
+//// scenario starts from the initial value in its own process. The steps of the
+//// scenario then pass the value from one step to the next:
+////
+//// - An `Action` step gets the state and returns the new state, or an error.
+//// - A `Check` step gets the state and returns an assertion result. It cannot
+////   change the state.
+////
+//// The state is an immutable value, so two scenarios cannot share it, and
+//// nothing needs cleanup after a scenario.
 ////
 //// ## Example
 ////
 //// ```gleam
-////   let steps =
-////     new()
-////     |> given("I have {int} items in my cart", step_have_items)
-////     |> when_("I add {int} more items", step_add_items)
-////     |> then_("I should have {int} items total", step_should_have)
+//// fn step_have_items(_count: Int, context: StepContext) {
+////   get_int(context.captures, 0)
+//// }
+////
+//// fn step_add_items(count: Int, context: StepContext) {
+////   use added <- result.try(get_int(context.captures, 0))
+////   Ok(count + added)
+//// }
+////
+//// fn step_should_have(count: Int, context: StepContext) {
+////   use expected <- result.try(get_int(context.captures, 0))
+////   count
+////   |> should
+////   |> be_equal(expected)
+////   |> or_fail_with("Cart count mismatch")
+//// }
+////
+//// let steps =
+////   new(initial: 0)
+////   |> given("I have {int} items in my cart", Action(step_have_items))
+////   |> when_("I add {int} more items", Action(step_add_items))
+////   |> then_("I should have {int} items total", Check(step_should_have))
 //// ```
 ////
 //// ## Phases
@@ -21,7 +53,7 @@
 //// Every step definition belongs to exactly one phase: `given` (Arrange),
 //// `when_` (Act) or `then_` (Assert). A step matches only the definitions of
 //// its phase. `And`, `But` and `*` steps take the phase of the step before
-//// them.
+//// them. A definition of any phase can be an `Action` or a `Check`.
 ////
 //// Each pattern can have one definition for each phase. A second definition
 //// of the same pattern in the same phase is an error: `find_step` and
@@ -40,6 +72,13 @@
 ////
 //// Placeholders can include literal prefixes/suffixes. For example, `${float}`
 //// matches `$19.99` but captures `19.99` as a `Float`.
+////
+//// ## Capture errors
+////
+//// The capture helpers return a `Result`. Pass the error on with
+//// `result.try`, so the scenario fails with a message that names the capture,
+//// for example `Capture 0 is the word "apples", not an integer`. Do not hide
+//// the error with `result.unwrap`: the scenario then runs with a wrong value.
 
 import dream_test/gherkin/step_trie.{
   type CapturedValue, type StepMatch, type StepTrie, CapturedFloat, CapturedInt,
@@ -48,7 +87,6 @@ import dream_test/gherkin/step_trie.{
 import dream_test/gherkin/types.{
   type StepPhase, GivenPhase, ThenPhase, WhenPhase,
 }
-import dream_test/gherkin/world.{type World}
 import dream_test/types as dream_types
 import gleam/float
 import gleam/int
@@ -60,13 +98,20 @@ import gleam/string
 // Types
 // ============================================================================
 
-/// Context passed to every step handler.
+/// The data of the step that runs, apart from the scenario state.
 ///
-/// Contains everything a step needs to execute:
 /// - `captures` - Values captured from pattern placeholders
 /// - `table` - Optional DataTable argument from the step
 /// - `doc_string` - Optional DocString argument from the step
-/// - `world` - Mutable scenario state
+/// - `scenario_id` - The id of the scenario, unique in the run
+///
+/// ## Example
+///
+/// ```gleam
+/// fn step_order_name(_order: Order, context: StepContext) {
+///   Ok(Order(name: context.scenario_id))
+/// }
+/// ```
 ///
 pub type StepContext {
   StepContext(
@@ -76,41 +121,68 @@ pub type StepContext {
     table: Option(List(List(String))),
     /// Optional DocString attached to the step
     doc_string: Option(String),
-    /// Mutable scenario state for sharing data between steps
-    world: World,
+    /// The scenario id: the Feature name, the Rule group (if any) and the
+    /// scenario name, joined with `::`, for example
+    /// `"Shopping Cart::Adding items"`. Use it to make names (for example
+    /// database rows or files) that no other scenario uses.
+    scenario_id: String,
   )
 }
 
-/// Type alias for step handler functions.
+/// What a step does with the scenario state.
 ///
-/// All step handlers have the same signature: they receive a StepContext
-/// and return `Result(AssertionResult, String)`, just like unit test bodies.
+/// - `Action(run)`: `run` gets the state and the step context, and returns
+///   the new state. An `Error(message)` fails the scenario with `message`,
+///   and the steps after it do not run.
+/// - `Check(run)`: `run` gets the state and the step context, and returns an
+///   assertion result, like a unit test body. A failed assertion or an
+///   `Error(message)` fails the scenario, and the steps after it do not run.
+///   The next step gets the same state.
 ///
-/// This means you can use the exact same assertion style inside steps:
+/// ## Example
 ///
 /// ```gleam
-/// fn step_should_have(context: StepContext) {
-///   let expected = get_int(context.captures, 0) |> result.unwrap(0)
-///   get_or(context.world, "cart", 0)
+/// fn step_add_items(count: Int, context: StepContext) {
+///   use added <- result.try(get_int(context.captures, 0))
+///   Ok(count + added)
+/// }
+///
+/// fn step_should_have(count: Int, context: StepContext) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   count
 ///   |> should
 ///   |> be_equal(expected)
 ///   |> or_fail_with("Cart count mismatch")
 /// }
+///
+/// let steps =
+///   new(initial: 0)
+///   |> when_("I add {int} more items", Action(step_add_items))
+///   |> then_("I should have {int} items total", Check(step_should_have))
 /// ```
 ///
-pub type StepHandler =
-  fn(StepContext) -> Result(dream_types.AssertionResult, String)
+pub type StepDefinition(state) {
+  /// A step that changes the state.
+  Action(run: fn(state, StepContext) -> Result(state, String))
+  /// A step that makes sure the state is correct.
+  Check(
+    run: fn(state, StepContext) -> Result(dream_types.AssertionResult, String),
+  )
+}
 
 /// Step registry backed by radix trie.
 ///
-/// Stores step definitions and provides fast lookup.
+/// Stores the initial scenario state and the step definitions, and provides
+/// fast lookup.
 ///
 /// “Fast” here means lookup cost grows with the **length of the step text**,
 /// not with how many step definitions you’ve registered.
 ///
-pub opaque type StepRegistry {
+pub opaque type StepRegistry(state) {
   StepRegistry(
-    trie: StepTrie(StepHandler),
+    /// The state that each scenario starts from.
+    initial: state,
+    trie: StepTrie(StepDefinition(state)),
     /// Duplicate step definition errors, newest first.
     errors_newest_first: List(String),
   )
@@ -120,24 +192,38 @@ pub opaque type StepRegistry {
 // Registry Construction
 // ============================================================================
 
-/// Create an empty step registry.
+/// Create an empty step registry with the initial scenario state.
 ///
-/// Start with this and chain `given`, `when_`, `then_` calls to add steps.
+/// Each scenario that runs with this registry starts from `initial`. Chain
+/// `given`, `when_` and `then_` calls to add steps.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let steps =
-///   new()
-///   |> given("I have {int} items", step_int)
-///   |> given("the price is ${float}", step_float)
-///   |> given("the message is {string}", step_string)
-///   |> given("the user is {word}", step_word)
-///   |> then_("everything works", step_pass)
+///   new(initial: 0)
+///   |> given("I have {int} items", Action(step_have_items))
+///   |> then_("I should have {int} items", Check(step_should_have))
 /// ```
 ///
-pub fn new() -> StepRegistry {
-  StepRegistry(trie: step_trie.new(), errors_newest_first: [])
+pub fn new(initial initial: state) -> StepRegistry(state) {
+  StepRegistry(initial: initial, trie: step_trie.new(), errors_newest_first: [])
+}
+
+/// Get the state that each scenario starts from.
+///
+/// ## Example
+///
+/// ```gleam
+///       new(initial: 7)
+///       |> initial_state
+///       |> should
+///       |> be_equal(7)
+///       |> or_fail_with("the registry should keep the initial state")
+/// ```
+///
+pub fn initial_state(registry registry: StepRegistry(state)) -> state {
+  registry.initial
 }
 
 /// Register a Given step definition.
@@ -148,7 +234,7 @@ pub fn new() -> StepRegistry {
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `handler`: Handler function to execute
+/// - `definition`: An `Action` or a `Check`
 ///
 /// ## Returns
 ///
@@ -157,15 +243,16 @@ pub fn new() -> StepRegistry {
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new() |> given("I have {int} items", step_pass)
+///       let registry =
+///         new(initial: 0) |> given("I have {int} items", Action(step_count))
 /// ```
 ///
 pub fn given(
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   pattern pattern: String,
-  handler handler: StepHandler,
-) -> StepRegistry {
-  register(registry, GivenPhase, pattern, handler)
+  definition definition: StepDefinition(state),
+) -> StepRegistry(state) {
+  register(registry, GivenPhase, pattern, definition)
 }
 
 /// Register a When step definition.
@@ -178,7 +265,7 @@ pub fn given(
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `handler`: Handler function to execute
+/// - `definition`: An `Action` or a `Check`
 ///
 /// ## Returns
 ///
@@ -187,15 +274,16 @@ pub fn given(
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new() |> when_("I add {int} items", step_pass)
+///       let registry =
+///         new(initial: 0) |> when_("I add {int} items", Action(step_add))
 /// ```
 ///
 pub fn when_(
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   pattern pattern: String,
-  handler handler: StepHandler,
-) -> StepRegistry {
-  register(registry, WhenPhase, pattern, handler)
+  definition definition: StepDefinition(state),
+) -> StepRegistry(state) {
+  register(registry, WhenPhase, pattern, definition)
 }
 
 /// Register a Then step definition.
@@ -208,7 +296,7 @@ pub fn when_(
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `handler`: Handler function to execute
+/// - `definition`: An `Action` or a `Check`
 ///
 /// ## Returns
 ///
@@ -217,25 +305,27 @@ pub fn when_(
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new() |> then_("I should have {int} items", step_pass)
+///       let registry =
+///         new(initial: 0)
+///         |> then_("I should have {int} items", Check(step_should_have))
 /// ```
 ///
 pub fn then_(
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   pattern pattern: String,
-  handler handler: StepHandler,
-) -> StepRegistry {
-  register(registry, ThenPhase, pattern, handler)
+  definition definition: StepDefinition(state),
+) -> StepRegistry(state) {
+  register(registry, ThenPhase, pattern, definition)
 }
 
 /// Add a step definition, or record a duplicate step definition error.
 fn register(
-  registry: StepRegistry,
+  registry: StepRegistry(state),
   phase: StepPhase,
   pattern: String,
-  handler: StepHandler,
-) -> StepRegistry {
-  case step_trie.insert(registry.trie, phase, pattern, handler) {
+  definition: StepDefinition(state),
+) -> StepRegistry(state) {
+  case step_trie.insert(registry.trie, phase, pattern, definition) {
     Ok(updated) -> StepRegistry(..registry, trie: updated)
     Error(message) ->
       StepRegistry(..registry, errors_newest_first: [
@@ -264,9 +354,9 @@ fn register(
 /// ## Example
 ///
 /// ```gleam
-///       new()
-///       |> given("I have {int} items", step_pass)
-///       |> given("I have {int} items", step_pass)
+///       new(initial: 0)
+///       |> given("I have {int} items", Action(step_count))
+///       |> given("I have {int} items", Action(step_count))
 ///       |> validate
 ///       |> should
 ///       |> be_equal(Error(
@@ -275,7 +365,7 @@ fn register(
 ///       |> or_fail_with("expected a duplicate step definition error")
 /// ```
 ///
-pub fn validate(registry registry: StepRegistry) -> Result(Nil, String) {
+pub fn validate(registry registry: StepRegistry(state)) -> Result(Nil, String) {
   case registry.errors_newest_first {
     [] -> Ok(Nil)
     errors -> Error(string.join(list.reverse(errors), "\n"))
@@ -288,8 +378,9 @@ pub fn validate(registry registry: StepRegistry) -> Result(Nil, String) {
 
 /// Find a matching step definition.
 ///
-/// Searches the registry for a handler of the given phase that matches the
-/// text. Returns the handler and captured values on success, or an error
+/// Searches the registry for a definition of the given phase that matches
+/// the text. Returns the definition (as `handler`) and captured values on
+/// success, or an error
 /// message. A registry with duplicate step definitions gives the error of
 /// `validate`.
 ///
@@ -324,13 +415,14 @@ pub fn validate(registry registry: StepRegistry) -> Result(Nil, String) {
 ///
 /// ## Returns
 ///
-/// - `Ok(StepMatch)`: Contains matched handler and captured values
+/// - `Ok(StepMatch)`: Contains the matched definition and captured values
 /// - `Error(String)`: Error message if no match found
 ///
 /// ## Example
 ///
 /// ```gleam
-///       let registry = new() |> given("I have {int} items", step_pass)
+///       let registry =
+///         new(initial: 0) |> given("I have {int} items", Action(step_count))
 ///
 ///       use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
 ///
@@ -341,10 +433,10 @@ pub fn validate(registry registry: StepRegistry) -> Result(Nil, String) {
 /// ```
 ///
 pub fn find_step(
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   phase phase: StepPhase,
   text text: String,
-) -> Result(StepMatch(StepHandler), String) {
+) -> Result(StepMatch(StepDefinition(state)), String) {
   case validate(registry) {
     Ok(Nil) -> lookup_step(registry, phase, text)
     Error(message) -> Error(message)
@@ -352,10 +444,10 @@ pub fn find_step(
 }
 
 fn lookup_step(
-  registry: StepRegistry,
+  registry: StepRegistry(state),
   phase: StepPhase,
   text: String,
-) -> Result(StepMatch(StepHandler), String) {
+) -> Result(StepMatch(StepDefinition(state)), String) {
   case step_trie.lookup(registry.trie, phase, text) {
     Some(match) -> Ok(match)
     None ->
@@ -380,10 +472,8 @@ fn lookup_step(
 /// ## Example
 ///
 /// ```gleam
-/// fn step_int(context: StepContext) {
-///   let value = get_int(context.captures, 0) |> result.unwrap(0)
-///   put(context.world, "int", value)
-///   Ok(succeed())
+/// fn step_int(_value: Int, context: StepContext) {
+///   get_int(context.captures, 0)
 /// }
 /// ```
 ///
@@ -411,10 +501,8 @@ pub fn get_int(
 /// ## Example
 ///
 /// ```gleam
-/// fn step_float(context: StepContext) {
-///   let value = get_float(context.captures, 0) |> result.unwrap(0.0)
-///   put(context.world, "float", value)
-///   Ok(succeed())
+/// fn step_float(_value: Float, context: StepContext) {
+///   get_float(context.captures, 0)
 /// }
 /// ```
 ///
@@ -442,10 +530,8 @@ pub fn get_float(
 /// ## Example
 ///
 /// ```gleam
-/// fn step_string(context: StepContext) {
-///   let value = get_string(context.captures, 0) |> result.unwrap("")
-///   put(context.world, "string", value)
-///   Ok(succeed())
+/// fn step_string(_value: String, context: StepContext) {
+///   get_string(context.captures, 0)
 /// }
 /// ```
 ///
@@ -474,10 +560,8 @@ pub fn get_string(
 /// ## Example
 ///
 /// ```gleam
-/// fn step_word(context: StepContext) {
-///   let value = get_word(context.captures, 0) |> result.unwrap("")
-///   put(context.world, "word", value)
-///   Ok(succeed())
+/// fn step_word(_value: String, context: StepContext) {
+///   get_word(context.captures, 0)
 /// }
 /// ```
 ///
