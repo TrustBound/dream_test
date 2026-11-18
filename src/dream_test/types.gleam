@@ -780,15 +780,15 @@ fn scope_text(scope: List(String)) -> String {
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
 /// - `SetupStopped(set_up, scope, reason)`: a set-up stopped. The process
-///   that keeps its set-up alive exited after its set-up hooks, for
-///   example because a process that a `before_all` hook linked to it
-///   crashed. `set_up` is the set-up hook. `scope` is the group path for
-///   `BeforeAllHook`, the suite name for `BeforeEachSuiteHook` and `[]`
-///   for `BeforeAllSuitesHook`. `reason` is the exit reason of the
-///   process. The tests of the scope that had not started are not run:
-///   each one is `SetupFailed` with the failure of
-///   `setup_stopped_failure`. The tear-down hooks of the scope run in a
-///   new process.
+///   that keeps its set-up alive exited while or after its set-up hooks
+///   ran, for example because a `before_all` hook killed it, or a process
+///   that the hook linked to it crashed. `set_up` is the set-up hook.
+///   `scope` is the group path for `BeforeAllHook`, the suite name for
+///   `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`. `reason`
+///   is the exit reason of the process. The tests of the scope that had
+///   not started are not run: each one is `SetupFailed` with the failure
+///   of `setup_stopped_failure`. The tear-down hooks of the scope run in
+///   a new process.
 ///
 /// ## Example
 ///

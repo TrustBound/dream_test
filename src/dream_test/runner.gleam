@@ -872,7 +872,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
   }
 
   let all_suites_timeout_ms = builder.config.default_timeout_ms
-  let #(all_suites_owner, before_all_result) =
+  let before_all_result =
     run_suite_level_hooks(
       SuiteSetUp(
         hooks: builder.runner_before_all_suites,
@@ -886,7 +886,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
   let #(collected, completed2, all_suites_owner_after_run) = case
     before_all_result
   {
-    Ok(_) ->
+    SuiteSetUpRan(owner: all_suites_owner) ->
       run_suites_with_hooks(
         suite_runs_with_infos,
         builder.config,
@@ -899,9 +899,9 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
         builder.runner_before_each_test,
         builder.runner_after_each_test,
         Collected(tests: [], teardown_failures: []),
-        alive_suite_owner(all_suites_owner),
+        all_suites_owner,
       )
-    Error(message) -> {
+    SuiteSetUpFailed(owner: all_suites_owner, message: message) -> {
       let setup_failures =
         setup_failed_results_from_suites(
           suite_infos,
@@ -1198,17 +1198,34 @@ fn checked_suite_owner(
   }
 }
 
+/// The result of the suite-level set-up hooks of a scope, by cause.
+type SuiteSetUpResult(input) {
+  /// Every hook returned `Ok`, or the owner process exited. `owner` is
+  /// `SuiteOwnerGone` when the owner exited: the set-up stopped, so the
+  /// tests of the scope are not run, and its tear-down hooks run in a new
+  /// owner. `owner` is `None` when the scope has no set-up hook.
+  SuiteSetUpRan(owner: Option(SuiteScopeOwner(input)))
+  /// A hook returned `Error`, crashed inside the hook call, or timed out.
+  /// `message` names the scope for a crash or a timeout. `owner` is the
+  /// owner when it is still alive.
+  SuiteSetUpFailed(owner: Option(SuiteOwner(input)), message: String)
+}
+
 /// Run suite-level set-up hooks in order, in the owner process of their
-/// scope, and stop at the first error. The first hook starts the owner, so
-/// a resource that a hook starts lives until the owner stops after the
-/// tear-down hooks. Each hook gets the timeout of the scope. A timeout or
-/// a crash becomes an `Error` that names the scope.
+/// scope, and stop at the first failure or when the owner exits. The
+/// first hook starts the owner, so a resource that a hook starts lives
+/// until the owner stops after the tear-down hooks. Each hook gets the
+/// timeout of the scope.
+///
+/// A hook that returns `Error`, crashes or times out is a failure of the
+/// hook. An owner process that exits, while a hook runs or between two
+/// hooks, stops the set-up.
 fn run_suite_level_hooks(
   set_up: SuiteSetUp(input),
   owner: Option(SuiteOwner(input)),
-) -> #(Option(SuiteOwner(input)), Result(Nil, String)) {
+) -> SuiteSetUpResult(input) {
   case set_up.hooks {
-    [] -> #(owner, Ok(Nil))
+    [] -> SuiteSetUpRan(owner: alive_suite_owner(owner))
     [hook, ..rest] ->
       suite_set_up_result(
         SuiteSetUp(..set_up, hooks: rest),
@@ -1225,23 +1242,24 @@ fn run_suite_level_hooks(
 fn suite_set_up_result(
   rest: SuiteSetUp(input),
   owner_result: OwnerResult(SuiteHookCall(input), Result(Nil, String)),
-) -> #(Option(SuiteOwner(input)), Result(Nil, String)) {
+) -> SuiteSetUpResult(input) {
   case owner_result {
     OwnerReturned(owner: owner, value: Ok(Nil)) ->
       run_suite_level_hooks(rest, Some(owner))
-    OwnerReturned(owner: owner, value: Error(message)) -> #(
-      Some(owner),
-      Error(message),
-    )
-    OwnerCaught(owner: owner, reason: reason) -> #(
-      Some(owner),
-      Error(suite_hook_crash_message(rest.scope, reason)),
-    )
-    OwnerTimedOut -> #(None, Error(suite_hook_timeout_message(rest.scope)))
-    OwnerExited(reason: reason) | OwnerLost(reason: reason) -> #(
-      None,
-      Error(suite_hook_crash_message(rest.scope, reason)),
-    )
+    OwnerReturned(owner: owner, value: Error(message)) ->
+      SuiteSetUpFailed(owner: Some(owner), message: message)
+    OwnerCaught(owner: owner, reason: reason) ->
+      SuiteSetUpFailed(
+        owner: Some(owner),
+        message: suite_hook_crash_message(rest.scope, reason),
+      )
+    OwnerTimedOut ->
+      SuiteSetUpFailed(
+        owner: None,
+        message: suite_hook_timeout_message(rest.scope),
+      )
+    OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
+      SuiteSetUpRan(owner: Some(SuiteOwnerGone(reason: reason)))
   }
 }
 
@@ -1554,7 +1572,7 @@ fn run_one_suite(
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   let suite_scope = [suite_run.info.name]
-  let #(owner, before_result) =
+  let before_result =
     run_suite_level_hooks(
       SuiteSetUp(
         hooks: before_each_suite_hooks,
@@ -1567,7 +1585,7 @@ fn run_one_suite(
   let #(tests_collected, completed_after_tests, all_owner, suite_owner) = case
     before_result
   {
-    Error(message) -> {
+    SuiteSetUpFailed(owner: owner, message: message) -> {
       let setup_failures =
         setup_failed_results_from_tests(
           suite_run.info.tests,
@@ -1587,8 +1605,7 @@ fn run_one_suite(
         alive_suite_owner(owner),
       )
     }
-    Ok(_) -> {
-      let suite_owner = alive_suite_owner(owner)
+    SuiteSetUpRan(owner: suite_owner) -> {
       let result =
         run_suite_tests(
           suite_run,

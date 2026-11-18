@@ -340,7 +340,7 @@ pub fn tests() {
       |> or_fail_with("after_each should run after the test process died")
     }),
 
-    it("a before_all that kills its process fails its group only", fn() {
+    it("a before_all that kills its process stops its group only", fn() {
       runner.new([
         describe("first", [
           unit.before_all(fn() { kill_self() }),
@@ -355,16 +355,83 @@ pub fn tests() {
           RunSummary(
             tests: [
               #("a", SetupFailed, [
-                #("before_all", "hook crashed in first: killed"),
+                #(
+                  "before_all",
+                  "not run: the set-up from before_all in \"first\" stopped (killed)",
+                ),
               ]),
               #("b", Passed, []),
             ],
-            teardown_failures: [],
+            teardown_failures: [
+              SetupStopped(
+                set_up: BeforeAllHook,
+                scope: ["first"],
+                reason: "killed",
+              ),
+            ],
           ),
         ),
       )
-      |> or_fail_with("a killed before_all process should fail its group")
+      |> or_fail_with("a killed before_all process should stop its set-up")
     }),
+
+    it(
+      "after the first before_all kills its process, no other set-up hook runs",
+      fn() {
+        let reports = process.new_subject()
+        describe("root", [
+          unit.before_all(fn() { kill_self() }),
+          unit.before_all(fn() {
+            process.send(reports, "second before_all ran")
+            Ok(Nil)
+          }),
+          it("a", passing_test),
+          unit.group("inner", [
+            unit.before_all(fn() {
+              process.send(reports, "inner before_all ran")
+              Ok(Nil)
+            }),
+            it("b", passing_test),
+          ]),
+          unit.after_all(fn() {
+            process.send(reports, "after_all ran")
+            Ok(Nil)
+          }),
+        ])
+        |> run_bounded
+        |> result_and_report(reports)
+        |> should
+        |> be_equal(#(
+          SandboxCompleted(
+            RunSummary(
+              tests: [
+                #("a", SetupFailed, [
+                  #(
+                    "before_all",
+                    "not run: the set-up from before_all in \"root\" stopped (killed)",
+                  ),
+                ]),
+                #("b", SetupFailed, [
+                  #(
+                    "before_all",
+                    "not run: the set-up from before_all in \"root\" stopped (killed)",
+                  ),
+                ]),
+              ],
+              teardown_failures: [
+                SetupStopped(
+                  set_up: BeforeAllHook,
+                  scope: ["root"],
+                  reason: "killed",
+                ),
+              ],
+            ),
+          ),
+          Ok("after_all ran"),
+        ))
+        |> or_fail_with("only after_all should run after the set-up stopped")
+      },
+    ),
 
     it("a before_all process that dies during the tests is reported", fn() {
       let reports = process.new_subject()
@@ -657,25 +724,80 @@ pub fn tests() {
     }),
 
     it(
-      "a before_all_suites hook that kills its process gives SetupFailed",
+      "a before_all_suites hook that kills its process stops the run set-up",
       fn() {
+        let reports = process.new_subject()
         runner.new([describe("suite", [it("a", passing_test)])])
         |> runner.before_all_suites(fn(_suites) { kill_self() })
+        |> runner.after_all_suites(fn(_suites) {
+          process.send(reports, "after_all_suites ran")
+          Ok(Nil)
+        })
         |> run_builder_bounded
+        |> result_and_report(reports)
         |> should
-        |> be_equal(
+        |> be_equal(#(
           SandboxCompleted(
             RunSummary(
               tests: [
                 #("a", SetupFailed, [
-                  #("before_all_suites", "hook crashed: killed"),
+                  #(
+                    "before_all_suites",
+                    "not run: the set-up from before_all_suites stopped (killed)",
+                  ),
                 ]),
               ],
-              teardown_failures: [],
+              teardown_failures: [
+                SetupStopped(
+                  set_up: BeforeAllSuitesHook,
+                  scope: [],
+                  reason: "killed",
+                ),
+              ],
             ),
           ),
-        )
-        |> or_fail_with("a killed before_all_suites process should be reported")
+          Ok("after_all_suites ran"),
+        ))
+        |> or_fail_with("a killed before_all_suites process should stop it")
+      },
+    ),
+
+    it(
+      "a before_each_suite hook that kills its process stops the suite set-up",
+      fn() {
+        let reports = process.new_subject()
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.before_each_suite(fn(_suite) { kill_self() })
+        |> runner.after_each_suite(fn(_suite) {
+          process.send(reports, "after_each_suite ran")
+          Ok(Nil)
+        })
+        |> run_builder_bounded
+        |> result_and_report(reports)
+        |> should
+        |> be_equal(#(
+          SandboxCompleted(
+            RunSummary(
+              tests: [
+                #("a", SetupFailed, [
+                  #(
+                    "before_each_suite",
+                    "not run: the set-up from before_each_suite in \"suite\" stopped (killed)",
+                  ),
+                ]),
+              ],
+              teardown_failures: [
+                SetupStopped(
+                  set_up: BeforeEachSuiteHook,
+                  scope: ["suite"],
+                  reason: "killed",
+                ),
+              ],
+            ),
+          ),
+          Ok("after_each_suite ran"),
+        ))
+        |> or_fail_with("a killed before_each_suite process should stop it")
       },
     ),
 

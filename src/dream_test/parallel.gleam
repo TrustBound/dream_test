@@ -679,7 +679,7 @@ fn execute_node(
         )
       let #(hooks, tests, groups) =
         collect_children(children, empty_hooks, [], [])
-      let #(owner, ctx2, failures) =
+      case
         run_before_all_chain(
           config,
           group_scope,
@@ -687,9 +687,8 @@ fn execute_node(
           context,
           hooks.before_all,
         )
-
-      case failures {
-        [_, ..] -> {
+      {
+        BeforeAllFailed(owner: owner, context: ctx2, failure: failure) -> {
           // If before_all fails, do not execute any tests in this scope.
           // Instead, mark all tests under this group as SetupFailed and skip
           // their bodies.
@@ -699,7 +698,7 @@ fn execute_node(
               combined_tags,
               tests,
               groups,
-              failures,
+              [failure],
               [],
             )
           // These tests never ran in a process, so we must still emit
@@ -735,7 +734,7 @@ fn execute_node(
           )
         }
 
-        [] -> {
+        BeforeAllRan(owner: owner, context: ctx2) -> {
           let combined_before_each =
             list.append(inherited_before_each, hooks.before_each)
           let combined_after_each =
@@ -744,10 +743,7 @@ fn execute_node(
           let scope_owners =
             Owners(
               ..owners,
-              groups: list.append(
-                owners.groups,
-                option.values([alive_owner(group_scope, owner)]),
-              ),
+              groups: list.append(owners.groups, option.values([owner])),
             )
           let #(group_outcomes_rev, completed_after_tests, owners_after_tests) =
             run_tests_in_group(
@@ -1106,22 +1102,39 @@ fn run_group_hook(call: GroupHookCall(context)) -> Result(context, String) {
   }
 }
 
+/// The result of the `before_all` hooks of a group, by cause.
+type BeforeAllResult(context) {
+  /// Every hook returned `Ok`, or the owner process exited. `owner` is
+  /// `OwnerGone` when the owner exited: the set-up stopped, so the tests
+  /// of the group are not run, and its `after_all` hooks run in a new
+  /// owner. `owner` is `None` when the group has no `before_all` hook.
+  BeforeAllRan(owner: Option(ScopeOwner(context)), context: context)
+  /// A hook returned `Error`, crashed inside the hook call, or timed out.
+  /// `owner` is the owner when it is still alive.
+  BeforeAllFailed(
+    owner: Option(GroupOwner(context)),
+    context: context,
+    failure: AssertionFailure,
+  )
+}
+
 /// Run the `before_all` hooks of a group in the owner process of the
-/// group, and stop at the first failure. The first hook starts the owner.
-/// Each hook gets the default timeout.
+/// group, and stop at the first failure or when the owner exits. The first
+/// hook starts the owner. Each hook gets the default timeout.
 ///
-/// Gives the owner (`None` when no owner is alive), the context after the
-/// last hook that returned, and the failure (an empty list when every
-/// hook returned).
+/// A hook that returns `Error`, crashes or times out is a failure of the
+/// hook. An owner process that exits, while a hook runs or between two
+/// hooks, stops the set-up. The context is the context after the last
+/// hook that returned.
 fn run_before_all_chain(
   config: ParallelConfig,
   scope: List(String),
   owner: Option(GroupOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(context, String))),
-) -> #(Option(GroupOwner(context)), context, List(AssertionFailure)) {
+) -> BeforeAllResult(context) {
   case hooks {
-    [] -> #(owner, context, [])
+    [] -> BeforeAllRan(owner: alive_owner(scope, owner), context: context)
     [hook, ..rest] ->
       before_all_result(
         config,
@@ -1144,24 +1157,33 @@ fn before_all_result(
   context: context,
   rest: List(Callback(context, Result(context, String))),
   owner_result: OwnerResult(GroupHookCall(context), Result(context, String)),
-) -> #(Option(GroupOwner(context)), context, List(AssertionFailure)) {
+) -> BeforeAllResult(context) {
   case owner_result {
     OwnerReturned(owner: owner, value: Ok(next)) ->
       run_before_all_chain(config, scope, Some(owner), next, rest)
-    OwnerReturned(owner: owner, value: Error(message)) -> #(
-      Some(owner),
-      context,
-      [hook_failure("before_all", message)],
-    )
-    OwnerCaught(owner: owner, reason: reason) -> #(Some(owner), context, [
-      hook_failure("before_all", hook_crash_message(scope, reason)),
-    ])
-    OwnerTimedOut -> #(None, context, [
-      hook_failure("before_all", hook_timeout_message(scope)),
-    ])
-    OwnerExited(reason: reason) | OwnerLost(reason: reason) -> #(None, context, [
-      hook_failure("before_all", hook_crash_message(scope, reason)),
-    ])
+    OwnerReturned(owner: owner, value: Error(message)) ->
+      BeforeAllFailed(
+        owner: Some(owner),
+        context: context,
+        failure: hook_failure("before_all", message),
+      )
+    OwnerCaught(owner: owner, reason: reason) ->
+      BeforeAllFailed(
+        owner: Some(owner),
+        context: context,
+        failure: hook_failure("before_all", hook_crash_message(scope, reason)),
+      )
+    OwnerTimedOut ->
+      BeforeAllFailed(
+        owner: None,
+        context: context,
+        failure: hook_failure("before_all", hook_timeout_message(scope)),
+      )
+    OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
+      BeforeAllRan(
+        owner: Some(OwnerGone(scope: scope, reason: reason)),
+        context: context,
+      )
   }
 }
 

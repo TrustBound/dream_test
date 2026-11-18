@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.teardown_hook_name`.
 - `types.SetupStopped(set_up:, scope:, reason:)`, a variant of
   `types.TeardownFailure` for a set-up that stopped: the process that
-  keeps its set-up alive exited after its set-up hooks. Also
+  keeps its set-up alive exited while or after its set-up hooks ran. Also
   `types.SetUpHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
   `BeforeAllSuitesHook`) with `types.set_up_hook_name`, and
   `types.setup_stopped_failure(set_up:, scope:, reason:)`, the failure of
@@ -475,8 +475,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hook timed out` or `hook timed out in <scope>`, and a tear-down hook
   gives a tear-down failure with the same message.
 - A hook that kills its owner process no longer stops the run. The runner
-  monitors the owner and records `hook crashed in <scope>: <reason>`. The
-  next hook of the scope runs in a new owner process.
+  monitors the owner. A tear-down hook that kills its owner is recorded as
+  `hook crashed in <scope>: <reason>`, and the next hook of the scope runs
+  in a new owner process.
+- A set-up is reported by its cause, not by its timing. When the owner
+  process of a set-up exits, while a `before_all`, `before_each_suite` or
+  `before_all_suites` hook runs or between two of them, the set-up
+  stopped: it is reported as `types.SetupStopped`, no other set-up hook
+  of the scope runs, and each test of the scope is `SetupFailed` with
+  `not run: the set-up from <set-up hook> ... stopped (<reason>)`. A
+  set-up hook that returns `Error` or crashes inside the hook is still
+  `hook crashed in <scope>: <reason>` (or its error message), and a hook
+  that never returns is still `hook timed out in <scope>`. Before, an
+  owner that exited during a set-up hook was reported as
+  `hook crashed in <scope>: <reason>`.
 - A set-up whose process stops while the tests of its scope run is now
   reported as a stopped set-up, `types.SetupStopped`, not as a failure of
   a tear-down hook. The tests of the scope that did not start yet are not
