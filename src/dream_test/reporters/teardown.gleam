@@ -90,8 +90,22 @@ fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
           ansi.apply_if(color, ansi.red, "Set-up and tear-down failures:"),
         ),
         "\n",
-        ..list.map(failures, format_failure(color, _))
+        ..format_failures(color, failures)
       ])
+  }
+}
+
+/// The text of each failure, in order.
+fn format_failures(
+  color: Bool,
+  failures: List(TeardownFailure),
+) -> List(String) {
+  case failures {
+    [] -> []
+    [failure, ..rest] -> [
+      format_failure(color, failure),
+      ..format_failures(color, rest)
+    ]
   }
 }
 
@@ -125,8 +139,13 @@ fn failure_lines(color: Bool, title: String, details: List(String)) -> String {
     "  ",
     ansi.apply_if(color, ansi.red, title),
     "\n",
-    ..list.map(details, fn(detail) { "    " <> detail <> "\n" })
+    ..list.map(details, detail_line)
   ])
+}
+
+/// One detail line of a failure, indented under its first line.
+fn detail_line(detail: String) -> String {
+  "    " <> detail <> "\n"
 }
 
 /// The lines that name the tests that a stopped set-up did not run, or no
@@ -136,11 +155,14 @@ fn not_run_lines(not_run: List(List(String))) -> List(String) {
     [] -> []
     _ -> [
       "These tests had not started and were not run:",
-      ..list.map(not_run, fn(full_name) {
-        "  " <> string.join(full_name, " > ")
-      })
+      ..list.map(not_run, not_run_name)
     ]
   }
+}
+
+/// The full name of a test that did not run, indented under its heading.
+fn not_run_name(full_name: List(String)) -> String {
+  "  " <> string.join(full_name, " > ")
 }
 
 fn quoted_groups(groups: List(String)) -> String {

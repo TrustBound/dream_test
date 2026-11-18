@@ -898,13 +898,21 @@ type Stop {
 }
 
 /// The outermost set-up whose process stopped: the failure of each test
-/// that does not run because of it, and the function that records those
-/// tests in it. The outer set-ups are outside the group scopes.
+/// that does not run because of it, and where it is in the owners, so
+/// `record_not_run` can record those tests in it. The outer set-ups are
+/// outside the group scopes.
 type StoppedSetup(context) {
   StoppedSetup(
     failure: AssertionFailure,
-    record_not_run: fn(List(List(String))) -> Owners(context),
+    owners: Owners(context),
+    place: StopPlace(context),
   )
+}
+
+/// Where a stopped set-up is: in the outer set-ups or in the group scopes.
+type StopPlace(context) {
+  OuterStopPlace(found: Found(OuterSetup, Stop))
+  GroupStopPlace(found: Found(ScopeOwner(context), Stop))
 }
 
 /// An item of a list and the items around it: the items before it, newest
@@ -919,45 +927,53 @@ fn stopped_setup(owners: Owners(context)) -> Option(StoppedSetup(context)) {
     find_first(owners.groups, group_stop, [])
   {
     Ok(found), _ ->
-      Some(
-        StoppedSetup(
-          failure: not_run_failure(found.value),
-          record_not_run: fn(names) {
-            Owners(
-              ..owners,
-              outer: rebuild(
-                found,
-                SetupStopped(
-                  set_up: found.value.set_up,
-                  groups: found.value.scope,
-                  reason: found.value.reason,
-                  not_run: list.append(found.value.not_run, names),
-                ),
-              ),
-            )
-          },
-        ),
-      )
+      Some(StoppedSetup(
+        failure: not_run_failure(found.value),
+        owners: owners,
+        place: OuterStopPlace(found),
+      ))
     Error(Nil), Ok(found) ->
-      Some(
-        StoppedSetup(
-          failure: not_run_failure(found.value),
-          record_not_run: fn(names) {
-            Owners(
-              ..owners,
-              groups: rebuild(
-                found,
-                OwnerGone(
-                  scope: found.value.scope,
-                  reason: found.value.reason,
-                  not_run: list.append(found.value.not_run, names),
-                ),
-              ),
-            )
-          },
+      Some(StoppedSetup(
+        failure: not_run_failure(found.value),
+        owners: owners,
+        place: GroupStopPlace(found),
+      ))
+    Error(Nil), Error(Nil) -> None
+  }
+}
+
+/// The owners with `names` added to the tests that the stopped set-up did
+/// not run.
+fn record_not_run(
+  stopped: StoppedSetup(context),
+  names: List(List(String)),
+) -> Owners(context) {
+  case stopped.place {
+    OuterStopPlace(found: found) ->
+      Owners(
+        ..stopped.owners,
+        outer: rebuild(
+          found,
+          SetupStopped(
+            set_up: found.value.set_up,
+            groups: found.value.scope,
+            reason: found.value.reason,
+            not_run: list.append(found.value.not_run, names),
+          ),
         ),
       )
-    Error(Nil), Error(Nil) -> None
+    GroupStopPlace(found: found) ->
+      Owners(
+        ..stopped.owners,
+        groups: rebuild(
+          found,
+          OwnerGone(
+            scope: found.value.scope,
+            reason: found.value.reason,
+            not_run: list.append(found.value.not_run, names),
+          ),
+        ),
+      )
   }
 }
 
@@ -1046,7 +1062,11 @@ fn quoted_scope(scope: List(String)) -> String {
 
 /// The full name of each result, in order.
 fn full_names(results: List(TestResult)) -> List(List(String)) {
-  list.map(results, fn(result) { types.full_name(result.groups, result.name) })
+  list.map(results, result_full_name)
+}
+
+fn result_full_name(result: TestResult) -> List(String) {
+  types.full_name(result.groups, result.name)
 }
 
 fn empty_collected() -> Collected {
@@ -1626,7 +1646,7 @@ fn execute_or_fail_group(
           node_config.total,
           list.reverse(results_rev),
         ),
-        stopped.record_not_run(full_names(list.reverse(results_rev))),
+        record_not_run(stopped, full_names(list.reverse(results_rev))),
       )
     }
   }
@@ -1756,7 +1776,8 @@ fn start_or_fail_next(
         LoopState(
           ..state,
           pending: [],
-          owners: stopped.record_not_run(
+          owners: record_not_run(
+            stopped,
             full_names(list.map(results, indexed_result_value)),
           ),
         ),

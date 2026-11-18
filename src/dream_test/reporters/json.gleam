@@ -343,10 +343,14 @@ fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
             groups,
             reason,
           ),
-          [#("not_run", json.array(not_run, json.array(_, json.string)))],
+          [#("not_run", json.array(not_run, full_name_json))],
         ),
       )
   }
+}
+
+fn full_name_json(full_name: List(String)) -> Json {
+  json.array(full_name, json.string)
 }
 
 fn teardown_failure_fields(

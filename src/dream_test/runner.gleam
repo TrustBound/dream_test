@@ -1729,9 +1729,33 @@ fn stopped_suite_owner(
   set_up: SetUpHook,
   outer_setups: List(parallel.OuterSetup),
 ) -> Option(SuiteScopeOwner(input)) {
-  case owner, list.find_map(outer_setups, stopped_owner(_, set_up)) {
+  case owner, find_stopped_owner(outer_setups, set_up) {
     Some(_), Ok(gone) -> Some(gone)
     _, _ -> owner
+  }
+}
+
+/// The first of `outer_setups` that says the set-up `set_up` stopped, as
+/// a gone owner.
+fn find_stopped_owner(
+  outer_setups: List(parallel.OuterSetup),
+  set_up: SetUpHook,
+) -> Result(SuiteScopeOwner(input), Nil) {
+  case outer_setups {
+    [] -> Error(Nil)
+    [outer_setup, ..rest] ->
+      stopped_owner_or_next(stopped_owner(outer_setup, set_up), rest, set_up)
+  }
+}
+
+fn stopped_owner_or_next(
+  found: Result(SuiteScopeOwner(input), Nil),
+  rest: List(parallel.OuterSetup),
+  set_up: SetUpHook,
+) -> Result(SuiteScopeOwner(input), Nil) {
+  case found {
+    Ok(gone) -> Ok(gone)
+    Error(Nil) -> find_stopped_owner(rest, set_up)
   }
 }
 
