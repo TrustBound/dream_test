@@ -16,7 +16,7 @@ import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, group, it, skip,
 }
 import gleam/erlang/atom.{type Atom}
-import gleam/erlang/process
+import gleam/erlang/process.{type Name, type Pid, type Subject}
 import gleam/list
 import gleam/option.{None, Some}
 
@@ -92,10 +92,7 @@ pub fn tests() {
 
     it("a test that runs too long times out in sequence", fn() {
       describe("root", [
-        it("sleeps", fn() {
-          process.sleep(1000)
-          Ok(AssertionOk)
-        }),
+        it("sleeps", block_forever),
       ])
       |> run_sequential_with_timeout(50)
       |> summaries
@@ -171,7 +168,7 @@ pub fn tests() {
     it("an after_each failure keeps the TimedOut status of a test", fn() {
       describe("root", [
         after_each(fn() { Error("no teardown") }),
-        timed_test("slow", Some(50), 1000),
+        timed_test("slow", Some(50), block_forever),
       ])
       |> run_default
       |> statuses
@@ -263,7 +260,7 @@ pub fn tests() {
     it("an after_each that runs too long is a tear-down failure", fn() {
       describe("root", [
         after_each(fn() {
-          process.sleep(1000)
+          process.sleep_forever()
           Ok(Nil)
         }),
         it("a", fn() { Ok(AssertionOk) }),
@@ -302,7 +299,7 @@ pub fn tests() {
       |> runner.max_concurrency(1)
       |> runner.default_timeout_ms(50)
       |> runner.before_each_test(fn(_info, context) {
-        process.sleep(1000)
+        process.sleep_forever()
         Ok(context)
       })
       |> runner.silent()
@@ -343,7 +340,7 @@ pub fn tests() {
         |> runner.max_concurrency(1)
         |> runner.default_timeout_ms(50)
         |> runner.after_each_test(fn(_info, _context) {
-          process.sleep(1000)
+          process.sleep_forever()
           Ok(Nil)
         })
         |> runner.silent()
@@ -384,12 +381,14 @@ pub fn tests() {
 
     it("a test with its own timeout times out while another runs on", fn() {
       // The runner hook holds each worker for 30ms before the bodies start.
-      // The 20ms deadline of "short" counts from the start of its body, so
-      // it ends while "long" still runs.
+      // The 20ms deadline of "short" counts from the start of its body.
+      // "short" never ends, and "long" waits until the process of "short"
+      // has exited, so "short" times out while "long" still runs.
+      let watch = start_watch()
       runner.new([
         describe("root", [
-          timed_test("short", Some(20), 1000),
-          timed_test("long", None, 200),
+          timed_test("short", Some(20), fn() { start_then_block(watch) }),
+          timed_test("long", None, fn() { pass_when_gone(watch) }),
         ]),
       ])
       |> runner.before_each_test(fn(_info, context) {
@@ -414,8 +413,8 @@ pub fn tests() {
       // checks the deadline after the write, so "slow" times out.
       runner.new([
         describe("root", [
-          timed_test("slow", None, 1000),
-          timed_test("fast", None, 0),
+          timed_test("slow", None, block_forever),
+          timed_test("fast", None, pass),
         ]),
       ])
       |> runner.default_timeout_ms(50)
@@ -458,7 +457,7 @@ pub fn tests() {
     }),
 
     it("a test with its own timeout runs in sequence", fn() {
-      describe("root", [timed_test("own", Some(1000), 0)])
+      describe("root", [timed_test("own", Some(1000), pass)])
       |> run_sequential
       |> summaries
       |> should
@@ -468,40 +467,106 @@ pub fn tests() {
   ])
 }
 
-/// A test that sleeps `sleep_ms` and passes, with its own timeout.
+/// A test with its own timeout.
 fn timed_test(
   name: String,
   timeout_ms: option.Option(Int),
-  sleep_ms: Int,
+  body: fn() -> Result(AssertionResult, String),
 ) -> Node(Nil) {
   Test(
     name: name,
     tags: [],
     kind: Unit,
-    run: types.WithInput(fn(_nil) { sleep_then_pass(sleep_ms) }),
+    run: types.WithInput(fn(_nil) { body() }),
     timeout_ms: timeout_ms,
     source: None,
   )
 }
 
-fn sleep_then_pass(sleep_ms: Int) -> Result(AssertionResult, String) {
-  process.sleep(sleep_ms)
+fn pass() -> Result(AssertionResult, String) {
+  Ok(AssertionOk)
+}
+
+/// A body that never returns, so its test can only time out.
+fn block_forever() -> Result(AssertionResult, String) {
+  process.sleep_forever()
+  Ok(AssertionOk)
+}
+
+/// The messages of a watch process: one test process says that it started,
+/// and another test waits until that process has exited.
+type Watch {
+  Started(pid: Pid)
+  WaitUntilGone(reply: Subject(Nil))
+}
+
+/// Start a watch process under a new name. The name is registered before
+/// this function returns, so the tests can always send to it.
+fn start_watch() -> Name(Watch) {
+  let name = process.new_name("dream_test_watch")
+  let pid = process.spawn_unlinked(fn() { watch(name, None, None) })
+  let assert Ok(Nil) = process.register(pid, name)
+  name
+}
+
+fn watch(
+  name: Name(Watch),
+  started: option.Option(Pid),
+  waiting: option.Option(Subject(Nil)),
+) -> Nil {
+  case started, waiting {
+    Some(pid), Some(reply) -> {
+      wait_until_gone(pid)
+      process.send(reply, Nil)
+    }
+    _, _ ->
+      case process.receive_forever(process.named_subject(name)) {
+        Started(pid) -> watch(name, Some(pid), waiting)
+        WaitUntilGone(reply) -> watch(name, started, Some(reply))
+      }
+  }
+}
+
+fn wait_until_gone(pid: Pid) -> Nil {
+  let monitor = process.monitor(pid)
+  process.new_selector()
+  |> process.select_specific_monitor(monitor, fn(_down) { Nil })
+  |> process.selector_receive_forever
+}
+
+/// Tell `watch` which process this test is, then never return.
+fn start_then_block(watch: Name(Watch)) -> Result(AssertionResult, String) {
+  process.send(process.named_subject(watch), Started(process.self()))
+  block_forever()
+}
+
+/// Pass when the test process that started at `watch` has exited.
+fn pass_when_gone(watch: Name(Watch)) -> Result(AssertionResult, String) {
+  let reply = process.new_subject()
+  process.send(process.named_subject(watch), WaitUntilGone(reply))
+  process.receive_forever(reply)
   Ok(AssertionOk)
 }
 
 fn run_suite_that_kills_a_worker(
   _input: Nil,
 ) -> List(#(List(String), Status, List(AssertionFailure))) {
+  let watch = start_watch()
   describe("root", [
-    it("kills its worker", kill_worker_then_pass),
-    timed_test("passes", None, 50),
+    it("kills its worker", fn() { kill_worker_then_pass(watch) }),
+    timed_test("passes", None, fn() { pass_when_gone(watch) }),
   ])
   |> run_default
   |> summaries
 }
 
-/// The body runs in the test process, so the body kills that process.
-fn kill_worker_then_pass() -> Result(AssertionResult, String) {
+/// The body runs in the test process, so the body kills that process. It
+/// first tells `watch` which process it is, so "passes" still runs when the
+/// worker is killed.
+fn kill_worker_then_pass(
+  watch: Name(Watch),
+) -> Result(AssertionResult, String) {
+  process.send(process.named_subject(watch), Started(process.self()))
   process.kill(process.self())
   Ok(AssertionOk)
 }

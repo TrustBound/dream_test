@@ -8,7 +8,7 @@ import dream_test/sandbox.{
 }
 import dream_test/unit.{describe, it}
 import gleam/erlang/atom.{type Atom}
-import gleam/erlang/process
+import gleam/erlang/process.{type Name}
 import gleam/option.{None, Some}
 
 pub fn tests() {
@@ -35,7 +35,7 @@ pub fn tests() {
     }),
 
     it("an owner that does not answer in time times out", fn() {
-      sandbox.run_in_owner(None, 20, sleep_then_double, 1000)
+      sandbox.run_in_owner(None, 20, block_forever, 1000)
       |> summary
       |> should
       |> be_equal(TimedOut)
@@ -87,16 +87,17 @@ pub fn tests() {
     }),
 
     it("an owner that stopped before the function gives OwnerLost", fn() {
+      let crash = process.new_name("dream_test_crash")
       let ran = process.new_subject()
-      case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
+      case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
         OwnerReturned(owner: owner, value: _) -> {
-          process.sleep(100)
+          crash_owner(crash)
           #(
             summary(sandbox.run_in_owner(
               Some(owner),
               1000,
-              fn(_nil) { process.send(ran, "ran") },
-              Nil,
+              fn(_crash) { process.send(ran, "ran") },
+              crash,
             )),
             process.receive(ran, 0),
           )
@@ -109,11 +110,17 @@ pub fn tests() {
     }),
 
     it("an owner that check_owner saw stop times out on the next call", fn() {
-      case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
+      let crash = process.new_name("dream_test_crash")
+      case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
         OwnerReturned(owner: owner, value: _) -> {
-          process.sleep(100)
+          crash_owner(crash)
           let _checked = sandbox.check_owner(owner)
-          summary(sandbox.run_in_owner(Some(owner), 20, start_crash, Nil))
+          summary(sandbox.run_in_owner(
+            Some(owner),
+            20,
+            start_linked_crash,
+            crash,
+          ))
         }
         other -> summary(other)
       }
@@ -123,9 +130,10 @@ pub fn tests() {
     }),
 
     it("check_owner gives the exit reason of an owner that stopped", fn() {
-      case sandbox.run_in_owner(None, 1000, start_crash, Nil) {
+      let crash = process.new_name("dream_test_crash")
+      case sandbox.run_in_owner(None, 1000, start_linked_crash, crash) {
         OwnerReturned(owner: owner, value: _) -> {
-          process.sleep(100)
+          crash_owner(crash)
           check_then_stop(owner)
         }
         _other -> Error("did not start")
@@ -184,17 +192,14 @@ fn crash_or_double(number: Int) -> Int {
   }
 }
 
-fn sleep_then_double(milliseconds: Int) -> Int {
-  process.sleep(milliseconds)
-  milliseconds * 2
+/// Never return, so the owner can only time out.
+fn block_forever(number: Int) -> Int {
+  process.sleep_forever()
+  number * 2
 }
 
 fn kill_self(_input: Nil) -> Nil {
   process.kill(process.self())
-}
-
-fn start_crash(_input: Nil) -> Nil {
-  start_linked_crash()
 }
 
 /// Make a named table. Gives `True`, so it has the type of `table_exists`.
@@ -212,5 +217,15 @@ fn new_named_table(name: Atom) -> Nil
 @external(erlang, "dream_test_hook_resource_test_ffi", "table_exists")
 fn table_exists(name: Atom) -> Bool
 
+/// The name of a process that `start_linked_crash` starts. It gets no
+/// Gleam messages: `crash_owner` talks to it.
+type Crash
+
+/// Start a process that links to the caller and waits under `name`.
 @external(erlang, "dream_test_hook_resource_test_ffi", "start_linked_crash")
-fn start_linked_crash() -> Nil
+fn start_linked_crash(name: Name(Crash)) -> Nil
+
+/// Make the process under `name` exit with reason `boom`, then wait until
+/// the owner that started it has exited.
+@external(erlang, "dream_test_hook_resource_test_ffi", "crash_owner")
+fn crash_owner(name: Name(Crash)) -> Nil

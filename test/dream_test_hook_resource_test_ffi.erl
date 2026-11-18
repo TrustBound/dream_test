@@ -1,5 +1,6 @@
 -module(dream_test_hook_resource_test_ffi).
--export([new_named_table/1, table_exists/1, delete_table/1, start_linked_crash/0]).
+-export([new_named_table/1, table_exists/1, delete_table/1, start_linked_crash/1,
+         crash_owner/1]).
 
 %% Helpers for the hook resource tests. A test helper that owns an ETS table
 %% is the simplest resource a hook can start: the table lives only while the
@@ -21,12 +22,31 @@ delete_table(Name) ->
         _ -> _ = ets:delete(Name), nil
     end.
 
-%% Start a process that links to the caller and exits with reason `boom`
-%% after 10ms, so the caller dies a short time after it returns.
-start_linked_crash() ->
-    _ = spawn_link(fun exit_after_delay/0),
+%% Start a process that links to the caller and registers it under `Name`.
+%% The process waits until `crash_owner(Name)` tells it to exit. Then it
+%% exits with reason `boom`, so the caller (the owner) dies through the
+%% link. The name is registered before this function returns, so a test
+%% can always find the process.
+start_linked_crash(Name) ->
+    Owner = self(),
+    Pid = spawn_link(fun() -> wait_for_crash(Owner) end),
+    true = register(Name, Pid),
     nil.
 
-exit_after_delay() ->
-    timer:sleep(10),
-    exit(boom).
+wait_for_crash(Owner) ->
+    receive
+        {crash, From, Ref} ->
+            From ! {Ref, Owner},
+            exit(boom)
+    end.
+
+%% Tell the process under `Name` to exit, then wait until the owner that
+%% started it has exited. When this function returns, the owner is dead.
+crash_owner(Name) ->
+    Ref = make_ref(),
+    Name ! {crash, self(), Ref},
+    Owner = receive {Ref, Pid} -> Pid end,
+    Monitor = erlang:monitor(process, Owner),
+    receive
+        {'DOWN', Monitor, process, Owner, _Reason} -> nil
+    end.

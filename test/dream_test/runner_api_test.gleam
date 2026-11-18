@@ -51,16 +51,13 @@ pub fn tests() {
     it("can add suites with a per-suite execution config override", fn() {
       let ok_suite =
         describe("ok", [
-          it("passes", fn() {
-            process.sleep(20)
-            Ok(AssertionOk)
-          }),
+          it("passes", fn() { Ok(AssertionOk) }),
         ])
 
       let slow_suite =
         describe("slow", [
           it("times out", fn() {
-            process.sleep(200)
+            process.sleep_forever()
             Ok(AssertionOk)
           }),
         ])

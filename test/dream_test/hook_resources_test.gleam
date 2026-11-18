@@ -434,14 +434,15 @@ pub fn tests() {
     ),
 
     it("a before_all process that dies during the tests is reported", fn() {
+      let crash = new_crash()
       let reports = process.new_subject()
       describe("root", [
         unit.before_all(fn() {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         }),
         it("a", fn() {
-          process.sleep(30)
+          crash_owner(crash)
           Ok(AssertionOk)
         }),
         unit.after_all(fn() {
@@ -464,13 +465,14 @@ pub fn tests() {
     }),
 
     it("a stopped before_all set-up without after_all is reported", fn() {
+      let crash = new_crash()
       describe("root", [
         unit.before_all(fn() {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         }),
         it("a", fn() {
-          process.sleep(30)
+          crash_owner(crash)
           Ok(AssertionOk)
         }),
       ])
@@ -489,15 +491,16 @@ pub fn tests() {
     it(
       "the tests that have not started in a group whose set-up stopped are not run",
       fn() {
+        let crash = new_crash()
         let reports = process.new_subject()
         runner.new([
           describe("root", [
             unit.before_all(fn() {
-              start_linked_crash()
+              start_linked_crash(crash)
               Ok(Nil)
             }),
             it("a", fn() {
-              process.sleep(30)
+              crash_owner(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -542,14 +545,15 @@ pub fn tests() {
     ),
 
     it("every group after a stopped set-up gives SetupFailed", fn() {
+      let crash = new_crash()
       runner.new([
         describe("root", [
           unit.before_all(fn() {
-            start_linked_crash()
+            start_linked_crash(crash)
             Ok(Nil)
           }),
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(crash)
             Ok(AssertionOk)
           }),
           unit.group("first", [it("c", passing_test)]),
@@ -590,15 +594,16 @@ pub fn tests() {
     }),
 
     it("a group under a stopped set-up does not run its before_all", fn() {
+      let crash = new_crash()
       let reports = process.new_subject()
       runner.new([
         describe("root", [
           unit.before_all(fn() {
-            start_linked_crash()
+            start_linked_crash(crash)
             Ok(Nil)
           }),
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(crash)
             Ok(AssertionOk)
           }),
           unit.group("inner", [
@@ -824,16 +829,17 @@ pub fn tests() {
     ),
 
     it("a before_all_suites process that dies during the run is reported", fn() {
+      let crash = new_crash()
       runner.new([
         describe("suite", [
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(crash)
             Ok(AssertionOk)
           }),
         ]),
       ])
       |> runner.before_all_suites(fn(_suites) {
-        start_linked_crash()
+        start_linked_crash(crash)
         Ok(Nil)
       })
       |> run_builder_bounded
@@ -853,11 +859,12 @@ pub fn tests() {
     it(
       "the suites that have not started after the run set-up stopped are not run",
       fn() {
+        let crash = new_crash()
         let reports = process.new_subject()
         runner.new([
           describe("first", [
             it("a", fn() {
-              process.sleep(30)
+              crash_owner(crash)
               Ok(AssertionOk)
             }),
           ]),
@@ -869,7 +876,7 @@ pub fn tests() {
           ]),
         ])
         |> runner.before_all_suites(fn(_suites) {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         })
         |> runner.after_all_suites(fn(_suites) {
@@ -909,16 +916,17 @@ pub fn tests() {
     ),
 
     it("a stopped suite set-up without after_each_suite is reported", fn() {
+      let crash = new_crash()
       runner.new([
         describe("suite", [
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(crash)
             Ok(AssertionOk)
           }),
         ]),
       ])
       |> runner.before_each_suite(fn(_suite) {
-        start_linked_crash()
+        start_linked_crash(crash)
         Ok(Nil)
       })
       |> run_builder_bounded
@@ -938,17 +946,18 @@ pub fn tests() {
     }),
 
     it("a stopped suite set-up runs after_each_suite in a new process", fn() {
+      let crash = new_crash()
       let reports = process.new_subject()
       runner.new([
         describe("suite", [
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(crash)
             Ok(AssertionOk)
           }),
         ]),
       ])
       |> runner.before_each_suite(fn(_suite) {
-        start_linked_crash()
+        start_linked_crash(crash)
         Ok(Nil)
       })
       |> runner.after_each_suite(fn(_suite) {
@@ -976,11 +985,12 @@ pub fn tests() {
     it(
       "the tests that have not started in the suite of a stopped run set-up are not run",
       fn() {
+        let crash = new_crash()
         let reports = process.new_subject()
         runner.new([
           describe("suite", [
             it("a", fn() {
-              process.sleep(30)
+              crash_owner(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -991,7 +1001,7 @@ pub fn tests() {
         ])
         |> runner.max_concurrency(1)
         |> runner.before_all_suites(fn(_suites) {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         })
         |> run_builder_bounded
@@ -1027,11 +1037,12 @@ pub fn tests() {
     it(
       "a group in the suite of a stopped run set-up does not run its before_all",
       fn() {
+        let crash = new_crash()
         let reports = process.new_subject()
         runner.new([
           describe("suite", [
             it("a", fn() {
-              process.sleep(30)
+              crash_owner(crash)
               Ok(AssertionOk)
             }),
             unit.group("inner", [
@@ -1044,7 +1055,7 @@ pub fn tests() {
           ]),
         ])
         |> runner.before_all_suites(fn(_suites) {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         })
         |> run_builder_bounded
@@ -1082,11 +1093,12 @@ pub fn tests() {
     it(
       "the tests that have not started after the suite set-up stopped are not run",
       fn() {
+        let crash = new_crash()
         let reports = process.new_subject()
         runner.new([
           describe("suite", [
             it("a", fn() {
-              process.sleep(30)
+              crash_owner(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -1097,7 +1109,7 @@ pub fn tests() {
         ])
         |> runner.max_concurrency(1)
         |> runner.before_each_suite(fn(_suite) {
-          start_linked_crash()
+          start_linked_crash(crash)
           Ok(Nil)
         })
         |> run_builder_bounded
@@ -1131,10 +1143,13 @@ pub fn tests() {
     ),
 
     it("the run set-up is the outermost stopped set-up", fn() {
+      let run_crash = new_crash()
+      let suite_crash = new_crash()
       runner.new([
         describe("suite", [
           it("a", fn() {
-            process.sleep(30)
+            crash_owner(suite_crash)
+            crash_owner(run_crash)
             Ok(AssertionOk)
           }),
           it("b", passing_test),
@@ -1142,11 +1157,11 @@ pub fn tests() {
       ])
       |> runner.max_concurrency(1)
       |> runner.before_all_suites(fn(_suites) {
-        start_linked_crash()
+        start_linked_crash(run_crash)
         Ok(Nil)
       })
       |> runner.before_each_suite(fn(_suite) {
-        start_linked_crash()
+        start_linked_crash(suite_crash)
         Ok(Nil)
       })
       |> run_builder_bounded
@@ -1340,8 +1355,26 @@ fn kill_self() -> a {
   hang()
 }
 
+/// The name of a process that `start_linked_crash` starts. It gets no
+/// Gleam messages: `crash_owner` talks to it.
+type Crash
+
+fn new_crash() -> Name(Crash) {
+  process.new_name("dream_test_crash")
+}
+
+/// Start a process that links to the caller and waits under `name`. The
+/// caller is the owner of a set-up, so the set-up stops when the process
+/// exits.
 @external(erlang, "dream_test_hook_resource_test_ffi", "start_linked_crash")
-fn start_linked_crash() -> Nil
+fn start_linked_crash(name: Name(Crash)) -> Nil
+
+/// Make the process under `name` exit with reason `boom`, then wait until
+/// the owner that started it has exited. A test calls this while it runs,
+/// so the set-up stops during that test, after the test started and before
+/// the test ends.
+@external(erlang, "dream_test_hook_resource_test_ffi", "crash_owner")
+fn crash_owner(name: Name(Crash)) -> Nil
 
 /// Run a builder with a 50ms default timeout in a sandbox of 2 seconds, so
 /// a hook that never returns fails the test instead of the whole run.

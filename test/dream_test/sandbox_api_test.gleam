@@ -35,7 +35,7 @@ pub fn tests() {
     it("returns SandboxTimedOut on timeout", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 5, show_crash_reports: False)
-      case sandbox.run_isolated(config, sleep_then_pass, 50) {
+      case sandbox.run_isolated(config, block_forever, Nil) {
         sandbox.SandboxTimedOut -> Ok(AssertionOk)
         other ->
           Ok(
@@ -182,8 +182,9 @@ pub fn tests() {
   ])
 }
 
-fn sleep_then_pass(milliseconds: Int) -> AssertionResult {
-  process.sleep(milliseconds)
+/// Never return, so the sandbox can only time out.
+fn block_forever(_input: Nil) -> AssertionResult {
+  process.sleep_forever()
   AssertionOk
 }
 

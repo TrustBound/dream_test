@@ -136,8 +136,7 @@ pub fn tests() {
         let monitor = process.monitor(owner)
         describe("suite", [
           it("a", fn() {
-            process.kill(owner)
-            process.sleep(10)
+            kill_and_wait(owner)
             Ok(AssertionOk)
           }),
           it("b", passing_test),
@@ -280,4 +279,13 @@ fn passing_test() -> Result(AssertionResult, String) {
 
 fn ignore(_text: String) -> Nil {
   Nil
+}
+
+/// Kill a process and wait until it has exited.
+fn kill_and_wait(pid: process.Pid) -> Nil {
+  let monitor = process.monitor(pid)
+  process.kill(pid)
+  process.new_selector()
+  |> process.select_specific_monitor(monitor, fn(_down) { Nil })
+  |> process.selector_receive_forever
 }
