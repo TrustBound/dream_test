@@ -145,7 +145,11 @@ pub fn tests() {
       |> types.report_teardown_failures
       |> should
       |> be_equal([
-        TeardownFailure(hook: AfterAllSuitesHook, scope: [], message: "cleanup"),
+        TeardownFailure(
+          hook: AfterAllSuitesHook,
+          groups: [],
+          message: "cleanup",
+        ),
       ])
       |> or_fail_with("after_all_suites should run and its failure be kept")
     }),
@@ -169,8 +173,8 @@ pub fn tests() {
       |> types.report_teardown_failures
       |> should
       |> be_equal([
-        TeardownFailure(hook: AfterAllSuitesHook, scope: [], message: "first"),
-        TeardownFailure(hook: AfterAllSuitesHook, scope: [], message: "second"),
+        TeardownFailure(hook: AfterAllSuitesHook, groups: [], message: "first"),
+        TeardownFailure(hook: AfterAllSuitesHook, groups: [], message: "second"),
       ])
       |> or_fail_with("every after_all_suites hook should run")
     }),
@@ -204,7 +208,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachSuiteHook,
-          scope: ["suite_one"],
+          groups: ["suite_one"],
           message: "suite_one failed",
         ),
       ])
@@ -221,12 +225,12 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachSuiteHook,
-          scope: ["suite"],
+          groups: ["suite"],
           message: "first",
         ),
         TeardownFailure(
           hook: AfterEachSuiteHook,
-          scope: ["suite"],
+          groups: ["suite"],
           message: "second",
         ),
       ])
@@ -286,12 +290,12 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachTestHook,
-          scope: ["suite", "after"],
+          groups: ["suite", "after"],
           message: "first",
         ),
         TeardownFailure(
           hook: AfterEachTestHook,
-          scope: ["suite", "after"],
+          groups: ["suite", "after"],
           message: "second",
         ),
       ])

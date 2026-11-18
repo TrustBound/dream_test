@@ -144,7 +144,7 @@ Feature: Unknown Feature
           "Feature: Cart\n"
           <> "  Scenario: adds ✓\n"
           <> "\n"
-          <> "Tear-down failures:\n"
+          <> "Set-up and tear-down failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"

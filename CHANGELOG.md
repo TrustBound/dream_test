@@ -26,11 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   teardown_failures:)`, read it with `types.report_tests` and
   `types.report_teardown_failures`, and check it with `types.failed`.
   `RunReport` is opaque, so it can grow without a breaking change.
-- `types.TeardownFailure(hook:, scope:, message:)` and
+- `types.TeardownFailure(hook:, groups:, message:)` and
   `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
   `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
   `types.teardown_hook_name`.
-- `types.SetupStopped(set_up:, scope:, reason:, not_run:)`, a variant of
+- `types.SetupStopped(set_up:, groups:, reason:, not_run:)`, a variant of
   `types.TeardownFailure` for a set-up that stopped: the process that
   keeps its set-up alive exited while or after its set-up hooks ran.
   `not_run` is the full name of each test that had not started and was
@@ -39,11 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
   `types.set_up_hook_name`. The BDD and Gherkin reporters show a stopped
   set-up as
-  `before_all in "<scope>" stopped: the process that keeps its set-up alive exited with <reason>.`,
+  `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`,
   then `These tests had not started and were not run:` and the full name
   of each test, for example `root > b` (the list only when tests were not
   run). The JSON reporter gives it as `{"kind": "setup_stopped", "hook":
-  "before_all", "scope": [...], "message": "<reason>", "not_run":
+  "before_all", "groups": [...], "message": "<reason>", "not_run":
   [["root", "b"], ...]}`, with each test as its `full_name` list, and each
   failed tear-down hook now has `"kind": "hook_failed"`.
 - `sandbox.OwnerLost(reason)`: `run_in_owner` gives it when the owner had
@@ -52,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Failed`, `SetupFailed`, `TimedOut`). The runner, the BDD reporter and
   `types.failed` use it.
 - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
-  `Tear-down failures:` section that the BDD and Gherkin reporters show.
+  `Set-up and tear-down failures:` section that the BDD and Gherkin
+  reporters show.
   Each function takes the list of tear-down failures, for example
   `types.report_teardown_failures(report)`.
 - `sandbox.run_catching(run:, input:)` runs a function in the calling
@@ -197,7 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: an `after_each` or `after_each_test` failure changed the test
     status to `Failed`, also for `TimedOut`, `Skipped` and `SetupFailed`.
     After: the status stays, and the report has
-    `TeardownFailure(hook: AfterEachHook, scope: <full test name>, ...)`.
+    `TeardownFailure(hook: AfterEachHook, groups: <full test name>, ...)`.
   - Before: an `after_all`, `after_each_suite` or `after_all_suites`
     failure added a fake test (`<after_all>`, `<after_each_suite>`,
     `<after_all_suites>`) that changed the test count, and the later hooks
@@ -220,8 +221,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `outer_setups` that gives the same set-ups after the run. An
   `OuterSetup` is a set-up around the suite that keeps its resources
   alive in a process, for example the `before_all_suites` or
-  `before_each_suite` set-up: `SetupRunning(set_up:, scope:,
-  check_owner:)` or `SetupStopped(set_up:, scope:, reason:, not_run:)`.
+  `before_each_suite` set-up: `SetupRunning(set_up:, groups:,
+  check_owner:)` or `SetupStopped(set_up:, groups:, reason:, not_run:)`.
   The executor checks each one before each test and each group starts.
   After a set-up stopped, the tests of the suite that did not start are
   `SetupFailed`, no hook of the suite starts, and the executor adds the
@@ -250,13 +251,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bdd.format(types.run_report(tests: results, teardown_failures: []))`.
 - BREAKING: the JSON schema version is `2.0`. `summary` has a new count
   `teardown_failed`, and the object has a new list `teardown_failures` of
-  `{"hook", "scope", "message"}` objects. Fake tests such as `<after_all>`
+  `{"hook", "groups", "message"}` objects. Fake tests such as `<after_all>`
   are no longer in `tests`.
 - BREAKING: `progress.RunFinishedProgress` has a new field
   `teardown_failures`. The last progress line says
   `done, 1 tear-down failed` when a tear-down hook failed.
-- The BDD and Gherkin reporters show a `Tear-down failures:` section
-  before the summary, and the summary line adds `N tear-down failed`.
+- The BDD and Gherkin reporters show a `Set-up and tear-down failures:`
+  section before the summary, and the summary line adds
+  `N tear-down failed`.
   `summary.Counts` has a new field `teardown_failed`, and
   `coverage.RunOutcome` has a new field `teardown_failed`.
 - `exit_on_failure` stops with status 1 when a tear-down hook failed, also

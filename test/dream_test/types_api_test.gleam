@@ -179,7 +179,7 @@ fn passed_result() -> types.TestResult {
 fn cleanup_failure() -> types.TeardownFailure {
   types.TeardownFailure(
     hook: types.AfterAllHook,
-    scope: ["root"],
+    groups: ["root"],
     message: "no cleanup",
   )
 }

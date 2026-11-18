@@ -714,21 +714,21 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 ///
 /// ## Variants
 ///
-/// - `TeardownFailure(hook, scope, message)`: a tear-down hook failed.
-///   `hook` is the hook. `scope` is where it ran: for `AfterEachTestHook`
+/// - `TeardownFailure(hook, groups, message)`: a tear-down hook failed.
+///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
 ///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
 ///   the group path. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
-/// - `SetupStopped(set_up, scope, reason, not_run)`: a set-up stopped.
+/// - `SetupStopped(set_up, groups, reason, not_run)`: a set-up stopped.
 ///   The process that keeps its set-up alive exited while or after its
 ///   set-up hooks ran, for example because a `before_all` hook killed it,
 ///   or a process that the hook linked to it crashed. `set_up` is the
-///   set-up hook. `scope` is the group path for `BeforeAllHook`, the suite
+///   set-up hook. `groups` is the group path for `BeforeAllHook`, the suite
 ///   name for `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`.
 ///   `reason` is the exit reason of the process. The tests of the scope
 ///   that had not started are not run: each one is `SetupFailed` with the
-///   failure `not run: the set-up from <set-up hook> in "<scope>" stopped
+///   failure `not run: the set-up from <set-up hook> in "<groups>" stopped
 ///   (<reason>)`. `not_run` is the full name of each of these tests (see
 ///   `full_name`), in the order of the run. The runner records each test
 ///   when it skips it. When a test is in the scope of more than one
@@ -740,15 +740,15 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 /// ```gleam
 /// types.TeardownFailure(
 ///   hook: types.AfterAllHook,
-///   scope: ["Database"],
+///   groups: ["Database"],
 ///   message: "could not drop the test schema",
 /// )
 /// ```
 pub type TeardownFailure {
-  TeardownFailure(hook: TeardownHook, scope: List(String), message: String)
+  TeardownFailure(hook: TeardownHook, groups: List(String), message: String)
   SetupStopped(
     set_up: SetUpHook,
-    scope: List(String),
+    groups: List(String),
     reason: String,
     not_run: List(List(String)),
   )
@@ -864,7 +864,7 @@ pub fn report_teardown_failures(
 /// types.run_report(tests: [], teardown_failures: [
 ///   types.TeardownFailure(
 ///     hook: types.AfterAllSuitesHook,
-///     scope: [],
+///     groups: [],
 ///     message: "could not stop the pool",
 ///   ),
 /// ])

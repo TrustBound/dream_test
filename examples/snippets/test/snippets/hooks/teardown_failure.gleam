@@ -30,7 +30,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterAllHook,
-          scope: ["Database"],
+          groups: ["Database"],
           message: "could not drop the test schema",
         ),
       ])

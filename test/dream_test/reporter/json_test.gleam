@@ -252,7 +252,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"scope\":[\"root\"],\"message\":\"no cleanup\"}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}",
         )
         |> or_fail_with(
           "each tear-down failure should have its kind, hook, scope and message",
@@ -263,7 +263,7 @@ pub fn tests() {
         types.run_report(tests: [], teardown_failures: [
           types.SetupStopped(
             set_up: types.BeforeAllHook,
-            scope: ["root"],
+            groups: ["root"],
             reason: "Boom",
             not_run: [["root", "b"], ["root", "c"]],
           ),
@@ -272,7 +272,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}",
         )
         |> or_fail_with("a stopped set-up should have its own kind")
       }),

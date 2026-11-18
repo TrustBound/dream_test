@@ -10,7 +10,7 @@
 //// import dream_test/reporters/teardown
 ////
 //// teardown.format(types.report_teardown_failures(report))
-//// // -> "Tear-down failures:\n  after_all in Database\n    could not drop the schema\n"
+//// // -> "Set-up and tear-down failures:\n  after_all in Database\n    could not drop the schema\n"
 //// ```
 
 import dream_test/reporters/ansi
@@ -18,13 +18,13 @@ import dream_test/types.{type TeardownFailure, SetupStopped, TeardownFailure}
 import gleam/list
 import gleam/string
 
-/// Format the tear-down failures of a run without colour.
+/// Format the set-up and tear-down failures of a run without colour.
 ///
-/// A failed tear-down hook has a line with the hook name and the scope (the
-/// scope is left out for a hook of the whole run), and a line with the
-/// message. A set-up that stopped (`SetupStopped`) has the line
-/// `<set-up hook> in "<scope>" stopped: the process that keeps its set-up
-/// alive exited with <reason>.` For the whole run, `in "<scope>"` is left
+/// A failed tear-down hook has a line with the hook name and its groups
+/// (left out for a hook of the whole run), and a line with the message. A
+/// set-up that stopped (`SetupStopped`) has the line
+/// `<set-up hook> in "<groups>" stopped: the process that keeps its set-up
+/// alive exited with <reason>.` For the whole run, `in "<groups>"` is left
 /// out. When the set-up did not run some tests, the line
 /// `These tests had not started and were not run:` follows, then the full
 /// name of each test, with its names joined by ` > `.
@@ -45,18 +45,18 @@ import gleam/string
 /// teardown.format([
 ///   types.SetupStopped(
 ///     set_up: types.BeforeAllHook,
-///     scope: ["root"],
+///     groups: ["root"],
 ///     reason: "Boom",
 ///     not_run: [["root", "b"], ["root", "c"]],
 ///   ),
 /// ])
-/// // -> "Tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
+/// // -> "Set-up and tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
 /// ```
 pub fn format(failures failures: List(TeardownFailure)) -> String {
   format_section(failures, False)
 }
 
-/// Format the tear-down failures of a run with ANSI colour codes.
+/// Format the set-up and tear-down failures of a run with ANSI colour codes.
 ///
 /// The header is bold red, and the first line of each failure is red. The
 /// text is the same as the text of `format`.
@@ -87,7 +87,7 @@ fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
         ansi.apply_if(
           color,
           ansi.bold,
-          ansi.apply_if(color, ansi.red, "Tear-down failures:"),
+          ansi.apply_if(color, ansi.red, "Set-up and tear-down failures:"),
         ),
         "\n",
         ..list.map(failures, format_failure(color, _))
@@ -97,15 +97,20 @@ fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
 
 fn format_failure(color: Bool, failure: TeardownFailure) -> String {
   case failure {
-    TeardownFailure(hook: hook, scope: scope, message: message) ->
-      failure_lines(color, with_scope(types.teardown_hook_name(hook), scope), [
+    TeardownFailure(hook: hook, groups: groups, message: message) ->
+      failure_lines(color, with_groups(types.teardown_hook_name(hook), groups), [
         message,
       ])
-    SetupStopped(set_up: set_up, scope: scope, reason: reason, not_run: not_run) ->
+    SetupStopped(
+      set_up: set_up,
+      groups: groups,
+      reason: reason,
+      not_run: not_run,
+    ) ->
       failure_lines(
         color,
         types.set_up_hook_name(set_up)
-          <> quoted_scope(scope)
+          <> quoted_groups(groups)
           <> " stopped: the process that keeps its set-up alive exited with "
           <> reason
           <> ".",
@@ -138,16 +143,16 @@ fn not_run_lines(not_run: List(List(String))) -> List(String) {
   }
 }
 
-fn quoted_scope(scope: List(String)) -> String {
-  case scope {
+fn quoted_groups(groups: List(String)) -> String {
+  case groups {
     [] -> ""
-    _ -> " in \"" <> string.join(scope, " > ") <> "\""
+    _ -> " in \"" <> string.join(groups, " > ") <> "\""
   }
 }
 
-fn with_scope(name: String, scope: List(String)) -> String {
-  case scope {
+fn with_groups(name: String, groups: List(String)) -> String {
+  case groups {
     [] -> name
-    _ -> name <> " in " <> string.join(scope, " > ")
+    _ -> name <> " in " <> string.join(groups, " > ")
   }
 }

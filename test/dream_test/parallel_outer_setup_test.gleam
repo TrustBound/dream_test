@@ -28,7 +28,7 @@ pub fn tests() {
       |> run_in_setups([
         SetupStopped(
           set_up: BeforeAllSuitesHook,
-          scope: [],
+          groups: [],
           reason: "Boom",
           not_run: [["first", "z"]],
         ),
@@ -73,7 +73,7 @@ pub fn tests() {
       |> run_in_setups([
         SetupRunning(
           set_up: BeforeEachSuiteHook,
-          scope: ["suite"],
+          groups: ["suite"],
           check_owner: fn() { Error("Boom") },
         ),
       ])
@@ -98,7 +98,7 @@ pub fn tests() {
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
       describe("suite", [it("a", passing_test)])
       |> run_in_setups([
-        SetupRunning(set_up: BeforeAllSuitesHook, scope: [], check_owner: fn() {
+        SetupRunning(set_up: BeforeAllSuitesHook, groups: [], check_owner: fn() {
           Ok(Nil)
         }),
       ])
@@ -117,13 +117,13 @@ pub fn tests() {
       |> run_in_setups([
         SetupStopped(
           set_up: BeforeAllSuitesHook,
-          scope: [],
+          groups: [],
           reason: "outer",
           not_run: [],
         ),
         SetupStopped(
           set_up: BeforeEachSuiteHook,
-          scope: ["suite"],
+          groups: ["suite"],
           reason: "inner",
           not_run: [],
         ),
@@ -164,7 +164,7 @@ pub fn tests() {
         |> run_with_concurrency_one([
           SetupRunning(
             set_up: BeforeAllSuitesHook,
-            scope: [],
+            groups: [],
             check_owner: fn() { check_process(monitor) },
           ),
         ])
@@ -264,8 +264,11 @@ fn test_summary(
 
 fn setup_summary(setup: OuterSetup) -> #(types.SetUpHook, SetupState) {
   case setup {
-    SetupRunning(set_up: set_up, scope: _, check_owner: _) -> #(set_up, Running)
-    SetupStopped(set_up: set_up, scope: _, reason: reason, not_run: not_run) -> #(
+    SetupRunning(set_up: set_up, groups: _, check_owner: _) -> #(
+      set_up,
+      Running,
+    )
+    SetupStopped(set_up: set_up, groups: _, reason: reason, not_run: not_run) -> #(
       set_up,
       Stopped(reason, not_run),
     )

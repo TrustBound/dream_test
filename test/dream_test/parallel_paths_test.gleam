@@ -158,7 +158,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachHook,
-          scope: ["root", "a"],
+          groups: ["root", "a"],
           message: "no teardown",
         ),
       ])
@@ -199,7 +199,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterAllHook,
-          scope: ["root"],
+          groups: ["root"],
           message: "no cleanup",
         ),
       ])
@@ -215,8 +215,8 @@ pub fn tests() {
       |> teardown_failures_default
       |> should
       |> be_equal([
-        TeardownFailure(hook: AfterAllHook, scope: ["root"], message: "first"),
-        TeardownFailure(hook: AfterAllHook, scope: ["root"], message: "second"),
+        TeardownFailure(hook: AfterAllHook, groups: ["root"], message: "first"),
+        TeardownFailure(hook: AfterAllHook, groups: ["root"], message: "second"),
       ])
       |> or_fail_with("every after_all should run")
     }),
@@ -234,7 +234,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterAllHook,
-          scope: ["root"],
+          groups: ["root"],
           message: "no cleanup",
         ),
       ])
@@ -270,7 +270,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachHook,
-          scope: ["root", "a"],
+          groups: ["root", "a"],
           message: "hook timed out in root",
         ),
       ])
@@ -287,7 +287,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachHook,
-          scope: ["root", "a"],
+          groups: ["root", "a"],
           message: "hook crashed in root: error:boom",
         ),
       ])
@@ -350,7 +350,7 @@ pub fn tests() {
         |> be_equal([
           TeardownFailure(
             hook: AfterEachTestHook,
-            scope: ["root", "a"],
+            groups: ["root", "a"],
             message: "hook timed out in root",
           ),
         ])
@@ -370,7 +370,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachTestHook,
-          scope: ["root", "a"],
+          groups: ["root", "a"],
           message: "hook crashed in root: error:boom",
         ),
       ])

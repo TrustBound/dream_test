@@ -16,7 +16,9 @@ pub fn tests() {
     it("format gives a header, the hook and scope, and the message", fn() {
       teardown.format([cleanup_failure()])
       |> should
-      |> be_equal("Tear-down failures:\n  after_all in root\n    no cleanup\n")
+      |> be_equal(
+        "Set-up and tear-down failures:\n  after_all in root\n    no cleanup\n",
+      )
       |> or_fail_with("each failure should show its hook, scope and message")
     }),
 
@@ -24,13 +26,13 @@ pub fn tests() {
       teardown.format([
         types.TeardownFailure(
           hook: types.AfterAllSuitesHook,
-          scope: [],
+          groups: [],
           message: "pool still running",
         ),
       ])
       |> should
       |> be_equal(
-        "Tear-down failures:\n  after_all_suites\n    pool still running\n",
+        "Set-up and tear-down failures:\n  after_all_suites\n    pool still running\n",
       )
       |> or_fail_with("a run-level hook should have no scope")
     }),
@@ -39,14 +41,14 @@ pub fn tests() {
       teardown.format([
         types.SetupStopped(
           set_up: types.BeforeAllHook,
-          scope: ["root", "pool"],
+          groups: ["root", "pool"],
           reason: "Boom",
           not_run: [],
         ),
       ])
       |> should
       |> be_equal(
-        "Tear-down failures:\n  before_all in \"root > pool\" stopped: the process that keeps its set-up alive exited with Boom.\n",
+        "Set-up and tear-down failures:\n  before_all in \"root > pool\" stopped: the process that keeps its set-up alive exited with Boom.\n",
       )
       |> or_fail_with("a stopped set-up should name its set-up hook and reason")
     }),
@@ -55,14 +57,14 @@ pub fn tests() {
       teardown.format([
         types.SetupStopped(
           set_up: types.BeforeAllHook,
-          scope: ["root"],
+          groups: ["root"],
           reason: "Boom",
           not_run: [["root", "b"], ["root", "c"]],
         ),
       ])
       |> should
       |> be_equal(
-        "Tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n",
+        "Set-up and tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n",
       )
       |> or_fail_with("each test that was not run should have its full name")
     }),
@@ -71,14 +73,14 @@ pub fn tests() {
       teardown.format([
         types.SetupStopped(
           set_up: types.BeforeAllSuitesHook,
-          scope: [],
+          groups: [],
           reason: "Boom",
           not_run: [["suite", "a"]],
         ),
       ])
       |> should
       |> be_equal(
-        "Tear-down failures:\n  before_all_suites stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      suite > a\n",
+        "Set-up and tear-down failures:\n  before_all_suites stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      suite > a\n",
       )
       |> or_fail_with("a stopped run set-up should have no scope names")
     }),
@@ -87,13 +89,13 @@ pub fn tests() {
       teardown.format([
         types.TeardownFailure(
           hook: types.AfterEachHook,
-          scope: ["root", "adds"],
+          groups: ["root", "adds"],
           message: "no teardown",
         ),
       ])
       |> should
       |> be_equal(
-        "Tear-down failures:\n  after_each in root > adds\n    no teardown\n",
+        "Set-up and tear-down failures:\n  after_each in root > adds\n    no teardown\n",
       )
       |> or_fail_with("the scope names should be joined with >")
     }),
@@ -102,7 +104,7 @@ pub fn tests() {
       teardown.format_in_color([cleanup_failure()])
       |> should
       |> be_equal(
-        "\u{1b}[1m\u{1b}[31mTear-down failures:\u{1b}[0m\u{1b}[0m\n  \u{1b}[31mafter_all in root\u{1b}[0m\n    no cleanup\n",
+        "\u{1b}[1m\u{1b}[31mSet-up and tear-down failures:\u{1b}[0m\u{1b}[0m\n  \u{1b}[31mafter_all in root\u{1b}[0m\n    no cleanup\n",
       )
       |> or_fail_with("the header and the hook line should have colour")
     }),
@@ -111,14 +113,14 @@ pub fn tests() {
       teardown.format_in_color([
         types.SetupStopped(
           set_up: types.BeforeAllHook,
-          scope: ["root"],
+          groups: ["root"],
           reason: "Boom",
           not_run: [["root", "b"]],
         ),
       ])
       |> should
       |> be_equal(
-        "\u{1b}[1m\u{1b}[31mTear-down failures:\u{1b}[0m\u{1b}[0m\n  \u{1b}[31mbefore_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\u{1b}[0m\n    These tests had not started and were not run:\n      root > b\n",
+        "\u{1b}[1m\u{1b}[31mSet-up and tear-down failures:\u{1b}[0m\u{1b}[0m\n  \u{1b}[31mbefore_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\u{1b}[0m\n    These tests had not started and were not run:\n      root > b\n",
       )
       |> or_fail_with("only the first line of the failure should have colour")
     }),

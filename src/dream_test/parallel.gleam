@@ -137,7 +137,7 @@ pub type RunRootParallelWithReporterConfig(context) {
 /// The executor checks each outer set-up before each test and each group
 /// starts. After the process of a set-up stopped, no test or hook of the
 /// suite starts: each test that did not start is `SetupFailed` with the
-/// failure `not run: the set-up from <set-up hook> in "<scope>" stopped
+/// failure `not run: the set-up from <set-up hook> in "<groups>" stopped
 /// (<reason>)`, for example
 /// `not run: the set-up from before_each_suite in "suite" stopped (<reason>)`,
 /// with the operator `<set-up hook>`. The executor records the full name of
@@ -150,27 +150,27 @@ pub type RunRootParallelWithReporterConfig(context) {
 ///
 /// ## Variants
 ///
-/// - `SetupRunning(set_up, scope, check_owner)`: the process of the set-up
+/// - `SetupRunning(set_up, groups, check_owner)`: the process of the set-up
 ///   was alive at the last check. `check_owner` checks it again and gives
 ///   `Ok(Nil)` while it is alive, or `Error(reason)` after it stopped. The
 ///   executor does not call `check_owner` again after it gave `Error`.
 ///   With `sandbox.Owner`, use `sandbox.check_owner`.
-/// - `SetupStopped(set_up, scope, reason, not_run)`: the process of the
+/// - `SetupStopped(set_up, groups, reason, not_run)`: the process of the
 ///   set-up exited with `reason`. `not_run` is the full name of each test
 ///   that was not run because of it (see `types.full_name`), in the order
 ///   of the run. Give `[]` for a set-up that no test was skipped for yet.
 ///
-/// `set_up` is the set-up hook of the scope. `scope` is `[]` for the whole
+/// `set_up` is the set-up hook of the scope. `groups` is `[]` for the whole
 /// run, or the names of the scope, for example `[suite name]`.
 pub type OuterSetup {
   SetupRunning(
     set_up: SetUpHook,
-    scope: List(String),
+    groups: List(String),
     check_owner: fn() -> Result(Nil, String),
   )
   SetupStopped(
     set_up: SetUpHook,
-    scope: List(String),
+    groups: List(String),
     reason: String,
     not_run: List(List(String)),
   )
@@ -849,7 +849,7 @@ fn refresh_owners(owners: Owners(context)) -> Owners(context) {
 
 fn refresh_outer_setup(scope: OuterSetup) -> OuterSetup {
   case scope {
-    SetupRunning(set_up: set_up, scope: names, check_owner: check) ->
+    SetupRunning(set_up: set_up, groups: names, check_owner: check) ->
       checked_outer_setup(scope, set_up, names, check())
     SetupStopped(..) -> scope
   }
@@ -864,7 +864,7 @@ fn checked_outer_setup(
   case checked {
     Ok(Nil) -> scope
     Error(reason) ->
-      SetupStopped(set_up: set_up, scope: names, reason: reason, not_run: [])
+      SetupStopped(set_up: set_up, groups: names, reason: reason, not_run: [])
   }
 }
 
@@ -929,7 +929,7 @@ fn stopped_setup(owners: Owners(context)) -> Option(StoppedSetup(context)) {
                 found,
                 SetupStopped(
                   set_up: found.value.set_up,
-                  scope: found.value.scope,
+                  groups: found.value.scope,
                   reason: found.value.reason,
                   not_run: list.append(found.value.not_run, names),
                 ),
@@ -993,7 +993,12 @@ fn rebuild(found: Found(item, value), replacement: item) -> List(item) {
 
 fn outer_stop(setup: OuterSetup) -> Result(Stop, Nil) {
   case setup {
-    SetupStopped(set_up: set_up, scope: scope, reason: reason, not_run: not_run) ->
+    SetupStopped(
+      set_up: set_up,
+      groups: scope,
+      reason: reason,
+      not_run: not_run,
+    ) ->
       Ok(Stop(set_up: set_up, scope: scope, reason: reason, not_run: not_run))
     SetupRunning(..) -> Error(Nil)
   }
@@ -1013,8 +1018,8 @@ fn group_stop(owner: ScopeOwner(context)) -> Result(Stop, Nil) {
 }
 
 /// The failure of a test that was not run because `stop` stopped:
-/// `not run: the set-up from <set-up hook> in "<scope>" stopped (<reason>)`,
-/// without `in "<scope>"` for the whole run. The operator is the name of
+/// `not run: the set-up from <set-up hook> in "<groups>" stopped (<reason>)`,
+/// without `in "<groups>"` for the whole run. The operator is the name of
 /// the set-up hook.
 fn not_run_failure(stop: Stop) -> AssertionFailure {
   let name = types.set_up_hook_name(stop.set_up)
@@ -1030,7 +1035,7 @@ fn not_run_failure(stop: Stop) -> AssertionFailure {
   )
 }
 
-/// ` in "<scope>"` for a scope, with its names joined by ` > `, or `""`
+/// ` in "<groups>"` for a scope, with its names joined by ` > `, or `""`
 /// for the whole run.
 fn quoted_scope(scope: List(String)) -> String {
   case scope {
@@ -1387,7 +1392,7 @@ fn group_setup_stopped(
 ) -> TeardownFailure {
   types.SetupStopped(
     set_up: BeforeAllHook,
-    scope: scope,
+    groups: scope,
     reason: reason,
     not_run: not_run,
   )
@@ -1529,7 +1534,7 @@ fn add_teardown_failure(
   message: String,
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
-  [TeardownFailure(hook: hook, scope: scope, message: message), ..failures_rev]
+  [TeardownFailure(hook: hook, groups: scope, message: message), ..failures_rev]
 }
 
 fn run_child_groups_sequentially(

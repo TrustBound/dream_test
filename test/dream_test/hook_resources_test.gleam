@@ -120,7 +120,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterEachSuiteHook,
-          scope: ["suite"],
+          groups: ["suite"],
           message: "hook crashed in suite: error:boom",
         ),
       ])
@@ -191,7 +191,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             TeardownFailure(
               hook: AfterAllHook,
-              scope: ["root"],
+              groups: ["root"],
               message: "hook timed out in root",
             ),
           ]),
@@ -230,7 +230,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
               TeardownFailure(
                 hook: AfterAllSuitesHook,
-                scope: [],
+                groups: [],
                 message: "hook timed out",
               ),
             ]),
@@ -274,7 +274,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
               TeardownFailure(
                 hook: AfterEachSuiteHook,
-                scope: ["suite"],
+                groups: ["suite"],
                 message: "hook timed out in suite",
               ),
             ]),
@@ -365,7 +365,7 @@ pub fn tests() {
             teardown_failures: [
               SetupStopped(
                 set_up: BeforeAllHook,
-                scope: ["first"],
+                groups: ["first"],
                 reason: "killed",
                 not_run: [["first", "a"]],
               ),
@@ -422,7 +422,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllHook,
-                  scope: ["root"],
+                  groups: ["root"],
                   reason: "killed",
                   not_run: [["root", "a"], ["root", "inner", "b"]],
                 ),
@@ -460,7 +460,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
               set_up: BeforeAllHook,
-              scope: ["root"],
+              groups: ["root"],
               reason: "Boom",
               not_run: [],
             ),
@@ -490,7 +490,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
               set_up: BeforeAllHook,
-              scope: ["root"],
+              groups: ["root"],
               reason: "Boom",
               not_run: [],
             ),
@@ -544,7 +544,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllHook,
-                  scope: ["root"],
+                  groups: ["root"],
                   reason: "Boom",
                   not_run: [["root", "b"]],
                 ),
@@ -596,7 +596,7 @@ pub fn tests() {
             teardown_failures: [
               SetupStopped(
                 set_up: BeforeAllHook,
-                scope: ["root"],
+                groups: ["root"],
                 reason: "Boom",
                 not_run: [["root", "first", "c"], ["root", "second", "d"]],
               ),
@@ -648,7 +648,7 @@ pub fn tests() {
             teardown_failures: [
               SetupStopped(
                 set_up: BeforeAllHook,
-                scope: ["root"],
+                groups: ["root"],
                 reason: "Boom",
                 not_run: [["root", "inner", "c"]],
               ),
@@ -692,7 +692,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             TeardownFailure(
               hook: AfterEachHook,
-              scope: ["root", "a"],
+              groups: ["root", "a"],
               message: "hook crashed in root: killed",
             ),
           ]),
@@ -713,7 +713,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             TeardownFailure(
               hook: AfterAllHook,
-              scope: ["root"],
+              groups: ["root"],
               message: "hook crashed in root: error:boom",
             ),
           ]),
@@ -734,7 +734,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             TeardownFailure(
               hook: AfterAllHook,
-              scope: ["root"],
+              groups: ["root"],
               message: "hook crashed in root: killed",
             ),
           ]),
@@ -770,7 +770,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllSuitesHook,
-                  scope: [],
+                  groups: [],
                   reason: "killed",
                   not_run: [["suite", "a"]],
                 ),
@@ -810,7 +810,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeEachSuiteHook,
-                  scope: ["suite"],
+                  groups: ["suite"],
                   reason: "killed",
                   not_run: [["suite", "a"]],
                 ),
@@ -835,7 +835,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
               TeardownFailure(
                 hook: AfterEachSuiteHook,
-                scope: ["suite"],
+                groups: ["suite"],
                 message: "hook crashed in suite: killed",
               ),
             ]),
@@ -866,7 +866,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
               set_up: BeforeAllSuitesHook,
-              scope: [],
+              groups: [],
               reason: "Boom",
               not_run: [],
             ),
@@ -923,7 +923,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllSuitesHook,
-                  scope: [],
+                  groups: [],
                   reason: "Boom",
                   not_run: [["second", "b"]],
                 ),
@@ -959,7 +959,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
               set_up: BeforeEachSuiteHook,
-              scope: ["suite"],
+              groups: ["suite"],
               reason: "Boom",
               not_run: [],
             ),
@@ -996,7 +996,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
               set_up: BeforeEachSuiteHook,
-              scope: ["suite"],
+              groups: ["suite"],
               reason: "Boom",
               not_run: [],
             ),
@@ -1047,7 +1047,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllSuitesHook,
-                  scope: [],
+                  groups: [],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
                 ),
@@ -1102,7 +1102,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeAllSuitesHook,
-                  scope: [],
+                  groups: [],
                   reason: "Boom",
                   not_run: [["suite", "inner", "c"]],
                 ),
@@ -1157,7 +1157,7 @@ pub fn tests() {
               teardown_failures: [
                 SetupStopped(
                   set_up: BeforeEachSuiteHook,
-                  scope: ["suite"],
+                  groups: ["suite"],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
                 ),
@@ -1209,13 +1209,13 @@ pub fn tests() {
             teardown_failures: [
               SetupStopped(
                 set_up: BeforeEachSuiteHook,
-                scope: ["suite"],
+                groups: ["suite"],
                 reason: "Boom",
                 not_run: [],
               ),
               SetupStopped(
                 set_up: BeforeAllSuitesHook,
-                scope: [],
+                groups: [],
                 reason: "Boom",
                 not_run: [["suite", "b"]],
               ),
@@ -1235,7 +1235,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailure(
           hook: AfterAllSuitesHook,
-          scope: [],
+          groups: [],
           message: "hook crashed: error:boom",
         ),
       ])

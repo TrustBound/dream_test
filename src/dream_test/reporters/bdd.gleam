@@ -111,8 +111,8 @@ pub fn failures_only(
 /// Render the end-of-run BDD output for a run report.
 ///
 /// The output has the test results, then the failures (full mode), then a
-/// `Tear-down failures:` section when a tear-down hook failed (full and
-/// failures-only modes), then the summary line.
+/// `Set-up and tear-down failures:` section when a tear-down hook failed or
+/// a set-up stopped (full and failures-only modes), then the summary line.
 pub fn render(
   config config: reporter_types.BddReporterConfig,
   report report: RunReport,

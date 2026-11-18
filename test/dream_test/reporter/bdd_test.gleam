@@ -290,7 +290,7 @@ pub fn tests() {
           "root\n"
           <> "  ✓ adds\n"
           <> "\n"
-          <> "Tear-down failures:\n"
+          <> "Set-up and tear-down failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
@@ -307,7 +307,7 @@ pub fn tests() {
         |> should
         |> be_equal(
           "\n"
-          <> "\u{1b}[1m\u{1b}[31mTear-down failures:\u{1b}[0m\u{1b}[0m\n"
+          <> "\u{1b}[1m\u{1b}[31mSet-up and tear-down failures:\u{1b}[0m\u{1b}[0m\n"
           <> "  \u{1b}[31mafter_all in root\u{1b}[0m\n"
           <> "    no cleanup\n"
           <> "\n"
@@ -326,7 +326,7 @@ pub fn tests() {
         |> should
         |> be_equal(
           "\n"
-          <> "Tear-down failures:\n"
+          <> "Set-up and tear-down failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
@@ -499,7 +499,7 @@ pub fn tests() {
           "root\n"
           <> "  ✓ adds\n"
           <> "\n"
-          <> "Tear-down failures:\n"
+          <> "Set-up and tear-down failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"

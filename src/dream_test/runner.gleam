@@ -1320,7 +1320,7 @@ fn suite_setup_stopped(
 ) -> TeardownFailure {
   SetupStopped(
     set_up: tear_down.set_up,
-    scope: tear_down.scope,
+    groups: tear_down.scope,
     reason: reason,
     not_run: not_run,
   )
@@ -1422,7 +1422,7 @@ fn add_teardown_failure(
   [
     TeardownFailure(
       hook: tear_down.hook_kind,
-      scope: tear_down.scope,
+      groups: tear_down.scope,
       message: message,
     ),
     ..failures_rev
@@ -1700,14 +1700,14 @@ fn outer_setup(
   case owner {
     None -> []
     Some(SuiteOwnerAlive(owner: alive)) -> [
-      parallel.SetupRunning(set_up: set_up, scope: scope, check_owner: fn() {
+      parallel.SetupRunning(set_up: set_up, groups: scope, check_owner: fn() {
         check_suite_owner(alive)
       }),
     ]
     Some(SuiteOwnerGone(reason: reason, not_run: not_run)) -> [
       parallel.SetupStopped(
         set_up: set_up,
-        scope: scope,
+        groups: scope,
         reason: reason,
         not_run: not_run,
       ),
@@ -1742,7 +1742,7 @@ fn stopped_owner(
   case outer_setup {
     parallel.SetupStopped(
       set_up: stopped,
-      scope: _,
+      groups: _,
       reason: reason,
       not_run: not_run,
     )
