@@ -93,7 +93,7 @@ import dream_test/coverage.{
   EverySourceFileExcluded, ExcludeMatchedNothing, ExcludeWithoutReason,
   FilesBelowMinimumPercent, HtmlDeleteFailed, HtmlFileSourceReadFailed,
   HtmlFileWriteFailed, HtmlSourceReadFailed, HtmlWriteFailed,
-  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction, IgnoreLineWithoutCode,
   IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
   InvalidEnvironmentValue, InvalidMinimumPercent, InvalidMinimumPercentPerFile,
   JsonWriteFailed, LcovReadFailed, LcovSourceNotFound, LcovWriteFailed,
@@ -1017,6 +1017,14 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> " is not followed by a complete function.",
         reason: "a coverage:ignore-function marker ignores the whole function after it, but the code after this marker is not a function, or the file ends before the function ends.",
         fix: "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
+      )
+    IgnoreLineWithoutCode(source_path, line_number) ->
+      ErrorMessage(
+        what: "The coverage:ignore marker at "
+          <> source_location(source_path, line_number)
+          <> " is not followed by a line of code.",
+        reason: "a coverage:ignore marker ignores the next line that holds code, but another marker comes before that line, or the file ends first.",
+        fix: "put the marker on its own line directly above the line to ignore, or remove it.",
       )
     ExcludeWithoutReason(pattern) ->
       ErrorMessage(

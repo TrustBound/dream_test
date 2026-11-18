@@ -229,6 +229,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - `coverage:ignore`, `coverage:ignore-start` / `coverage:ignore-end` and
     `coverage:ignore-function` comment markers ignore lines, blocks and whole
     functions in `.gleam` and `.erl` files. Text after a marker is its reason
+  - A marker that cannot apply fails the run with the file and the line,
+    for example a `coverage:ignore` marker that another marker or the end
+    of the file follows before a line of code (`IgnoreLineWithoutCode`)
   - A count line after the total shows what was excluded.
     `coverage.show_excluded` adds an `Excluded` column with the reasons, and
     `coverage.require_exclusion_reasons` fails the run when a reason is missing

@@ -117,7 +117,8 @@
 //// ```
 ////
 //// - `// coverage:ignore` ignores the next line that holds code. Blank lines
-////   and comment lines between the marker and the code are skipped.
+////   and comment lines between the marker and the code are skipped. Another
+////   marker before that line, or the end of the file, is an error.
 //// - `// coverage:ignore-start` and `// coverage:ignore-end` ignore every
 ////   line from the start marker to the end marker.
 //// - `// coverage:ignore-function` ignores every line from the marker to the
@@ -138,8 +139,9 @@
 ////
 //// An ignore-start marker without an ignore-end marker, an ignore-end marker
 //// without an ignore-start marker, an ignore-start marker inside an ignored
-//// block, and an ignore-function marker that no complete function follows
-//// are errors. The error gives the file and the line.
+//// block, an ignore-function marker that no complete function follows,
+//// and an ignore marker that another marker or the end of the file follows
+//// before a line of code are errors. The error gives the file and the line.
 ////
 //// Markers match exact source lines only on Gleam 1.19 and later. See
 //// "Line accuracy".
@@ -572,6 +574,11 @@ pub type CoverageError {
   ///
   /// - `line_number`: the 1-based line of the marker
   IgnoreFunctionWithoutFunction(source_path: String, line_number: Int)
+  /// A `coverage:ignore` marker is not followed by a line that holds code:
+  /// another marker comes first, or the file ends first.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  IgnoreLineWithoutCode(source_path: String, line_number: Int)
   /// `coverage.require_exclusion_reasons` is on, and a pattern was given to
   /// `coverage.exclude`, which gives no reason.
   ExcludeWithoutReason(pattern: String)
@@ -2314,6 +2321,11 @@ type OpenBlock {
   OpenBlock(line_number: Int, text: String)
 }
 
+/// A `coverage:ignore` marker that no line of code has followed yet.
+type PendingLine {
+  PendingLine(line_number: Int, text: String)
+}
+
 /// Where the marker reader is in one source file, and what it found.
 type MarkerScan {
   MarkerScan(
@@ -2322,7 +2334,7 @@ type MarkerScan {
     line_number: Int,
     ignored: Dict(Int, String),
     open_block: Option(OpenBlock),
-    pending_text: Option(String),
+    pending_line: Option(PendingLine),
     require_reasons: Bool,
   )
 }
@@ -2387,7 +2399,7 @@ fn scan_then_continue(
       line_number: 1,
       ignored: dict.new(),
       open_block: None,
-      pending_text: None,
+      pending_line: None,
       require_reasons: marker_read.require_reasons,
     )
   case scan_lines(scan, string.split(text, "\n")) {
@@ -2420,14 +2432,19 @@ fn scan_lines(
   scan: MarkerScan,
   lines: List(String),
 ) -> Result(Dict(Int, String), CoverageError) {
-  case lines, scan.open_block {
-    [], None -> Ok(scan.ignored)
-    [], Some(open) ->
+  case lines, scan.open_block, scan.pending_line {
+    [], None, None -> Ok(scan.ignored)
+    [], None, Some(pending) ->
+      Error(IgnoreLineWithoutCode(
+        source_path: scan.source_path,
+        line_number: pending.line_number,
+      ))
+    [], Some(open), _ ->
       Error(IgnoreStartWithoutEnd(
         source_path: scan.source_path,
         line_number: open.line_number,
       ))
-    [line, ..rest], _ -> scan_line_then_continue(scan, line, rest)
+    [line, ..rest], _, _ -> scan_line_then_continue(scan, line, rest)
   }
 }
 
@@ -2456,18 +2473,22 @@ fn scan_source_line(
   source_line: SourceLine,
   rest: List(String),
 ) -> Result(Dict(Int, String), CoverageError) {
-  case source_line, scan.open_block, scan.pending_text {
+  case source_line, scan.open_block, scan.pending_line {
     Marker(IgnoreStart, _, _), Some(open), _ ->
       Error(NestedIgnoreStart(
         source_path: scan.source_path,
         line_number: scan.line_number,
         open_line_number: open.line_number,
       ))
-    Marker(IgnoreStart, _, text), None, _ ->
+    Marker(_, _, _), None, Some(pending) ->
+      Error(IgnoreLineWithoutCode(
+        source_path: scan.source_path,
+        line_number: pending.line_number,
+      ))
+    Marker(IgnoreStart, _, text), None, None ->
       MarkerScan(
         ..ignore_line(scan, text),
         open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
-        pending_text: None,
       )
       |> next_line(rest)
     Marker(IgnoreEnd, _, _), None, _ ->
@@ -2482,9 +2503,16 @@ fn scan_source_line(
     Marker(IgnoreFunction, _, text), None, _ ->
       ignore_function_then_continue(scan, text, rest)
     Marker(IgnoreLine, _, text), None, _ ->
-      next_line(MarkerScan(..scan, pending_text: Some(text)), rest)
-    CodeLine, None, Some(text) ->
-      MarkerScan(..ignore_line(scan, text), pending_text: None)
+      MarkerScan(
+        ..scan,
+        pending_line: Some(PendingLine(
+          line_number: scan.line_number,
+          text: text,
+        )),
+      )
+      |> next_line(rest)
+    CodeLine, None, Some(pending) ->
+      MarkerScan(..ignore_line(scan, pending.text), pending_line: None)
       |> next_line(rest)
     CodeLine, None, None -> next_line(scan, rest)
     OtherLine, None, _ -> next_line(scan, rest)
@@ -2579,7 +2607,7 @@ fn ignore_function_then_continue(
     |> string.replace("\r", "")
   case function_last_line(scan.syntax, source) {
     Ok(offset) ->
-      MarkerScan(..scan, pending_text: None)
+      scan
       |> ignore_range(scan.line_number + offset, text)
       |> next_line(list.drop(rest, offset))
     Error(Nil) ->

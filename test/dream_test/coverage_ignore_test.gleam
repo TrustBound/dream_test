@@ -6,8 +6,8 @@
 import coverage_ignore_fixtures/ignored
 import dream_test/coverage.{
   type CoverageConfig, type CoverageError, IgnoreEndWithoutStart,
-  IgnoreFunctionWithoutFunction, IgnoreStartWithoutEnd, NestedIgnoreStart,
-  SourceReadFailed,
+  IgnoreFunctionWithoutFunction, IgnoreLineWithoutCode, IgnoreStartWithoutEnd,
+  NestedIgnoreStart, SourceReadFailed,
 }
 import dream_test/coverage/report.{type CoverageReport, type LineCoverage}
 import dream_test/coverage_project_support.{
@@ -36,6 +36,8 @@ fn error_from_project(
       NestedIgnoreStart(from_project(project, source_path), line, open_line)
     IgnoreFunctionWithoutFunction(source_path, line) ->
       IgnoreFunctionWithoutFunction(from_project(project, source_path), line)
+    IgnoreLineWithoutCode(source_path, line) ->
+      IgnoreLineWithoutCode(from_project(project, source_path), line)
     SourceReadFailed(path, file_error) ->
       SourceReadFailed(
         from_project(project, path),
@@ -622,6 +624,75 @@ pub fn tests() {
           |> or_fail_with("expected IgnoreEndWithoutStart in lib/outside.gleam")
         },
       ),
+      it("returns IgnoreLineWithoutCode when the file ends first", fn() {
+        outside_error(outside_path(), [
+          "pub fn run() {",
+          "  1",
+          "}",
+          "// coverage:ignore",
+          "",
+        ])
+        |> should
+        |> be_equal(Ok(IgnoreLineWithoutCode(outside_path(), 4)))
+        |> or_fail_with("expected IgnoreLineWithoutCode at line 4")
+      }),
+      it(
+        "returns IgnoreLineWithoutCode when another ignore marker follows",
+        fn() {
+          outside_error(outside_path(), [
+            "pub fn run() {",
+            "  // coverage:ignore",
+            "  // coverage:ignore second",
+            "  1",
+            "}",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreLineWithoutCode(outside_path(), 2)))
+          |> or_fail_with("expected IgnoreLineWithoutCode at line 2")
+        },
+      ),
+      it(
+        "returns IgnoreLineWithoutCode when an ignore-start marker follows",
+        fn() {
+          outside_error(outside_path(), [
+            "pub fn run() {",
+            "  // coverage:ignore",
+            "  // coverage:ignore-start",
+            "  1",
+            "  // coverage:ignore-end",
+            "}",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreLineWithoutCode(outside_path(), 2)))
+          |> or_fail_with("expected IgnoreLineWithoutCode at line 2")
+        },
+      ),
+      it(
+        "returns IgnoreLineWithoutCode when an ignore-function marker follows",
+        fn() {
+          outside_error(outside_path(), [
+            "// coverage:ignore",
+            "// coverage:ignore-function",
+            "pub fn run() {",
+            "  1",
+            "}",
+          ])
+          |> should
+          |> be_equal(Ok(IgnoreLineWithoutCode(outside_path(), 1)))
+          |> or_fail_with("expected IgnoreLineWithoutCode at line 1")
+        },
+      ),
+      it("returns IgnoreLineWithoutCode in an .erl file", fn() {
+        marked_module([
+          "    First = Number + 1,",
+          "    First.",
+          "%% coverage:ignore",
+        ])
+        |> measure_error(project_config, _, [])
+        |> should
+        |> be_equal(Ok(IgnoreLineWithoutCode("src/marked.erl", 7)))
+        |> or_fail_with("expected IgnoreLineWithoutCode at line 7")
+      }),
       it("returns IgnoreFunctionWithoutFunction above a Gleam constant", fn() {
         outside_error(outside_path(), [
           "pub fn run() {",

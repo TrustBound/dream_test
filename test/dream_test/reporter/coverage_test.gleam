@@ -6,7 +6,7 @@ import dream_test/coverage.{
   EncryptedDebugInfo, EverySourceFileExcluded, ExcludeMatchedNothing,
   ExcludeWithoutReason, HtmlDeleteFailed, HtmlFileSourceReadFailed,
   HtmlFileWriteFailed, HtmlSourceReadFailed, HtmlWriteFailed,
-  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction,
+  IgnoreEndWithoutStart, IgnoreFunctionWithoutFunction, IgnoreLineWithoutCode,
   IgnoreMarkerWithoutReason, IgnoreStartWithoutEnd, InstrumentedLoadFailed,
   InvalidEnvironmentValue, InvalidMinimumPercent, JsonWriteFailed,
   LcovReadFailed, LcovSourceNotFound, LcovWriteFailed, MalformedLcov,
@@ -834,6 +834,16 @@ pub fn tests() {
           "put the marker on its own line directly above a function (doc comments and attributes can be between them), or use coverage:ignore-start and coverage:ignore-end for other code.",
         ))
         |> or_fail_with("expected the IgnoreFunctionWithoutFunction message")
+      }),
+      it("describes IgnoreLineWithoutCode", fn() {
+        render_failure_for(IgnoreLineWithoutCode("src/app/cart.gleam", 12))
+        |> should
+        |> be_equal(failure_block(
+          "The coverage:ignore marker at src/app/cart.gleam:12 is not followed by a line of code.",
+          "a coverage:ignore marker ignores the next line that holds code, but another marker comes before that line, or the file ends first.",
+          "put the marker on its own line directly above the line to ignore, or remove it.",
+        ))
+        |> or_fail_with("expected the IgnoreLineWithoutCode message")
       }),
       it("describes ExcludeWithoutReason", fn() {
         render_failure_for(ExcludeWithoutReason("src/app/generated/**"))
