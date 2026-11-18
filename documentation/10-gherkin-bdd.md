@@ -74,7 +74,7 @@ The capture helpers (`get_int`, `get_float`, `get_string`, `get_word`) return a 
 
 ### Inline Gherkin (the “hero” example)
 
-#### An inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_hero.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### An inline feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_hero.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
@@ -139,7 +139,7 @@ What to notice in this example:
 Placeholders let you capture values from the step text into `context.captures`.
 Typed helpers like `get_int` parse the capture into the right type.
 
-#### Typed placeholders <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_placeholders.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Typed placeholders <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_placeholders.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then}
@@ -246,7 +246,7 @@ A second definition of the same pattern in the same phase is a duplicate.
 `steps.validate` returns the duplicates, and each scenario that uses the registry fails with them.
 The same pattern in two phases is not a duplicate.
 
-#### Phases and `*` steps <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_phases.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Phases and `*` steps <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_phases.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{
@@ -306,7 +306,7 @@ If you want tests authored in plain text (often by QA/product, or copied from ti
 
 #### Example `.feature` file
 
-##### The feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### The feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gherkin
 @shopping
@@ -331,7 +331,7 @@ Feature: Shopping Cart
 
 #### Loading a `.feature` file and converting to a suite
 
-##### Load a feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Load a feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
@@ -404,7 +404,7 @@ So the first step of a Rule Background, or of a scenario in a Rule, can use `And
 A scenario can have more than one `Examples` section, and every row of every section runs.
 The tags of an `Examples` section apply to the tests that its rows make.
 
-#### A feature with Rules and two Examples sections <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/features/stock.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### A feature with Rules and two Examples sections <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/features/stock.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gherkin
 @stock
@@ -447,7 +447,7 @@ Feature: Stock control
       Then the stock holds 0 items
 ```
 
-#### Run the feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Run the feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
@@ -508,7 +508,7 @@ How the tests get their names and tags:
 - A scenario with no steps runs no Background steps.
 - A step can have a DataTable and a DocString, in either order. The step function gets them in `context.table` and `context.doc_string`.
 
-#### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
@@ -577,7 +577,7 @@ Use `parser.feature_file_error_to_string` for a message such as `test/cart.featu
 
 Use discovery when you want real `.feature` files (e.g. written by QA or copied into tickets).
 
-#### Discover feature files <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_discover.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Discover feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_discover.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/discover

@@ -4,7 +4,7 @@ If you’ve used Jest/RSpec style assertions before, this is the Dream Test equi
 
 Dream Test assertions are designed around a single, composable pattern:
 
-### An assertion pipeline <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/equality.gleam#L7-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### An assertion pipeline <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/equality.gleam#L7-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
       2 + 3
@@ -32,7 +32,7 @@ There’s also a human reason:
 
 ### Chaining matchers (unwrap + assert)
 
-#### Chain matchers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/chaining.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Chain matchers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/chaining.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
@@ -74,7 +74,7 @@ pub fn main() {
 
 ### Built-in matcher catalogue (practical examples)
 
-#### Built-in matchers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/builtin_matchers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Built-in matchers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/builtin_matchers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{
@@ -189,7 +189,7 @@ Dream Test doesn’t require a special “custom matcher API.” Built-in and cu
 
 Here’s a minimal custom matcher that checks “even number”:
 
-#### An even-number matcher <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/custom_matchers.gleam#L5-L41"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### An even-number matcher <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/custom_matchers.gleam#L5-L41"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/types.{
@@ -250,7 +250,7 @@ Instead of:
 Sometimes you need a conditional check that isn’t a good fit for the normal matcher pipeline.
 Use `succeed()` and `fail_with("...")` to keep the return type consistent.
 
-#### Explicit success and failure <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/unit/explicit_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Explicit success and failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/explicit_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{fail_with, succeed}

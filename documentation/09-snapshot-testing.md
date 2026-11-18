@@ -34,7 +34,7 @@ If your snapshot fails every day for “expected reasons,” it’s no longer bu
 
 ### String snapshots + `inspect` snapshots
 
-#### String and inspect snapshots <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/matchers/snapshot_testing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### String and inspect snapshots <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/snapshot_testing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{

@@ -20,7 +20,7 @@ This keeps output readable under parallel execution:
 
 This is the standard “human” output: live progress while tests run, then a full BDD report (with failures repeated near the end) and a summary.
 
-#### Progress and BDD output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/bdd_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Progress and BDD output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/bdd_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -49,7 +49,7 @@ pub fn main() {
 
 Use JSON output for CI/CD integration and tooling (parsing, dashboards, artifact uploads).
 
-#### JSON output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/json_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### JSON output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/json_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -92,7 +92,7 @@ The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `dur
 
 Use progress output when you want compact logs, especially for large suites.
 
-#### Progress output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Progress output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -123,7 +123,7 @@ Post-run formatting is useful when you want to:
 - Embed results into a larger tool
 - Perform extra processing before output
 
-#### Format a report into a string <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/bdd_formatting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Format a report into a string <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/bdd_formatting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{match_snapshot, or_fail_with, should}
@@ -181,7 +181,7 @@ If you want “plug in an arbitrary reporter module” wired into the runner, yo
 Use `runner.output(...)` to route any reporter output into your own sinks.
 This is useful for snapshots, embedding Dream Test in other tools, or writing reports to files.
 
-##### Capture the runner output <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/output_routing.gleam#L1-L65"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Capture the runner output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/output_routing.gleam#L1-L65"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -256,7 +256,7 @@ fn example_suite() {
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
 write a pure formatter over the `types.RunReport` that `runner.run()` gives. Read the tests with `types.report_tests` and the failed tear-down hooks with `types.report_teardown_failures`.
 
-##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -314,7 +314,7 @@ fn count_loop(results: List(TestResult), wanted: Status, n: Int) -> Int {
 
 Then call it from your runner `main()`:
 
-##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L53-L56"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L53-L56"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn main() {
@@ -339,7 +339,7 @@ This is intentionally **not** the common path; most users should attach progress
 
 If you’re using `dream_test/gherkin`, you can render results in Gherkin-friendly formatting.
 
-#### Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/reporters/gherkin_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then}

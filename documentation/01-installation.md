@@ -44,7 +44,7 @@ Create a file under `test/` (for example, `test/{project_name}_test.gleam`) with
 
 You can use module discovery to avoid maintaining an import list.
 
-#### A discovery test runner <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/runner/discovery_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### A discovery test runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/discovery_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/discover.{from_path, to_suites}

@@ -20,7 +20,7 @@ They’re public because they’re useful in real test suites, but they’re int
 
 Use these helpers when you want predictable, structured error handling around file IO (snapshots, temp files, fixtures).
 
-#### File helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/file_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### File helpers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/file_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/file.{
@@ -100,7 +100,7 @@ pub fn tests() {
 
 These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
 
-#### Counter and port helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/process_counter_and_port.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Counter and port helpers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/process_counter_and_port.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_between, be_equal, or_fail_with, should}
@@ -134,7 +134,7 @@ pub fn tests() {
 
 Use `timing.now_ms()` / `timing.now_us()` for monotonic timing, and format helpers for readable output.
 
-#### Timing helpers <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/timing_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Timing helpers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/timing_helpers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -197,7 +197,7 @@ pub fn tests() {
 
 This is the mechanism Dream Test uses to make test execution resilient: run code in an isolated process, detect timeouts, and catch crashes.
 
-#### Sandboxed functions <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/utils/sandboxing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Sandboxed functions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/sandboxing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}

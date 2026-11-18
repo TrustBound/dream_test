@@ -17,7 +17,7 @@ The `badges` branch has no shared history with your code. It holds only `coverag
 
 Set `coverage.json_path` in your test `main`. The badge step reads `total` and `minimum_percent` from this file.
 
-#### Coverage for the badge <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/coverage/coverage_badge.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Coverage for the badge <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_badge.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {

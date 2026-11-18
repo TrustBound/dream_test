@@ -36,7 +36,7 @@ inline DSL suite.
 
 Write features in standard `.feature` files:
 
-#### The feature file <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/features/shopping_cart.feature#L1-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/features/shopping_cart.feature#L1-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gherkin
 @shopping @e2e
@@ -59,7 +59,7 @@ Feature: Shopping Cart
 
 Define features directly in Gleam:
 
-#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/features/shopping_cart.gleam#L25-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/features/shopping_cart.gleam#L25-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
   feature_with_background("Shopping Cart (inline)", registry, bg, [
@@ -77,7 +77,7 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
-### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 Each scenario starts from `cart_world.initial()` and passes one `CartWorld` value from step to step. A `given` or `when` step returns a new `CartWorld`. A `then` step reads it.
 
@@ -101,7 +101,7 @@ pub type Checkout {
 }
 ```
 
-### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/shopping_cart/test/steps/cart.gleam#L18-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart.gleam#L18-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
@@ -109,14 +109,8 @@ pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   |> steps.given("I have an empty cart", step_empty_cart)
   |> steps.given("I add {int} {word} to the cart", step_add_product)
   |> steps.when("I add {int} {word} to the cart", step_add_product)
-  |> steps.when(
-    "I try to add {int} {word} to the cart",
-    step_try_add_product,
-  )
-  |> steps.when(
-    "I update the {word} quantity to {int}",
-    step_update_quantity,
-  )
+  |> steps.when("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when("I update the {word} quantity to {int}", step_update_quantity)
   |> steps.when("I remove {word} from the cart", step_remove_product)
 }
 ```
