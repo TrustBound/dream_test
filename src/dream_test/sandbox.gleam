@@ -36,27 +36,35 @@
 //// }
 //// import dream_test/unit.{describe, it}
 ////
-//// fn loop_forever() {
-////   loop_forever()
+//// fn double(number: Int) -> Int {
+////   number * 2
+//// }
+////
+//// fn loop_forever(_input: Nil) -> Nil {
+////   loop_forever(Nil)
+//// }
+////
+//// fn crash(message: String) -> Int {
+////   panic as message
 //// }
 ////
 //// pub fn tests() {
 ////   describe("Sandboxing", [
 ////     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-////       let result = sandbox.run_isolated(config, fn() { 123 })
+////       let result = sandbox.run_isolated(config, double, 61)
 ////
 ////       result
 ////       |> should
-////       |> be_equal(SandboxCompleted(123))
-////       |> or_fail_with("expected SandboxCompleted(123)")
+////       |> be_equal(SandboxCompleted(122))
+////       |> or_fail_with("expected SandboxCompleted(122)")
 ////     }),
 ////
 ////     it(
 ////       "run_isolated returns SandboxTimedOut when the function is too slow",
 ////       fn() {
 ////         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-////         let result = sandbox.run_isolated(config, loop_forever)
+////         let result = sandbox.run_isolated(config, loop_forever, Nil)
 ////
 ////         result
 ////         |> should
@@ -67,7 +75,7 @@
 ////
 ////     it("run_isolated returns SandboxCrashed when the function panics", fn() {
 ////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-////       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+////       let result = sandbox.run_isolated(config, crash, "boom")
 ////
 ////       let did_crash = case result {
 ////         SandboxCrashed(_) -> True
@@ -141,11 +149,13 @@ type WorkerMessage(a) {
 }
 
 @external(erlang, "sandbox_ffi", "run_catching")
-fn run_catching(test_function: fn() -> a) -> Result(a, String)
+fn run_catching(run: fn(input) -> a, input: input) -> Result(a, String)
 
-/// Run a test function in an isolated process with timeout.
+/// Run a function with its input in an isolated process with timeout.
 ///
-/// The test function runs in a separate BEAM process that is monitored.
+/// The function runs in a separate BEAM process that is monitored, and gets
+/// `input` as its argument. Give the data that the function needs as
+/// `input`, so the function can be a named function.
 /// If the process completes normally, its result is returned.
 /// If the process crashes or times out, an appropriate SandboxResult is returned.
 ///
@@ -158,27 +168,35 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 /// }
 /// import dream_test/unit.{describe, it}
 ///
-/// fn loop_forever() {
-///   loop_forever()
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn loop_forever(_input: Nil) -> Nil {
+///   loop_forever(Nil)
+/// }
+///
+/// fn crash(message: String) -> Int {
+///   panic as message
 /// }
 ///
 /// pub fn tests() {
 ///   describe("Sandboxing", [
 ///     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-///       let result = sandbox.run_isolated(config, fn() { 123 })
+///       let result = sandbox.run_isolated(config, double, 61)
 ///
 ///       result
 ///       |> should
-///       |> be_equal(SandboxCompleted(123))
-///       |> or_fail_with("expected SandboxCompleted(123)")
+///       |> be_equal(SandboxCompleted(122))
+///       |> or_fail_with("expected SandboxCompleted(122)")
 ///     }),
 ///
 ///     it(
 ///       "run_isolated returns SandboxTimedOut when the function is too slow",
 ///       fn() {
 ///         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-///         let result = sandbox.run_isolated(config, loop_forever)
+///         let result = sandbox.run_isolated(config, loop_forever, Nil)
 ///
 ///         result
 ///         |> should
@@ -189,7 +207,7 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 ///
 ///     it("run_isolated returns SandboxCrashed when the function panics", fn() {
 ///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-///       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+///       let result = sandbox.run_isolated(config, crash, "boom")
 ///
 ///       let did_crash = case result {
 ///         SandboxCrashed(_) -> True
@@ -208,44 +226,58 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 /// ## Parameters
 ///
 /// - `config`: sandbox configuration (timeout + crash report behavior)
-/// - `test_function`: function to run in an isolated process
+/// - `run`: function to run in an isolated process
+/// - `input`: the argument that `run` gets
 ///
 /// ## Returns
 ///
 /// A `SandboxResult(a)` describing completion, timeout, or crash.
 pub fn run_isolated(
   config config: SandboxConfig,
-  test_function test_function: fn() -> a,
+  run run: fn(input) -> a,
+  input input: input,
 ) -> SandboxResult(a) {
   let result_subject = new_subject()
   let worker_pid =
-    spawn_worker(result_subject, test_function, config.show_crash_reports)
+    spawn_worker(result_subject, run, input, config.show_crash_reports)
   let worker_monitor = monitor(worker_pid)
   let selector = build_result_selector(result_subject, worker_monitor)
 
   wait_for_result(config, selector, worker_pid, worker_monitor)
 }
 
-/// Spawn a worker process that runs the test and sends the result.
+/// Spawn a worker process that runs the function and sends the result.
 fn spawn_worker(
   result_subject: Subject(WorkerMessage(a)),
-  test_function: fn() -> a,
+  run: fn(input) -> a,
+  input: input,
   show_crash_reports: Bool,
 ) -> Pid {
   spawn_unlinked(fn() {
-    case show_crash_reports {
-      True -> {
-        let result = test_function()
-        send(result_subject, TestCompleted(result))
-      }
-
-      False ->
-        case run_catching(test_function) {
-          Ok(result) -> send(result_subject, TestCompleted(result))
-          Error(reason) -> send(result_subject, WorkerDown(reason))
-        }
-    }
+    run_worker(result_subject, run, input, show_crash_reports)
   })
+}
+
+/// The body of the worker process: run the function and send its result.
+/// With crash reports off, a crash is caught and sent as `WorkerDown`.
+fn run_worker(
+  result_subject: Subject(WorkerMessage(a)),
+  run: fn(input) -> a,
+  input: input,
+  show_crash_reports: Bool,
+) -> Nil {
+  case show_crash_reports {
+    True -> send(result_subject, TestCompleted(run(input)))
+    False -> send(result_subject, caught_message(run_catching(run, input)))
+  }
+}
+
+/// The worker message for the result of a caught run.
+fn caught_message(result: Result(a, String)) -> WorkerMessage(a) {
+  case result {
+    Ok(value) -> TestCompleted(value)
+    Error(reason) -> WorkerDown(reason)
+  }
 }
 
 /// Build a selector that waits for either test completion or process down.

@@ -85,6 +85,9 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 - Project standard: no closures capturing outer scope in library code.
 - No anonymous `fn` in library modules; every function should be named and top-level.
 - When tempted to use an inline anonymous function, instead define a small named helper.
+- Only two closures are allowed in library code: the function that starts a process (`spawn_unlinked(fn() { ... })`), and a stored callback (a test body or hook in a `Node`). The body of each is exactly one call: to a named top-level function, or to the user callback it adapts. See STANDARDS.md, "The two allowed closures".
+- To run a function later (for example in a sandbox), pass the function and its input as two parameters, as `sandbox.run_isolated(config, run, input)` does.
+- Erlang FFI: use a list comprehension or `fun name/arity`, not `fun(X) -> ... end`.
 
 ## 9. Check STANDARDS.md Before Designing APIs
 

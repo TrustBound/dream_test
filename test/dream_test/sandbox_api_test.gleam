@@ -1,6 +1,8 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/sandbox
-import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
+import dream_test/types.{
+  type AssertionResult, AssertionFailed, AssertionFailure, AssertionOk,
+}
 import dream_test/unit.{describe, it}
 import gleam/dynamic
 import gleam/erlang/atom.{type Atom}
@@ -13,7 +15,7 @@ pub fn tests() {
     it("returns SandboxCompleted on success", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-      case sandbox.run_isolated(config, fn() { AssertionOk }) {
+      case sandbox.run_isolated(config, fn(_input) { AssertionOk }, Nil) {
         sandbox.SandboxCompleted(result) ->
           result
           |> should
@@ -33,12 +35,7 @@ pub fn tests() {
     it("returns SandboxTimedOut on timeout", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 5, show_crash_reports: False)
-      case
-        sandbox.run_isolated(config, fn() {
-          process.sleep(50)
-          AssertionOk
-        })
-      {
+      case sandbox.run_isolated(config, sleep_then_pass, 50) {
         sandbox.SandboxTimedOut -> Ok(AssertionOk)
         other ->
           Ok(
@@ -54,10 +51,7 @@ pub fn tests() {
     it("reports a quiet worker that an exit signal stops as crashed", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
-      sandbox.run_isolated(config, fn() {
-        process.kill(process.self())
-        process.sleep(5000)
-      })
+      sandbox.run_isolated(config, kill_self, Nil)
       |> should
       |> be_equal(sandbox.SandboxCrashed("killed"))
       |> or_fail_with(
@@ -68,11 +62,11 @@ pub fn tests() {
     it("does not take the down message of an earlier worker", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
-      let _ = sandbox.run_isolated(config, fn() { 1 })
+      let _ = sandbox.run_isolated(config, double, 1)
       process.sleep(10)
-      sandbox.run_isolated(config, fn() { 2 })
+      sandbox.run_isolated(config, double, 2)
       |> should
-      |> be_equal(sandbox.SandboxCompleted(2))
+      |> be_equal(sandbox.SandboxCompleted(4))
       |> or_fail_with("the second run should complete")
     }),
 
@@ -99,7 +93,7 @@ pub fn tests() {
     it("reports a quiet crash with its class and reason", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
-      sandbox.run_isolated(config, fn() { erlang_error(atom.create("boom")) })
+      sandbox.run_isolated(config, erlang_error, atom.create("boom"))
       |> should
       |> be_equal(sandbox.SandboxCrashed("error:boom"))
       |> or_fail_with("a quiet crash should give error:boom")
@@ -108,10 +102,7 @@ pub fn tests() {
     it("reports an abnormal exit with crash reports on", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
-      sandbox.run_isolated(config, fn() {
-        process.send_abnormal_exit(process.self(), "boom")
-        process.sleep(5000)
-      })
+      sandbox.run_isolated(config, exit_abnormally, "boom")
       |> should
       |> be_equal(sandbox.SandboxCrashed("\"boom\""))
       |> or_fail_with("an abnormal exit should give its reason")
@@ -120,13 +111,28 @@ pub fn tests() {
     it("reports a normal exit before a result as crashed", fn() {
       let config =
         sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
-      sandbox.run_isolated(config, fn() {
-        process.send_exit(process.self())
-        process.sleep(5000)
-      })
+      sandbox.run_isolated(config, exit_normally, Nil)
       |> should
       |> be_equal(sandbox.SandboxCrashed("normal"))
       |> or_fail_with("a normal exit before a result should give normal")
+    }),
+
+    it("passes its input to the function with crash reports off", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
+      sandbox.run_isolated(config: config, run: double, input: 21)
+      |> should
+      |> be_equal(sandbox.SandboxCompleted(42))
+      |> or_fail_with("the function should get the input 21")
+    }),
+
+    it("passes its input to the function with crash reports on", fn() {
+      let config =
+        sandbox.SandboxConfig(timeout_ms: 1000, show_crash_reports: True)
+      sandbox.run_isolated(config: config, run: double, input: 4)
+      |> should
+      |> be_equal(sandbox.SandboxCompleted(8))
+      |> or_fail_with("the function should get the input 4")
     }),
 
     it("format_exit_reason shows a normal exit as normal", fn() {
@@ -153,6 +159,30 @@ pub fn tests() {
       |> or_fail_with("an abnormal exit should give the quoted reason")
     }),
   ])
+}
+
+fn sleep_then_pass(milliseconds: Int) -> AssertionResult {
+  process.sleep(milliseconds)
+  AssertionOk
+}
+
+fn kill_self(_input: Nil) -> Nil {
+  process.kill(process.self())
+  process.sleep(5000)
+}
+
+fn exit_abnormally(reason: String) -> Nil {
+  process.send_abnormal_exit(process.self(), reason)
+  process.sleep(5000)
+}
+
+fn exit_normally(_input: Nil) -> Nil {
+  process.send_exit(process.self())
+  process.sleep(5000)
+}
+
+fn double(number: Int) -> Int {
+  number * 2
 }
 
 @external(erlang, "erlang", "error")

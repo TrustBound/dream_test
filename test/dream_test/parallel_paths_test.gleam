@@ -367,6 +367,7 @@ pub fn tests() {
       sandbox.run_isolated(
         sandbox.SandboxConfig(timeout_ms: 2000, show_crash_reports: False),
         run_suite_that_kills_a_worker,
+        Nil,
       )
       |> should
       |> be_equal(
@@ -412,9 +413,9 @@ fn sleep_then_pass(sleep_ms: Int) -> Result(AssertionResult, String) {
   Ok(AssertionOk)
 }
 
-fn run_suite_that_kills_a_worker() -> List(
-  #(List(String), Status, List(AssertionFailure)),
-) {
+fn run_suite_that_kills_a_worker(
+  _input: Nil,
+) -> List(#(List(String), Status, List(AssertionFailure))) {
   describe("root", [
     it("kills its worker", kill_worker_then_pass),
     timed_test("passes", None, 50),

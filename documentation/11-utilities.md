@@ -206,27 +206,35 @@ import dream_test/sandbox.{
 }
 import dream_test/unit.{describe, it}
 
-fn loop_forever() {
-  loop_forever()
+fn double(number: Int) -> Int {
+  number * 2
+}
+
+fn loop_forever(_input: Nil) -> Nil {
+  loop_forever(Nil)
+}
+
+fn crash(message: String) -> Int {
+  panic as message
 }
 
 pub fn tests() {
   describe("Sandboxing", [
     it("run_isolated returns SandboxCompleted(value) on success", fn() {
       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-      let result = sandbox.run_isolated(config, fn() { 123 })
+      let result = sandbox.run_isolated(config, double, 61)
 
       result
       |> should
-      |> be_equal(SandboxCompleted(123))
-      |> or_fail_with("expected SandboxCompleted(123)")
+      |> be_equal(SandboxCompleted(122))
+      |> or_fail_with("expected SandboxCompleted(122)")
     }),
 
     it(
       "run_isolated returns SandboxTimedOut when the function is too slow",
       fn() {
         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-        let result = sandbox.run_isolated(config, loop_forever)
+        let result = sandbox.run_isolated(config, loop_forever, Nil)
 
         result
         |> should
@@ -237,7 +245,7 @@ pub fn tests() {
 
     it("run_isolated returns SandboxCrashed when the function panics", fn() {
       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-      let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+      let result = sandbox.run_isolated(config, crash, "boom")
 
       let did_crash = case result {
         SandboxCrashed(_) -> True

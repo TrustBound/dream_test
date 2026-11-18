@@ -783,7 +783,7 @@ fn run_before_all_chain(
       failures_rev,
     )
     [hook, ..rest] ->
-      case run_hook_transform(config, scope, context, hook) {
+      case run_hook(config, scope, hook, context) {
         Ok(next) ->
           run_before_all_chain(
             config,
@@ -1059,37 +1059,33 @@ fn spawn_test_worker(
   index: Int,
   test_case: TestCase(context),
 ) -> Pid {
-  let StartWorkersUpToLimitConfig(
-    config: config,
-    subject: subject,
-    scope: scope,
-    inherited_tags: inherited_tags,
-    context: context,
-    runner_before_each_test: runner_before_each_test,
-    runner_after_each_test: runner_after_each_test,
-    before_each_hooks: before_each_hooks,
-    after_each_hooks: after_each_hooks,
-    failures_rev: failures_rev,
-    pending: _,
-    running: _,
-    max_concurrency: _,
-  ) = input
-  spawn_unlinked(fn() {
-    let result =
-      execute_one_test_node(
-        config,
-        scope,
-        inherited_tags,
-        context,
-        runner_before_each_test,
-        runner_after_each_test,
-        before_each_hooks,
-        after_each_hooks,
-        failures_rev,
-        test_case,
-      )
-    send(subject, WorkerFinished(index: index, result: result))
-  })
+  // The worker gets only what one test needs, not the queue of the loop.
+  let worker_input =
+    StartWorkersUpToLimitConfig(..input, pending: [], running: [])
+  spawn_unlinked(fn() { run_test_worker(worker_input, index, test_case) })
+}
+
+/// The body of a test worker process: run the test and send its result to
+/// the loop.
+fn run_test_worker(
+  input: StartWorkersUpToLimitConfig(context),
+  index: Int,
+  test_case: TestCase(context),
+) -> Nil {
+  let result =
+    execute_one_test_node(
+      input.config,
+      input.scope,
+      input.inherited_tags,
+      input.context,
+      input.runner_before_each_test,
+      input.runner_after_each_test,
+      input.before_each_hooks,
+      input.after_each_hooks,
+      input.failures_rev,
+      test_case,
+    )
+  send(input.subject, WorkerFinished(index: index, result: result))
 }
 
 fn worker_crash_result(
@@ -1332,12 +1328,11 @@ fn execute_one_test_node(
     SetupFailed ->
       setup_failed_status_and_failures(failures_rev, setup_failures)
     _ -> {
-      run_in_sandbox(config, timeout_ms, fn() {
-        case run(ctx_after_setup) {
-          Ok(a) -> a
-          Error(message) -> AssertionFailed(hook_failure("error", message))
-        }
-      })
+      run_in_sandbox(
+        config,
+        timeout_ms,
+        TestBody(run: run, context: ctx_after_setup),
+      )
       |> sandbox_status_and_failures(failures_rev, setup_failures)
     }
   }
@@ -1499,7 +1494,7 @@ fn run_after_all_chain(
   case hooks {
     [] -> acc_rev
     [hook, ..rest] ->
-      case run_hook_teardown(config, scope, context, hook) {
+      case run_hook(config, scope, hook, context) {
         Ok(_) -> run_after_all_chain(config, scope, context, rest, acc_rev)
         Error(message) -> {
           let result =
@@ -1522,44 +1517,34 @@ fn run_after_all_chain(
 // Hook helpers
 // =============================================================================
 
-fn run_hook_transform(
-  config: ParallelConfig,
-  scope: List(String),
-  context: context,
-  hook: fn(context) -> Result(context, String),
-) -> Result(context, String) {
-  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
-    config
-  let sandbox_config =
-    sandbox.SandboxConfig(
-      timeout_ms: default_timeout_ms,
-      show_crash_reports: False,
-    )
-
-  case sandbox.run_isolated(sandbox_config, fn() { hook(context) }) {
-    sandbox.SandboxCompleted(result) -> result
-    sandbox.SandboxTimedOut ->
-      Error("hook timed out in " <> string.join(scope, " > "))
-    sandbox.SandboxCrashed(reason) ->
-      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
-  }
+/// A runner hook with the two arguments it gets, so that it can run in a
+/// sandbox as a function of one input.
+type RunnerHookCall(context, output) {
+  RunnerHookCall(
+    hook: fn(TestInfo, context) -> output,
+    info: TestInfo,
+    context: context,
+  )
 }
 
-fn run_hook_teardown(
+fn call_runner_hook(call: RunnerHookCall(context, output)) -> output {
+  call.hook(call.info, call.context)
+}
+
+/// Run one hook with its input in a sandbox. A timeout or a crash becomes
+/// an `Error` that names the scope.
+fn run_hook(
   config: ParallelConfig,
   scope: List(String),
-  context: context,
-  hook: fn(context) -> Result(Nil, String),
-) -> Result(Nil, String) {
-  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
-    config
+  hook: fn(input) -> Result(output, String),
+  input: input,
+) -> Result(output, String) {
   let sandbox_config =
     sandbox.SandboxConfig(
-      timeout_ms: default_timeout_ms,
+      timeout_ms: config.default_timeout_ms,
       show_crash_reports: False,
     )
-
-  case sandbox.run_isolated(sandbox_config, fn() { hook(context) }) {
+  case sandbox.run_isolated(sandbox_config, hook, input) {
     sandbox.SandboxCompleted(result) -> result
     sandbox.SandboxTimedOut ->
       Error("hook timed out in " <> string.join(scope, " > "))
@@ -1578,7 +1563,7 @@ fn run_before_each_list(
   case hooks {
     [] -> #(context, Passed, failures_rev)
     [hook, ..rest] ->
-      case run_hook_transform(config, scope, context, hook) {
+      case run_hook(config, scope, hook, context) {
         Ok(next) ->
           run_before_each_list(config, scope, next, rest, failures_rev)
         Error(message) -> #(context, SetupFailed, [
@@ -1600,7 +1585,7 @@ fn run_after_each_list(
   case hooks {
     [] -> #(status, failures_rev)
     [hook, ..rest] ->
-      case run_hook_teardown(config, scope, context, hook) {
+      case run_hook(config, scope, hook, context) {
         Ok(_) ->
           run_after_each_list(
             config,
@@ -1630,7 +1615,14 @@ fn run_runner_before_each_list(
   case hooks {
     [] -> #(context, Passed, failures_rev)
     [hook, ..rest] ->
-      case run_runner_hook_transform(config, scope, info, context, hook) {
+      case
+        run_hook(
+          config,
+          scope,
+          call_runner_hook,
+          RunnerHookCall(hook: hook, info: info, context: context),
+        )
+      {
         Ok(next) ->
           run_runner_before_each_list(
             config,
@@ -1660,7 +1652,14 @@ fn run_runner_after_each_list(
   case hooks {
     [] -> #(status, failures_rev)
     [hook, ..rest] ->
-      case run_runner_hook_teardown(config, scope, info, context, hook) {
+      case
+        run_hook(
+          config,
+          scope,
+          call_runner_hook,
+          RunnerHookCall(hook: hook, info: info, context: context),
+        )
+      {
         Ok(_) ->
           run_runner_after_each_list(
             config,
@@ -1682,54 +1681,6 @@ fn run_runner_after_each_list(
             [hook_failure("after_each_test", message), ..failures_rev],
           )
       }
-  }
-}
-
-fn run_runner_hook_transform(
-  config: ParallelConfig,
-  scope: List(String),
-  info: TestInfo,
-  context: context,
-  hook: fn(TestInfo, context) -> Result(context, String),
-) -> Result(context, String) {
-  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
-    config
-  let sandbox_config =
-    sandbox.SandboxConfig(
-      timeout_ms: default_timeout_ms,
-      show_crash_reports: False,
-    )
-
-  case sandbox.run_isolated(sandbox_config, fn() { hook(info, context) }) {
-    sandbox.SandboxCompleted(result) -> result
-    sandbox.SandboxTimedOut ->
-      Error("hook timed out in " <> string.join(scope, " > "))
-    sandbox.SandboxCrashed(reason) ->
-      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
-  }
-}
-
-fn run_runner_hook_teardown(
-  config: ParallelConfig,
-  scope: List(String),
-  info: TestInfo,
-  context: context,
-  hook: fn(TestInfo, context) -> Result(Nil, String),
-) -> Result(Nil, String) {
-  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
-    config
-  let sandbox_config =
-    sandbox.SandboxConfig(
-      timeout_ms: default_timeout_ms,
-      show_crash_reports: False,
-    )
-
-  case sandbox.run_isolated(sandbox_config, fn() { hook(info, context) }) {
-    sandbox.SandboxCompleted(result) -> result
-    sandbox.SandboxTimedOut ->
-      Error("hook timed out in " <> string.join(scope, " > "))
-    sandbox.SandboxCrashed(reason) ->
-      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
   }
 }
 
@@ -1765,12 +1716,29 @@ fn setup_failed_status_and_failures(
   #(SetupFailed, list.append(setup_failures_rev, inherited_failures_rev))
 }
 
+/// A test body with the context that it gets.
+type TestBody(context) {
+  TestBody(
+    run: fn(context) -> Result(AssertionResult, String),
+    context: context,
+  )
+}
+
+/// Run a test body with its context. An `Error` from the body is a failed
+/// assertion with the operator `error`.
+fn run_test_body(body: TestBody(context)) -> AssertionResult {
+  case body.run(body.context) {
+    Ok(result) -> result
+    Error(message) -> AssertionFailed(hook_failure("error", message))
+  }
+}
+
 /// Run a test body in a sandbox. The sandbox timeout is the only deadline
 /// of a test, in parallel and in sequential runs.
 fn run_in_sandbox(
   config: ParallelConfig,
   timeout_override: Option(Int),
-  test_function: fn() -> AssertionResult,
+  body: TestBody(context),
 ) -> sandbox.SandboxResult(AssertionResult) {
   let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
     config
@@ -1780,7 +1748,7 @@ fn run_in_sandbox(
   }
   let sandbox_config =
     sandbox.SandboxConfig(timeout_ms: timeout, show_crash_reports: False)
-  sandbox.run_isolated(sandbox_config, test_function)
+  sandbox.run_isolated(sandbox_config, run_test_body, body)
 }
 
 /// The status and failures of a test body from its sandbox result. A body

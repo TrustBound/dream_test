@@ -432,12 +432,7 @@ pub fn skip(
 ///
 /// A `UnitNode` representing a `before_all` hook.
 pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeAll(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeAll(fn(_nil: Nil) { setup() })
 }
 
 /// Run before each test in the current scope.
@@ -524,12 +519,7 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing a `before_each` hook.
 pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeEach(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeEach(fn(_nil: Nil) { setup() })
 }
 
 /// Run after each test in the current scope.

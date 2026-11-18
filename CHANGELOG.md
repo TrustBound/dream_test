@@ -76,6 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING: `sandbox.run_isolated` now takes the function and its input as
+  two parameters: `run_isolated(config:, run: fn(input) -> a, input:)` in
+  place of `run_isolated(config:, test_function: fn() -> a)`. The function
+  gets `input` as its argument, so a caller can pass a named function and
+  its data and needs no closure. Before:
+  `sandbox.run_isolated(config, fn() { double(21) })`. After:
+  `sandbox.run_isolated(config, double, 21)`. A function with no data
+  takes `Nil`: `sandbox.run_isolated(config, loop_forever, Nil)`.
 - `runner.exit_on_failure` now stops the BEAM with `init:stop(1)` in place
   of `erlang:halt(1)`. This is how Gleam itself stops a `main` that
   crashes. The BEAM shuts down cleanly: the output is written and

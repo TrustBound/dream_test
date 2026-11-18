@@ -293,9 +293,7 @@ fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
     name: run.name,
     tags: run.tags,
     kind: GherkinScenario(scenario_id),
-    run: fn(_nil: Nil) {
-      Ok(execute_scenario(scenario_id, all_steps, registry))
-    },
+    run: fn(_nil: Nil) { execute_scenario(scenario_id, all_steps, registry) },
     timeout_ms: None,
     source: scope.source,
   )
@@ -512,10 +510,10 @@ fn execute_scenario(
   scenario_id: String,
   steps: List(gherkin_types.Step),
   registry: StepRegistry,
-) -> AssertionResult {
+) -> Result(AssertionResult, String) {
   case steps.validate(registry) {
-    Ok(Nil) -> resolve_and_execute(scenario_id, steps, registry)
-    Error(message) -> step_failure(message)
+    Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry))
+    Error(message) -> Ok(step_failure(message))
   }
 }
 

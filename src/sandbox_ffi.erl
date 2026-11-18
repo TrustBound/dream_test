@@ -4,11 +4,11 @@
 %% can suppress noisy crash reports while still reporting SandboxCrashed.
 -module(sandbox_ffi).
 
--export([run_catching/1]).
+-export([run_catching/2]).
 
-run_catching(Fun) ->
+run_catching(Fun, Input) ->
   try
-    {ok, Fun()}
+    {ok, Fun(Input)}
   catch
     Class:Reason:Stack ->
       %% Keep it simple and stable for tests: include class + reason.
