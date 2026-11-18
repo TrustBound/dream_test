@@ -14,9 +14,10 @@
 //// scenario starts from the initial value in its own process. The steps of the
 //// scenario then pass the value from one step to the next:
 ////
-//// - An `Action` step gets the state and returns the new state, or an error.
-//// - A `Check` step gets the state and returns an assertion result. It cannot
-////   change the state.
+//// - A `given` or `when` step is an action. It gets the state and returns the
+////   new state, or an error.
+//// - A `then` step is a check. It gets the state and returns an assertion
+////   result. It cannot change the state.
 ////
 //// The state is an immutable value, so two scenarios cannot share it, and
 //// nothing needs cleanup after a scenario.
@@ -43,17 +44,19 @@
 ////
 //// let steps =
 ////   new(initial: 0)
-////   |> given("I have {int} items in my cart", Action(step_have_items))
-////   |> when_("I add {int} more items", Action(step_add_items))
-////   |> then_("I should have {int} items total", Check(step_should_have))
+////   |> given("I have {int} items in my cart", step_have_items)
+////   |> when("I add {int} more items", step_add_items)
+////   |> then("I should have {int} items total", step_should_have)
 //// ```
 ////
 //// ## Phases
 ////
 //// Every step definition belongs to exactly one phase: `given` (Arrange),
-//// `when_` (Act) or `then_` (Assert). A step matches only the definitions of
+//// `when` (Act) or `then` (Assert). A step matches only the definitions of
 //// its phase. `And`, `But` and `*` steps take the phase of the step before
-//// them. A definition of any phase can be an `Action` or a `Check`.
+//// them. The phase sets what a definition can do: a `given` or `when`
+//// definition is an action that changes the state, and a `then` definition
+//// is a check that cannot change it.
 ////
 //// Each pattern can have one definition for each phase. A second definition
 //// of the same pattern in the same phase is an error: `find_step` and
@@ -82,7 +85,7 @@
 
 import dream_test/gherkin/step_trie.{
   type CapturedValue, type StepMatch, type StepTrie, CapturedFloat, CapturedInt,
-  CapturedString, CapturedWord,
+  CapturedString, CapturedWord, StepMatch,
 }
 import dream_test/gherkin/types.{
   type StepPhase, GivenPhase, ThenPhase, WhenPhase,
@@ -129,46 +132,56 @@ pub type StepContext {
   )
 }
 
-/// What a step does with the scenario state.
+/// A step definition that `find_step` found.
 ///
-/// - `Action(run)`: `run` gets the state and the step context, and returns
-///   the new state. An `Error(message)` fails the scenario with `message`,
-///   and the steps after it do not run.
-/// - `Check(run)`: `run` gets the state and the step context, and returns an
-///   assertion result, like a unit test body. A failed assertion or an
-///   `Error(message)` fails the scenario, and the steps after it do not run.
-///   The next step gets the same state.
+/// The phase of the definition sets its kind:
+///
+/// - `Action(run)`: a `given` or `when` definition. `run` gets the state and
+///   the step context, and returns the new state. An `Error(message)` fails
+///   the scenario with `message`, and the steps after it do not run.
+/// - `Check(run)`: a `then` definition. `run` gets the state and the step
+///   context, and returns an assertion result, like a unit test body. A
+///   failed assertion or an `Error(message)` fails the scenario, and the
+///   steps after it do not run. The next step gets the same state.
+///
+/// You do not make a `StepDefinition`: `given`, `when` and `then` take your
+/// function directly.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// fn step_add_items(count: Int, context: StepContext) {
-///   use added <- result.try(get_int(context.captures, 0))
-///   Ok(count + added)
-/// }
+///       let registry =
+///         steps.new(initial: 0)
+///         |> then("I should have {int} items", step_should_have)
 ///
-/// fn step_should_have(count: Int, context: StepContext) {
-///   use expected <- result.try(get_int(context.captures, 0))
-///   count
-///   |> should
-///   |> be_equal(expected)
-///   |> or_fail_with("Cart count mismatch")
-/// }
+///       use matched <- result.try(find_step(
+///         registry,
+///         ThenPhase,
+///         "I should have 3 items",
+///       ))
 ///
-/// let steps =
-///   new(initial: 0)
-///   |> when_("I add {int} more items", Action(step_add_items))
-///   |> then_("I should have {int} items total", Check(step_should_have))
+///       case matched.handler {
+///         Action(_) -> Ok(fail_with("a Then definition is never an action"))
+///         Check(_) -> Ok(succeed())
+///       }
 /// ```
 ///
 pub type StepDefinition(state) {
-  /// A step that changes the state.
-  Action(run: fn(state, StepContext) -> Result(state, String))
-  /// A step that makes sure the state is correct.
-  Check(
-    run: fn(state, StepContext) -> Result(dream_types.AssertionResult, String),
-  )
+  /// A `given` or `when` definition. It changes the state.
+  Action(run: StepAction(state))
+  /// A `then` definition. It makes sure the state is correct.
+  Check(run: StepCheck(state))
 }
+
+/// The function of a `given` or `when` step: it gets the state and the step
+/// context, and returns the new state or an error message.
+type StepAction(state) =
+  fn(state, StepContext) -> Result(state, String)
+
+/// The function of a `then` step: it gets the state and the step context,
+/// and returns an assertion result or an error message.
+type StepCheck(state) =
+  fn(state, StepContext) -> Result(dream_types.AssertionResult, String)
 
 /// Step registry backed by radix trie.
 ///
@@ -182,7 +195,10 @@ pub opaque type StepRegistry(state) {
   StepRegistry(
     /// The state that each scenario starts from.
     initial: state,
-    trie: StepTrie(StepDefinition(state)),
+    /// The `given` and `when` definitions.
+    actions: StepTrie(StepAction(state)),
+    /// The `then` definitions.
+    checks: StepTrie(StepCheck(state)),
     /// Duplicate step definition errors, newest first.
     errors_newest_first: List(String),
   )
@@ -195,19 +211,24 @@ pub opaque type StepRegistry(state) {
 /// Create an empty step registry with the initial scenario state.
 ///
 /// Each scenario that runs with this registry starts from `initial`. Chain
-/// `given`, `when_` and `then_` calls to add steps.
+/// `given`, `when` and `then` calls to add steps.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let steps =
 ///   new(initial: 0)
-///   |> given("I have {int} items", Action(step_have_items))
-///   |> then_("I should have {int} items", Check(step_should_have))
+///   |> given("I have {int} items", step_have_items)
+///   |> then("I should have {int} items", step_should_have)
 /// ```
 ///
 pub fn new(initial initial: state) -> StepRegistry(state) {
-  StepRegistry(initial: initial, trie: step_trie.new(), errors_newest_first: [])
+  StepRegistry(
+    initial: initial,
+    actions: step_trie.new(),
+    checks: step_trie.new(),
+    errors_newest_first: [],
+  )
 }
 
 /// Get the state that each scenario starts from.
@@ -228,13 +249,15 @@ pub fn initial_state(registry registry: StepRegistry(state)) -> state {
 
 /// Register a Given step definition.
 ///
-/// Given steps describe initial context or preconditions.
+/// Given steps arrange the initial context. A Given step is an action: it
+/// gets the state and returns the new state.
 ///
 /// ## Parameters
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `definition`: An `Action` or a `Check`
+/// - `action`: Gets the state and the step context, and returns the new
+///   state, or an error message that fails the scenario
 ///
 /// ## Returns
 ///
@@ -244,28 +267,28 @@ pub fn initial_state(registry registry: StepRegistry(state)) -> state {
 ///
 /// ```gleam
 ///       let registry =
-///         new(initial: 0) |> given("I have {int} items", Action(step_count))
+///         new(initial: 0) |> given("I have {int} items", step_count)
 /// ```
 ///
 pub fn given(
   registry registry: StepRegistry(state),
   pattern pattern: String,
-  definition definition: StepDefinition(state),
+  action action: fn(state, StepContext) -> Result(state, String),
 ) -> StepRegistry(state) {
-  register(registry, GivenPhase, pattern, definition)
+  register_action(registry, GivenPhase, pattern, action)
 }
 
 /// Register a When step definition.
 ///
-/// When steps describe an action or event.
-///
-/// Note: Named `when_` with trailing underscore because `when` is reserved.
+/// When steps do the action or event under test. A When step is an action:
+/// it gets the state and returns the new state.
 ///
 /// ## Parameters
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `definition`: An `Action` or a `Check`
+/// - `action`: Gets the state and the step context, and returns the new
+///   state, or an error message that fails the scenario
 ///
 /// ## Returns
 ///
@@ -275,28 +298,29 @@ pub fn given(
 ///
 /// ```gleam
 ///       let registry =
-///         new(initial: 0) |> when_("I add {int} items", Action(step_add))
+///         new(initial: 0) |> when("I add {int} items", step_add)
 /// ```
 ///
-pub fn when_(
+pub fn when(
   registry registry: StepRegistry(state),
   pattern pattern: String,
-  definition definition: StepDefinition(state),
+  action action: fn(state, StepContext) -> Result(state, String),
 ) -> StepRegistry(state) {
-  register(registry, WhenPhase, pattern, definition)
+  register_action(registry, WhenPhase, pattern, action)
 }
 
 /// Register a Then step definition.
 ///
-/// Then steps describe expected outcomes or assertions.
-///
-/// Note: Named `then_` with trailing underscore because `then` is reserved.
+/// Then steps assert the expected outcome. A Then step is a check: it gets
+/// the state and returns an assertion result. It cannot change the state,
+/// so the next step gets the same state.
 ///
 /// ## Parameters
 ///
 /// - `registry`: The registry to add to
 /// - `pattern`: Step pattern with placeholders
-/// - `definition`: An `Action` or a `Check`
+/// - `check`: Gets the state and the step context, and returns an assertion
+///   result, or an error message that fails the scenario
 ///
 /// ## Returns
 ///
@@ -307,32 +331,43 @@ pub fn when_(
 /// ```gleam
 ///       let registry =
 ///         new(initial: 0)
-///         |> then_("I should have {int} items", Check(step_should_have))
+///         |> then("I should have {int} items", step_should_have)
 /// ```
 ///
-pub fn then_(
+pub fn then(
   registry registry: StepRegistry(state),
   pattern pattern: String,
-  definition definition: StepDefinition(state),
+  check check: fn(state, StepContext) ->
+    Result(dream_types.AssertionResult, String),
 ) -> StepRegistry(state) {
-  register(registry, ThenPhase, pattern, definition)
+  case step_trie.insert(registry.checks, ThenPhase, pattern, check) {
+    Ok(updated) -> StepRegistry(..registry, checks: updated)
+    Error(message) -> record_error(registry, message)
+  }
 }
 
-/// Add a step definition, or record a duplicate step definition error.
-fn register(
+/// Add a Given or When step definition, or record a duplicate step
+/// definition error.
+fn register_action(
   registry: StepRegistry(state),
   phase: StepPhase,
   pattern: String,
-  definition: StepDefinition(state),
+  action: StepAction(state),
 ) -> StepRegistry(state) {
-  case step_trie.insert(registry.trie, phase, pattern, definition) {
-    Ok(updated) -> StepRegistry(..registry, trie: updated)
-    Error(message) ->
-      StepRegistry(..registry, errors_newest_first: [
-        message,
-        ..registry.errors_newest_first
-      ])
+  case step_trie.insert(registry.actions, phase, pattern, action) {
+    Ok(updated) -> StepRegistry(..registry, actions: updated)
+    Error(message) -> record_error(registry, message)
   }
+}
+
+fn record_error(
+  registry: StepRegistry(state),
+  message: String,
+) -> StepRegistry(state) {
+  StepRegistry(..registry, errors_newest_first: [
+    message,
+    ..registry.errors_newest_first
+  ])
 }
 
 /// Check a registry for duplicate step definitions.
@@ -343,7 +378,7 @@ fn register(
 /// recorded errors, one per line. Every scenario that runs with a registry
 /// that has errors fails with this message, so a duplicate cannot be missed.
 ///
-/// The same pattern in different phases (for example `given` and `then_`) is
+/// The same pattern in different phases (for example `given` and `then`) is
 /// not a duplicate.
 ///
 /// ## Returns
@@ -355,8 +390,8 @@ fn register(
 ///
 /// ```gleam
 ///       new(initial: 0)
-///       |> given("I have {int} items", Action(step_count))
-///       |> given("I have {int} items", Action(step_count))
+///       |> given("I have {int} items", step_count)
+///       |> given("I have {int} items", step_count)
 ///       |> validate
 ///       |> should
 ///       |> be_equal(Error(
@@ -422,7 +457,7 @@ pub fn validate(registry registry: StepRegistry(state)) -> Result(Nil, String) {
 ///
 /// ```gleam
 ///       let registry =
-///         new(initial: 0) |> given("I have {int} items", Action(step_count))
+///         new(initial: 0) |> given("I have {int} items", step_count)
 ///
 ///       use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
 ///
@@ -448,11 +483,37 @@ fn lookup_step(
   phase: StepPhase,
   text: String,
 ) -> Result(StepMatch(StepDefinition(state)), String) {
-  case step_trie.lookup(registry.trie, phase, text) {
-    Some(match) -> Ok(match)
-    None ->
-      Error("Undefined step: " <> types.phase_to_string(phase) <> " " <> text)
+  case phase {
+    ThenPhase -> lookup_check(registry, text)
+    GivenPhase | WhenPhase -> lookup_action(registry, phase, text)
   }
+}
+
+fn lookup_action(
+  registry: StepRegistry(state),
+  phase: StepPhase,
+  text: String,
+) -> Result(StepMatch(StepDefinition(state)), String) {
+  case step_trie.lookup(registry.actions, phase, text) {
+    Some(StepMatch(handler: action, captures: captures)) ->
+      Ok(StepMatch(handler: Action(action), captures: captures))
+    None -> Error(undefined_step_message(phase, text))
+  }
+}
+
+fn lookup_check(
+  registry: StepRegistry(state),
+  text: String,
+) -> Result(StepMatch(StepDefinition(state)), String) {
+  case step_trie.lookup(registry.checks, ThenPhase, text) {
+    Some(StepMatch(handler: check, captures: captures)) ->
+      Ok(StepMatch(handler: Check(check), captures: captures))
+    None -> Error(undefined_step_message(ThenPhase, text))
+  }
+}
+
+fn undefined_step_message(phase: StepPhase, text: String) -> String {
+  "Undefined step: " <> types.phase_to_string(phase) <> " " <> text
 }
 
 // ============================================================================

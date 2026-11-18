@@ -13,10 +13,10 @@
 ////   // Define the steps and the state each scenario starts from
 ////   let steps =
 ////     steps.new(initial: Cart(server_running: False, items: 0))
-////     |> given("the server is running", Action(step_server_running))
-////     |> given("the cart is empty", Action(step_empty_cart))
-////     |> when_("I add {int} items", Action(step_add_items))
-////     |> then_("the cart should have {int} items", Check(step_verify_count))
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when("I add {int} items", step_add_items)
+////     |> then("the cart should have {int} items", step_verify_count)
 ////
 ////   // Parse the .feature file
 ////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -33,10 +33,10 @@
 //// pub fn tests() {
 ////   let steps =
 ////     steps.new(initial: Cart(server_running: False, items: 0))
-////     |> given("the server is running", Action(step_server_running))
-////     |> given("the cart is empty", Action(step_empty_cart))
-////     |> when_("I add {int} items", Action(step_add_items))
-////     |> then_("the cart should have {int} items", Check(step_verify_count))
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when("I add {int} items", step_add_items)
+////     |> then("the cart should have {int} items", step_verify_count)
 ////
 ////   let bg = background([given("the server is running")])
 ////
@@ -716,9 +716,9 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 /// ```gleam
 /// let steps =
 ///   steps.new(initial: 0)
-///   |> given("I have {int} items in my cart", Action(step_have_items))
-///   |> when_("I add {int} more items", Action(step_add_items))
-///   |> then_("I should have {int} items total", Check(step_should_have))
+///   |> given("I have {int} items in my cart", step_have_items)
+///   |> when("I add {int} more items", step_add_items)
+///   |> then("I should have {int} items total", step_should_have)
 ///
 /// feature("Shopping Cart", steps, [
 ///   scenario("Adding items to cart", [

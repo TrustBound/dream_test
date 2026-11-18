@@ -30,8 +30,8 @@ This chapter explains Dream Test’s Gherkin layer as an engineering tool:
 - Each feature has one **state type** that you choose, for example `Int` or a `Cart` record. The step registry gets its initial value: `steps.new(initial: 0)`.
 - Each scenario starts from the initial value in its own process. The state is an immutable value, so scenarios cannot share it.
 - A **step registry** maps text patterns to step definitions:
-  - an `Action` gets the state and returns the new state, or an error
-  - a `Check` gets the state and returns an assertion result. It cannot change the state.
+  - a `given` or `when` definition is an action: it gets the state and returns the new state, or an error
+  - a `then` definition is a check: it gets the state and returns an assertion result. It cannot change the state.
 
 Dream Test includes a Gherkin DSL that lets you write scenarios with **Given/When/Then** structure.
 
@@ -55,8 +55,8 @@ If your tests are mostly “function input → output”, the unit DSL (`describ
 
 Each step function gets two arguments: the scenario state and a `StepContext` record.
 
-- `Action(run)`: `run(state, context)` returns `Ok(new_state)`, or `Error(message)` to fail the scenario.
-- `Check(run)`: `run(state, context)` returns an assertion result, like a unit test body. The next step gets the same state.
+- `run`: `run(state, context)` returns `Ok(new_state)`, or `Error(message)` to fail the scenario.
+- `run`: `run(state, context)` returns an assertion result, like a unit test body. The next step gets the same state.
 
 The `StepContext` fields:
 
@@ -78,7 +78,7 @@ The capture helpers (`get_int`, `get_float`, `get_string`, `get_word`) return a 
 
 ```gleam
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -105,9 +105,9 @@ fn step_should_have(cart: Int, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: 0)
-    |> steps.given("I have {int} items in my cart", Action(step_have_items))
-    |> steps.when_("I add {int} more items", Action(step_add_items))
-    |> steps.then_("I should have {int} items total", Check(step_should_have))
+    |> steps.given("I have {int} items in my cart", step_have_items)
+    |> steps.when("I add {int} more items", step_add_items)
+    |> steps.then("I should have {int} items total", step_should_have)
 
   feature("Shopping Cart", steps, [
     scenario("Adding items to cart", [
@@ -144,7 +144,7 @@ Typed helpers like `get_int` parse the capture into the right type.
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, Action, Check, get_float, get_int, get_string, get_word,
+  type StepContext, get_float, get_int, get_string, get_word,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
@@ -195,11 +195,11 @@ fn step_everything_works(values: Values, _context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: Values(int: 0, float: 0.0, string: "", word: ""))
-    |> steps.given("I have {int} items", Action(step_int))
-    |> steps.given("the price is ${float}", Action(step_float))
-    |> steps.given("the message is {string}", Action(step_string))
-    |> steps.given("the user is {word}", Action(step_word))
-    |> steps.then_("everything works", Check(step_everything_works))
+    |> steps.given("I have {int} items", step_int)
+    |> steps.given("the price is ${float}", step_float)
+    |> steps.given("the message is {string}", step_string)
+    |> steps.given("the user is {word}", step_word)
+    |> steps.then("everything works", step_everything_works)
 
   feature("Placeholder Types", steps, [
     scenario("Using different placeholders", [
@@ -224,7 +224,7 @@ pub fn main() {
 ### Phases: Given, When, Then, And, But and `*`
 
 Given, When and Then are the three phases of a scenario: Arrange, Act and Assert.
-Each step definition belongs to one phase. Register it with `steps.given`, `steps.when_` or `steps.then_`.
+Each step definition belongs to one phase. Register it with `steps.given`, `steps.when` or `steps.then`.
 A step matches only the step definitions of its phase, so a `Given` definition never runs for a `When` step.
 
 `And`, `But` and `*` take the phase of the step before them.
@@ -253,7 +253,7 @@ import dream_test/gherkin/feature.{
   and, asterisk, background, feature_with_background, given, scenario, then,
   when,
 }
-import dream_test/gherkin/steps.{type StepContext, Action, Check}
+import dream_test/gherkin/steps.{type StepContext}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 
 fn step_trip(_bag: Int, _context: StepContext) {
@@ -278,11 +278,11 @@ fn step_bag_has_two(bag: Int, _context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: 0)
-    |> steps.given("I plan a trip", Action(step_trip))
-    |> steps.given("I pack a passport", Action(step_pack))
-    |> steps.given("I pack a toothbrush", Action(step_pack))
-    |> steps.when_("I close the bag", Action(step_close_bag))
-    |> steps.then_("the bag has 2 things", Check(step_bag_has_two))
+    |> steps.given("I plan a trip", step_trip)
+    |> steps.given("I pack a passport", step_pack)
+    |> steps.given("I pack a toothbrush", step_pack)
+    |> steps.when("I close the bag", step_close_bag)
+    |> steps.then("the bag has 2 things", step_bag_has_two)
 
   feature_with_background(
     "Packing",
@@ -336,7 +336,7 @@ Feature: Shopping Cart
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -372,10 +372,10 @@ pub fn tests() {
   // Define the steps and the state each scenario starts from
   let steps =
     steps.new(initial: Cart(server_running: False, items: 0))
-    |> steps.given("the server is running", Action(step_server_running))
-    |> steps.given("the cart is empty", Action(step_empty_cart))
-    |> steps.when_("I add {int} items", Action(step_add_items))
-    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when("I add {int} items", step_add_items)
+    |> steps.then("the cart should have {int} items", step_verify_count)
 
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -452,7 +452,7 @@ Feature: Stock control
 ```gleam
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
@@ -485,10 +485,10 @@ fn step_check_stock(shop: Shop, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: Shop(open: False, stock: 0))
-    |> steps.given("the shop is open", Action(step_shop_open))
-    |> steps.given("the stock holds {int} items", Action(step_set_stock))
-    |> steps.when_("I sell {int} items", Action(step_sell))
-    |> steps.then_("the stock holds {int} items", Check(step_check_stock))
+    |> steps.given("the shop is open", step_shop_open)
+    |> steps.given("the stock holds {int} items", step_set_stock)
+    |> steps.when("I sell {int} items", step_sell)
+    |> steps.then("the stock holds {int} items", step_check_stock)
 
   // Each Rule becomes a group named "Rule: <name>".
   // Each Examples row becomes one test, for example
@@ -581,7 +581,7 @@ Use discovery when you want real `.feature` files (e.g. written by QA or copied 
 
 ```gleam
 import dream_test/gherkin/discover
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -617,10 +617,10 @@ pub fn tests() {
   // Define the steps and the state each scenario starts from
   let steps =
     steps.new(initial: Cart(server_running: False, items: 0))
-    |> steps.given("the server is running", Action(step_server_running))
-    |> steps.given("the cart is empty", Action(step_empty_cart))
-    |> steps.when_("I add {int} items", Action(step_add_items))
-    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when("I add {int} items", step_add_items)
+    |> steps.then("the cart should have {int} items", step_verify_count)
 
   // Discover and load all .feature files
   discover.features("test/*.feature")

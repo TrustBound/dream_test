@@ -1,12 +1,12 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_float}
+import dream_test/gherkin/steps.{type StepContext, get_float}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import gleam/result
 
-// The scenario state is the balance. An Action returns the new balance.
+// The scenario state is the balance. A Given or When step returns the new balance.
 fn step_have_balance(_balance: Float, context: StepContext) {
   // {float} captures the numeric value (even with $ prefix)
   get_float(context.captures, 0)
@@ -17,7 +17,7 @@ fn step_withdraw(balance: Float, context: StepContext) {
   Ok(balance -. amount)
 }
 
-// A Check gets the balance and returns an assertion result.
+// A Then step gets the balance and returns an assertion result.
 fn step_balance_is(balance: Float, context: StepContext) {
   use expected <- result.try(get_float(context.captures, 0))
   balance
@@ -28,9 +28,9 @@ fn step_balance_is(balance: Float, context: StepContext) {
 
 pub fn register(registry) {
   registry
-  |> steps.given("I have a balance of ${float}", Action(step_have_balance))
-  |> steps.when_("I withdraw ${float}", Action(step_withdraw))
-  |> steps.then_("my balance should be ${float}", Check(step_balance_is))
+  |> steps.given("I have a balance of ${float}", step_have_balance)
+  |> steps.when("I withdraw ${float}", step_withdraw)
+  |> steps.then("my balance should be ${float}", step_balance_is)
 }
 
 pub fn tests() {

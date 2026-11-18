@@ -2,7 +2,7 @@ import dream_test/gherkin/feature.{
   and, background, feature_with_background, given, scenario, then, when,
   with_tags,
 }
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -38,10 +38,10 @@ fn step_verify_count(cart: Cart, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: Cart(server_running: False, items: 0))
-    |> steps.given("the server is running", Action(step_server_running))
-    |> steps.given("the cart is empty", Action(step_empty_cart))
-    |> steps.when_("I add {int} items", Action(step_add_items))
-    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when("I add {int} items", step_add_items)
+    |> steps.then("the cart should have {int} items", step_verify_count)
 
   let bg = background([given("the server is running")])
 

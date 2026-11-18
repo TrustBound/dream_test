@@ -17,8 +17,8 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a thing", steps.Check(gherkin_step_ok))
-        |> steps.then_("it works", steps.Check(gherkin_step_ok))
+        |> steps.given("a thing", gherkin_step_ok)
+        |> steps.then("it works", gherkin_check_ok)
 
       let suite =
         gfeature.feature("Inline Feature", registry, [
@@ -55,7 +55,7 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a thing", steps.Check(gherkin_step_ok))
+        |> steps.given("a thing", gherkin_step_ok)
 
       let suite =
         gfeature.feature("Inline Tags", registry, [
@@ -101,7 +101,7 @@ pub fn tests() {
         <> "  | 2 |\n"
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("the value is {int}", steps.Check(gherkin_step_ok))
+        |> steps.given("the value is {int}", gherkin_step_ok)
 
       run_parsed(content, registry)
       |> list.map(fn(result) { #(result.kind, result.status) })
@@ -211,8 +211,8 @@ pub fn tests() {
         <> "\"\"\"\n"
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a table", steps.Check(expect_table))
-        |> steps.then_("a doc string", steps.Check(expect_doc_string))
+        |> steps.given("a table", expect_table)
+        |> steps.then("a doc string", expect_doc_string)
 
       run_parsed(content, registry)
       |> list.map(fn(result) { result.failures })
@@ -224,10 +224,7 @@ pub fn tests() {
     it("to_test_suite gives a step both its DataTable and its DocString", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given(
-          "a step with both arguments",
-          steps.Check(expect_both_arguments),
-        )
+        |> steps.given("a step with both arguments", expect_both_arguments)
 
       run_file(
         conformance_directory <> "step_with_datatable_and_docstring.feature",
@@ -253,7 +250,7 @@ pub fn tests() {
     it("to_test_suite puts the example values in the DocString", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("the {}", steps.Check(fail_with_doc_string))
+        |> steps.given("the {}", fail_with_doc_string)
 
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
@@ -270,7 +267,7 @@ pub fn tests() {
       fn() {
         let registry =
           steps.new(initial: Nil)
-          |> steps.given("this file:", steps.Check(fail_with_doc_string))
+          |> steps.given("this file:", fail_with_doc_string)
 
         run_file(
           conformance_directory <> "scenario_outline_with_docstring.feature",
@@ -286,7 +283,7 @@ pub fn tests() {
     it("to_test_suite puts the example values in the DataTable cells", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("the {}", steps.Check(fail_with_table))
+        |> steps.given("the {}", fail_with_table)
 
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
@@ -363,8 +360,8 @@ pub fn tests() {
     it("a scenario fails with the Error message of a handler", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("it breaks", steps.Check(gherkin_step_error))
-        |> steps.then_("never runs", steps.Check(gherkin_step_ok))
+        |> steps.given("it breaks", gherkin_step_error)
+        |> steps.then("never runs", gherkin_check_ok)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -393,7 +390,7 @@ pub fn tests() {
     it("a scenario fails with the message of a capture error", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("I add {word}", steps.Check(add_an_int_capture))
+        |> steps.given("I add {word}", add_an_int_capture)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.given("I add apples")]),
@@ -411,11 +408,11 @@ pub fn tests() {
     it("feature_with_background runs background and When/And/But steps", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a base", steps.Check(gherkin_step_ok))
-        |> steps.when_("I act", steps.Check(gherkin_step_ok))
-        |> steps.when_("I act more", steps.Check(gherkin_step_ok))
-        |> steps.when_("I do not stop", steps.Check(gherkin_step_ok))
-        |> steps.then_("it works", steps.Check(gherkin_step_ok))
+        |> steps.given("a base", gherkin_step_ok)
+        |> steps.when("I act", gherkin_step_ok)
+        |> steps.when("I act more", gherkin_step_ok)
+        |> steps.when("I do not stop", gherkin_step_ok)
+        |> steps.then("it works", gherkin_check_ok)
       let suite =
         gfeature.feature_with_background(
           "F",
@@ -490,7 +487,7 @@ pub fn tests() {
     it("a hand-built InlineStep runs the handler of its keyword", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.then_("it works", steps.Check(gherkin_step_ok))
+        |> steps.then("it works", gherkin_check_ok)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -519,8 +516,8 @@ pub fn tests() {
     it("a * step runs the handler of the phase before it", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a trip", steps.Check(gherkin_step_ok))
-        |> steps.given("I pack a passport", steps.Check(gherkin_step_ok))
+        |> steps.given("a trip", gherkin_step_ok)
+        |> steps.given("I pack a passport", gherkin_step_ok)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -543,8 +540,8 @@ pub fn tests() {
       fn() {
         let registry =
           steps.new(initial: Nil)
-          |> steps.given("a base", steps.Check(gherkin_step_ok))
-          |> steps.given("another base", steps.Check(gherkin_step_ok))
+          |> steps.given("a base", gherkin_step_ok)
+          |> steps.given("another base", gherkin_step_ok)
         let suite =
           gfeature.feature_with_background(
             "F",
@@ -566,8 +563,8 @@ pub fn tests() {
     it("a parsed scenario that starts with And continues the Background", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a base", steps.Check(gherkin_step_ok))
-        |> steps.given("another base", steps.Check(gherkin_step_ok))
+        |> steps.given("a base", gherkin_step_ok)
+        |> steps.given("another base", gherkin_step_ok)
 
       run_parsed(
         "Feature: F\nBackground:\n  Given a base\nScenario: S\n  And another base\n",
@@ -582,7 +579,7 @@ pub fn tests() {
     it("an inline scenario that starts with And fails with no Background", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a base", steps.Check(gherkin_step_ok))
+        |> steps.given("a base", gherkin_step_ok)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.and("a base")]),
@@ -608,7 +605,7 @@ pub fn tests() {
     it("an inline Background that starts with But fails the scenario", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("a base", steps.Check(gherkin_step_ok))
+        |> steps.given("a base", gherkin_step_ok)
       let suite =
         gfeature.feature_with_background(
           "F",
@@ -654,7 +651,7 @@ pub fn tests() {
     it("each scenario starts from the initial state", fn() {
       let registry =
         steps.new(initial: 10)
-        |> steps.then_("the count should be {int}", steps.Check(expect_count))
+        |> steps.then("the count should be {int}", expect_count)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.then("the count should be 10")]),
@@ -731,8 +728,8 @@ pub fn tests() {
     it("an Action Error fails the scenario and stops it", fn() {
       let registry =
         counter_registry()
-        |> steps.when_("the shop is closed", steps.Action(close_shop))
-        |> steps.then_("never runs", steps.Check(check_never_runs))
+        |> steps.when("the shop is closed", close_shop)
+        |> steps.then("never runs", check_never_runs)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [
@@ -751,7 +748,7 @@ pub fn tests() {
     it("a step gets the id of its scenario", fn() {
       let registry =
         steps.new(initial: 0)
-        |> steps.then_("the id is right", steps.Check(fail_with_scenario_id))
+        |> steps.then("the id is right", fail_with_scenario_id)
       let suite =
         gfeature.feature("F", registry, [
           gfeature.scenario("S", [gfeature.then("the id is right")]),
@@ -782,8 +779,8 @@ pub fn tests() {
     it("a registry with a duplicate step definition fails every scenario", fn() {
       let registry =
         steps.new(initial: Nil)
-        |> steps.then_("it works", steps.Check(gherkin_step_ok))
-        |> steps.then_("it works", steps.Check(gherkin_step_ok))
+        |> steps.then("it works", gherkin_check_ok)
+        |> steps.then("it works", gherkin_check_ok)
       let suite = gfeature.feature("F", registry, [gfeature.scenario("S", [])])
 
       runner.new([suite])
@@ -816,9 +813,9 @@ fn run_suites(
 
 fn counter_registry() -> steps.StepRegistry(Int) {
   steps.new(initial: 0)
-  |> steps.given("the count is {int}", steps.Action(set_count))
-  |> steps.when_("I add {int}", steps.Action(add_to_count))
-  |> steps.then_("the count should be {int}", steps.Check(expect_count))
+  |> steps.given("the count is {int}", set_count)
+  |> steps.when("I add {int}", add_to_count)
+  |> steps.then("the count should be {int}", expect_count)
 }
 
 fn set_count(_count: Int, context: steps.StepContext) -> Result(Int, String) {
@@ -900,10 +897,9 @@ fn run_file(
 fn expect_both_arguments(
   _state: Nil,
   context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   case context.table, context.doc_string {
-    Some([["id", "name"], ["1", "bob"]]), Some("hello") ->
-      Ok(test_types.AssertionOk)
+    Some([["id", "name"], ["1", "bob"]]), Some("hello") -> Ok(Nil)
     table, doc_string ->
       Error(
         "unexpected arguments: "
@@ -917,20 +913,20 @@ fn expect_both_arguments(
 fn fail_with_doc_string(
   _state: Nil,
   context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   case context.doc_string {
     Some(content) -> Error(content)
-    None -> Ok(test_types.AssertionOk)
+    None -> Ok(Nil)
   }
 }
 
 fn fail_with_table(
   _state: Nil,
   context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   case context.table {
     Some(rows) -> Error(string.join(list.flatten(rows), ","))
-    None -> Ok(test_types.AssertionOk)
+    None -> Ok(Nil)
   }
 }
 
@@ -951,24 +947,24 @@ fn failure_message(failure: test_types.AssertionFailure) -> String {
 fn add_an_int_capture(
   _state: Nil,
   context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   use _count <- result.try(steps.get_int(context.captures, 0))
-  Ok(test_types.AssertionOk)
+  Ok(Nil)
 }
 
 fn gherkin_step_error(
   _state: Nil,
   _context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   Error("boom")
 }
 
 fn expect_table(
   _state: Nil,
   context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
+) -> Result(Nil, String) {
   case context.table {
-    Some([["a", "b"]]) -> Ok(test_types.AssertionOk)
+    Some([["a", "b"]]) -> Ok(Nil)
     other -> Error("unexpected table: " <> string.inspect(other))
   }
 }
@@ -983,11 +979,18 @@ fn expect_doc_string(
   }
 }
 
-fn gherkin_step_ok(
+fn gherkin_check_ok(
   _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
+}
+
+fn gherkin_step_ok(
+  _state: Nil,
+  _context: steps.StepContext,
+) -> Result(Nil, String) {
+  Ok(Nil)
 }
 
 fn rules_feature() -> String {
@@ -1017,9 +1020,9 @@ Feature: F
 
 fn rules_registry() -> steps.StepRegistry(Nil) {
   steps.new(initial: Nil)
-  |> steps.given("feature setup", steps.Check(gherkin_step_ok))
-  |> steps.given("rule setup", steps.Check(gherkin_step_ok))
-  |> steps.then_("done", steps.Check(gherkin_step_ok))
+  |> steps.given("feature setup", gherkin_step_ok)
+  |> steps.given("rule setup", gherkin_step_ok)
+  |> steps.then("done", gherkin_check_ok)
 }
 
 fn examples_feature() -> String {
@@ -1045,7 +1048,7 @@ fn examples_feature() -> String {
 
 fn examples_registry() -> steps.StepRegistry(Nil) {
   steps.new(initial: Nil)
-  |> steps.given("the value is {int}", steps.Check(gherkin_step_ok))
+  |> steps.given("the value is {int}", gherkin_step_ok)
 }
 
 fn group_and_name(result: test_types.TestResult) -> #(List(String), String) {

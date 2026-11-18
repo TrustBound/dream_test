@@ -1,7 +1,7 @@
 //// Discount application steps.
 
 import dream_test/gherkin/steps.{
-  type StepContext, type StepRegistry, Action, get_float, get_int,
+  type StepContext, type StepRegistry, get_float, get_int,
 }
 import gleam/int
 import gleam/option.{Some}
@@ -16,14 +16,8 @@ import steps/cart_world.{type CartWorld, CartWorld}
 
 pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.when_(
-    "I apply a {int}% discount",
-    Action(step_apply_percent_discount),
-  )
-  |> steps.when_(
-    "I apply a ${float} discount",
-    Action(step_apply_fixed_discount),
-  )
+  |> steps.when("I apply a {int}% discount", step_apply_percent_discount)
+  |> steps.when("I apply a ${float} discount", step_apply_fixed_discount)
 }
 
 // ============================================================================

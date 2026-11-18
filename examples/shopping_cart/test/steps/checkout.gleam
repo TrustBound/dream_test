@@ -1,6 +1,6 @@
 //// Checkout steps.
 
-import dream_test/gherkin/steps.{type StepContext, type StepRegistry, Action}
+import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import shopping_cart/checkout
 import shopping_cart/types as cart_types
 import steps/cart_world.{
@@ -13,7 +13,7 @@ import steps/cart_world.{
 
 pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.when_("I checkout", Action(step_checkout))
+  |> steps.when("I checkout", step_checkout)
 }
 
 // ============================================================================

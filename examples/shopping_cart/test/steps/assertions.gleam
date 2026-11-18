@@ -1,7 +1,7 @@
 //// Assertion/verification steps (Then steps).
 
 import dream_test/gherkin/steps.{
-  type StepContext, type StepRegistry, Check, get_float, get_int, get_string,
+  type StepContext, type StepRegistry, get_float, get_int, get_string,
 }
 import dream_test/matchers.{be_equal, be_true, or_fail_with, should, succeed}
 import dream_test/types.{type AssertionResult}
@@ -21,28 +21,19 @@ import steps/cart_world.{
 
 pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.then_(
-    "the cart should contain {int} items",
-    Check(step_verify_item_count),
-  )
-  |> steps.then_("the subtotal should be ${float}", Check(step_verify_subtotal))
-  |> steps.then_("the discount should be ${float}", Check(step_verify_discount))
-  |> steps.then_("the total should be ${float}", Check(step_verify_total))
-  |> steps.then_(
-    "the checkout should succeed",
-    Check(step_verify_checkout_success),
-  )
-  |> steps.then_(
+  |> steps.then("the cart should contain {int} items", step_verify_item_count)
+  |> steps.then("the subtotal should be ${float}", step_verify_subtotal)
+  |> steps.then("the discount should be ${float}", step_verify_discount)
+  |> steps.then("the total should be ${float}", step_verify_total)
+  |> steps.then("the checkout should succeed", step_verify_checkout_success)
+  |> steps.then(
     "the checkout should fail with {string}",
-    Check(step_verify_checkout_failure),
+    step_verify_checkout_failure,
   )
-  |> steps.then_(
-    "the order total should be ${float}",
-    Check(step_verify_order_total),
-  )
-  |> steps.then_(
+  |> steps.then("the order total should be ${float}", step_verify_order_total)
+  |> steps.then(
     "the operation should fail with {string}",
-    Check(step_verify_operation_failure),
+    step_verify_operation_failure,
   )
 }
 

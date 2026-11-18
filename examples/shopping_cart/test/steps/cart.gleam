@@ -1,7 +1,7 @@
 //// Cart setup and manipulation steps.
 
 import dream_test/gherkin/steps.{
-  type StepContext, type StepRegistry, Action, get_int, get_string,
+  type StepContext, type StepRegistry, get_int, get_string,
 }
 import gleam/option.{None, Some}
 import gleam/result
@@ -17,18 +17,12 @@ import steps/cart_world.{type CartWorld, CartWorld}
 
 pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.given("I have an empty cart", Action(step_empty_cart))
-  |> steps.given("I add {int} {word} to the cart", Action(step_add_product))
-  |> steps.when_("I add {int} {word} to the cart", Action(step_add_product))
-  |> steps.when_(
-    "I try to add {int} {word} to the cart",
-    Action(step_try_add_product),
-  )
-  |> steps.when_(
-    "I update the {word} quantity to {int}",
-    Action(step_update_quantity),
-  )
-  |> steps.when_("I remove {word} from the cart", Action(step_remove_product))
+  |> steps.given("I have an empty cart", step_empty_cart)
+  |> steps.given("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.when("I remove {word} from the cart", step_remove_product)
 }
 
 // ============================================================================

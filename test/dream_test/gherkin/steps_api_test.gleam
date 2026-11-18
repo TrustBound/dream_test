@@ -12,10 +12,7 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given(
-          "I have {int} items of {word}",
-          steps.Check(steps_test_handler),
-        )
+        |> steps.given("I have {int} items of {word}", steps_test_action)
 
       // Act
       let result =
@@ -36,10 +33,7 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given(
-          "I have {int} items of {word}",
-          steps.Check(steps_test_handler),
-        )
+        |> steps.given("I have {int} items of {word}", steps_test_action)
 
       // Act
       let result =
@@ -60,10 +54,7 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given(
-          "I have {int} items of {word}",
-          steps.Check(steps_test_handler),
-        )
+        |> steps.given("I have {int} items of {word}", steps_test_action)
 
       // Act
       let result =
@@ -84,7 +75,7 @@ pub fn tests() {
       // Arrange
       let registry =
         steps.new(initial: Nil)
-        |> steps.given("I say {string}", steps.Check(steps_test_handler))
+        |> steps.given("I say {string}", steps_test_action)
 
       // Act
       let result =
@@ -168,7 +159,7 @@ pub fn tests() {
 
     it("find_step does not match a definition of another phase", fn() {
       steps.new(initial: Nil)
-      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps_test_action)
       |> steps.find_step(gtypes.ThenPhase, "a b")
       |> result.map(capture_count_of)
       |> should
@@ -178,8 +169,8 @@ pub fn tests() {
 
     it("find_step returns the duplicate step definition error", fn() {
       steps.new(initial: Nil)
-      |> steps.given("a b", steps.Check(steps_test_handler))
-      |> steps.given("a b", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps_test_action)
+      |> steps.given("a b", steps_test_action)
       |> steps.find_step(gtypes.GivenPhase, "a b")
       |> result.map(capture_count_of)
       |> should
@@ -189,11 +180,41 @@ pub fn tests() {
       |> or_fail_with("a duplicate should make find_step fail")
     }),
 
+    it("find_step gives a Given definition as an action", fn() {
+      steps.new(initial: Nil)
+      |> steps.given("a b", steps_test_action)
+      |> steps.find_step(gtypes.GivenPhase, "a b")
+      |> result.map(definition_kind)
+      |> should
+      |> be_equal(Ok("action"))
+      |> or_fail_with("a Given definition should be an action")
+    }),
+
+    it("find_step gives a When definition as an action", fn() {
+      steps.new(initial: Nil)
+      |> steps.when("a b", steps_test_action)
+      |> steps.find_step(gtypes.WhenPhase, "a b")
+      |> result.map(definition_kind)
+      |> should
+      |> be_equal(Ok("action"))
+      |> or_fail_with("a When definition should be an action")
+    }),
+
+    it("find_step gives a Then definition as a check", fn() {
+      steps.new(initial: Nil)
+      |> steps.then("a b", steps_test_check)
+      |> steps.find_step(gtypes.ThenPhase, "a b")
+      |> result.map(definition_kind)
+      |> should
+      |> be_equal(Ok("check"))
+      |> or_fail_with("a Then definition should be a check")
+    }),
+
     it("validate returns Ok for a registry without duplicates", fn() {
       steps.new(initial: Nil)
-      |> steps.given("a b", steps.Check(steps_test_handler))
-      |> steps.when_("a b", steps.Check(steps_test_handler))
-      |> steps.then_("a b", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps_test_action)
+      |> steps.when("a b", steps_test_action)
+      |> steps.then("a b", steps_test_check)
       |> steps.validate
       |> should
       |> be_equal(Ok(Nil))
@@ -202,10 +223,10 @@ pub fn tests() {
 
     it("validate gives one line for each duplicate in registration order", fn() {
       steps.new(initial: Nil)
-      |> steps.given("a b", steps.Check(steps_test_handler))
-      |> steps.given("a b", steps.Check(steps_test_handler))
-      |> steps.then_("c", steps.Check(steps_test_handler))
-      |> steps.then_("c", steps.Check(steps_test_handler))
+      |> steps.given("a b", steps_test_action)
+      |> steps.given("a b", steps_test_action)
+      |> steps.then("c", steps_test_check)
+      |> steps.then("c", steps_test_check)
       |> steps.validate
       |> should
       |> be_equal(Error(
@@ -286,11 +307,27 @@ pub fn tests() {
   ])
 }
 
-fn steps_test_handler(
+fn steps_test_action(
+  state: Nil,
+  _context: steps.StepContext,
+) -> Result(Nil, String) {
+  Ok(state)
+}
+
+fn steps_test_check(
   _state: Nil,
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
+}
+
+fn definition_kind(
+  matched: step_trie.StepMatch(steps.StepDefinition(Nil)),
+) -> String {
+  case matched.handler {
+    steps.Action(_) -> "action"
+    steps.Check(_) -> "check"
+  }
 }
 
 fn capture_count_of(

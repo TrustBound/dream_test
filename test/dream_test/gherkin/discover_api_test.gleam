@@ -180,8 +180,7 @@ pub fn tests() {
           "./test/tmp/features/discover_good.feature",
           "Feature: Good\n  Scenario: One\n    Given a thing\n",
         )
-      let registry =
-        steps.new(initial: Nil) |> steps.given("a thing", steps.Check(step_ok))
+      let registry = steps.new(initial: Nil) |> steps.given("a thing", step_ok)
 
       let suite =
         discover.features("./test/tmp/features/discover_good.feature")
@@ -225,9 +224,6 @@ fn result_status(result: test_types.TestResult) -> test_types.Status {
   result.status
 }
 
-fn step_ok(
-  _state: Nil,
-  _context: steps.StepContext,
-) -> Result(test_types.AssertionResult, String) {
-  Ok(test_types.AssertionOk)
+fn step_ok(_state: Nil, _context: steps.StepContext) -> Result(Nil, String) {
+  Ok(Nil)
 }

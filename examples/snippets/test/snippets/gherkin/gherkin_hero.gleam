@@ -1,5 +1,5 @@
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -26,9 +26,9 @@ fn step_should_have(cart: Int, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: 0)
-    |> steps.given("I have {int} items in my cart", Action(step_have_items))
-    |> steps.when_("I add {int} more items", Action(step_add_items))
-    |> steps.then_("I should have {int} items total", Check(step_should_have))
+    |> steps.given("I have {int} items in my cart", step_have_items)
+    |> steps.when("I add {int} more items", step_add_items)
+    |> steps.then("I should have {int} items total", step_should_have)
 
   feature("Shopping Cart", steps, [
     scenario("Adding items to cart", [

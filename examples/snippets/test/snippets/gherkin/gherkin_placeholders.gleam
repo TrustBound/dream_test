@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{
-  type StepContext, Action, Check, get_float, get_int, get_string, get_word,
+  type StepContext, get_float, get_int, get_string, get_word,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
@@ -51,11 +51,11 @@ fn step_everything_works(values: Values, _context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: Values(int: 0, float: 0.0, string: "", word: ""))
-    |> steps.given("I have {int} items", Action(step_int))
-    |> steps.given("the price is ${float}", Action(step_float))
-    |> steps.given("the message is {string}", Action(step_string))
-    |> steps.given("the user is {word}", Action(step_word))
-    |> steps.then_("everything works", Check(step_everything_works))
+    |> steps.given("I have {int} items", step_int)
+    |> steps.given("the price is ${float}", step_float)
+    |> steps.given("the message is {string}", step_string)
+    |> steps.given("the user is {word}", step_word)
+    |> steps.then("everything works", step_everything_works)
 
   feature("Placeholder Types", steps, [
     scenario("Using different placeholders", [

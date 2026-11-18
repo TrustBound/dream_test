@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -36,10 +36,10 @@ pub fn tests() {
   // Define the steps and the state each scenario starts from
   let steps =
     steps.new(initial: Cart(server_running: False, items: 0))
-    |> steps.given("the server is running", Action(step_server_running))
-    |> steps.given("the cart is empty", Action(step_empty_cart))
-    |> steps.when_("I add {int} items", Action(step_add_items))
-    |> steps.then_("the cart should have {int} items", Check(step_verify_count))
+    |> steps.given("the server is running", step_server_running)
+    |> steps.given("the cart is empty", step_empty_cart)
+    |> steps.when("I add {int} items", step_add_items)
+    |> steps.then("the cart should have {int} items", step_verify_count)
 
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")

@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
@@ -33,10 +33,10 @@ fn step_check_stock(shop: Shop, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: Shop(open: False, stock: 0))
-    |> steps.given("the shop is open", Action(step_shop_open))
-    |> steps.given("the stock holds {int} items", Action(step_set_stock))
-    |> steps.when_("I sell {int} items", Action(step_sell))
-    |> steps.then_("the stock holds {int} items", Check(step_check_stock))
+    |> steps.given("the shop is open", step_shop_open)
+    |> steps.given("the stock holds {int} items", step_set_stock)
+    |> steps.when("I sell {int} items", step_sell)
+    |> steps.then("the stock holds {int} items", step_check_stock)
 
   // Each Rule becomes a group named "Rule: <name>".
   // Each Examples row becomes one test, for example

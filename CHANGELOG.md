@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Typed Gherkin scenario state. `steps.new(initial:)` takes the state that
-  each scenario starts from. A step definition is
-  `steps.Action(fn(state, StepContext) -> Result(state, String))` or
-  `steps.Check(fn(state, StepContext) -> Result(AssertionResult, String))`.
+  each scenario starts from. A `given` or `when` step definition is an
+  action, `fn(state, StepContext) -> Result(state, String)`. A `then` step
+  definition is a check,
+  `fn(state, StepContext) -> Result(AssertionResult, String)`.
   `steps.initial_state(registry)` gives the initial state.
   `StepContext.scenario_id` gives the id of the scenario.
 - `types.Callback(input, output)` (`NoInput` and `WithInput`) and
@@ -115,19 +116,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dream_test/gherkin/world` (`put`, `get`, `get_or`, `has`, `delete`,
   `scenario_id`, `new_world`, `cleanup`) and its ETS table. Each scenario
   made one atom that was never freed. The state is now one typed value that
-  each step gets and an `Action` step returns. Before:
+  each step gets and a `given` or `when` step returns. Before:
   `fn step_add(context: StepContext) { put(context.world, "cart", get_or(context.world, "cart", 0) + 1) Ok(succeed()) }`.
   After: `fn step_add(cart: Int, _context: StepContext) { Ok(cart + 1) }`.
 - BREAKING: `steps.new()` takes the initial scenario state, and
   `StepRegistry`, `FeatureConfig` and `discover.RunnableDiscovery` take
   the state type as a type parameter. Before: `steps.new()`. After:
   `steps.new(initial: 0)`, of type `StepRegistry(Int)`.
-- BREAKING: `steps.given`, `steps.when_` and `steps.then_` take a
-  `StepDefinition(state)` (labelled `definition`) in place of a
-  `StepHandler`. The `StepHandler` type is removed, and `find_step` gives a
-  `StepMatch(StepDefinition(state))`. Before:
-  `steps.then_("I have {int} items", step_should_have)`. After:
-  `steps.then_("I have {int} items", Check(step_should_have))`.
+- BREAKING: the phase of a step definition sets its kind. `steps.given`
+  and `steps.when` take an action (labelled `action`),
+  `fn(state, StepContext) -> Result(state, String)`. `steps.then` takes a
+  check (labelled `check`),
+  `fn(state, StepContext) -> Result(AssertionResult, String)`. A check
+  cannot change the state. The `StepHandler` type is removed. `find_step`
+  gives a `StepMatch(StepDefinition(state))`: a `given` or `when`
+  definition comes back as `Action(run)`, and a `then` definition as
+  `Check(run)`. Before:
+  `fn step_add(context: StepContext) -> Result(AssertionResult, String)`
+  with `steps.when_("I add {int} items", step_add)`. After:
+  `fn step_add(cart: Int, context: StepContext) -> Result(Int, String)`
+  with `steps.when("I add {int} items", step_add)`.
+- BREAKING: `steps.when_` is now `steps.when`, and `steps.then_` is now
+  `steps.then`. The public API has no names with a trailing underscore.
+  Before: `|> steps.when_("I add {int} items", add)`. After:
+  `|> steps.when("I add {int} items", add)`.
 - BREAKING: `StepContext` has no `world` field. It has a `scenario_id`
   field. Before: `world.scenario_id(context.world)`. After:
   `context.scenario_id`.
@@ -288,9 +300,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - BREAKING: `gherkin/steps.step` is removed. Each step definition now
   belongs to exactly one phase. Before, `step` matched a step of any
-  keyword. Now register it with `given`, `when_` or `then_`, for example
+  keyword. Now register it with `given`, `when` or `then`, for example
   `|> steps.step("I add {int} items", add)` becomes
-  `|> steps.when_("I add {int} items", add)`. To use one pattern in two
+  `|> steps.when("I add {int} items", add)`. To use one pattern in two
   phases, register it in each phase.
 - BREAKING: `gherkin/types.StepKeyword` has a new variant, `Asterisk`, for
   the `*` keyword. A `case` on `StepKeyword` must add a branch for it.
@@ -306,7 +318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pattern is an `Error` in place of a silent replacement.
 - BREAKING: A pattern registered two times in one phase is now an error.
   Before, the second definition replaced the first without a message. Now
-  `given`, `when_` and `then_` keep the first definition and record the
+  `given`, `when` and `then` keep the first definition and record the
   error. `find_step` and `validate` return it, and each scenario that uses
   the registry fails with it, for example
   `Duplicate step definition: Given "I have {int} items" is already defined. Each pattern can have one definition for each of Given, When and Then.`

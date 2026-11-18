@@ -1,6 +1,6 @@
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, Action, Check, get_int}
+import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
@@ -24,9 +24,9 @@ fn step_verify_count(cart: Int, context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: 0)
-    |> steps.given("I have {int} items in my cart", Action(step_have_items))
-    |> steps.when_("I add {int} more items", Action(step_add_items))
-    |> steps.then_("I should have {int} items total", Check(step_verify_count))
+    |> steps.given("I have {int} items in my cart", step_have_items)
+    |> steps.when("I add {int} more items", step_add_items)
+    |> steps.then("I should have {int} items total", step_verify_count)
 
   let assert Ok(feature) =
     parser.parse_file("test/features/shopping_cart.feature")

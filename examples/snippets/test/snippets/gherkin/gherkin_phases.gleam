@@ -2,7 +2,7 @@ import dream_test/gherkin/feature.{
   and, asterisk, background, feature_with_background, given, scenario, then,
   when,
 }
-import dream_test/gherkin/steps.{type StepContext, Action, Check}
+import dream_test/gherkin/steps.{type StepContext}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 
 fn step_trip(_bag: Int, _context: StepContext) {
@@ -27,11 +27,11 @@ fn step_bag_has_two(bag: Int, _context: StepContext) {
 pub fn tests() {
   let steps =
     steps.new(initial: 0)
-    |> steps.given("I plan a trip", Action(step_trip))
-    |> steps.given("I pack a passport", Action(step_pack))
-    |> steps.given("I pack a toothbrush", Action(step_pack))
-    |> steps.when_("I close the bag", Action(step_close_bag))
-    |> steps.then_("the bag has 2 things", Check(step_bag_has_two))
+    |> steps.given("I plan a trip", step_trip)
+    |> steps.given("I pack a passport", step_pack)
+    |> steps.given("I pack a toothbrush", step_pack)
+    |> steps.when("I close the bag", step_close_bag)
+    |> steps.then("the bag has 2 things", step_bag_has_two)
 
   feature_with_background(
     "Packing",
