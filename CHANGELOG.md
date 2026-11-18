@@ -543,6 +543,10 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   test of a Feature tagged `@f` with a scenario tagged `@s` had the tags
   `["f", "f", "s"]`. Now it has `["f", "s"]`. The order is Feature, Rule,
   scenario, `Examples`.
+- A DocString line unescapes each escaped separator of the active
+  separator, as the official Gherkin parser does: `\"\"\"` becomes `"""`
+  inside a `"""` DocString, and `` \`\`\` `` becomes ```` ``` ```` inside a
+  ```` ``` ```` DocString. Before, the backslashes stayed in the content.
 - A table cell can be empty. Before, `| a | | b |` gave `["a", "b"]`. Now
   it gives `["a", "", "b"]`.
 - A table cell unescapes `\|`, `\\` and `\n`. The text before the first `|`

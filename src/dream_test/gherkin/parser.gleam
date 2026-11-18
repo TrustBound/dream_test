@@ -1067,8 +1067,9 @@ fn media_type_option(media_type: String) -> Option(String) {
   }
 }
 
-/// Remove the indentation of the opening separator, then unescape the first
-/// escaped separator (`\"\"\"` or `` \`\`\` ``).
+/// Remove the indentation of the opening separator, then unescape every
+/// escaped separator (`\"\"\"` or `` \`\`\` ``), as the official Java
+/// parser does.
 fn doc_string_content(line: String, draft: DocStringDraft) -> String {
   line
   |> remove_indentation(draft.indentation)
@@ -1102,10 +1103,7 @@ fn unescape_separator(
   escaped: String,
   separator: String,
 ) -> String {
-  case string.split_once(line, escaped) {
-    Ok(#(before, after)) -> before <> separator <> after
-    Error(Nil) -> line
-  }
+  string.replace(in: line, each: escaped, with: separator)
 }
 
 // ============================================================================

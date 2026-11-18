@@ -1499,6 +1499,7 @@ The parser follows the official Gherkin grammar. A `.feature` file that 2.x read
 | `@a b` gave the tag `a`. `@a@b` gave one tag. | `@a b` is a `TagContainsWhitespace` error. `@a@b` gives `a` and `b`. `@tag #comment` ignores the comment. | Remove the space. |
 | `# language: fr` was a comment. | An `UnsupportedLanguage` error. Only `en` is supported. | Remove the line, or use `# language: en`. |
 | A description lost its leading whitespace and empty lines. | A description keeps them. | Update tests that compare descriptions. |
+| A DocString line kept an escaped separator, such as `\"\"\"`, as written. | Each escaped separator of the active separator becomes the separator: `\"\"\"` becomes `"""` and `` \`\`\` `` becomes ```` ``` ````. | Update steps that expect the backslashes. |
 
 ### The sandbox
 

@@ -877,6 +877,30 @@ Scenario: S
           |> or_fail_with("expected the DocString content")
         },
       ),
+      it("parse_string unescapes every escaped separator of a line", fn() {
+        parser.parse_string(
+          "Feature: F
+Scenario: S
+  Given text
+    ```
+    a \\`\\`\\` b \\`\\`\\` c
+    ```
+",
+        )
+        |> result.map(first_scenario_steps)
+        |> should
+        |> be_equal(
+          Ok([
+            gtypes.Step(
+              gtypes.Given,
+              "text",
+              Some(gtypes.DocString("a ``` b ``` c", None)),
+              None,
+            ),
+          ]),
+        )
+        |> or_fail_with("expected both separators unescaped")
+      }),
       it("parse_string rejects an inconsistent DataTable row", fn() {
         parser.parse_string(
           "Feature: F\nScenario: S\n  Given text\n    | a |\n    | b | c |\n",
