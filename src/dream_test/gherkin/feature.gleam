@@ -143,10 +143,15 @@ pub type InlineStep {
 /// An example row test is named `<scenario> (Example N)`, or
 /// `<scenario> (<examples name>, Example N)` when its `Examples` section has
 /// a name. N counts the rows of all `Examples` sections of the scenario, from
-/// 1. The tags of a test are the Feature tags, then the Rule tags, then the
-/// scenario tags, then the `Examples` tags. The suite root also holds the
-/// Feature tags, so the effective tags of a test start with the Feature tags
-/// two times. A Rule group holds no tags.
+/// 1.
+///
+/// Tags follow Gherkin: a scenario inherits the Feature tags and the Rule
+/// tags. The suite root holds the Feature tags, a Rule group holds the Rule
+/// tags, and a test holds the scenario tags, then the `Examples` tags. The
+/// runner adds the tags of the groups of a test in front of its own tags.
+/// So the tags of a test result, and the tags that a `runner.filter_tests`
+/// predicate sees, are the Feature tags, then the Rule tags, then the
+/// scenario tags, then the `Examples` tags, each one time.
 ///
 /// ## Parameters
 ///

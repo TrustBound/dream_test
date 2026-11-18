@@ -135,6 +135,22 @@ pub fn tests() {
       )
     }),
 
+    it("a tag filter sees the Rule tags on each test of the Rule", fn() {
+      run_parsed_filtered(rules_feature(), rules_registry(), has_rule_tag)
+      |> list.map(result_name)
+      |> should
+      |> be_equal(["Sell"])
+      |> or_fail_with("only the scenario in the Rule should run")
+    }),
+
+    it("a tag filter sees the Feature tags on each test", fn() {
+      run_parsed_filtered(rules_feature(), rules_registry(), has_feature_tag)
+      |> list.map(result_name)
+      |> should
+      |> be_equal(["Outside", "Sell", "Nameless"])
+      |> or_fail_with("every scenario should run")
+    }),
+
     it(
       "to_test_suite runs the Feature Background, then the Rule Background",
       fn() {
@@ -991,6 +1007,34 @@ fn gherkin_step_ok(
   _context: steps.StepContext,
 ) -> Result(Nil, String) {
   Ok(Nil)
+}
+
+fn run_parsed_filtered(
+  content: String,
+  registry: steps.StepRegistry(Nil),
+  predicate: fn(test_types.TestInfo) -> Bool,
+) -> List(test_types.TestResult) {
+  case parser.parse_string(content) {
+    Ok(feature) ->
+      runner.new([
+        gfeature.to_test_suite(gfeature.FeatureConfig(
+          feature: feature,
+          step_registry: registry,
+        )),
+      ])
+      |> runner.filter_tests(predicate)
+      |> runner.run()
+      |> test_types.report_tests
+    Error(_) -> []
+  }
+}
+
+fn has_rule_tag(info: test_types.TestInfo) -> Bool {
+  list.contains(info.tags, "r")
+}
+
+fn has_feature_tag(info: test_types.TestInfo) -> Bool {
+  list.contains(info.tags, "f")
 }
 
 fn rules_feature() -> String {
