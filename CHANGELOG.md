@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `sandbox.run_catching(run:, input:)` runs a function in the calling
+  process and gives `Ok(value)`, or `Error("class:reason")` when the
+  function crashes. No new process starts, so a resource that the function
+  starts stays alive after it returns.
 - `progress.line` and `progress.ProgressEvent`. `progress.line` gives the
   text of the progress bar for the start of a run, a finished test, or the
   end of a run. It always gives a line, because `ProgressEvent` has no hook
@@ -76,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING: group `before_all` and `after_all` hooks run in the runner
+  process, not in a sandbox process, so no timeout applies to them. Before:
+  a `before_all` that ran longer than the timeout gave `SetupFailed` with
+  `hook timed out in <group>`. After: the runner waits until the hook
+  returns. A crash is still caught and gives `hook crashed in <group>: ...`.
 - BREAKING: `sandbox.run_isolated` now takes the function and its input as
   two parameters: `run_isolated(config:, run: fn(input) -> a, input:)` in
   place of `run_isolated(config:, test_function: fn() -> a)`. The function
@@ -253,6 +262,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A resource that a group `before_all` hook starts now lives for the tests
+  of the group. Before, the hook ran in a short-lived process, so a pool
+  that links to its caller (for example a supervisor) and an ETS table
+  stopped before the first test ran.
+- A crash in a suite-level hook (`before_all_suites`, `before_each_suite`,
+  `after_each_suite`, `after_all_suites`) no longer stops the whole run.
+  The runner catches it and records it as a failure of that hook, with the
+  message `hook crashed: <reason>` or `hook crashed in <suite>: <reason>`.
+  These hooks still run in the runner process, so the resources that they
+  start live until the run ends or a later hook stops them.
 - Coverage no longer counts the line of a function with an
   `@external(erlang, ...)` attribute. Gleam code never calls the wrapper
   that Gleam compiles for such a function, so the line was always shown as

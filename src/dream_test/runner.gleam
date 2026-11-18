@@ -57,6 +57,7 @@ import dream_test/reporters/coverage as coverage_reporter
 import dream_test/reporters/json
 import dream_test/reporters/progress
 import dream_test/reporters/types as reporter_types
+import dream_test/sandbox
 import dream_test/types.{
   type AssertionFailure, type Node, type TestResult, type TestSuite, AfterAll,
   AfterEach, BeforeAll, BeforeEach, Failed, Group, Passed, Root, SetupFailed,
@@ -65,6 +66,7 @@ import dream_test/types.{
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 
 /// Lightweight information about a test, used for filtering what runs.
 ///
@@ -837,7 +839,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
   }
 
   let before_all_result =
-    run_before_all_suites_hooks(builder.runner_before_all_suites, suite_infos)
+    run_suite_level_hooks(builder.runner_before_all_suites, suite_infos, [])
 
   let #(results, completed2, progress_reporter1) = case before_all_result {
     Ok(_) ->
@@ -1053,59 +1055,45 @@ fn all_sources_match(value: String, rest: List(types.TestInfo)) -> Bool {
   }
 }
 
-fn run_before_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
+/// Run suite-level hooks in order, in the runner's process, and stop at the
+/// first error. A crash becomes an `Error` that names the suite.
+///
+/// Suite-level hooks do not run in a sandbox: a resource that a hook starts,
+/// such as a pool that links to the caller or an ETS table, must live until
+/// the hook that stops it, and a sandbox process stops when the hook
+/// returns. So no timeout applies to these hooks.
+fn run_suite_level_hooks(
+  hooks: List(fn(input) -> Result(Nil, String)),
+  input: input,
+  scope: List(String),
 ) -> Result(Nil, String) {
   case hooks {
     [] -> Ok(Nil)
     [hook, ..rest] ->
-      case hook(suites) {
-        Ok(_) -> run_before_all_suites_hooks(rest, suites)
+      case run_suite_level_hook(hook, input, scope) {
+        Ok(Nil) -> run_suite_level_hooks(rest, input, scope)
         Error(message) -> Error(message)
       }
   }
 }
 
-fn run_before_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  suite: types.SuiteInfo,
+fn run_suite_level_hook(
+  hook: fn(input) -> Result(Nil, String),
+  input: input,
+  scope: List(String),
 ) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suite) {
-        Ok(_) -> run_before_each_suite_hooks(rest, suite)
-        Error(message) -> Error(message)
-      }
+  case sandbox.run_catching(hook, input) {
+    Ok(result) -> result
+    Error(reason) -> Error(suite_hook_crash_message(scope, reason))
   }
 }
 
-fn run_after_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  suite: types.SuiteInfo,
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suite) {
-        Ok(_) -> run_after_each_suite_hooks(rest, suite)
-        Error(message) -> Error(message)
-      }
-  }
-}
-
-fn run_after_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suites) {
-        Ok(_) -> run_after_all_suites_hooks(rest, suites)
-        Error(message) -> Error(message)
-      }
+/// `hook crashed: <reason>` for a hook of the whole run, and
+/// `hook crashed in <suite>: <reason>` for a hook of one suite.
+fn suite_hook_crash_message(scope: List(String), reason: String) -> String {
+  case scope {
+    [] -> "hook crashed: " <> reason
+    _ -> "hook crashed in " <> string.join(scope, " > ") <> ": " <> reason
   }
 }
 
@@ -1126,7 +1114,9 @@ fn run_suites_with_hooks(
     [] -> #(acc, completed, progress_reporter)
     [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
       let before_result =
-        run_before_each_suite_hooks(before_each_suite_hooks, suite_info)
+        run_suite_level_hooks(before_each_suite_hooks, suite_info, [
+          suite_info.name,
+        ])
       case before_result {
         Error(message) -> {
           let failures =
@@ -1215,7 +1205,7 @@ fn apply_after_each_suite_hooks(
   suite_info: types.SuiteInfo,
   results: List(TestResult),
 ) -> List(TestResult) {
-  case run_after_each_suite_hooks(hooks, suite_info) {
+  case run_suite_level_hooks(hooks, suite_info, [suite_info.name]) {
     Ok(_) -> results
     Error(message) ->
       list.append(results, [
@@ -1229,7 +1219,7 @@ fn apply_after_all_suites_hooks(
   suites: List(types.SuiteInfo),
   results: List(TestResult),
 ) -> List(TestResult) {
-  case run_after_all_suites_hooks(hooks, suites) {
+  case run_suite_level_hooks(hooks, suites, []) {
     Ok(_) -> results
     Error(message) ->
       list.append(results, [after_all_suites_failure_result(message)])

@@ -165,25 +165,6 @@ pub fn tests() {
       |> or_fail_with("a failing after_all should add an <after_all> result")
     }),
 
-    it("a before_all that runs too long gives SetupFailed", fn() {
-      describe("root", [
-        before_all(fn() {
-          process.sleep(1000)
-          Ok(Nil)
-        }),
-        it("a", fn() { Ok(AssertionOk) }),
-      ])
-      |> run_sequential_with_timeout(50)
-      |> summaries
-      |> should
-      |> be_equal([
-        #(["root", "a"], SetupFailed, [
-          failure("before_all", "hook timed out in root"),
-        ]),
-      ])
-      |> or_fail_with("a slow before_all should give SetupFailed")
-    }),
-
     it("a before_all that crashes gives SetupFailed", fn() {
       describe("root", [
         before_all(fn() { erlang_error(atom.create("boom")) }),

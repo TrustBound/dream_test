@@ -291,6 +291,21 @@ pub fn main() {
 }
 ```
 
+### Where hooks run
+
+A hook can start a resource that its tests use, for example a pool or an ETS table. On the BEAM, such a resource often stops when the process that started it stops. So each hook runs in a process that lives as long as the tests that it serves:
+
+| Hooks | Process | Timeout |
+|---|---|---|
+| `before_all`, `after_all` | the runner process | none |
+| `before_all_suites`, `before_each_suite`, `after_each_suite`, `after_all_suites` | the runner process | none |
+| `before_each`, `after_each`, `before_each_test`, `after_each_test` | a new process for each hook | the test timeout |
+
+- A pool that `before_all` starts lives until `after_all` stops it.
+- A crash in a hook does not stop the run. The runner records it as a failure of that hook.
+- A hook that runs in the runner process has no timeout. If it never returns, the run never ends.
+- A resource that `before_each` starts stops when the hook returns. Start a per-test resource in the test body.
+
 ### Hooks and parallelism (the source of most flaky tests)
 
 Dream Test runs tests in parallel by default (configurable). Hooks don’t change that: they run _around_ tests, but they don’t automatically serialize tests that share resources.

@@ -503,7 +503,6 @@ fn execute_node(
         collect_children(children, empty_hooks, [], [])
       let #(ctx2, _before_each2, _after_each2, failures_rev) =
         run_before_all_chain(
-          config,
           group_scope,
           context,
           hooks.before_all,
@@ -539,7 +538,6 @@ fn execute_node(
 
           let final_rev =
             run_after_all_chain(
-              config,
               group_scope,
               ctx2,
               hooks.after_all,
@@ -591,7 +589,6 @@ fn execute_node(
 
           let final_rev =
             run_after_all_chain(
-              config,
               group_scope,
               ctx2,
               hooks.after_all,
@@ -762,7 +759,6 @@ fn collect_children(
 }
 
 fn run_before_all_chain(
-  config: ParallelConfig,
   scope: List(String),
   context: context,
   hooks: List(fn(context) -> Result(context, String)),
@@ -783,10 +779,9 @@ fn run_before_all_chain(
       failures_rev,
     )
     [hook, ..rest] ->
-      case run_hook(config, scope, hook, context) {
+      case run_hook_in_process(scope, hook, context) {
         Ok(next) ->
           run_before_all_chain(
-            config,
             scope,
             next,
             rest,
@@ -1485,7 +1480,6 @@ fn run_child_groups_sequentially(
 }
 
 fn run_after_all_chain(
-  config: ParallelConfig,
   scope: List(String),
   context: context,
   hooks: List(fn(context) -> Result(Nil, String)),
@@ -1494,8 +1488,8 @@ fn run_after_all_chain(
   case hooks {
     [] -> acc_rev
     [hook, ..rest] ->
-      case run_hook(config, scope, hook, context) {
-        Ok(_) -> run_after_all_chain(config, scope, context, rest, acc_rev)
+      case run_hook_in_process(scope, hook, context) {
+        Ok(_) -> run_after_all_chain(scope, context, rest, acc_rev)
         Error(message) -> {
           let result =
             TestResult(
@@ -1548,9 +1542,30 @@ fn run_hook(
     sandbox.SandboxCompleted(result) -> result
     sandbox.SandboxTimedOut ->
       Error("hook timed out in " <> string.join(scope, " > "))
-    sandbox.SandboxCrashed(reason) ->
-      Error("hook crashed in " <> string.join(scope, " > ") <> ": " <> reason)
+    sandbox.SandboxCrashed(reason) -> Error(hook_crash_message(scope, reason))
   }
+}
+
+/// Run a group-level hook (`before_all` or `after_all`) in the process that
+/// runs the group. A crash becomes an `Error` that names the scope.
+///
+/// The hook does not run in a sandbox: a resource that it starts, such as a
+/// pool that links to the caller or an ETS table, must live for all the
+/// tests of the group, and a sandbox process stops when the hook returns.
+/// So no timeout applies to these hooks.
+fn run_hook_in_process(
+  scope: List(String),
+  hook: fn(input) -> Result(output, String),
+  input: input,
+) -> Result(output, String) {
+  case sandbox.run_catching(hook, input) {
+    Ok(result) -> result
+    Error(reason) -> Error(hook_crash_message(scope, reason))
+  }
+}
+
+fn hook_crash_message(scope: List(String), reason: String) -> String {
+  "hook crashed in " <> string.join(scope, " > ") <> ": " <> reason
 }
 
 fn run_before_each_list(

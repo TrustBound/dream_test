@@ -158,6 +158,27 @@ pub fn tests() {
       |> be_equal("\"boom\"")
       |> or_fail_with("an abnormal exit should give the quoted reason")
     }),
+
+    it("run_catching returns the value of a function that returns", fn() {
+      sandbox.run_catching(double, 61)
+      |> should
+      |> be_equal(Ok(122))
+      |> or_fail_with("run_catching should return Ok(122)")
+    }),
+
+    it("run_catching returns the crash of a function that crashes", fn() {
+      sandbox.run_catching(erlang_error, atom.create("boom"))
+      |> should
+      |> be_equal(Error("error:boom"))
+      |> or_fail_with("run_catching should return the crash reason")
+    }),
+
+    it("run_catching runs the function in the calling process", fn() {
+      sandbox.run_catching(own_pid, Nil)
+      |> should
+      |> be_equal(Ok(process.self()))
+      |> or_fail_with("run_catching should not start a process")
+    }),
   ])
 }
 
@@ -187,3 +208,7 @@ fn double(number: Int) -> Int {
 
 @external(erlang, "erlang", "error")
 fn erlang_error(reason: Atom) -> Nil
+
+fn own_pid(_input: Nil) -> process.Pid {
+  process.self()
+}

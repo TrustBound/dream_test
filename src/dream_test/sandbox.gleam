@@ -148,8 +148,56 @@ type WorkerMessage(a) {
   WorkerDown(reason: String)
 }
 
+/// Run a function with its input in the calling process, and turn a crash
+/// into an `Error`.
+///
+/// Use this function for code that must run in the calling process, for
+/// example a hook that starts a resource which must live as long as the
+/// caller. A process that the function links to, and an ETS table that it
+/// makes, stay alive after the function returns.
+///
+/// No new process starts, so no timeout applies: a function that never
+/// returns blocks the caller. A crash (`panic`, `erlang:error`, `throw` or
+/// `exit` in the calling process) becomes `Error` with the class and the
+/// reason. An exit signal that another process sends is not caught.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/unit.{describe, it}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// pub fn tests() {
+///   describe("run_catching", [
+///     it("returns the value of a function that returns", fn() {
+///       sandbox.run_catching(double, 61)
+///       |> should
+///       |> be_equal(Ok(122))
+///       |> or_fail_with("expected Ok(122)")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `run`: the function to run in the calling process
+/// - `input`: the argument that `run` gets
+///
+/// ## Returns
+///
+/// `Ok(value)` when `run` returns, or `Error("class:reason")` when it
+/// crashes, for example `Error("error:boom")`.
 @external(erlang, "sandbox_ffi", "run_catching")
-fn run_catching(run: fn(input) -> a, input: input) -> Result(a, String)
+pub fn run_catching(
+  run run: fn(input) -> a,
+  input input: input,
+) -> Result(a, String)
 
 /// Run a function with its input in an isolated process with timeout.
 ///
