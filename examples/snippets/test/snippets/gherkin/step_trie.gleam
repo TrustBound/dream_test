@@ -13,38 +13,26 @@ pub fn tests() {
         step_trie.parse_step_pattern("the total is ${float}USD")
         |> should
         |> be_equal([
-          step_trie.LiteralWord("the"),
-          step_trie.LiteralWord("total"),
-          step_trie.LiteralWord("is"),
-          step_trie.LiteralWord("$"),
-          step_trie.FloatParam,
-          step_trie.LiteralWord("USD"),
+          [step_trie.LiteralText("the")],
+          [step_trie.LiteralText("total")],
+          [step_trie.LiteralText("is")],
+          [
+            step_trie.LiteralText("$"),
+            step_trie.FloatParam,
+            step_trie.LiteralText("USD"),
+          ],
         ])
         |> or_fail_with(
           "expected ${float}USD to split into literal + FloatParam segments",
         )
       },
     ),
-    it(
-      "tokenize_step_text preserves quoted strings and splits numeric boundaries",
-      fn() {
-        step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
-        |> should
-        |> be_equal([
-          "I",
-          "add",
-          "\"Red Widget\"",
-          "and",
-          "pay",
-          "$",
-          "19.99",
-          "USD",
-        ])
-        |> or_fail_with(
-          "expected tokenization to preserve quotes and split $19.99USD",
-        )
-      },
-    ),
+    it("tokenize_step_text keeps a quoted run in one word", fn() {
+      step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
+      |> should
+      |> be_equal(["I", "add", "\"Red Widget\"", "and", "pay", "$19.99USD"])
+      |> or_fail_with("expected tokenization to keep the quoted run")
+    }),
     it("lookup finds the most specific pattern and captures typed values", fn() {
       use trie <- result.try(
         step_trie.new()

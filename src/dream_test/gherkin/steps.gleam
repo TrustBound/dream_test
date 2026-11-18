@@ -69,12 +69,18 @@
 ////
 //// - `{int}`: integers (e.g. `42`, `-5`)
 //// - `{float}`: decimals (e.g. `3.14`, `-0.5`)
-//// - `{string}`: quoted strings (e.g. `"hello world"`)
-//// - `{word}`: a single unquoted word (e.g. `alice`)
-//// - `{}`: any single token
+//// - `{string}`: double-quoted strings (e.g. `"hello world"`)
+//// - `{word}`: a run of characters with no space (e.g. `alice`, `user42`)
+//// - `{}`: any text in one word
 ////
 //// Placeholders can include literal prefixes/suffixes. For example, `${float}`
 //// matches `$19.99` but captures `19.99` as a `Float`.
+////
+//// Step text and patterns are split into words in the same way: at spaces,
+//// with a double-quoted run kept in one word. So a pattern without
+//// placeholders always matches its own text. When more than one pattern
+//// matches, a literal word wins over a placeholder. See
+//// `dream_test/gherkin/step_trie` for the full priority rules.
 ////
 //// ## Capture errors
 ////
@@ -421,24 +427,15 @@ pub fn validate(registry registry: StepRegistry(state)) -> Result(Nil, String) {
 ///
 /// ## Performance
 ///
-/// Lookup cost scales with the number of **tokens** in the step text after
-/// tokenization (the same tokenization used by the step trie).
+/// Lookup follows the words of the step text through a trie, so its cost
+/// depends on the number of words in the step text, not on the number of
+/// registered steps. When a branch of the trie does not match, lookup goes
+/// back and tries the next branch. Each branch that it tries adds to the
+/// cost.
 ///
-/// Concretely: this is the **total number of tokens** in the input step text,
-/// not the number of *unique* words.
-///
-/// In practice:
-/// - Tokens are usually “words” separated by spaces.
-/// - Quoted strings are treated as a single token.
-/// - Some punctuation/number boundaries are split so patterns like `{int}%` or
-///   `${float}USD` can match predictably.
-///
-/// Examples:
-/// - `"I add 2 items"` → 4 tokens (`["I", "add", "2", "items"]`)
-/// - `"the message is \"hello world\""` → 4 tokens (`["the", "message", "is", "\"hello world\""]`)
-///
-/// This does **not** scale with the number of registered steps: you can register
-/// hundreds of steps and lookup still stays proportional to the tokenized input.
+/// Words are separated by spaces. A double-quoted string is one word:
+/// - `"I add 2 items"` → 4 words (`["I", "add", "2", "items"]`)
+/// - `"the message is \"hello world\""` → 4 words (`["the", "message", "is", "\"hello world\""]`)
 ///
 /// ## Parameters
 ///

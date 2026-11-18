@@ -422,6 +422,20 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 
 The usual chain `discover.features(...) |> discover.with_registry(steps) |> discover.to_suite(...)` does not change.
 
+#### How step text matches a pattern
+
+In 3.0.0, step text and step patterns are split into words in the same way: at spaces, with a double-quoted run kept in one word. A pattern without placeholders always matches its own text. In 2.x, the step text was also split where digits meet other characters, but the pattern was not.
+
+| 2.x | 3.0.0 | What to do |
+|---|---|---|
+| `the user is {word}` did not match `the user is user42`. | It matches and captures `user42`. | Nothing. |
+| A pattern without placeholders, such as `I enable 2FA` or `I click "Save changes"`, did not match its own text. | It matches. | Nothing. |
+| A space in the pattern did not need a space in the text: `$ {float}` matched `$19.99`. | A space in the pattern must be a space in the text. | Write the pattern as the text is written, for example `${float}`. |
+| `{word}` matched a quoted run with spaces, for example `"Save changes"`. | `{word}` matches only text with no space. | Use `{string}`, or `{}` to keep the quotes. |
+| With `I have {int} items` and `I have 5 apples`, the text `I have 5 items` matched no step. Lookup took the literal word `5` and did not go back. | Lookup goes back and tries the next pattern, so the text matches `I have {int} items`. When two patterns match, a literal word wins over a placeholder. | Nothing. |
+| `step_trie.parse_step_pattern` gave a flat `List(StepSegment)` with `LiteralWord`. | It gives one `List(StepSegment)` for each word, with `LiteralText`. | Read the segments of each word. |
+| `step_trie.tokenize_step_text("$19.99USD")` gave `["$", "19.99", "USD"]`. | It gives `["$19.99USD"]`. | Nothing, unless you call it. |
+
 ### The runner and the run report
 
 `runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results and the tear-down hooks that failed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.

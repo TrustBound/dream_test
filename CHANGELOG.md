@@ -104,6 +104,14 @@ store. This release has breaking changes. Read
   duplicate.
 - `feature.InlineStep` holds `keyword: gherkin/types.StepKeyword` in place
   of `keyword: String`.
+- Step text and step patterns are split into words in the same way: at
+  spaces, with a double-quoted run kept in one word. A space in a pattern
+  must be a space in the text, so `$ {float}` does not match `$19.99`.
+  `{word}` matches only text with no space. Before, the step text was also
+  split where digits meet other characters, and the pattern was not.
+- `step_trie.parse_step_pattern` gives one `List(StepSegment)` for each
+  word, and `StepSegment.LiteralWord` is now `LiteralText`.
+  `step_trie.tokenize_step_text` splits only at spaces outside quotes.
 - `discover.with_registry` gives the opaque type `RunnableDiscovery`, and
   `discover.to_suite` takes only that type.
 
@@ -157,6 +165,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - `StepContext` has `scenario_id` in place of `world`.
 - A pattern registered two times in one phase is an error.
 - `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
+- Step text and patterns split into words only at spaces.
 - `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `exit_on_failure` stops with `init:stop(1)`: code after `runner.run` can run.
@@ -533,6 +542,13 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   and after the last `|` of a row is not a cell.
 - A table row with a different number of cells than the first row of its
   table is an `InconsistentCellCount` error.
+- A step pattern matches its own text. Before, `I enable 2FA` and
+  `I click "Save changes"` matched no step, and `the user is {word}` did
+  not match `the user is user42`.
+- Step lookup finds a match whenever one exists. Before, with
+  `I have {int} items` and `I have 5 apples`, the text `I have 5 items`
+  matched no step, because lookup took the literal word `5` and did not go
+  back. When two patterns match, a literal word wins over a placeholder.
 - `gherkin/discover.to_suite` gives the full file path as the source of a
   parse error test. Before, it cut the path at the first `": "`, so a path
   such as `features/a: b.feature` gave the source `features/a`.

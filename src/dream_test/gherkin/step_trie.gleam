@@ -1,18 +1,46 @@
 //// Fast step-definition lookup using Cucumber-Expression-style placeholders.
 ////
-//// This is the data structure behind `dream_test/gherkin/steps`. It matches step
-//// text in time proportional to the **number of tokens in the step text**, not
-//// the number of registered step definitions.
+//// This is the data structure behind `dream_test/gherkin/steps`. It finds
+//// the step definition for a line of step text.
+////
+//// ## Words
+////
+//// Step text and step patterns are split into words by one function,
+//// `tokenize_step_text`. A space ends a word. A double-quoted run, such as
+//// `"Red Widget"`, stays in one word with its spaces. Because both sides use
+//// the same split, a pattern without placeholders always matches its own
+//// text.
 ////
 //// ## Placeholder syntax
 ////
-//// - `{int}`: integers like `42`, `-5`
-//// - `{float}`: decimals like `3.14`, `-0.5`
-//// - `{string}`: quoted strings like `"hello world"`
-//// - `{word}` / `{}`: a single token
+//// - `{int}`: an integer, such as `42` or `-5`
+//// - `{float}`: a decimal number, such as `3.14` or `-0.5`
+//// - `{string}`: a double-quoted string, such as `"hello world"`. The
+////   capture does not include the quotes.
+//// - `{word}`: a run of characters with no space, such as `alice` or `user42`
+//// - `{}`: any text in one word
 ////
-//// Prefix/suffix text can be attached to placeholders. For example,
-//// `${float}USD` matches `$19.99USD` and captures `19.99` as a float.
+//// A placeholder can have literal text before or after it in the same word.
+//// For example, `${float}USD` matches `$19.99USD` and captures `19.99` as a
+//// float. A space in a pattern must be a space in the text: `$ {float}` does
+//// not match `$19.99`.
+////
+//// ## Priority
+////
+//// When more than one pattern matches a step, lookup compares the words from
+//// left to right and takes the pattern with the more specific word at the
+//// first word where they differ:
+////
+//// 1. A word with no placeholders comes first.
+//// 2. Then a word with more segments (literal text and placeholders) comes
+////    first. `{int}%` comes before `{word}`.
+//// 3. Then the segments are compared from left to right. Literal text comes
+////    before `{string}`, then `{int}`, `{float}`, `{word}` and `{}`. Longer
+////    literal text comes before shorter literal text.
+////
+//// If the most specific word leads to no match for the rest of the step,
+//// lookup tries the next word in this order. So lookup finds a match whenever
+//// one exists.
 ////
 //// ## Example
 ////
@@ -35,26 +63,23 @@ import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/order.{type Order}
 import gleam/string
 
 // ============================================================================
 // Segment Types
 // ============================================================================
 
-/// Segment types for step patterns.
+/// One segment of a word in a step pattern.
 ///
-/// Each segment type has different matching behavior and priority:
-/// - `LiteralWord`: Exact word match, highest priority
-/// - `StringParam`: Matches quoted strings
-/// - `IntParam`: Matches integers
-/// - `FloatParam`: Matches decimal numbers
-/// - `WordParam`: Matches a single unquoted word
-/// - `AnyParam`: Matches any single word (lowest priority)
+/// `parse_step_pattern` splits each word of a pattern into segments. A word
+/// without placeholders is one `LiteralText` segment. The word `${float}USD`
+/// is `[LiteralText("$"), FloatParam, LiteralText("USD")]`.
 ///
 pub type StepSegment {
-  /// Literal word requiring exact match.
+  /// Literal text that the step text must contain exactly.
   /// Example: "have" in "I have {int} items"
-  LiteralWord(String)
+  LiteralText(String)
 
   /// Integer parameter capture.
   /// Matches: 42, -5, 0
@@ -64,16 +89,16 @@ pub type StepSegment {
   /// Matches: 3.14, -0.5, 2.0
   FloatParam
 
-  /// Quoted string parameter capture.
+  /// Double-quoted string parameter capture.
   /// Matches: "hello world", "test"
   StringParam
 
-  /// Single unquoted word capture.
-  /// Matches any non-whitespace word
+  /// Word parameter capture.
+  /// Matches a run of characters with no space
   WordParam
 
-  /// Anonymous capture (matches any single word).
-  /// Lowest priority among params
+  /// Anonymous capture.
+  /// Matches any text in one word
   AnyParam
 }
 
@@ -102,25 +127,17 @@ pub type CapturedValue {
 
 /// A node in the step trie.
 ///
-/// Each node can store handlers for different phases and has children
-/// for different segment types. Children are organized by priority.
+/// Each node can store handlers for different phases. It has one child for
+/// each literal word and one child for each word with placeholders.
 ///
 pub opaque type StepTrieNode(handler) {
   StepTrieNode(
     /// Handlers at this node, keyed by phase (one handler for each phase)
     handlers: Dict(StepPhase, handler),
-    /// Child nodes for literal words (exact matches, highest priority)
+    /// Child nodes for words without placeholders, keyed by the word
     literal_children: Dict(String, StepTrieNode(handler)),
-    /// Child node for {string} parameter
-    string_child: Option(StepTrieNode(handler)),
-    /// Child node for {int} parameter
-    int_child: Option(StepTrieNode(handler)),
-    /// Child node for {float} parameter
-    float_child: Option(StepTrieNode(handler)),
-    /// Child node for {word} parameter
-    word_child: Option(StepTrieNode(handler)),
-    /// Child node for {} anonymous parameter (lowest priority)
-    any_child: Option(StepTrieNode(handler)),
+    /// Child nodes for words with placeholders, in priority order
+    pattern_children: List(#(List(StepSegment), StepTrieNode(handler))),
   )
 }
 
@@ -129,11 +146,7 @@ fn empty_node() -> StepTrieNode(handler) {
   StepTrieNode(
     handlers: dict.new(),
     literal_children: dict.new(),
-    string_child: None,
-    int_child: None,
-    float_child: None,
-    word_child: None,
-    any_child: None,
+    pattern_children: [],
   )
 }
 
@@ -141,10 +154,11 @@ fn empty_node() -> StepTrieNode(handler) {
 // Step Trie
 // ============================================================================
 
-/// Radix trie for fast step lookup.
+/// Trie for fast step lookup.
 ///
 /// The trie is the main data structure holding all step definitions.
-/// Patterns are organized by word segments for efficient O(words) lookup.
+/// Patterns are organized by word, so lookup follows the words of the step
+/// text.
 ///
 pub opaque type StepTrie(handler) {
   StepTrie(root: StepTrieNode(handler))
@@ -225,8 +239,8 @@ pub fn insert(
   pattern pattern: String,
   handler handler: handler,
 ) -> Result(StepTrie(handler), String) {
-  let segments = parse_step_pattern(pattern)
-  case insert_into_node(trie.root, phase, segments, handler) {
+  let words = parse_step_pattern(pattern)
+  case insert_into_node(trie.root, phase, words, handler) {
     Ok(updated_root) -> Ok(StepTrie(root: updated_root))
     Error(Nil) -> Error(duplicate_definition_message(phase, pattern))
   }
@@ -243,18 +257,15 @@ fn duplicate_definition_message(phase: StepPhase, pattern: String) -> String {
 fn insert_into_node(
   node: StepTrieNode(handler),
   phase: StepPhase,
-  segments: List(StepSegment),
+  words: List(List(StepSegment)),
   handler: handler,
 ) -> Result(StepTrieNode(handler), Nil) {
-  case segments {
+  case words {
     [] -> insert_handler_at_node(node, phase, handler)
-    [LiteralWord(word), ..rest] ->
-      insert_literal_segment(node, word, phase, rest, handler)
-    [IntParam, ..rest] -> insert_int_segment(node, phase, rest, handler)
-    [FloatParam, ..rest] -> insert_float_segment(node, phase, rest, handler)
-    [StringParam, ..rest] -> insert_string_segment(node, phase, rest, handler)
-    [WordParam, ..rest] -> insert_word_segment(node, phase, rest, handler)
-    [AnyParam, ..rest] -> insert_any_segment(node, phase, rest, handler)
+    [[LiteralText(word)], ..rest] ->
+      insert_literal_word(node, word, phase, rest, handler)
+    [segments, ..rest] ->
+      insert_pattern_word(node, segments, phase, rest, handler)
   }
 }
 
@@ -277,14 +288,14 @@ fn insert_handler_at_node(
   }
 }
 
-fn insert_literal_segment(
+fn insert_literal_word(
   node: StepTrieNode(handler),
   word: String,
   phase: StepPhase,
-  rest: List(StepSegment),
+  rest: List(List(StepSegment)),
   handler: handler,
 ) -> Result(StepTrieNode(handler), Nil) {
-  let child = get_or_create_literal_child(node, word)
+  let child = existing_or_empty(dict.get(node.literal_children, word))
   case insert_into_node(child, phase, rest, handler) {
     Ok(updated_child) ->
       Ok(
@@ -301,83 +312,86 @@ fn insert_literal_segment(
   }
 }
 
-fn insert_int_segment(
+fn insert_pattern_word(
   node: StepTrieNode(handler),
+  segments: List(StepSegment),
   phase: StepPhase,
-  rest: List(StepSegment),
+  rest: List(List(StepSegment)),
   handler: handler,
 ) -> Result(StepTrieNode(handler), Nil) {
-  let child = option.unwrap(node.int_child, empty_node())
+  let child = existing_or_empty(list.key_find(node.pattern_children, segments))
   case insert_into_node(child, phase, rest, handler) {
     Ok(updated_child) ->
-      Ok(StepTrieNode(..node, int_child: Some(updated_child)))
+      Ok(
+        StepTrieNode(
+          ..node,
+          pattern_children: node.pattern_children
+            |> list.key_set(segments, updated_child)
+            |> list.sort(compare_pattern_children),
+        ),
+      )
     Error(Nil) -> Error(Nil)
   }
 }
 
-fn insert_float_segment(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  rest: List(StepSegment),
-  handler: handler,
-) -> Result(StepTrieNode(handler), Nil) {
-  let child = option.unwrap(node.float_child, empty_node())
-  case insert_into_node(child, phase, rest, handler) {
-    Ok(updated_child) ->
-      Ok(StepTrieNode(..node, float_child: Some(updated_child)))
-    Error(Nil) -> Error(Nil)
-  }
-}
-
-fn insert_string_segment(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  rest: List(StepSegment),
-  handler: handler,
-) -> Result(StepTrieNode(handler), Nil) {
-  let child = option.unwrap(node.string_child, empty_node())
-  case insert_into_node(child, phase, rest, handler) {
-    Ok(updated_child) ->
-      Ok(StepTrieNode(..node, string_child: Some(updated_child)))
-    Error(Nil) -> Error(Nil)
-  }
-}
-
-fn insert_word_segment(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  rest: List(StepSegment),
-  handler: handler,
-) -> Result(StepTrieNode(handler), Nil) {
-  let child = option.unwrap(node.word_child, empty_node())
-  case insert_into_node(child, phase, rest, handler) {
-    Ok(updated_child) ->
-      Ok(StepTrieNode(..node, word_child: Some(updated_child)))
-    Error(Nil) -> Error(Nil)
-  }
-}
-
-fn insert_any_segment(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  rest: List(StepSegment),
-  handler: handler,
-) -> Result(StepTrieNode(handler), Nil) {
-  let child = option.unwrap(node.any_child, empty_node())
-  case insert_into_node(child, phase, rest, handler) {
-    Ok(updated_child) ->
-      Ok(StepTrieNode(..node, any_child: Some(updated_child)))
-    Error(Nil) -> Error(Nil)
-  }
-}
-
-fn get_or_create_literal_child(
-  node: StepTrieNode(handler),
-  word: String,
+fn existing_or_empty(
+  found: Result(StepTrieNode(handler), Nil),
 ) -> StepTrieNode(handler) {
-  case dict.get(node.literal_children, word) {
+  case found {
     Ok(existing) -> existing
-    Error(_) -> empty_node()
+    Error(Nil) -> empty_node()
+  }
+}
+
+/// Order two pattern children by priority. The child that lookup tries first
+/// is `Lt`.
+fn compare_pattern_children(
+  left: #(List(StepSegment), StepTrieNode(handler)),
+  right: #(List(StepSegment), StepTrieNode(handler)),
+) -> Order {
+  int.compare(list.length(right.0), list.length(left.0))
+  |> order.break_tie(compare_segment_lists(left.0, right.0))
+}
+
+/// Compare two segment lists of the same length from left to right.
+fn compare_segment_lists(
+  left: List(StepSegment),
+  right: List(StepSegment),
+) -> Order {
+  case left, right {
+    [left_first, ..left_rest], [right_first, ..right_rest] ->
+      compare_segments(left_first, right_first)
+      |> order.break_tie(compare_segment_lists(left_rest, right_rest))
+    _, _ -> order.Eq
+  }
+}
+
+fn compare_segments(left: StepSegment, right: StepSegment) -> Order {
+  let left_text = literal_text(left)
+  let right_text = literal_text(right)
+  int.compare(segment_rank(left), segment_rank(right))
+  |> order.break_tie(int.compare(
+    string.length(right_text),
+    string.length(left_text),
+  ))
+  |> order.break_tie(string.compare(left_text, right_text))
+}
+
+fn segment_rank(segment: StepSegment) -> Int {
+  case segment {
+    LiteralText(_) -> 0
+    StringParam -> 1
+    IntParam -> 2
+    FloatParam -> 3
+    WordParam -> 4
+    AnyParam -> 5
+  }
+}
+
+fn literal_text(segment: StepSegment) -> String {
+  case segment {
+    LiteralText(text) -> text
+    _ -> ""
   }
 }
 
@@ -385,11 +399,12 @@ fn get_or_create_literal_child(
 // Pattern Parsing
 // ============================================================================
 
-/// Parse a step pattern string into segments.
+/// Parse a step pattern string into words of segments.
 ///
-/// Splits the pattern by whitespace and converts each token into a `StepSegment`.
-/// Placeholders like `{int}` become typed parameter segments, while other tokens
-/// become literal word segments.
+/// Splits the pattern into words with `tokenize_step_text`, the same function
+/// that splits step text. Then it splits each word into segments.
+/// Placeholders like `{int}` become typed parameter segments. The text around
+/// them becomes `LiteralText` segments.
 ///
 /// ## Placeholder Syntax
 ///
@@ -397,18 +412,19 @@ fn get_or_create_literal_child(
 /// |-------------|--------------|---------|
 /// | `{int}` | `IntParam` | Integers like `42`, `-5` |
 /// | `{float}` | `FloatParam` | Decimals like `3.14` |
-/// | `{string}` | `StringParam` | Quoted strings like `"hello"` |
-/// | `{word}` | `WordParam` | Single unquoted words |
-/// | `{}` | `AnyParam` | Any single token |
+/// | `{string}` | `StringParam` | Double-quoted strings like `"hello"` |
+/// | `{word}` | `WordParam` | A run of characters with no space |
+/// | `{}` | `AnyParam` | Any text in one word |
+///
+/// Other text in braces, such as `{name}`, is literal text.
 ///
 /// ## Prefix and Suffix Handling
 ///
-/// Placeholders can have literal prefixes and/or suffixes attached. The parser
-/// automatically splits these into separate segments:
+/// A placeholder can have literal text before or after it in the same word:
 ///
-/// - `${float}` → `[LiteralWord("$"), FloatParam]`
-/// - `{int}%` → `[IntParam, LiteralWord("%")]`
-/// - `${float}USD` → `[LiteralWord("$"), FloatParam, LiteralWord("USD")]`
+/// - `${float}` → `[LiteralText("$"), FloatParam]`
+/// - `{int}%` → `[IntParam, LiteralText("%")]`
+/// - `${float}USD` → `[LiteralText("$"), FloatParam, LiteralText("USD")]`
 ///
 /// This enables patterns like `"the price is ${float}"` to match text like
 /// `"the price is $19.99"` and capture `19.99` as the float value.
@@ -419,186 +435,73 @@ fn get_or_create_literal_child(
 ///       step_trie.parse_step_pattern("the total is ${float}USD")
 ///       |> should
 ///       |> be_equal([
-///         step_trie.LiteralWord("the"),
-///         step_trie.LiteralWord("total"),
-///         step_trie.LiteralWord("is"),
-///         step_trie.LiteralWord("$"),
-///         step_trie.FloatParam,
-///         step_trie.LiteralWord("USD"),
+///         [step_trie.LiteralText("the")],
+///         [step_trie.LiteralText("total")],
+///         [step_trie.LiteralText("is")],
+///         [
+///           step_trie.LiteralText("$"),
+///           step_trie.FloatParam,
+///           step_trie.LiteralText("USD"),
+///         ],
 ///       ])
 ///       |> or_fail_with(
 ///         "expected ${float}USD to split into literal + FloatParam segments",
 ///       )
 /// ```
 ///
-pub fn parse_step_pattern(pattern pattern: String) -> List(StepSegment) {
+pub fn parse_step_pattern(pattern pattern: String) -> List(List(StepSegment)) {
   pattern
-  |> string.split(" ")
-  |> list.filter(is_non_empty)
-  |> list.flat_map(split_word_around_placeholder)
+  |> tokenize_step_text
   |> list.map(parse_pattern_word)
 }
 
-fn is_non_empty(word: String) -> Bool {
-  word != ""
+fn parse_pattern_word(word: String) -> List(StepSegment) {
+  parse_segments(word, "", [])
+  |> list.reverse
 }
 
-fn parse_pattern_word(word: String) -> StepSegment {
-  case word {
-    "{int}" -> IntParam
-    "{float}" -> FloatParam
-    "{string}" -> StringParam
-    "{word}" -> WordParam
-    "{}" -> AnyParam
-    _ -> LiteralWord(word)
-  }
-}
-
-/// Split a word around any placeholder it contains.
-/// e.g., "${float}" -> ["$", "{float}"]
-/// e.g., "{int}%" -> ["{int}", "%"]
-/// e.g., "hello" -> ["hello"]
-fn split_word_around_placeholder(word: String) -> List(String) {
-  let placeholders = ["{int}", "{float}", "{string}", "{word}", "{}"]
-  split_on_first_placeholder(word, placeholders)
-}
-
-fn split_on_first_placeholder(
-  word: String,
-  placeholders: List(String),
-) -> List(String) {
-  case placeholders {
-    [] -> [word]
-    [placeholder, ..rest] ->
-      case try_split_on_placeholder(word, placeholder) {
-        Some(parts) -> parts
-        None -> split_on_first_placeholder(word, rest)
-      }
-  }
-}
-
-fn try_split_on_placeholder(
-  word: String,
-  placeholder: String,
-) -> Option(List(String)) {
-  case string.split_once(word, placeholder) {
+/// Walk a pattern word. `literal` holds the literal text since the last
+/// placeholder. `segments` holds the finished segments in reverse order.
+fn parse_segments(
+  remaining: String,
+  literal: String,
+  segments: List(StepSegment),
+) -> List(StepSegment) {
+  case string.split_once(remaining, "{") {
     Ok(#(before, after)) ->
-      Some(append_placeholder_parts(before, placeholder, after))
-    Error(_) -> None
+      parse_placeholder(after, literal <> before, segments)
+    Error(Nil) -> add_literal(segments, literal <> remaining)
   }
 }
 
-fn append_placeholder_parts(
-  before: String,
-  placeholder: String,
+/// `after` is the text after a `{`.
+fn parse_placeholder(
   after: String,
-) -> List(String) {
-  []
-  |> append_if_non_empty(before)
-  |> list.append([placeholder])
-  |> append_list(split_after(after))
-}
-
-fn append_if_non_empty(parts: List(String), value: String) -> List(String) {
-  case value {
-    "" -> parts
-    _ -> list.append(parts, [value])
-  }
-}
-
-fn split_after(after: String) -> List(String) {
+  literal: String,
+  segments: List(StepSegment),
+) -> List(StepSegment) {
   case after {
-    "" -> []
-    _ -> split_word_around_placeholder(after)
+    "int}" <> rest ->
+      parse_segments(rest, "", [IntParam, ..add_literal(segments, literal)])
+    "float}" <> rest ->
+      parse_segments(rest, "", [FloatParam, ..add_literal(segments, literal)])
+    "string}" <> rest ->
+      parse_segments(rest, "", [StringParam, ..add_literal(segments, literal)])
+    "word}" <> rest ->
+      parse_segments(rest, "", [WordParam, ..add_literal(segments, literal)])
+    "}" <> rest ->
+      parse_segments(rest, "", [AnyParam, ..add_literal(segments, literal)])
+    _ -> parse_segments(after, literal <> "{", segments)
   }
 }
 
-fn append_list(parts: List(String), extra: List(String)) -> List(String) {
-  list.append(parts, extra)
-}
-
-/// Split a token on boundaries between numeric and non-numeric characters.
-/// e.g., "$3.00" -> ["$", "3.00"]
-/// e.g., "10%" -> ["10", "%"]
-/// e.g., "hello" -> ["hello"]
-/// Quoted strings are not split.
-///
-/// A number is an optional `-`, one or more digits, then an optional `.`
-/// and zero or more digits. The first number that starts at a position
-/// takes as many characters as it can.
-fn split_numeric_boundaries(token: String) -> List(String) {
-  case is_quoted_string(token) {
-    True -> [token]
-    False -> split_numbers(string.to_graphemes(token), "", [])
-  }
-}
-
-/// A number read from the start of a list of graphemes, and the graphemes
-/// after it.
-type NumberRead {
-  NumberRead(number: String, rest: List(String))
-}
-
-/// Walk the graphemes. `text` holds the non-numeric characters since the
-/// last number. `parts` holds the finished parts in reverse order.
-fn split_numbers(
-  graphemes: List(String),
-  text: String,
-  parts: List(String),
-) -> List(String) {
-  case graphemes {
-    [] -> finalize_tokens(parts, text)
-    [first, ..rest] -> split_at_grapheme(first, rest, text, parts)
-  }
-}
-
-fn split_at_grapheme(
-  first: String,
-  rest: List(String),
-  text: String,
-  parts: List(String),
-) -> List(String) {
-  case read_number(first, rest) {
-    Some(NumberRead(number: number, rest: after)) ->
-      split_numbers(after, "", [number, ..add_token_if_non_empty(parts, text)])
-    None -> split_numbers(rest, text <> first, parts)
-  }
-}
-
-fn read_number(first: String, rest: List(String)) -> Option(NumberRead) {
-  case first, rest {
-    "-", [second, ..after] -> read_integer_part("-", second, after)
-    _, _ -> read_integer_part("", first, rest)
-  }
-}
-
-fn read_integer_part(
-  sign: String,
-  first: String,
-  rest: List(String),
-) -> Option(NumberRead) {
-  case is_digit(first) {
-    True -> Some(read_fraction(take_digits(rest, sign <> first)))
-    False -> None
-  }
-}
-
-fn read_fraction(integer_part: NumberRead) -> NumberRead {
-  case integer_part.rest {
-    [".", ..after] -> take_digits(after, integer_part.number <> ".")
-    _ -> integer_part
-  }
-}
-
-fn take_digits(graphemes: List(String), collected: String) -> NumberRead {
-  let #(digits, rest) = list.split_while(graphemes, is_digit)
-  NumberRead(number: collected <> string.concat(digits), rest: rest)
-}
-
-fn is_digit(grapheme: String) -> Bool {
-  case grapheme {
-    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
-    _ -> False
+fn add_literal(
+  segments: List(StepSegment),
+  literal: String,
+) -> List(StepSegment) {
+  case literal {
+    "" -> segments
+    _ -> [LiteralText(literal), ..segments]
   }
 }
 
@@ -609,10 +512,12 @@ fn is_digit(grapheme: String) -> Bool {
 /// Look up a step in the trie.
 ///
 /// Searches for a handler of the given phase that matches the step text.
-/// Only handlers of that phase match.
-/// Returns the matched handler and captured values, or None if no match.
+/// Only handlers of that phase match. If more than one pattern matches,
+/// lookup takes the one with the highest priority (see the module
+/// documentation).
 ///
-/// Lookup is O(word count) - independent of total step definitions.
+/// Lookup follows the words of the step text through the trie. It goes back
+/// and tries another branch only when a branch does not match.
 ///
 /// ## Parameters
 ///
@@ -649,47 +554,28 @@ pub fn lookup(
   lookup_in_node(trie.root, phase, words, [])
 }
 
-/// Tokenize step text for matching.
+/// Split step text, or a step pattern, into words.
 ///
-/// Prepares step text for trie lookup by splitting it into tokens that align
-/// with how patterns are parsed. This enables matching patterns with prefixed
-/// or suffixed placeholders.
+/// `lookup` uses this function for step text and `parse_step_pattern` uses it
+/// for patterns, so both are split in the same way.
 ///
-/// ## Tokenization Rules
+/// ## Rules
 ///
-/// 1. **Whitespace splitting**: Text is split on spaces
-/// 2. **Quote preservation**: Quoted strings like `"Red Widget"` stay as one token
-/// 3. **Numeric boundary splitting**: Tokens are split at boundaries between
-///    numeric and non-numeric characters
-///
-/// The numeric boundary splitting is key for prefix/suffix support. When a
-/// pattern like `${float}` is parsed, it becomes `["$", "{float}"]`. For
-/// matching to work, the text `$19.99` must also become `["$", "19.99"]`.
+/// 1. A space ends a word. Two or more spaces do not make an empty word.
+/// 2. A double-quoted run, such as `"Red Widget"`, stays in one word with its
+///    spaces and quotes.
 ///
 /// ## Example
 ///
 /// ```gleam
 ///       step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
 ///       |> should
-///       |> be_equal([
-///         "I",
-///         "add",
-///         "\"Red Widget\"",
-///         "and",
-///         "pay",
-///         "$",
-///         "19.99",
-///         "USD",
-///       ])
-///       |> or_fail_with(
-///         "expected tokenization to preserve quotes and split $19.99USD",
-///       )
+///       |> be_equal(["I", "add", "\"Red Widget\"", "and", "pay", "$19.99USD"])
+///       |> or_fail_with("expected tokenization to keep the quoted run")
 /// ```
 ///
 pub fn tokenize_step_text(text text: String) -> List(String) {
-  text
-  |> tokenize_preserving_quotes([], "", False)
-  |> list.flat_map(split_numeric_boundaries)
+  tokenize_preserving_quotes(text, [], "", False)
 }
 
 fn tokenize_preserving_quotes(
@@ -759,16 +645,18 @@ fn lookup_handler_at_node(
   }
 }
 
-/// Match a single word against the node's children.
-///
-/// Priority order:
-/// 1. Literal match (exact word)
-/// 2. {string} (quoted string)
-/// 3. {int} (integer)
-/// 4. {float} (decimal)
-/// 5. {word} (unquoted single word)
-/// 6. {} (any word)
-///
+/// The state of a lookup at one word of the step text.
+type WordLookup {
+  WordLookup(
+    phase: StepPhase,
+    word: String,
+    rest: List(String),
+    captures: List(CapturedValue),
+  )
+}
+
+/// Match one word: first the literal child, then the pattern children in
+/// priority order.
 fn lookup_word(
   node: StepTrieNode(handler),
   phase: StepPhase,
@@ -776,144 +664,210 @@ fn lookup_word(
   rest: List(String),
   captures: List(CapturedValue),
 ) -> Option(StepMatch(handler)) {
-  // 1. Try literal match first (highest priority)
+  let search =
+    WordLookup(phase: phase, word: word, rest: rest, captures: captures)
   case dict.get(node.literal_children, word) {
-    Ok(child) -> lookup_in_node(child, phase, rest, captures)
-    Error(_) -> try_param_matches(node, phase, word, rest, captures)
+    Ok(child) -> lookup_after_literal_word(child, node, search)
+    Error(Nil) -> lookup_pattern_children(node.pattern_children, search)
   }
 }
 
-fn try_param_matches(
+fn lookup_after_literal_word(
+  child: StepTrieNode(handler),
   node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
-  captures: List(CapturedValue),
+  search: WordLookup,
 ) -> Option(StepMatch(handler)) {
-  // 2. Try {string} (quoted)
-  case try_string_match(node, phase, word, rest, captures) {
-    Some(result) -> Some(result)
-    None -> try_numeric_matches(node, phase, word, rest, captures)
+  case lookup_in_node(child, search.phase, search.rest, search.captures) {
+    Some(found) -> Some(found)
+    None -> lookup_pattern_children(node.pattern_children, search)
   }
 }
 
-fn try_string_match(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
-  captures: List(CapturedValue),
+fn lookup_pattern_children(
+  children: List(#(List(StepSegment), StepTrieNode(handler))),
+  search: WordLookup,
 ) -> Option(StepMatch(handler)) {
-  case node.string_child, is_quoted_string(word) {
-    Some(child), True -> {
-      let unquoted = unquote_string(word)
-      let updated_captures = [CapturedString(unquoted), ..captures]
-      lookup_in_node(child, phase, rest, updated_captures)
-    }
-    _, _ -> None
+  case children {
+    [] -> None
+    [#(segments, child), ..others] ->
+      lookup_pattern_child(segments, child, others, search)
   }
 }
 
-fn try_numeric_matches(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
-  captures: List(CapturedValue),
+fn lookup_pattern_child(
+  segments: List(StepSegment),
+  child: StepTrieNode(handler),
+  others: List(#(List(StepSegment), StepTrieNode(handler))),
+  search: WordLookup,
 ) -> Option(StepMatch(handler)) {
-  // 3. Try {int}
-  case try_int_match(node, phase, word, rest, captures) {
-    Some(result) -> Some(result)
-    None -> try_float_then_word(node, phase, word, rest, captures)
+  case match_segments(segments, search.word, search.captures) {
+    Some(captures) -> lookup_after_pattern_word(child, captures, others, search)
+    None -> lookup_pattern_children(others, search)
   }
 }
 
-fn try_int_match(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
+fn lookup_after_pattern_word(
+  child: StepTrieNode(handler),
   captures: List(CapturedValue),
+  others: List(#(List(StepSegment), StepTrieNode(handler))),
+  search: WordLookup,
 ) -> Option(StepMatch(handler)) {
-  case node.int_child, int.parse(word) {
-    Some(child), Ok(value) -> {
-      let updated_captures = [CapturedInt(value), ..captures]
-      lookup_in_node(child, phase, rest, updated_captures)
-    }
-    _, _ -> None
+  case lookup_in_node(child, search.phase, search.rest, captures) {
+    Some(found) -> Some(found)
+    None -> lookup_pattern_children(others, search)
   }
 }
 
-fn try_float_then_word(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
+// ============================================================================
+// Word Matching
+// ============================================================================
+
+/// Match the segments of one pattern word against one word of step text.
+/// Returns the captures with the new values in front.
+fn match_segments(
+  segments: List(StepSegment),
+  text: String,
   captures: List(CapturedValue),
-) -> Option(StepMatch(handler)) {
-  // 4. Try {float}
-  case try_float_match(node, phase, word, rest, captures) {
-    Some(result) -> Some(result)
-    None -> try_word_matches(node, phase, word, rest, captures)
+) -> Option(List(CapturedValue)) {
+  case segments {
+    [] -> match_end(text, captures)
+    [LiteralText(literal), ..rest] ->
+      match_literal(literal, rest, text, captures)
+    [IntParam, ..rest] ->
+      match_placeholder(
+        PlaceholderMatch(capture_int, rest, text, captures),
+        string.length(text),
+      )
+    [FloatParam, ..rest] ->
+      match_placeholder(
+        PlaceholderMatch(capture_float, rest, text, captures),
+        string.length(text),
+      )
+    [StringParam, ..rest] ->
+      match_placeholder(
+        PlaceholderMatch(capture_string, rest, text, captures),
+        string.length(text),
+      )
+    [WordParam, ..rest] ->
+      match_placeholder(
+        PlaceholderMatch(capture_word, rest, text, captures),
+        string.length(text),
+      )
+    [AnyParam, ..rest] ->
+      match_placeholder(
+        PlaceholderMatch(capture_any, rest, text, captures),
+        string.length(text),
+      )
   }
 }
 
-fn try_float_match(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
+fn match_end(
+  text: String,
   captures: List(CapturedValue),
-) -> Option(StepMatch(handler)) {
-  case node.float_child, float.parse(word) {
-    Some(child), Ok(value) -> {
-      let updated_captures = [CapturedFloat(value), ..captures]
-      lookup_in_node(child, phase, rest, updated_captures)
-    }
-    _, _ -> None
+) -> Option(List(CapturedValue)) {
+  case text {
+    "" -> Some(captures)
+    _ -> None
   }
 }
 
-fn try_word_matches(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
+fn match_literal(
+  literal: String,
+  rest: List(StepSegment),
+  text: String,
   captures: List(CapturedValue),
-) -> Option(StepMatch(handler)) {
-  // 5. Try {word}
-  case node.word_child {
-    Some(child) -> {
-      let updated_captures = [CapturedWord(word), ..captures]
-      lookup_in_node(child, phase, rest, updated_captures)
-    }
-    None -> try_any_match(node, phase, word, rest, captures)
+) -> Option(List(CapturedValue)) {
+  case string.starts_with(text, literal) {
+    True ->
+      match_segments(
+        rest,
+        string.drop_start(text, string.length(literal)),
+        captures,
+      )
+    False -> None
   }
 }
 
-fn try_any_match(
-  node: StepTrieNode(handler),
-  phase: StepPhase,
-  word: String,
-  rest: List(String),
-  captures: List(CapturedValue),
-) -> Option(StepMatch(handler)) {
-  // 6. Try {} (any)
-  case node.any_child {
-    Some(child) -> {
-      let updated_captures = [CapturedWord(word), ..captures]
-      lookup_in_node(child, phase, rest, updated_captures)
-    }
-    None -> None
+/// A placeholder at the start of `text`, followed by the `rest` segments.
+type PlaceholderMatch {
+  PlaceholderMatch(
+    capture: fn(String) -> Result(CapturedValue, Nil),
+    rest: List(StepSegment),
+    text: String,
+    captures: List(CapturedValue),
+  )
+}
+
+/// Try the placeholder on the first `length` characters of the text, then on
+/// fewer. The placeholder takes the longest text that lets the rest of the
+/// word match.
+fn match_placeholder(
+  attempt: PlaceholderMatch,
+  length: Int,
+) -> Option(List(CapturedValue)) {
+  case length {
+    0 -> None
+    _ -> match_placeholder_length(attempt, length)
   }
 }
 
-fn is_quoted_string(word: String) -> Bool {
-  string.starts_with(word, "\"") && string.ends_with(word, "\"")
+fn match_placeholder_length(
+  attempt: PlaceholderMatch,
+  length: Int,
+) -> Option(List(CapturedValue)) {
+  case attempt.capture(string.slice(attempt.text, 0, length)) {
+    Ok(value) -> match_after_placeholder(attempt, length, value)
+    Error(Nil) -> match_placeholder(attempt, length - 1)
+  }
 }
 
-fn unquote_string(quoted: String) -> String {
-  quoted
-  |> string.drop_start(1)
-  |> string.drop_end(1)
+fn match_after_placeholder(
+  attempt: PlaceholderMatch,
+  length: Int,
+  value: CapturedValue,
+) -> Option(List(CapturedValue)) {
+  let after = string.drop_start(attempt.text, length)
+  case match_segments(attempt.rest, after, [value, ..attempt.captures]) {
+    Some(captures) -> Some(captures)
+    None -> match_placeholder(attempt, length - 1)
+  }
+}
+
+fn capture_int(text: String) -> Result(CapturedValue, Nil) {
+  case int.parse(text) {
+    Ok(value) -> Ok(CapturedInt(value))
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+fn capture_float(text: String) -> Result(CapturedValue, Nil) {
+  case float.parse(text) {
+    Ok(value) -> Ok(CapturedFloat(value))
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+/// A double quote, any text without a double quote, and a double quote.
+fn capture_string(text: String) -> Result(CapturedValue, Nil) {
+  let inner = text |> string.drop_start(1) |> string.drop_end(1)
+  let quoted =
+    string.length(text) >= 2
+    && string.starts_with(text, "\"")
+    && string.ends_with(text, "\"")
+    && !string.contains(inner, "\"")
+  case quoted {
+    True -> Ok(CapturedString(inner))
+    False -> Error(Nil)
+  }
+}
+
+fn capture_word(text: String) -> Result(CapturedValue, Nil) {
+  case string.contains(text, " ") {
+    True -> Error(Nil)
+    False -> Ok(CapturedWord(text))
+  }
+}
+
+fn capture_any(text: String) -> Result(CapturedValue, Nil) {
+  Ok(CapturedWord(text))
 }

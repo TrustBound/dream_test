@@ -139,6 +139,14 @@ What to notice in this example:
 Placeholders let you capture values from the step text into `context.captures`.
 Typed helpers like `get_int` parse the capture into the right type.
 
+- `{int}`: an integer, such as `42` or `-5`
+- `{float}`: a decimal number, such as `3.14`
+- `{string}`: a double-quoted string, such as `"hello world"`. The capture has no quotes.
+- `{word}`: text with no space, such as `alice` or `user42`
+- `{}`: any text in one word
+
+Step text and patterns are split into words at spaces. A double-quoted run stays in one word. A placeholder can have text before or after it in the same word, such as `${float}USD`. A space in the pattern must be a space in the text. When more than one pattern matches a step, a literal word wins over a placeholder, and `{int}` wins over `{word}`. The module documentation of `dream_test/gherkin/step_trie` gives the full order.
+
 #### Typed placeholders <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_placeholders.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
