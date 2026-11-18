@@ -25,6 +25,7 @@
 //// |> or_fail_with("expected counter to be 2")
 //// ```
 
+import dream_test/timing
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/otp/actor
@@ -389,8 +390,10 @@ pub fn call_actor(
 ///
 /// ## Fields
 ///
-/// - `timeout_ms` - Maximum time to wait before giving up
-/// - `interval_ms` - How often to check the condition
+/// - `timeout_ms` - Maximum time to wait before giving up, on the monotonic
+///   clock. The time that the check takes counts too.
+/// - `interval_ms` - How long to wait between two checks. With 0, the check
+///   runs again at once, and the timeout still applies.
 ///
 /// ## Example
 ///
@@ -507,7 +510,11 @@ pub fn await_ready(
   config config: PollConfig,
   check check: fn() -> Bool,
 ) -> PollResult(Bool) {
-  poll_until_true(config.timeout_ms, config.interval_ms, check)
+  poll_until_true(
+    timing.now_ms() + config.timeout_ms,
+    config.interval_ms,
+    check,
+  )
 }
 
 /// Wait until a function returns Ok.
@@ -543,55 +550,64 @@ pub fn await_some(
   config config: PollConfig,
   check check: fn() -> Result(a, e),
 ) -> PollResult(a) {
-  poll_until_ok(config.timeout_ms, config.interval_ms, check)
+  poll_until_ok(timing.now_ms() + config.timeout_ms, config.interval_ms, check)
 }
 
+/// Check until `check` gives `True` or the monotonic clock reaches
+/// `deadline_ms`. The time in `check` counts toward the timeout.
 fn poll_until_true(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Bool,
 ) -> PollResult(Bool) {
-  case remaining_ms <= 0 {
+  case timing.now_ms() >= deadline_ms {
     True -> TimedOut
-    False -> poll_check_bool(remaining_ms, interval_ms, check)
+    False -> poll_check_bool(deadline_ms, interval_ms, check)
   }
 }
 
 fn poll_check_bool(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Bool,
 ) -> PollResult(Bool) {
   case check() {
     True -> Ready(True)
     False -> {
-      process.sleep(interval_ms)
-      poll_until_true(remaining_ms - interval_ms, interval_ms, check)
+      sleep_before_next_check(deadline_ms, interval_ms)
+      poll_until_true(deadline_ms, interval_ms, check)
     }
   }
 }
 
+/// Check until `check` gives `Ok` or the monotonic clock reaches
+/// `deadline_ms`. The time in `check` counts toward the timeout.
 fn poll_until_ok(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Result(a, e),
 ) -> PollResult(a) {
-  case remaining_ms <= 0 {
+  case timing.now_ms() >= deadline_ms {
     True -> TimedOut
-    False -> poll_check_result(remaining_ms, interval_ms, check)
+    False -> poll_check_result(deadline_ms, interval_ms, check)
   }
 }
 
 fn poll_check_result(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Result(a, e),
 ) -> PollResult(a) {
   case check() {
     Ok(value) -> Ready(value)
     Error(_) -> {
-      process.sleep(interval_ms)
-      poll_until_ok(remaining_ms - interval_ms, interval_ms, check)
+      sleep_before_next_check(deadline_ms, interval_ms)
+      poll_until_ok(deadline_ms, interval_ms, check)
     }
   }
+}
+
+/// Sleep for the interval, but not past the deadline.
+fn sleep_before_next_check(deadline_ms: Int, interval_ms: Int) -> Nil {
+  process.sleep(int.max(0, int.min(interval_ms, deadline_ms - timing.now_ms())))
 }

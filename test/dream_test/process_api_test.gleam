@@ -112,6 +112,36 @@ pub fn tests() {
       }
     }),
 
+    it("await_ready times out with an interval of 0", fn() {
+      dt_process.await_ready(
+        dt_process.PollConfig(timeout_ms: 20, interval_ms: 0),
+        fn() { False },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut with interval_ms: 0")
+    }),
+
+    it("await_some times out with an interval of 0", fn() {
+      dt_process.await_some(
+        dt_process.PollConfig(timeout_ms: 20, interval_ms: 0),
+        fn() { Error(Nil) },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut with interval_ms: 0")
+    }),
+
+    it("await_ready does not call the check with a timeout of 0", fn() {
+      dt_process.await_ready(
+        dt_process.PollConfig(timeout_ms: 0, interval_ms: 10),
+        fn() { True },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut before any check")
+    }),
+
     it("await_ready returns TimedOut when the check never succeeds", fn() {
       let config = dt_process.PollConfig(timeout_ms: 2, interval_ms: 1)
       case dt_process.await_ready(config, fn() { False }) {

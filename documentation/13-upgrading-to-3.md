@@ -1633,6 +1633,10 @@ pub fn tests() {
 }
 ```
 
+### Polling helpers
+
+`process.await_ready` and `process.await_some` measure `timeout_ms` on the monotonic clock. The time that the check takes counts, and `interval_ms: 0` still times out. In 2.x, each loop took `interval_ms` off the timeout, so `interval_ms: 0` waited forever and a slow check waited longer than `timeout_ms`. You do not have to change code, but a slow check can now time out sooner.
+
 ### Removed items
 
 | Removed in 3.0.0 | Use in its place |

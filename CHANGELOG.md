@@ -479,6 +479,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- `process.await_ready` and `process.await_some` measure the timeout on
+  the monotonic clock. `interval_ms: 0` no longer waits forever, and the
+  time in the check counts toward the timeout.
 - `discover.load` gives an error that names the module when `tests()`
   returns a value that is not a test suite. Before, the whole run crashed.
   The error text of a `tests()` that crashes, and of a pattern that cannot
