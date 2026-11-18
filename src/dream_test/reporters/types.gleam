@@ -13,9 +13,11 @@
 pub type BddOutputMode {
   /// Print the full hierarchical results, then repeat failures, then summary.
   BddFull
-  /// Print failures (repeated) and summary only.
+  /// Print failures (repeated), the set-up and tear-down failures, and the
+  /// summary.
   BddFailuresOnly
-  /// Print summary only.
+  /// Print the summary, after the set-up and tear-down failures when there
+  /// are any.
   BddSummaryOnly
 }
 

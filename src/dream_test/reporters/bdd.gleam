@@ -80,7 +80,9 @@ pub fn color(
   }
 }
 
-/// Print only the summary line at the end of the run.
+/// Print only the summary line at the end of the run, after the
+/// `Set-up and tear-down failures:` section when a tear-down hook failed or
+/// a set-up stopped.
 pub fn summary_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -112,7 +114,7 @@ pub fn failures_only(
 ///
 /// The output has the test results, then the failures (full mode), then a
 /// `Set-up and tear-down failures:` section when a tear-down hook failed or
-/// a set-up stopped (full and failures-only modes), then the summary line.
+/// a set-up stopped (all modes), then the summary line.
 pub fn render(
   config config: reporter_types.BddReporterConfig,
   report report: RunReport,
@@ -131,7 +133,8 @@ fn render_bdd_sections(
   let teardown_text = format_teardown_section(color, report)
 
   case mode {
-    reporter_types.BddSummaryOnly -> summary
+    reporter_types.BddSummaryOnly ->
+      summary_with_teardown(teardown_text, summary)
     reporter_types.BddFailuresOnly -> {
       let failures = filter_failures(results, [])
       let failures_text = format_all_results(color, failures, [], "")
@@ -150,6 +153,14 @@ fn render_bdd_sections(
       }
       string.concat([results_text, failures_text, teardown_text, "\n", summary])
     }
+  }
+}
+
+/// The summary line, after the tear-down section when it has text.
+fn summary_with_teardown(teardown_text: String, summary: String) -> String {
+  case teardown_text {
+    "" -> summary
+    _ -> teardown_text <> "\n" <> summary
   }
 }
 
@@ -284,7 +295,10 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
 /// ## Example
 ///
 /// ```gleam
-/// bdd.report([passing_result()], write_bdd_report_to_file)
+/// bdd.report(
+///   types.run_report(tests: [passing_result()], teardown_failures: []),
+///   write_bdd_report_to_file,
+/// )
 ///
 /// use text <- result.try(
 ///   file.read("test/tmp/bdd_report.txt")
@@ -333,15 +347,7 @@ pub fn report(
 ///
 /// A `FormatIncrementalResult` containing the text to print and the new
 /// describe/group path to pass as `previous_path` for the next call.
-pub fn format_incremental(
-  result result: TestResult,
-  previous_path previous_path: List(String),
-) -> FormatIncrementalResult {
-  let text = format_one_result_with_test_indent(False, result, previous_path, 0)
-  let new_path = result.groups
-  FormatIncrementalResult(text: text, new_path: new_path)
-}
-
+///
 /// ## Example
 ///
 /// ```gleam
@@ -355,6 +361,15 @@ pub fn format_incremental(
 /// |> be_equal(["Example Suite"])
 /// |> or_fail_with("expected new_path to be the describe path")
 /// ```
+pub fn format_incremental(
+  result result: TestResult,
+  previous_path previous_path: List(String),
+) -> FormatIncrementalResult {
+  let text = format_one_result_with_test_indent(False, result, previous_path, 0)
+  let new_path = result.groups
+  FormatIncrementalResult(text: text, new_path: new_path)
+}
+
 /// Format a single test result as BDD output, allowing an extra indent level
 /// for the test line.
 ///
@@ -368,6 +383,21 @@ pub fn format_incremental(
 ///
 /// A `FormatIncrementalResult` containing the text to print and the new
 /// describe/group path to pass as `previous_path` for the next call.
+///
+/// ## Example
+///
+/// ```gleam
+/// let result = passing_result()
+/// let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
+///   bdd.format_incremental_with_test_indent(result, [], 0)
+///
+/// text
+/// |> should
+/// |> match_snapshot(
+///   "./test/snapshots/bdd_format_incremental_with_test_indent.snap",
+/// )
+/// |> or_fail_with("expected incremental output snapshot match")
+/// ```
 pub fn format_incremental_with_test_indent(
   result result: TestResult,
   previous_path previous_path: List(String),
@@ -384,20 +414,6 @@ pub fn format_incremental_with_test_indent(
   FormatIncrementalResult(text: text, new_path: new_path)
 }
 
-/// ## Example
-///
-/// ```gleam
-/// let result = passing_result()
-/// let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
-///   bdd.format_incremental_with_test_indent(result, [], 0)
-///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental output snapshot match")
-/// ```
 /// Format a single incremental result as two parts:
 /// - `headers`: any new describe/group lines required for this result
 /// - `test_line`: the test line (and any failure details)
@@ -417,6 +433,22 @@ pub fn format_incremental_with_test_indent(
 /// - `headers`: any new describe/group lines required for this result
 /// - `test_line`: the test line (and any failure details)
 /// - `new_path`: the updated describe/group path to pass as `previous_path` for the next call
+///
+/// ## Example
+///
+/// ```gleam
+/// let result = passing_result()
+/// let text =
+///   bdd.format_incremental_parts_with_test_indent(result, [], 0)
+///   |> incremental_parts_text
+///
+/// text
+/// |> should
+/// |> match_snapshot(
+///   "./test/snapshots/bdd_format_incremental_parts_with_test_indent.snap",
+/// )
+/// |> or_fail_with("expected incremental parts snapshot match")
+/// ```
 pub fn format_incremental_parts_with_test_indent(
   result result: TestResult,
   previous_path previous_path: List(String),
@@ -437,21 +469,6 @@ pub fn format_incremental_parts_with_test_indent(
   )
 }
 
-/// ## Example
-///
-/// ```gleam
-/// let result = passing_result()
-/// let text =
-///   bdd.format_incremental_parts_with_test_indent(result, [], 0)
-///   |> incremental_parts_text
-///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_parts_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental parts snapshot match")
-/// ```
 /// Format only the trailing summary line (no per-test output).
 ///
 /// This gives the same line as `summary.format` from
@@ -468,7 +485,10 @@ pub fn format_incremental_parts_with_test_indent(
 /// ## Example
 ///
 /// ```gleam
-/// let summary = bdd.format_summary_only([passing_result()])
+/// let summary =
+///   bdd.format_summary_only(
+///     types.run_report(tests: [passing_result()], teardown_failures: []),
+///   )
 ///
 /// summary
 /// |> should

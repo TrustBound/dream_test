@@ -456,6 +456,25 @@ pub fn tests() {
         |> or_fail_with("only the summary line")
       }),
 
+      it("writes the tear-down failures in summary_only mode", fn() {
+        bdd.render(
+          config(False, reporter_types.BddSummaryOnly),
+          report_with_cleanup_failure([
+            result_of(["root"], "adds", types.Passed, [], types.Unit),
+          ]),
+        )
+        |> should
+        |> be_equal(
+          "\n"
+          <> "Set-up and tear-down failures:\n"
+          <> "  after_all in root\n"
+          <> "    no cleanup\n"
+          <> "\n"
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+        )
+        |> or_fail_with("summary_only mode should show what failed")
+      }),
+
       it("writes Feature and Scenario for Gherkin results", fn() {
         bdd.render(
           config(False, reporter_types.BddFull),

@@ -445,7 +445,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - **Reporters**
 
   - The BDD and Gherkin reporters show a `Set-up and tear-down failures:`
-    section before the summary, and the summary line adds
+    section before the summary, also in the BDD summary-only mode, and the summary line adds
     `N tear-down failed` for failed tear-down hooks and `N set-up stopped`
     for set-ups whose process stopped. A stopped set-up shows as
     `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`,
