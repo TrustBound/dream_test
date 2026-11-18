@@ -68,7 +68,9 @@ store. This release has breaking changes. Read
   `json.render`, `json.format`, `json.format_pretty`, `json.report`,
   `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report`
   functions return the report.
-- The JSON schema version is `2.0`.
+- The JSON schema version is `2.0`. Its `summary` adds the counts
+  `teardown_failed` (tear-down hooks that failed) and `setup_stopped`
+  (set-ups whose process stopped).
 - The summary line of the BDD and Gherkin reporters lists the extra counts
   in the order skipped, pending, timed out, setup failed.
 - The progress event API is removed: `reporters/types.ReporterEvent`,
@@ -444,7 +446,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
   - The BDD and Gherkin reporters show a `Set-up and tear-down failures:`
     section before the summary, and the summary line adds
-    `N tear-down failed`. A stopped set-up shows as
+    `N tear-down failed` for failed tear-down hooks and `N set-up stopped`
+    for set-ups whose process stopped. A stopped set-up shows as
     `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`,
     then `These tests had not started and were not run:` and the full name
     of each test, for example `root > b`

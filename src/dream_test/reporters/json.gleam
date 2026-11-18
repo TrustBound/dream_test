@@ -10,8 +10,9 @@
 //// - `duration_ms`: total duration (sum of test durations)
 //// - `system`: `os`, `otp_version`, `gleam_version`
 //// - `summary`: counts by status (`total`, `passed`, `failed`, `skipped`,
-////   `pending`, `timed_out`, `setup_failed`), and `teardown_failed`, the
-////   number of tear-down hooks that failed
+////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
+////   number of tear-down hooks that failed, and `setup_stopped`, the number
+////   of set-ups whose process stopped
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
 //// - `teardown_failures`: one object for each tear-down hook that failed
 ////   and each set-up that stopped, in the order that they happened. Each object
@@ -33,7 +34,7 @@
 ////     not run. Each one is its `full_name` list, as in `tests`.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
-//// count and no `teardown_failures` list: a failed tear-down hook was a
+//// or `setup_stopped` count and no `teardown_failures` list: a failed tear-down hook was a
 //// test with a name such as `<after_all>` in `tests`.
 ////
 //// ## Usage
@@ -315,6 +316,7 @@ fn build_summary_json(counts: summary.Counts) -> Json {
     #("timed_out", json.int(counts.timed_out)),
     #("setup_failed", json.int(counts.setup_failed)),
     #("teardown_failed", json.int(counts.teardown_failed)),
+    #("setup_stopped", json.int(counts.setup_stopped)),
   ])
 }
 

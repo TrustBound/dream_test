@@ -18,6 +18,7 @@ pub fn tests() {
         timed_out: 1,
         setup_failed: 1,
         teardown_failed: 0,
+        setup_stopped: 0,
         duration_ms: 21,
       ))
       |> or_fail_with("each status should have a count of 1")
@@ -34,6 +35,7 @@ pub fn tests() {
         timed_out: 0,
         setup_failed: 0,
         teardown_failed: 0,
+        setup_stopped: 0,
         duration_ms: 0,
       ))
       |> or_fail_with("no results should give zero counts")
@@ -79,6 +81,7 @@ pub fn tests() {
         timed_out: 0,
         setup_failed: 0,
         teardown_failed: 1,
+        setup_stopped: 0,
         duration_ms: 5,
       ))
       |> or_fail_with("one tear-down failure should give a count of 1")
@@ -96,6 +99,14 @@ pub fn tests() {
       )
       |> or_fail_with("the line should end with the tear-down failures")
     }),
+    it("format counts failed tear-down hooks and stopped set-ups apart", fn() {
+      summary.format(hook_failed_and_setup_stopped())
+      |> should
+      |> be_equal(
+        "Summary: 0 run, 0 failed, 0 passed, 1 tear-down failed, 1 set-up stopped in 0ms\n",
+      )
+      |> or_fail_with("a stopped set-up should not count as a failed hook")
+    }),
     it("format_in_color shows the tear-down failures in red", fn() {
       summary.format_in_color(report_with_cleanup_failure([]))
       |> should
@@ -104,6 +115,23 @@ pub fn tests() {
       )
       |> or_fail_with("the tear-down count should be red")
     }),
+  ])
+}
+
+/// A report with one failed tear-down hook and one stopped set-up.
+fn hook_failed_and_setup_stopped() -> types.RunReport {
+  types.run_report(tests: [], teardown_failures: [
+    types.TeardownFailure(
+      hook: types.AfterAllHook,
+      groups: ["root"],
+      message: "no cleanup",
+    ),
+    types.SetupStopped(
+      set_up: types.BeforeAllHook,
+      groups: ["root"],
+      reason: "Boom",
+      not_run: [],
+    ),
   ])
 }
 

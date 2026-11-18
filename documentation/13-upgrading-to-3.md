@@ -1179,7 +1179,7 @@ pub fn tests() {
 
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
 
-- `summary` has the count `teardown_failed`.
+- `summary` has the counts `teardown_failed` (tear-down hooks that failed) and `setup_stopped` (set-ups whose process stopped).
 - The object has the list `teardown_failures`. In 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
 - A failed tear-down hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
 - A set-up that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.

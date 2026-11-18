@@ -12,21 +12,22 @@
 //// ```
 ////
 //// The line always has the run, failed and passed counts. It adds the
-//// skipped, pending, timed out, setup failed and tear-down failed counts, in
-//// that order, only when they are not zero.
+//// skipped, pending, timed out, setup failed, tear-down failed and set-up
+//// stopped counts, in that order, only when they are not zero.
 
 import dream_test/reporters/ansi
 import dream_test/timing
 import dream_test/types.{
-  type RunReport, type TestResult, Failed, Passed, Pending, SetupFailed, Skipped,
-  TimedOut,
+  type RunReport, type TeardownFailure, type TestResult, Failed, Passed, Pending,
+  SetupFailed, Skipped, TimedOut,
 }
 import gleam/int
 import gleam/list
 import gleam/string
 
-/// The number of tests with each status, the number of tear-down failures,
-/// and the sum of the test durations.
+/// The number of tests with each status, the number of tear-down hooks that
+/// failed, the number of set-ups that stopped, and the sum of the test
+/// durations.
 ///
 /// `run` is the number of results. The six status counts add up to `run`.
 ///
@@ -38,7 +39,8 @@ import gleam/string
 ///   teardown_failures: [],
 /// ))
 /// // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
-/// //    timed_out: 0, setup_failed: 0, teardown_failed: 0, duration_ms: 0)
+/// //    timed_out: 0, setup_failed: 0, teardown_failed: 0, setup_stopped: 0,
+/// //    duration_ms: 0)
 /// ```
 pub type Counts {
   Counts(
@@ -56,16 +58,21 @@ pub type Counts {
     timed_out: Int,
     /// Results with status `SetupFailed`
     setup_failed: Int,
-    /// Tear-down hooks that failed. They are not test results, so they are
-    /// not part of `run`.
+    /// Tear-down hooks that failed: the `TeardownFailure` entries of
+    /// `types.report_teardown_failures`. They are not test results, so they
+    /// are not part of `run`.
     teardown_failed: Int,
+    /// Set-ups whose process stopped while their tests ran: the
+    /// `SetupStopped` entries of `types.report_teardown_failures`. They are
+    /// not part of `run`.
+    setup_stopped: Int,
     /// Sum of the `duration_ms` of all results
     duration_ms: Int,
   )
 }
 
-/// Count the test results by status, count the tear-down failures, and add
-/// up the test durations.
+/// Count the test results by status, count the tear-down hooks that failed
+/// and the set-ups that stopped, and add up the test durations.
 ///
 /// ## Parameters
 ///
@@ -84,9 +91,10 @@ pub type Counts {
 /// ```
 pub fn count(report report: RunReport) -> Counts {
   let counts = list.fold(types.report_tests(report), empty_counts(), add_result)
-  Counts(
-    ..counts,
-    teardown_failed: list.length(types.report_teardown_failures(report)),
+  list.fold(
+    types.report_teardown_failures(report),
+    counts,
+    add_teardown_failure,
   )
 }
 
@@ -114,8 +122,8 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// The word `Summary:` is bold cyan. The run count and the duration are
 /// cyan, the failed count is red and the passed count is green. The skipped
-/// and pending counts are yellow, the timed out, setup failed and tear-down
-/// failed counts are red, and their labels are dim.
+/// and pending counts are yellow, the timed out, setup failed, tear-down
+/// failed and set-up stopped counts are red, and their labels are dim.
 ///
 /// ## Parameters
 ///
@@ -144,6 +152,7 @@ fn empty_counts() -> Counts {
     timed_out: 0,
     setup_failed: 0,
     teardown_failed: 0,
+    setup_stopped: 0,
     duration_ms: 0,
   )
 }
@@ -162,6 +171,15 @@ fn add_result(counts: Counts, result: TestResult) -> Counts {
     Pending -> Counts(..counts, pending: counts.pending + 1)
     TimedOut -> Counts(..counts, timed_out: counts.timed_out + 1)
     SetupFailed -> Counts(..counts, setup_failed: counts.setup_failed + 1)
+  }
+}
+
+fn add_teardown_failure(counts: Counts, failure: TeardownFailure) -> Counts {
+  case failure {
+    types.TeardownFailure(..) ->
+      Counts(..counts, teardown_failed: counts.teardown_failed + 1)
+    types.SetupStopped(..) ->
+      Counts(..counts, setup_stopped: counts.setup_stopped + 1)
   }
 }
 
@@ -197,6 +215,7 @@ fn format_extra_counts(counts: Counts, color: Bool) -> String {
     ExtraCount(counts.timed_out, " timed out", ansi.red, color),
     ExtraCount(counts.setup_failed, " setup failed", ansi.red, color),
     ExtraCount(counts.teardown_failed, " tear-down failed", ansi.red, color),
+    ExtraCount(counts.setup_stopped, " set-up stopped", ansi.red, color),
   ]
   |> list.filter(is_not_zero)
   |> list.map(format_extra_count)

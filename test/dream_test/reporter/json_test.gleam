@@ -182,7 +182,7 @@ pub fn tests() {
         |> after("\"summary\":")
         |> should
         |> be_equal(
-          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
+          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
         )
         |> or_fail_with("compact JSON should have no spaces or new lines")
       }),
@@ -205,7 +205,8 @@ pub fn tests() {
           <> "    \"pending\": 0,\n"
           <> "    \"timed_out\": 0,\n"
           <> "    \"setup_failed\": 0,\n"
-          <> "    \"teardown_failed\": 0\n"
+          <> "    \"teardown_failed\": 0,\n"
+          <> "    \"setup_stopped\": 0\n"
           <> "  },\n"
           <> "  \"tests\": [\n"
           <> "    {\n"
@@ -242,9 +243,27 @@ pub fn tests() {
         |> between("\"summary\":", ",\"tests\"")
         |> should
         |> be_equal(
-          "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":1}",
+          "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":1,\"setup_stopped\":0}",
         )
         |> or_fail_with("the summary should count the tear-down failures")
+      }),
+
+      it("counts stopped set-ups apart from failed tear-down hooks", fn() {
+        types.run_report(tests: [], teardown_failures: [
+          types.SetupStopped(
+            set_up: types.BeforeAllHook,
+            groups: ["root"],
+            reason: "Boom",
+            not_run: [],
+          ),
+        ])
+        |> json.format
+        |> between("\"summary\":", ",\"tests\"")
+        |> should
+        |> be_equal(
+          "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":1}",
+        )
+        |> or_fail_with("a stopped set-up should have its own count")
       }),
 
       it("writes every tear-down failure after the tests", fn() {
@@ -282,7 +301,7 @@ pub fn tests() {
         |> between("\"summary\":", ",\"tests\"")
         |> should
         |> be_equal(
-          "{\"total\":6,\"passed\":1,\"failed\":1,\"skipped\":1,\"pending\":1,\"timed_out\":1,\"setup_failed\":1,\"teardown_failed\":0}",
+          "{\"total\":6,\"passed\":1,\"failed\":1,\"skipped\":1,\"pending\":1,\"timed_out\":1,\"setup_failed\":1,\"teardown_failed\":0,\"setup_stopped\":0}",
         )
         |> or_fail_with("the summary should count each status")
       }),

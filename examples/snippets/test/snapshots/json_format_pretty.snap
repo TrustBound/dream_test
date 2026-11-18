@@ -15,7 +15,8 @@
     "pending": 0,
     "timed_out": 0,
     "setup_failed": 0,
-    "teardown_failed": 0
+    "teardown_failed": 0,
+    "setup_stopped": 0
   },
   "tests": [
     {
