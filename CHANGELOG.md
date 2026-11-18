@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `types.Callback(input, output)` (`NoInput` and `WithInput`) and
+  `types.call`. A test body or hook in a `Node` keeps the shape that the
+  user wrote: `unit.before_all(setup)` stores
+  `BeforeAll(NoInput(setup))`, and `unit_context.before_all(setup)` stores
+  `BeforeAll(WithInput(setup))`.
 - `types.RunReport`, the result of a run: the test results and the
   tear-down hooks that failed. Make one with `types.run_report(tests:,
   teardown_failures:)`, read it with `types.report_tests` and
@@ -94,6 +99,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- BREAKING (only for code that builds `types.Node` values directly): the
+  `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and
+  `AfterAll` is a `types.Callback`, not a function. Before:
+  `types.BeforeAll(fn(_context) { setup() })`. After:
+  `types.BeforeAll(types.NoInput(setup))`, or
+  `types.BeforeAll(types.WithInput(setup_with_context))`. Code that uses
+  `unit` or `unit_context` does not change.
 - BREAKING: one rule for every hook failure. A failed set-up hook
   (`before_all_suites`, `before_each_suite`, `before_all`, `before_each`,
   `before_each_test`) gives `SetupFailed` to each test that it serves. A

@@ -219,9 +219,59 @@ pub fn tests() {
       |> be_equal(hook)
       |> or_fail_with("with_tags should not change a hook node")
     }),
+
+    it("before_all stores the setup function as the user wrote it", fn() {
+      before_all(setup_ok)
+      |> should
+      |> be_equal(types.BeforeAll(types.NoInput(setup_ok)))
+      |> or_fail_with("before_all should store setup_ok with no adapter")
+    }),
+
+    it("before_each stores the setup function as the user wrote it", fn() {
+      before_each(setup_ok)
+      |> should
+      |> be_equal(types.BeforeEach(types.NoInput(setup_ok)))
+      |> or_fail_with("before_each should store setup_ok with no adapter")
+    }),
+
+    it("after_each stores the teardown function as the user wrote it", fn() {
+      after_each(setup_ok)
+      |> should
+      |> be_equal(types.AfterEach(types.NoInput(setup_ok)))
+      |> or_fail_with("after_each should store setup_ok with no adapter")
+    }),
+
+    it("after_all stores the teardown function as the user wrote it", fn() {
+      after_all(setup_ok)
+      |> should
+      |> be_equal(types.AfterAll(types.NoInput(setup_ok)))
+      |> or_fail_with("after_all should store setup_ok with no adapter")
+    }),
+
+    it("it stores the test body as the user wrote it", fn() {
+      it("body", passing_body)
+      |> should
+      |> be_equal(types.Test(
+        name: "body",
+        tags: [],
+        kind: Unit,
+        run: types.NoInput(passing_body),
+        timeout_ms: None,
+        source: None,
+      ))
+      |> or_fail_with("it should store passing_body with no adapter")
+    }),
   ])
 }
 
 fn statuses(results: List(TestResult)) -> List(Status) {
   list.map(results, fn(result) { result.status })
+}
+
+fn setup_ok() -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn passing_body() -> Result(types.AssertionResult, String) {
+  Ok(AssertionOk)
 }

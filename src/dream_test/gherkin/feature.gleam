@@ -65,7 +65,7 @@ import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
+  AssertionFailure, AssertionOk, GherkinScenario, Group, NoInput, Root, Test,
 }
 import gleam/int
 import gleam/list
@@ -293,7 +293,7 @@ fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
     name: run.name,
     tags: run.tags,
     kind: GherkinScenario(scenario_id),
-    run: fn(_nil: Nil) { execute_scenario(scenario_id, all_steps, registry) },
+    run: NoInput(fn() { execute_scenario(scenario_id, all_steps, registry) }),
     timeout_ms: None,
     source: scope.source,
   )

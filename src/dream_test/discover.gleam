@@ -36,7 +36,7 @@
 
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, Group, Root, Test, Unit,
+  AssertionFailure, Group, NoInput, Root, Test, Unit,
 }
 import gleam/list
 import gleam/option.{None, Some}
@@ -593,13 +593,13 @@ fn error_to_node(error: String) -> Node(Nil) {
     name: "Discovery Error: " <> error,
     tags: ["discovery-error"],
     kind: Unit,
-    run: discovery_error_run,
+    run: NoInput(discovery_error_run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn discovery_error_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn discovery_error_run() -> Result(AssertionResult, String) {
   Ok(discovery_error_assertion())
 }
 

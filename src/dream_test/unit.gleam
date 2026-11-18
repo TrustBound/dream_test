@@ -56,7 +56,7 @@
 
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
 }
 import gleam/option.{None}
 
@@ -253,13 +253,13 @@ pub fn it(
     name: name,
     tags: [],
     kind: Unit,
-    run: fn(_nil: Nil) { run() },
+    run: NoInput(run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn skipped_test_run() -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
 }
 
@@ -340,7 +340,7 @@ pub fn skip(
         name: name,
         tags: tags,
         kind: kind,
-        run: skipped_test_run,
+        run: NoInput(skipped_test_run),
         timeout_ms: timeout_ms,
         source: source,
       )
@@ -434,7 +434,7 @@ pub fn skip(
 ///
 /// A `UnitNode` representing a `before_all` hook.
 pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeAll(fn(_nil: Nil) { setup() })
+  BeforeAll(NoInput(setup))
 }
 
 /// Run before each test in the current scope.
@@ -521,7 +521,7 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing a `before_each` hook.
 pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeEach(fn(_nil: Nil) { setup() })
+  BeforeEach(NoInput(setup))
 }
 
 /// Run after each test in the current scope.
@@ -610,7 +610,7 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_each` hook.
 pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterEach(fn(_nil: Nil) { teardown() })
+  AfterEach(NoInput(teardown))
 }
 
 /// Run once after all tests in the current scope.
@@ -699,7 +699,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_all` hook.
 pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterAll(fn(_nil: Nil) { teardown() })
+  AfterAll(NoInput(teardown))
 }
 
 /// Attach tags to a node.

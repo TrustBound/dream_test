@@ -325,7 +325,7 @@ fn suite_source(sources: List(Option(String))) -> String {
         name: "t" <> string.inspect(index),
         tags: [],
         kind: Unit,
-        run: fn(_nil) { Ok(AssertionOk) },
+        run: types.WithInput(fn(_nil) { Ok(AssertionOk) }),
         timeout_ms: None,
         source: source,
       )

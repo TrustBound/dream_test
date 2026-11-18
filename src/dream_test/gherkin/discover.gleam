@@ -350,13 +350,13 @@ fn error_to_node(failure: ParseFailure) -> Node(Nil) {
     name: "Parse Error: " <> format_parse_failure(failure),
     tags: ["parse-error"],
     kind: Unit,
-    run: parse_error_test_run,
+    run: types.NoInput(parse_error_test_run),
     timeout_ms: None,
     source: Some(failure.path),
   )
 }
 
-fn parse_error_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn parse_error_test_run() -> Result(AssertionResult, String) {
   Ok(parse_error_assertion())
 }
 

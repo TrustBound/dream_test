@@ -386,7 +386,7 @@ pub type SuiteInfo {
 ///     name: "adds",
 ///     tags: [],
 ///     kind: types.Unit,
-///     run: fn(_context) { Ok(types.AssertionOk) },
+///     run: types.WithInput(fn(_context) { Ok(types.AssertionOk) }),
 ///     timeout_ms: None,
 ///     source: None,
 ///   ),
@@ -413,17 +413,77 @@ pub type Node(context) {
     name: String,
     tags: List(String),
     kind: TestKind,
-    run: fn(context) -> Result(AssertionResult, String),
+    run: Callback(context, Result(AssertionResult, String)),
     timeout_ms: Option(Int),
     /// Best-effort origin string for this test (module name or .feature path).
     source: Option(String),
   )
 
   /// Group-scoped hooks.
-  BeforeAll(run: fn(context) -> Result(context, String))
-  BeforeEach(run: fn(context) -> Result(context, String))
-  AfterEach(run: fn(context) -> Result(Nil, String))
-  AfterAll(run: fn(context) -> Result(Nil, String))
+  BeforeAll(run: Callback(context, Result(context, String)))
+  BeforeEach(run: Callback(context, Result(context, String)))
+  AfterEach(run: Callback(context, Result(Nil, String)))
+  AfterAll(run: Callback(context, Result(Nil, String)))
+}
+
+/// A test body or a hook, in the shape that the user wrote it.
+///
+/// `dream_test/unit` stores functions with no argument, as `NoInput`.
+/// `dream_test/unit_context` stores functions that get the context, as
+/// `WithInput`. The runner calls both with `call`, so no adapter function
+/// is needed.
+///
+/// ## Example
+///
+/// ```gleam
+/// fn setup() -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// types.call(types.NoInput(setup), Nil)
+/// |> should
+/// |> be_equal(Ok(Nil))
+/// |> or_fail_with("a NoInput callback should ignore the input")
+/// ```
+pub type Callback(input, output) {
+  /// A function with no argument. The input is not given to it.
+  NoInput(run: fn() -> output)
+  /// A function that gets the input, for example the context.
+  WithInput(run: fn(input) -> output)
+}
+
+/// Call a `Callback` with an input.
+///
+/// ## Parameters
+///
+/// - `callback`: the test body or hook
+/// - `input`: the value that a `WithInput` callback gets. A `NoInput`
+///   callback does not get it.
+///
+/// ## Returns
+///
+/// What the callback returns.
+///
+/// ## Example
+///
+/// ```gleam
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// types.call(types.WithInput(double), 21)
+/// |> should
+/// |> be_equal(42)
+/// |> or_fail_with("a WithInput callback should get the input")
+/// ```
+pub fn call(
+  callback callback: Callback(input, output),
+  input input: input,
+) -> output {
+  case callback {
+    NoInput(run) -> run()
+    WithInput(run) -> run(input)
+  }
 }
 
 /// Compatibility alias: suites are roots in the unified model.

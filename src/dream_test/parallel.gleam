@@ -41,12 +41,13 @@ import dream_test/reporters/progress
 import dream_test/sandbox
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type AssertionResult, type Node, type RunReport,
-  type Status, type TeardownFailure, type TeardownHook, type TestInfo,
-  type TestKind, type TestResult, type TestSuite, AfterAll, AfterAllHook,
-  AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed, AssertionFailure,
-  AssertionOk, AssertionSkipped, BeforeAll, BeforeEach, Failed, Group, Passed,
-  Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
+  type AssertionFailure, type AssertionResult, type Callback, type Node,
+  type RunReport, type Status, type TeardownFailure, type TeardownHook,
+  type TestInfo, type TestKind, type TestResult, type TestSuite, AfterAll,
+  AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed,
+  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeEach, Failed,
+  Group, Passed, Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult,
+  TimedOut,
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
@@ -139,8 +140,8 @@ type ExecuteNodeConfig(context) {
     scope: List(String),
     inherited_tags: List(String),
     context: context,
-    inherited_before_each: List(fn(context) -> Result(context, String)),
-    inherited_after_each: List(fn(context) -> Result(Nil, String)),
+    inherited_before_each: List(Callback(context, Result(context, String))),
+    inherited_after_each: List(Callback(context, Result(Nil, String))),
     runner_before_each_test: List(
       fn(TestInfo, context) -> Result(context, String),
     ),
@@ -202,7 +203,7 @@ type TestCase(context) {
     name: String,
     tags: List(String),
     kind: TestKind,
-    run: fn(context) -> Result(AssertionResult, String),
+    run: Callback(context, Result(AssertionResult, String)),
     timeout_ms: Option(Int),
     source: Option(String),
   )
@@ -219,8 +220,8 @@ type RunParallelLoopConfig(context) {
       fn(TestInfo, context) -> Result(context, String),
     ),
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-    before_each_hooks: List(fn(context) -> Result(context, String)),
-    after_each_hooks: List(fn(context) -> Result(Nil, String)),
+    before_each_hooks: List(Callback(context, Result(context, String))),
+    after_each_hooks: List(Callback(context, Result(Nil, String))),
     failures_rev: List(AssertionFailure),
     pending: List(#(Int, TestCase(context))),
     running: List(RunningWorker(context)),
@@ -245,8 +246,8 @@ type StartWorkersUpToLimitConfig(context) {
       fn(TestInfo, context) -> Result(context, String),
     ),
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-    before_each_hooks: List(fn(context) -> Result(context, String)),
-    after_each_hooks: List(fn(context) -> Result(Nil, String)),
+    before_each_hooks: List(Callback(context, Result(context, String))),
+    after_each_hooks: List(Callback(context, Result(Nil, String))),
     failures_rev: List(AssertionFailure),
     pending: List(#(Int, TestCase(context))),
     running: List(RunningWorker(context)),
@@ -762,10 +763,10 @@ fn fail_group_nodes(
 
 type GroupHooks(context) {
   GroupHooks(
-    before_all: List(fn(context) -> Result(context, String)),
-    before_each: List(fn(context) -> Result(context, String)),
-    after_each: List(fn(context) -> Result(Nil, String)),
-    after_all: List(fn(context) -> Result(Nil, String)),
+    before_all: List(Callback(context, Result(context, String))),
+    before_each: List(Callback(context, Result(context, String))),
+    after_each: List(Callback(context, Result(Nil, String))),
+    after_all: List(Callback(context, Result(Nil, String))),
   )
 }
 
@@ -839,14 +840,14 @@ fn collect_children(
 fn run_before_all_chain(
   scope: List(String),
   context: context,
-  hooks: List(fn(context) -> Result(context, String)),
-  inherited_before_each: List(fn(context) -> Result(context, String)),
-  inherited_after_each: List(fn(context) -> Result(Nil, String)),
+  hooks: List(Callback(context, Result(context, String))),
+  inherited_before_each: List(Callback(context, Result(context, String))),
+  inherited_after_each: List(Callback(context, Result(Nil, String))),
   failures_rev: List(AssertionFailure),
 ) -> #(
   context,
-  List(fn(context) -> Result(context, String)),
-  List(fn(context) -> Result(Nil, String)),
+  List(Callback(context, Result(context, String))),
+  List(Callback(context, Result(Nil, String))),
   List(AssertionFailure),
 ) {
   case hooks {
@@ -886,8 +887,8 @@ fn run_tests_in_group(
     fn(TestInfo, context) -> Result(context, String),
   ),
   runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
+  before_each_hooks: List(Callback(context, Result(context, String))),
+  after_each_hooks: List(Callback(context, Result(Nil, String))),
   tests: List(TestCase(context)),
   failures_rev: List(AssertionFailure),
   progress_output: Option(ProgressOutput),
@@ -942,8 +943,8 @@ fn run_tests_parallel(
     fn(TestInfo, context) -> Result(context, String),
   ),
   runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
+  before_each_hooks: List(Callback(context, Result(context, String))),
+  after_each_hooks: List(Callback(context, Result(Nil, String))),
   tests: List(TestCase(context)),
   failures_rev: List(AssertionFailure),
   progress_output: Option(ProgressOutput),
@@ -1351,8 +1352,8 @@ fn execute_one_test_node(
     fn(TestInfo, context) -> Result(context, String),
   ),
   runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
+  before_each_hooks: List(Callback(context, Result(context, String))),
+  after_each_hooks: List(Callback(context, Result(Nil, String))),
   failures_rev: List(AssertionFailure),
   test_case: TestCase(context),
 ) -> TestOutcome {
@@ -1459,8 +1460,8 @@ fn run_tests_sequentially(
     fn(TestInfo, context) -> Result(context, String),
   ),
   runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
+  before_each_hooks: List(Callback(context, Result(context, String))),
+  after_each_hooks: List(Callback(context, Result(Nil, String))),
   tests: List(TestCase(context)),
   failures_rev: List(AssertionFailure),
   progress_output: Option(ProgressOutput),
@@ -1521,8 +1522,8 @@ fn run_child_groups_sequentially(
     fn(TestInfo, context) -> Result(context, String),
   ),
   runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(fn(context) -> Result(context, String)),
-  after_each_hooks: List(fn(context) -> Result(Nil, String)),
+  before_each_hooks: List(Callback(context, Result(context, String))),
+  after_each_hooks: List(Callback(context, Result(Nil, String))),
   groups: List(Node(context)),
   progress_output: Option(ProgressOutput),
   total: Int,
@@ -1572,7 +1573,7 @@ fn run_child_groups_sequentially(
 fn run_after_all_chain(
   scope: List(String),
   context: context,
-  hooks: List(fn(context) -> Result(Nil, String)),
+  hooks: List(Callback(context, Result(Nil, String))),
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
   case hooks {
@@ -1627,6 +1628,16 @@ fn call_runner_hook(call: RunnerHookCall(context, output)) -> output {
   call.hook(call.info, call.context)
 }
 
+/// A group hook with its input, so that it can run in a sandbox as a
+/// function of one input.
+type HookCall(input, output) {
+  HookCall(hook: Callback(input, output), input: input)
+}
+
+fn call_hook(call: HookCall(input, output)) -> output {
+  types.call(call.hook, call.input)
+}
+
 /// Run one hook with its input in a sandbox. A timeout or a crash becomes
 /// an `Error` that names the scope.
 fn run_hook(
@@ -1657,10 +1668,10 @@ fn run_hook(
 /// So no timeout applies to these hooks.
 fn run_hook_in_process(
   scope: List(String),
-  hook: fn(input) -> Result(output, String),
+  hook: Callback(input, Result(output, String)),
   input: input,
 ) -> Result(output, String) {
-  case sandbox.run_catching(hook, input) {
+  case sandbox.run_catching(call_hook, HookCall(hook: hook, input: input)) {
     Ok(result) -> result
     Error(reason) -> Error(hook_crash_message(scope, reason))
   }
@@ -1674,13 +1685,15 @@ fn run_before_each_list(
   config: ParallelConfig,
   scope: List(String),
   context: context,
-  hooks: List(fn(context) -> Result(context, String)),
+  hooks: List(Callback(context, Result(context, String))),
   failures_rev: List(AssertionFailure),
 ) -> #(context, Status, List(AssertionFailure)) {
   case hooks {
     [] -> #(context, Passed, failures_rev)
     [hook, ..rest] ->
-      case run_hook(config, scope, hook, context) {
+      case
+        run_hook(config, scope, call_hook, HookCall(hook: hook, input: context))
+      {
         Ok(next) ->
           run_before_each_list(config, scope, next, rest, failures_rev)
         Error(message) -> #(context, SetupFailed, [
@@ -1699,7 +1712,7 @@ fn run_after_each_list(
   scope: List(String),
   test_name: List(String),
   context: context,
-  hooks: List(fn(context) -> Result(Nil, String)),
+  hooks: List(Callback(context, Result(Nil, String))),
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
   case hooks {
@@ -1712,7 +1725,12 @@ fn run_after_each_list(
         context,
         rest,
         add_teardown_failure(
-          run_hook(config, scope, hook, context),
+          run_hook(
+            config,
+            scope,
+            call_hook,
+            HookCall(hook: hook, input: context),
+          ),
           AfterEachHook,
           test_name,
           failures_rev,
@@ -1829,7 +1847,7 @@ fn setup_failed_status_and_failures(
 /// A test body with the context that it gets.
 type TestBody(context) {
   TestBody(
-    run: fn(context) -> Result(AssertionResult, String),
+    run: Callback(context, Result(AssertionResult, String)),
     context: context,
   )
 }
@@ -1837,7 +1855,7 @@ type TestBody(context) {
 /// Run a test body with its context. An `Error` from the body is a failed
 /// assertion with the operator `error`.
 fn run_test_body(body: TestBody(context)) -> AssertionResult {
-  case body.run(body.context) {
+  case types.call(body.run, body.context) {
     Ok(result) -> result
     Error(message) -> AssertionFailed(hook_failure("error", message))
   }

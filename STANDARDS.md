@@ -91,11 +91,13 @@ If a function runs another function later, for example in a sandbox, give it the
 Library code may use a closure only in these two cases:
 
 1. **Process start.** The function given to `spawn` or `spawn_unlinked` can capture the values the new process needs.
-2. **Stored callbacks.** A function that the framework stores and calls later, such as a test body or a hook in a `Node`, can capture the user callback and its data, to give it the one stored shape.
+2. **Stored callbacks.** A function that the framework stores and calls later, such as a Gherkin scenario body in a `Node`, can capture the data that a named function needs.
 
-In both cases, the closure body is exactly one call: to a named top-level function, or to the user callback that the closure adapts, as in `fn(_nil: Nil) { setup() }`. All logic is in a named function.
+In both cases, the closure body is exactly one call to a named top-level function, as in `fn() { execute_scenario(scenario_id, steps, registry) }`. All logic is in a named function.
 
-**Why**: A new BEAM process gets its start data only through the function it runs. A stored callback must have the one shape of its record field, such as `fn(Nil) -> Result(AssertionResult, String)`. No named function can do these two jobs. A body that is one call keeps the logic named, searchable and visible in stack traces, and the closure only moves data.
+Do not write a closure only to change the shape of a user function. A hook or a test body keeps the shape that the user wrote: `unit.before_all(setup)` stores `BeforeAll(NoInput(setup))`, and the runner calls it with `types.call`. If two function types do not match, change the stored type, not the function.
+
+**Why**: A new BEAM process gets its start data only through the function it runs. A stored callback must have the one shape of its record field, and a callback that needs captured data has no other way to get it. No named function can do these two jobs. A body that is one named call keeps the logic named, searchable and visible in stack traces, and the closure only moves data.
 
 ❌ **Don't**
 

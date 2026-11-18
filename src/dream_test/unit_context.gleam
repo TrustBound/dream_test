@@ -55,7 +55,7 @@
 
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit, WithInput,
 }
 import gleam/option.{None}
 
@@ -247,7 +247,7 @@ pub fn it(
     name: name,
     tags: [],
     kind: Unit,
-    run: run,
+    run: WithInput(run),
     timeout_ms: None,
     source: None,
   )
@@ -315,7 +315,7 @@ pub fn skip(
     name: name,
     tags: [],
     kind: Unit,
-    run: skipped_test_run,
+    run: WithInput(skipped_test_run),
     timeout_ms: None,
     source: None,
   )
@@ -329,14 +329,14 @@ pub fn skip(
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
-  BeforeAll(setup)
+  BeforeAll(WithInput(setup))
 }
 
 /// Run before each test and transform the context for that test.
 pub fn before_each(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
-  BeforeEach(setup)
+  BeforeEach(WithInput(setup))
 }
 
 /// Run after each test for cleanup.
@@ -346,7 +346,7 @@ pub fn before_each(
 pub fn after_each(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
-  AfterEach(teardown)
+  AfterEach(WithInput(teardown))
 }
 
 /// Run once after all tests for cleanup.
@@ -357,7 +357,7 @@ pub fn after_each(
 pub fn after_all(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
-  AfterAll(teardown)
+  AfterAll(WithInput(teardown))
 }
 
 /// Attach tags to a node.

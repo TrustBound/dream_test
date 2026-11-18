@@ -477,7 +477,7 @@ fn timed_test(
     name: name,
     tags: [],
     kind: Unit,
-    run: fn(_nil) { sleep_then_pass(sleep_ms) },
+    run: types.WithInput(fn(_nil) { sleep_then_pass(sleep_ms) }),
     timeout_ms: timeout_ms,
     source: None,
   )
