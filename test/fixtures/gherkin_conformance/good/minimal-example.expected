@@ -1,0 +1,3 @@
+feature "Minimal"
+  scenario "Example" "minimalistic"
+    step "Given" "the minimalism"

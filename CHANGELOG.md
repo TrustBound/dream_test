@@ -63,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scenario.
 - The name and description of a Background, and the description of a
   scenario, a Rule and an `Examples` section.
+- Conformance tests for the Gherkin parser, from the official Gherkin
+  test files: 36 good files parse to the official structure, 12 bad files
+  give the official error line, and 9 good files that dream_test rejects on
+  purpose give the dream_test error. The fixture README lists the skipped
+  files and the reasons.
 - `gherkin/parser.ParseError`, `ParseProblem`, `TokenKind` and
   `FeatureFileError`: typed parse errors, with one `ParseProblem` variant
   for each kind of problem. `parser.problem_to_string`,

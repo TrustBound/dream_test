@@ -1,0 +1,24 @@
+feature "DataTables"
+  scenario "Scenario" "minimalistic"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with escape characters"
+      table
+        row "foo" "bar"
+        row "bo \\z" "boo\\"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"

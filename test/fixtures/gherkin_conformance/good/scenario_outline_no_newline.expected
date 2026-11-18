@@ -1,0 +1,6 @@
+feature "Minimal Scenario Outline"
+  scenario "Scenario Outline" "minimalistic"
+    step "Given" "the <what>"
+    examples ""
+      header "what"
+      row "minimalism"

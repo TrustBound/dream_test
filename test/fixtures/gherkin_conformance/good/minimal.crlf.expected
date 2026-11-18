@@ -1,0 +1,3 @@
+feature "Minimal with CRLF line endings"
+  scenario "Scenario" "minimalistic"
+    step "Given" "the minimalism"

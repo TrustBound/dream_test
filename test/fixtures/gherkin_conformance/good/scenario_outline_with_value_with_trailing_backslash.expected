@@ -1,0 +1,8 @@
+feature "Scenario Outline with values with trailing backslash"
+  scenario "Scenario Outline" "minimalistic"
+    step "Given" "<what>"
+    step "When" "<this>"
+    step "Then" "<that>"
+    examples ""
+      header "what" "this" "that"
+      row "x\\y" "this\\" "that\\"

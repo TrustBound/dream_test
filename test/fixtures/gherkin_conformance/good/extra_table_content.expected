@@ -1,0 +1,7 @@
+feature "Extra table content"
+  description "  Tables are delimited by pipes on both sides.\n  Anything that isn't enclosed is not part of\n  the table.\n\n  It is not recommended to use this feature, but\n  it is how the implementation currently works."
+  scenario "Scenario" "We're a bit extra"
+    step "Given" "a pirate crew"
+      table
+        row "Luffy" "Zorro"
+        row "Nami" "Brook"
