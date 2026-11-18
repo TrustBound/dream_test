@@ -5,13 +5,15 @@
 
 import dream_test/child_timeout.{with_child_timeout}
 import dream_test/coverage.{
-  type CoverageError, type CoverageSession, AlreadyInstrumented, BadBeamFile,
-  CompilerNotLoaded, DebugInfoUnreadable, EmbeddedMode, EncryptedDebugInfo,
-  InstrumentedLoadFailed, ModuleAlreadyMeasured, ModuleNotAnalysed,
-  ModuleNotBuilt, ModuleNotInstrumented, ModuleNotLoaded,
-  NativeCoverageUnsupported, NoDebugInfo, NotInstrumented, OldCodeInUse,
-  OnLoadFailed, RecompileFailed, SessionAlreadyFinished,
+  type CoverageConfig, type CoverageError, type CoverageSession,
+  AlreadyInstrumented, BadBeamFile, CompilerNotLoaded, DebugInfoUnreadable,
+  EmbeddedMode, EncryptedDebugInfo, InstrumentedLoadFailed,
+  ModuleAlreadyMeasured, ModuleNotAnalysed, ModuleNotBuilt,
+  ModuleNotInstrumented, ModuleNotLoaded, NativeCoverageUnsupported, NoDebugInfo,
+  NotInstrumented, OldCodeInUse, OnLoadFailed, RecompileFailed,
+  SessionAlreadyFinished,
 }
+import dream_test/coverage/report.{type CoverageReport}
 import dream_test/coverage_child_support.{
   child_project, run_in_child, run_in_embedded_child,
 }
@@ -24,6 +26,8 @@ import dream_test/file.{write}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, group, it}
 import gleam/dynamic.{type Dynamic}
+import gleam/list
+import gleam/result
 
 /// The start of a measurement of no modules, in a runtime with the given
 /// facts. Only its error is used.
@@ -34,6 +38,29 @@ fn start_measuring_for(
   otp_release: String,
   emulator_flavor: String,
 ) -> Result(Dynamic, CoverageError)
+
+/// Finish `session`, and start a second run with `config` at the moment the
+/// line counters of `session` are read. Returns what the second start
+/// returned.
+@external(erlang, "dream_test_coverage_project_ffi", "start_while_finishing")
+fn start_while_finishing(
+  session: CoverageSession,
+  config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError)
+
+/// Call `work` in a new process, and wait until that process ends.
+@external(erlang, "dream_test_coverage_project_ffi", "call_in_ended_process")
+fn call_in_ended_process(work: fn() -> a) -> a
+
+fn start_in_ended_process(
+  config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError) {
+  call_in_ended_process(fn() { coverage.start(config) })
+}
+
+fn measured_source_paths(coverage_report: CoverageReport) -> List(String) {
+  list.map(report.files(coverage_report), report.source_path)
+}
 
 fn measuring_error(
   result: Result(Dynamic, CoverageError),
@@ -428,6 +455,60 @@ pub fn tests() {
             )),
           )
           |> or_fail_with("expected ModuleAlreadyMeasured")
+        },
+      ),
+    ]),
+
+    group("claims", [
+      it(
+        "keeps the modules measured until finish has read their counters",
+        fn() {
+          let source_directory =
+            compiled_project("read_before_release", "failures_read")
+          let config = project_config(source_directory)
+          let assert Ok(session) = coverage.start(config)
+          start_while_finishing(session, config)
+          |> start_error()
+          |> should
+          |> be_equal(
+            Ok(ModuleAlreadyMeasured(
+              "failures_read",
+              "test/../build/coverage/projects/read_before_release/src/failures_read.erl",
+            )),
+          )
+          |> or_fail_with("expected ModuleAlreadyMeasured while finish reads")
+        },
+      ),
+      it("frees the modules of a run whose process ended", fn() {
+        let source_directory =
+          compiled_project("ended_process", "failures_ended")
+        let config = project_config(source_directory)
+        let assert Ok(_ended) = start_in_ended_process(config)
+        coverage.start(config)
+        |> result.try(coverage.finish)
+        |> result.map(measured_source_paths)
+        |> should
+        |> be_equal(
+          Ok([
+            "test/../build/coverage/projects/ended_process/src/failures_ended.erl",
+          ]),
+        )
+        |> or_fail_with("expected a new run to measure the module")
+      }),
+      it(
+        "returns SessionAlreadyFinished for a run whose process ended and whose modules another run took",
+        fn() {
+          let source_directory =
+            compiled_project("ended_then_taken", "failures_taken")
+          let config = project_config(source_directory)
+          let assert Ok(ended) = start_in_ended_process(config)
+          let assert Ok(taken) = coverage.start(config)
+          let ended_result = coverage.finish(ended) |> finish_error()
+          let _ = coverage.finish(taken)
+          ended_result
+          |> should
+          |> be_equal(Ok(SessionAlreadyFinished))
+          |> or_fail_with("expected SessionAlreadyFinished")
         },
       ),
     ]),

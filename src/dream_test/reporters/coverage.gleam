@@ -844,8 +844,8 @@ fn error_message(error: CoverageError) -> ErrorMessage {
     SessionAlreadyFinished ->
       ErrorMessage(
         what: "Could not finish the coverage session.",
-        reason: "coverage.finish already ran for this session, so the session no longer owns any line counters.",
-        fix: "call coverage.finish once for each session that coverage.start returns.",
+        reason: "coverage.finish already ran for this session, or the process that called coverage.start ended and another coverage run then measured one of its modules.",
+        fix: "call coverage.finish once for each session that coverage.start returns, from a process that is still running.",
       )
     LcovWriteFailed(path, error) -> write_message(lcov_output(), path, error)
     JsonWriteFailed(path, error) -> write_message(json_output(), path, error)

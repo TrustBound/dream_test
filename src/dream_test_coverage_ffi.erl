@@ -4,6 +4,7 @@
     list_source_files/1,
     start_measuring/2,
     stop_measuring/2,
+    stop_measuring_after/3,
     match_files/1,
     is_regular_file/1,
     erlang_function_last_line/1,
@@ -56,7 +57,8 @@ source_files_in(Directory) ->
 %% exist before OTP 27.
 %%
 %% Then each module is claimed for this measurement, so two measurements
-%% in one BEAM never count the same module. Then each module is recompiled
+%% in one BEAM never count the same module. A claim lasts until
+%% `stop_measuring/2`, or until the process that called this function ends. Then each module is recompiled
 %% from the abstract code in its `.beam` file with native line counters and
 %% loaded. A module that an earlier measurement already recompiled keeps its
 %% counters, which are set to zero.
@@ -100,18 +102,38 @@ give_back(Measurement, Error) ->
     ok = with_claims_lock(fun release/1, [Measurement]),
     Error.
 
-%% Stop a measurement: give back its claims, then read the line counts of
-%% every module. Returns `{SourcePath, Lines}` for each module, where Lines
+%% Stop a measurement: read the line counts of every module, then give back
+%% its claims. Both steps hold the claims lock, so no other measurement can
+%% claim a module and set its counters to zero before they are read. Returns `{SourcePath, Lines}` for each module, where Lines
 %% holds `{line_coverage, Line, Calls}` for every executable line, sorted.
 %%
 %% The modules keep their counters, so code that still runs them is still
 %% counted, but nothing reads those counts. The next measurement of a
 %% module sets them to zero.
 stop_measuring(Measurement, Modules) ->
-    case with_claims_lock(fun release_owned/2, [Measurement, Modules]) of
-        ok -> read_each(Modules, []);
-        {error, _} = Error -> Error
+    stop_measuring_after(fun no_step/0, Measurement, Modules).
+
+%% `stop_measuring/2` that calls `Step()` just before it reads the counters.
+%% The tests use `Step` to start another measurement at that moment.
+stop_measuring_after(Step, Measurement, Modules) ->
+    with_claims_lock(fun read_then_release/3, [Step, Measurement, Modules]).
+
+%% A measurement that does not hold every one of its modules was stopped
+%% before, or its process ended and another measurement took one of them.
+read_then_release(Step, Measurement, Modules) ->
+    case holds_every_module(Measurement, Modules) of
+        true -> read_and_release(Step, Measurement, Modules);
+        false -> {error, session_already_finished}
     end.
+
+read_and_release(Step, Measurement, Modules) ->
+    Step(),
+    Files = read_each(Modules, []),
+    ok = release(Measurement),
+    Files.
+
+no_step() ->
+    ok.
 
 read_each([], Files) ->
     {ok, lists:reverse(Files)};
@@ -263,9 +285,14 @@ load_cause(Reason) ->
 %% Claims
 %% ---------------------------------------------------------------------------
 
-%% The claims map module names to the measurement that counts them. It lives
-%% in a persistent term, and a global lock on this node makes each read and
+%% The claims map module names to `{Measurement, Process}`: the measurement
+%% that counts the module, and the process that started it. It lives in a
+%% persistent term, and a global lock on this node makes each read and
 %% update of it one step.
+%%
+%% A claim whose process has ended is not a claim: `claim/2` lets another
+%% measurement take its module, so a session that is never finished does not
+%% hold its modules for the life of the BEAM.
 with_claims_lock(Function, Arguments) ->
     Lock = {?CLAIMS, self()},
     true = global:set_lock(Lock, [node()]),
@@ -277,23 +304,24 @@ with_claims_lock(Function, Arguments) ->
 
 claim(Measurement, Modules) ->
     Claims = persistent_term:get(?CLAIMS, #{}),
-    case [Covered || {covered_module, ModuleName, _} = Covered <- Modules, maps:is_key(ModuleName, Claims)] of
-        [] -> persistent_term:put(?CLAIMS, maps:merge(Claims, #{ModuleName => Measurement || {covered_module, ModuleName, _} <- Modules}));
+    case [Covered || {covered_module, ModuleName, _} = Covered <- Modules, is_live(maps:get(ModuleName, Claims, none))] of
+        [] -> persistent_term:put(?CLAIMS, maps:merge(Claims, #{ModuleName => {Measurement, self()} || {covered_module, ModuleName, _} <- Modules}));
         [{covered_module, ModuleName, SourcePath} | _] -> {error, {module_already_measured, ModuleName, SourcePath}}
     end.
 
+is_live({_Measurement, Process}) -> is_process_alive(Process);
+is_live(none) -> false.
+
 release(Measurement) ->
     Claims = persistent_term:get(?CLAIMS, #{}),
-    persistent_term:put(?CLAIMS, #{ModuleName => Owner || ModuleName := Owner <- Claims, Owner =/= Measurement}).
+    persistent_term:put(?CLAIMS, #{ModuleName => Claim || ModuleName := {Holder, _Process} = Claim <- Claims, Holder =/= Measurement}).
 
-%% Give back the claims of a measurement that still owns every one of its
-%% modules. When it does not, `stop_measuring/2` already ran for it.
-release_owned(Measurement, Modules) ->
+holds_every_module(Measurement, Modules) ->
     Claims = persistent_term:get(?CLAIMS, #{}),
-    case [ModuleName || {covered_module, ModuleName, _} <- Modules, maps:get(ModuleName, Claims, none) =/= Measurement] of
-        [] -> release(Measurement);
-        _NotOwned -> {error, session_already_finished}
-    end.
+    [] =:= [ModuleName || {covered_module, ModuleName, _} <- Modules, not is_held_by(Measurement, maps:get(ModuleName, Claims, none))].
+
+is_held_by(Measurement, {Measurement, _Process}) -> true;
+is_held_by(_Measurement, _Claim) -> false.
 
 %% The regular files that match a wildcard pattern, sorted.
 match_files(Pattern) ->

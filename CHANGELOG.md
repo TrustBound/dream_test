@@ -202,6 +202,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - More than one coverage run can measure in one BEAM, as long as no module
     is in two runs at the same time. Coverage never stops a process that
     runs old code of a measured module
+  - A run keeps its modules until `coverage.finish` reads their line
+    counts, or until the process that called `coverage.start` ends. Then
+    another run can measure them
   - `coverage.source_directory` measures one folder in place of `src`
   - `coverage.show_missing` adds a `Missing` column with the line ranges that
     did not run

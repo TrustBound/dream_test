@@ -1000,8 +1000,8 @@ pub fn tests() {
         |> should
         |> be_equal(failure_block(
           "Could not finish the coverage session.",
-          "coverage.finish already ran for this session, so the session no longer owns any line counters.",
-          "call coverage.finish once for each session that coverage.start returns.",
+          "coverage.finish already ran for this session, or the process that called coverage.start ended and another coverage run then measured one of its modules.",
+          "call coverage.finish once for each session that coverage.start returns, from a process that is still running.",
         ))
         |> or_fail_with("expected the SessionAlreadyFinished message")
       }),

@@ -19,7 +19,9 @@
     start_server/1,
     ask/1,
     is_alive/1,
-    call_answer/1
+    call_answer/1,
+    start_while_finishing/2,
+    call_in_ended_process/1
 ]).
 
 %% Helpers for the coverage tests that run in the test run's own BEAM.
@@ -253,3 +255,29 @@ is_alive(Process) ->
 %% Call `Module:answer/0`.
 call_answer(Module) ->
     (binary_to_atom(Module)):answer().
+
+%% Finish Session, and start a second run with Config at the moment
+%% `dream_test_coverage_ffi` reads the line counters of Session. Returns
+%% what the second start returned. A second session that started is
+%% finished.
+start_while_finishing(Session, Config) ->
+    {coverage_session, _Config, Measurement, Modules, _Excluded, _Marks, _Inexact} = Session,
+    Step = fun() -> self() ! {second_start, 'dream_test@coverage':start(Config)} end,
+    _ = dream_test_coverage_ffi:stop_measuring_after(Step, Measurement, Modules),
+    receive
+        {second_start, Second} -> finish_second(Second)
+    end.
+
+finish_second({ok, Session} = Second) ->
+    _ = 'dream_test@coverage':finish(Session),
+    Second;
+finish_second(Second) ->
+    Second.
+
+%% Call Function in a new process, and wait until that process ends.
+%% Returns what Function returned.
+call_in_ended_process(Function) ->
+    {Process, Monitor} = spawn_monitor(fun() -> exit({returned, Function()}) end),
+    receive
+        {'DOWN', Monitor, process, Process, {returned, Value}} -> Value
+    end.

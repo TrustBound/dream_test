@@ -388,6 +388,10 @@ type ExcludePattern {
 /// A coverage run that has started.
 ///
 /// Only `coverage.start` creates one. Pass it to `coverage.finish`.
+///
+/// The session measures its modules until `coverage.finish`, or until the
+/// process that called `coverage.start` ends. After that process ends,
+/// another run can measure the same modules.
 pub opaque type CoverageSession {
   CoverageSession(
     config: CoverageConfig,
@@ -414,7 +418,8 @@ type PreparedRun {
 }
 
 /// The Erlang reference that names one measurement. The line counters of
-/// its modules belong to it until `coverage.finish`.
+/// its modules belong to it until `coverage.finish`, or until the process
+/// that started it ends.
 type Measurement
 
 /// Everything that can go wrong during a coverage run.
@@ -462,7 +467,9 @@ pub type CoverageError {
     cause: AnalysisCause,
     raw: String,
   )
-  /// `coverage.finish` already ran for this session.
+  /// `coverage.finish` already ran for this session, or the process that
+  /// called `coverage.start` ended and another run then measured one of its
+  /// modules.
   SessionAlreadyFinished
   /// The LCOV file could not be written.
   LcovWriteFailed(path: String, error: FileError)
@@ -1877,7 +1884,9 @@ fn erlang_module_name(relative_path: String) -> String {
 ///   file holds its ignored line ranges with their reasons, and the report
 ///   holds the excluded files with their patterns and reasons
 ///   (`report.ignored_ranges`, `report.excluded_files`).
-/// - `Error(CoverageError)` when `finish` already ran for this session, a
+/// - `Error(CoverageError)` when `finish` already ran for this session (or
+///   the process that called `coverage.start` ended and another run took
+///   one of its modules), a
 ///   module lost its line counters during the run, an LCOV file to
 ///   merge cannot be read, a file that only merged LCOV covers has a bad
 ///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
