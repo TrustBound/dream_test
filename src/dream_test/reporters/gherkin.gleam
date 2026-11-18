@@ -17,7 +17,8 @@ import dream_test/types.{
   type AssertionFailure, type Status, type TestResult, EqualityFailure, Failed,
   GherkinScenario, Passed, Pending, SetupFailed, Skipped, TimedOut,
 }
-import gleam/option.{Some}
+import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/string
 
 // ============================================================================
@@ -56,6 +57,10 @@ pub fn format(results results: List(TestResult)) -> String {
 
 /// Format test results as Gherkin feature and scenario lines, with no
 /// summary.
+///
+/// The feature is the last group of a result that is not a Rule group. A
+/// Rule group (`Rule: <name>`, made by `gherkin/feature`) prints as a heading
+/// under its feature, and the scenarios of the Rule indent two more spaces.
 ///
 /// `format` gives these lines, then an empty line and the summary line.
 /// Use `format_scenarios` when you write your own summary, for example in a
@@ -102,7 +107,7 @@ pub fn format(results results: List(TestResult)) -> String {
 /// The feature and scenario lines as a `String`. Each line ends with `\n`.
 /// An empty list gives `""`.
 pub fn format_scenarios(results results: List(TestResult)) -> String {
-  format_all_results(results, "", "")
+  format_all_results(results, Heading(feature: "", rule: None), "")
 }
 
 /// Print test results using a provided writer function.
@@ -164,46 +169,102 @@ pub fn is_gherkin_result(result result: TestResult) -> Bool {
 // Result Formatting
 // ============================================================================
 
+/// The headings that a scenario line belongs under. `rule` is the name of the
+/// `Rule: <name>` group that `gherkin/feature` makes for a Rule.
+type Heading {
+  Heading(feature: String, rule: Option(String))
+}
+
 fn format_all_results(
   results: List(TestResult),
-  previous_feature: String,
+  previous: Heading,
   accumulated: String,
 ) -> String {
   case results {
     [] -> accumulated
     [result, ..rest] -> {
-      let feature_name = extract_feature_name(result.groups)
-      let feature_header =
-        format_feature_header_if_new(feature_name, previous_feature)
-      let scenario_text = format_scenario(result)
-      let updated = string.concat([accumulated, feature_header, scenario_text])
-      format_all_results(rest, feature_name, updated)
+      let heading = heading_of(result.groups)
+      let heading_text = format_heading_if_new(heading, previous)
+      let scenario_text = format_scenario(result, heading)
+      let updated = string.concat([accumulated, heading_text, scenario_text])
+      format_all_results(rest, heading, updated)
     }
   }
 }
 
-fn extract_feature_name(groups: List(String)) -> String {
-  case groups {
-    [] -> "Unknown Feature"
-    [feature, ..] -> feature
+/// The feature is the last group that is not a Rule group. Discovery puts
+/// the suite name before the feature name, so the first group is not always
+/// the feature.
+fn heading_of(groups: List(String)) -> Heading {
+  heading_from_newest(list.reverse(groups))
+}
+
+fn heading_from_newest(groups_newest_first: List(String)) -> Heading {
+  case groups_newest_first {
+    [] -> Heading(feature: unknown_feature, rule: None)
+    [last, ..rest] ->
+      heading_with_last(last, rest, string.starts_with(last, "Rule:"))
   }
 }
 
-fn format_feature_header_if_new(current: String, previous: String) -> String {
-  case current == previous {
-    True -> ""
-    False -> string.concat(["Feature: ", current, "\n"])
+fn heading_with_last(
+  last: String,
+  rest: List(String),
+  last_is_rule: Bool,
+) -> Heading {
+  case last_is_rule, rest {
+    False, _ -> Heading(feature: last, rule: None)
+    True, [feature, ..] -> Heading(feature: feature, rule: Some(last))
+    True, [] -> Heading(feature: unknown_feature, rule: Some(last))
   }
 }
 
-fn format_scenario(result: TestResult) -> String {
+const unknown_feature = "Unknown Feature"
+
+fn format_heading_if_new(current: Heading, previous: Heading) -> String {
+  case current.feature == previous.feature, current.rule == previous.rule {
+    True, True -> ""
+    True, False -> format_rule_heading(current.rule)
+    False, _ ->
+      string.concat([
+        "Feature: ",
+        current.feature,
+        "\n",
+        format_rule_heading(current.rule),
+      ])
+  }
+}
+
+fn format_rule_heading(rule: Option(String)) -> String {
+  case rule {
+    Some(rule) -> string.concat(["  ", rule, "\n"])
+    None -> ""
+  }
+}
+
+fn format_scenario(result: TestResult, heading: Heading) -> String {
   let scenario_name = result.name
   let marker = status_marker(result.status)
   let duration = format_duration(result.duration_ms)
   let scenario_line =
-    string.concat(["  Scenario: ", scenario_name, " ", marker, duration, "\n"])
+    string.concat([
+      scenario_indent(heading),
+      "Scenario: ",
+      scenario_name,
+      " ",
+      marker,
+      duration,
+      "\n",
+    ])
   let failure_text = format_failure_details(result)
   string.concat([scenario_line, failure_text])
+}
+
+fn scenario_indent(heading: Heading) -> String {
+  case heading.rule {
+    Some(_) -> "    "
+    None -> "  "
+  }
 }
 
 fn format_duration(duration_ms: Int) -> String {

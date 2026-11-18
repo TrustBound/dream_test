@@ -128,34 +128,40 @@ pub type Step {
 // Background
 // ============================================================================
 
-/// Background steps that run before each scenario.
+/// Steps that run before each scenario of a Feature or a Rule.
 ///
-/// A Background defines common setup steps that are executed before
-/// every scenario in the feature. It's useful for shared preconditions.
-///
-/// Background steps run before each scenario, as if they were prepended.
+/// A Feature can have one Background. Each Rule can also have one
+/// Background. The steps of a Feature Background run before the steps of a
+/// Rule Background, and both run before the steps of the scenario.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// empty_background()
 /// |> should
-/// |> be_equal(Background(steps: []))
+/// |> be_equal(Background(name: "", description: None, steps: []))
 /// |> or_fail_with("expected empty background")
 /// ```
 ///
 pub type Background {
-  Background(steps: List(Step))
+  Background(
+    /// The text after `Background:`. It is `""` when the line has no name.
+    name: String,
+    /// The free text below the `Background:` line, if there is some.
+    description: Option(String),
+    /// The steps, in file order.
+    steps: List(Step),
+  )
 }
 
 // ============================================================================
-// Examples Table (for Scenario Outline)
+// Examples (for Scenario Outline)
 // ============================================================================
 
-/// Examples table for Scenario Outline.
+/// The table of an `Examples:` section.
 ///
-/// Provides data for parameterized scenarios. Each row generates a
-/// separate scenario instance with placeholders replaced by values.
+/// The first row of the table is the header row. Each other row makes one
+/// scenario, with each `<placeholder>` replaced by the value in its column.
 ///
 /// ## Example
 ///
@@ -174,49 +180,151 @@ pub type ExamplesTable {
   )
 }
 
+/// One `Examples:` (or `Scenarios:`) section of a scenario.
+///
+/// A scenario can have more than one `Examples` section. Every row of every
+/// section runs. The tags of an `Examples` section apply to the scenarios
+/// that its rows make.
+///
+/// ## Example
+///
+/// ```gleam
+/// let table = ExamplesTable(headers: ["quantity"], rows: [["1"]])
+///
+/// Examples(name: "Small", description: None, tags: ["fast"], table: Some(table))
+/// |> should
+/// |> be_equal(Examples(
+///   name: "Small",
+///   description: None,
+///   tags: ["fast"],
+///   table: Some(table),
+/// ))
+/// |> or_fail_with("expected Examples to be constructible")
+/// ```
+///
+pub type Examples {
+  Examples(
+    /// The text after `Examples:`. It is `""` when the line has no name.
+    name: String,
+    /// The free text below the `Examples:` line, if there is some.
+    description: Option(String),
+    /// The tags on the lines above the `Examples:` line, without the `@`.
+    tags: List(String),
+    /// The table, or `None` when the section has no table rows.
+    table: Option(ExamplesTable),
+  )
+}
+
 // ============================================================================
 // Scenario Types
 // ============================================================================
 
-/// A scenario within a feature.
+/// The keyword that starts a scenario.
 ///
-/// There are two variants:
+/// Gherkin has two synonyms for a scenario and two synonyms for a scenario
+/// outline. The keyword does not change how the scenario runs: a scenario
+/// with `Examples` runs one time for each example row, and a scenario without
+/// `Examples` runs one time.
 ///
-/// A `Scenario` has concrete step text; a `ScenarioOutline` is parameterized
-/// with an examples table and uses `<placeholder>` values in step text.
+/// ## Example
+///
+/// ```gleam
+/// scenario_keyword_to_string(KeywordScenarioOutline)
+/// |> should
+/// |> be_equal("Scenario Outline")
+/// |> or_fail_with("expected Scenario Outline")
+/// ```
+///
+pub type ScenarioKeyword {
+  /// `Scenario:`
+  KeywordScenario
+  /// `Example:`, a synonym for `Scenario:`
+  KeywordExample
+  /// `Scenario Outline:`
+  KeywordScenarioOutline
+  /// `Scenario Template:`, a synonym for `Scenario Outline:`
+  KeywordScenarioTemplate
+}
+
+/// A scenario within a Feature or a Rule.
+///
+/// A scenario with no `examples` runs one time. A scenario with `examples`
+/// runs one time for each row of each `Examples` table, with each
+/// `<placeholder>` in the step text replaced by the value in its column.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+/// let scenario =
+///   Scenario(
+///     keyword: KeywordScenario,
+///     name: "Example scenario",
+///     description: None,
+///     tags: [],
+///     steps: [step],
+///     examples: [],
+///   )
 ///
-/// Scenario(name: "Example scenario", tags: [], steps: [step])
+/// scenario.name
 /// |> should
-/// |> be_equal(Scenario(name: "Example scenario", tags: [], steps: [step]))
+/// |> be_equal("Example scenario")
 /// |> or_fail_with("expected Scenario to be constructible")
 /// ```
 ///
 pub type Scenario {
-  /// A standard scenario with fixed step values.
   Scenario(
+    /// The keyword that started the scenario
+    keyword: ScenarioKeyword,
     /// The scenario name
     name: String,
-    /// Tags applied to this scenario (e.g., @slow, @wip)
+    /// The free text below the scenario line, if there is some.
+    description: Option(String),
+    /// Tags applied to this scenario (e.g., @slow, @wip), without the `@`
     tags: List(String),
-    /// The steps to execute
+    /// The steps to execute. Outline steps use `<placeholder>` text.
     steps: List(Step),
+    /// The `Examples` sections, in file order
+    examples: List(Examples),
   )
+}
 
-  /// A parameterized scenario expanded from examples.
-  ScenarioOutline(
-    /// The scenario outline name
+// ============================================================================
+// Rule
+// ============================================================================
+
+/// A `Rule:` section of a Feature.
+///
+/// A Rule groups scenarios that show one business rule. A Rule can have its
+/// own Background. Its steps run after the steps of the Feature Background.
+///
+/// ## Example
+///
+/// ```gleam
+/// Rule(name: "Stock", description: None, tags: [], background: None, scenarios: [])
+/// |> should
+/// |> be_equal(Rule(
+///   name: "Stock",
+///   description: None,
+///   tags: [],
+///   background: None,
+///   scenarios: [],
+/// ))
+/// |> or_fail_with("expected Rule to be constructible")
+/// ```
+///
+pub type Rule {
+  Rule(
+    /// The text after `Rule:`. It is `""` when the line has no name.
     name: String,
-    /// Tags applied to this scenario outline
+    /// The free text below the `Rule:` line, if there is some.
+    description: Option(String),
+    /// The tags on the lines above the `Rule:` line, without the `@`.
     tags: List(String),
-    /// The step templates with <placeholder> syntax
-    steps: List(Step),
-    /// The examples table for parameterization
-    examples: ExamplesTable,
+    /// The Background of this Rule, if it has one
+    background: Option(Background),
+    /// The scenarios of this Rule, in file order
+    scenarios: List(Scenario),
   )
 }
 
@@ -228,32 +336,41 @@ pub type Scenario {
 ///
 /// A feature represents a complete `.feature` file containing:
 /// - Metadata (name, description, tags)
-/// - Optional background steps
-/// - One or more scenarios
+/// - An optional Background
+/// - Scenarios that are not in a Rule
+/// - Rules, each with an optional Background and its own scenarios
+///
+/// Gherkin puts these in a fixed order: the Background first, then the
+/// scenarios, then the Rules. The fields keep that order.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
-/// let scenario = Scenario(name: "Example scenario", tags: [], steps: [step])
+/// let scenario =
+///   Scenario(
+///     keyword: KeywordScenario,
+///     name: "Example scenario",
+///     description: None,
+///     tags: [],
+///     steps: [step],
+///     examples: [],
+///   )
 ///
-/// Feature(
-///   name: "Example feature",
-///   description: None,
-///   tags: [],
-///   background: None,
-///   scenarios: [scenario],
-/// )
-/// |> should
-/// |> be_equal(
+/// let feature =
 ///   Feature(
 ///     name: "Example feature",
+///     source: None,
 ///     description: None,
 ///     tags: [],
 ///     background: None,
 ///     scenarios: [scenario],
-///   ),
-/// )
+///     rules: [],
+///   )
+///
+/// feature.name
+/// |> should
+/// |> be_equal("Example feature")
 /// |> or_fail_with("expected Feature to be constructible")
 /// ```
 ///
@@ -263,20 +380,43 @@ pub type Feature {
     name: String,
     /// Optional source identifier (typically the .feature file path)
     source: Option(String),
-    /// Optional description text below the feature name
+    /// Optional description text below the feature name. Each line keeps
+    /// its leading whitespace, as in the file.
     description: Option(String),
     /// Tags applied to the feature (inherited by all scenarios)
     tags: List(String),
     /// Optional background steps run before each scenario
     background: Option(Background),
-    /// The scenarios in this feature
+    /// The scenarios that are not in a Rule
     scenarios: List(Scenario),
+    /// The Rules, in file order
+    rules: List(Rule),
   )
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/// Convert a ScenarioKeyword to the keyword text used in a `.feature` file.
+///
+/// ## Example
+///
+/// ```gleam
+/// scenario_keyword_to_string(KeywordExample)
+/// |> should
+/// |> be_equal("Example")
+/// |> or_fail_with("expected Example")
+/// ```
+///
+pub fn scenario_keyword_to_string(keyword keyword: ScenarioKeyword) -> String {
+  case keyword {
+    KeywordScenario -> "Scenario"
+    KeywordExample -> "Example"
+    KeywordScenarioOutline -> "Scenario Outline"
+    KeywordScenarioTemplate -> "Scenario Template"
+  }
+}
 
 /// Convert a StepKeyword to its string representation.
 ///
@@ -427,10 +567,10 @@ pub fn empty_examples() -> ExamplesTable {
 /// ```gleam
 /// empty_background()
 /// |> should
-/// |> be_equal(Background(steps: []))
+/// |> be_equal(Background(name: "", description: None, steps: []))
 /// |> or_fail_with("expected empty background")
 /// ```
 ///
 pub fn empty_background() -> Background {
-  Background(steps: [])
+  Background(name: "", description: option.None, steps: [])
 }

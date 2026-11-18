@@ -1,8 +1,9 @@
 import dream_test/gherkin/types.{
-  And, Asterisk, Background, DataTable, DocString, ExamplesTable, Feature, Given,
-  GivenPhase, Scenario, ScenarioOutline, Step, Then, WhenPhase, empty_background,
-  empty_examples, keyword_from_string, keyword_to_string, phase_to_string,
-  resolve_keyword, resolve_phase,
+  And, Asterisk, Background, DataTable, DocString, Examples, ExamplesTable,
+  Feature, Given, GivenPhase, KeywordScenario, KeywordScenarioOutline,
+  KeywordScenarioTemplate, Rule, Scenario, Step, Then, WhenPhase,
+  empty_background, empty_examples, keyword_from_string, keyword_to_string,
+  phase_to_string, resolve_keyword, resolve_phase, scenario_keyword_to_string,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
@@ -78,7 +79,7 @@ pub fn tests() {
     it("empty_background returns a background with no steps", fn() {
       empty_background()
       |> should
-      |> be_equal(Background(steps: []))
+      |> be_equal(Background(name: "", description: None, steps: []))
       |> or_fail_with("expected empty background")
     }),
     it("ExamplesTable can be constructed", fn() {
@@ -89,55 +90,84 @@ pub fn tests() {
     }),
     it("Scenario can be constructed", fn() {
       let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+      let scenario =
+        Scenario(
+          keyword: KeywordScenario,
+          name: "Example scenario",
+          description: None,
+          tags: [],
+          steps: [step],
+          examples: [],
+        )
 
-      Scenario(name: "Example scenario", tags: [], steps: [step])
+      scenario.name
       |> should
-      |> be_equal(Scenario(name: "Example scenario", tags: [], steps: [step]))
+      |> be_equal("Example scenario")
       |> or_fail_with("expected Scenario to be constructible")
     }),
     it("Feature can be constructed", fn() {
-      let step = Step(keyword: Given, text: "I have 1 item", argument: None)
-      let scenario = Scenario(name: "Example scenario", tags: [], steps: [step])
-
-      Feature(
-        name: "Example feature",
-        source: None,
-        description: None,
-        tags: [],
-        background: None,
-        scenarios: [scenario],
-      )
-      |> should
-      |> be_equal(
+      let feature =
         Feature(
           name: "Example feature",
           source: None,
           description: None,
           tags: [],
           background: None,
-          scenarios: [scenario],
+          scenarios: [],
+          rules: [
+            Rule(
+              name: "Stock",
+              description: None,
+              tags: [],
+              background: None,
+              scenarios: [],
+            ),
+          ],
+        )
+
+      feature.rules
+      |> should
+      |> be_equal([
+        Rule(
+          name: "Stock",
+          description: None,
+          tags: [],
+          background: None,
+          scenarios: [],
         ),
-      )
+      ])
       |> or_fail_with("expected Feature to be constructible")
     }),
-    it("ScenarioOutline can be constructed", fn() {
+    it("a scenario outline holds its Examples sections", fn() {
       let step =
         Step(keyword: Given, text: "I have <count> items", argument: None)
+      let small =
+        Examples(
+          name: "Small",
+          description: None,
+          tags: ["fast"],
+          table: Some(ExamplesTable(headers: ["count"], rows: [["1"], ["5"]])),
+        )
+      let outline =
+        Scenario(
+          keyword: KeywordScenarioOutline,
+          name: "Example outline",
+          description: None,
+          tags: [],
+          steps: [step],
+          examples: [small],
+        )
 
-      ScenarioOutline(
-        name: "Example outline",
-        tags: [],
-        steps: [step],
-        examples: ExamplesTable(headers: ["count"], rows: [["1"], ["5"]]),
-      )
+      outline.examples
       |> should
-      |> be_equal(ScenarioOutline(
-        name: "Example outline",
-        tags: [],
-        steps: [step],
-        examples: ExamplesTable(headers: ["count"], rows: [["1"], ["5"]]),
-      ))
-      |> or_fail_with("expected ScenarioOutline to be constructible")
+      |> be_equal([small])
+      |> or_fail_with("expected the Examples section")
+    }),
+    it("scenario_keyword_to_string gives the keyword text", fn() {
+      scenario_keyword_to_string(KeywordScenarioTemplate)
+      |> should
+      |> be_equal("Scenario Template")
+      |> or_fail_with("expected Scenario Template")
     }),
   ])
 }

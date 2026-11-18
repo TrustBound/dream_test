@@ -50,6 +50,35 @@ fn every_status() -> List(types.TestResult) {
 
 pub fn tests() {
   describe("dream_test/reporters/gherkin", [
+    it("format_scenarios prints a Rule heading under its Feature", fn() {
+      gherkin.format_scenarios([
+        scenario(["Suite", "F"], "Outside", types.Passed, []),
+        scenario(["Suite", "F", "Rule: A"], "One", types.Passed, []),
+        scenario(["Suite", "F", "Rule: A"], "Two", types.Passed, []),
+        scenario(["Suite", "F", "Rule: B"], "Three", types.Passed, []),
+        scenario(["G", "Rule: C"], "Four", types.Passed, []),
+        scenario(["Rule: D"], "Five", types.Passed, []),
+      ])
+      |> should
+      |> be_equal(
+        "Feature: F
+  Scenario: Outside ✓
+  Rule: A
+    Scenario: One ✓
+    Scenario: Two ✓
+  Rule: B
+    Scenario: Three ✓
+Feature: G
+  Rule: C
+    Scenario: Four ✓
+Feature: Unknown Feature
+  Rule: D
+    Scenario: Five ✓
+",
+      )
+      |> or_fail_with("expected Feature and Rule headings")
+    }),
+
     it("is_gherkin_result is false for non-gherkin kinds", fn() {
       let result =
         types.TestResult(

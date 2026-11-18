@@ -57,7 +57,7 @@
 //// ```
 
 import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
-import dream_test/gherkin/parser
+import dream_test/gherkin/parser.{type FeatureFileError}
 import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
 import dream_test/types.{
@@ -116,9 +116,14 @@ pub opaque type RunnableDiscovery {
 /// ## Fields
 ///
 /// - `features`: successfully parsed feature values
-/// - `errors`: parse errors as strings (typically `"path: message"`)
+/// - `errors`: one `parser.FeatureFileError` for each file that could not be
+///   read or parsed. Use `parser.feature_file_error_to_string` to get the
+///   message (`"path: line N: ..."`).
 pub type LoadResult {
-  LoadResult(features: List(gherkin_types.Feature), errors: List(String))
+  LoadResult(
+    features: List(gherkin_types.Feature),
+    errors: List(FeatureFileError),
+  )
 }
 
 // ============================================================================
@@ -258,7 +263,7 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
   let parsed = parse_all_features(discover_files(discovery.pattern))
   LoadResult(
     features: parsed.features,
-    errors: list.map(parsed.failures, format_parse_failure),
+    errors: list.map(parsed.failures, failure_error),
   )
 }
 
@@ -297,7 +302,7 @@ fn discover_files(pattern: String) -> List(String) {
 
 /// A feature file that did not parse: its path and the parser message.
 type ParseFailure {
-  ParseFailure(path: String, message: String)
+  ParseFailure(path: String, error: FeatureFileError)
 }
 
 /// The features that parsed and the files that did not, in file order.
@@ -322,18 +327,22 @@ fn parse_into(parsed: ParsedFeatures, path: String) -> ParsedFeatures {
   case parser.parse_file(path) {
     Ok(feature) ->
       ParsedFeatures(..parsed, features: [feature, ..parsed.features])
-    Error(message) ->
+    Error(error) ->
       ParsedFeatures(..parsed, failures: [
-        ParseFailure(path: path, message: message),
+        ParseFailure(path: path, error: error),
         ..parsed.failures
       ])
   }
 }
 
-/// `parser.parse_file` puts the path at the start of a parse error, and a
-/// read error names the path, so the message is complete.
+fn failure_error(failure: ParseFailure) -> FeatureFileError {
+  failure.error
+}
+
+/// A parse error starts with the path, and a read error names the path, so
+/// the message is complete.
 fn format_parse_failure(failure: ParseFailure) -> String {
-  failure.message
+  parser.feature_file_error_to_string(failure.error)
 }
 
 fn error_to_node(failure: ParseFailure) -> Node(Nil) {

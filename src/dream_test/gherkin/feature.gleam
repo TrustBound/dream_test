@@ -65,7 +65,7 @@ import dream_test/gherkin/types as gherkin_types
 import dream_test/gherkin/world.{type World}
 import dream_test/types.{
   type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, AssertionOk, GherkinScenario, Root, Test,
+  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
 }
 import gleam/dict.{type Dict}
 import gleam/int
@@ -129,13 +129,24 @@ pub type InlineStep {
 // ============================================================================
 // Feature → TestSuite Conversion
 // ============================================================================
-
 /// Convert a Feature to a TestSuite.
 ///
-/// Creates a TestSuite with one test per scenario. Background steps are
-/// prepended to each scenario, so a scenario that starts with `And`, `But` or
-/// `*` takes the phase of the last Background step. ScenarioOutlines are expanded based on
-/// their examples table.
+/// Creates a TestSuite with one test per scenario, and one test per example
+/// row of a scenario with `Examples`. Each Rule becomes a group named
+/// `Rule: <name>` (or `Rule:` when the Rule has no name), so the full name of
+/// a scenario in a Rule is `Feature > Rule: <name> > Scenario`.
+///
+/// The steps of the Feature Background run first, then the steps of the Rule
+/// Background, then the scenario steps. So a scenario that starts with `And`,
+/// `But` or `*` takes the phase of the last Background step.
+///
+/// An example row test is named `<scenario> (Example N)`, or
+/// `<scenario> (<examples name>, Example N)` when its `Examples` section has
+/// a name. N counts the rows of all `Examples` sections of the scenario, from
+/// 1. The tags of a test are the Feature tags, then the Rule tags, then the
+/// scenario tags, then the `Examples` tags. The suite root also holds the
+/// Feature tags, so the effective tags of a test start with the Feature tags
+/// two times. A Rule group holds no tags.
 ///
 /// ## Parameters
 ///
@@ -153,35 +164,94 @@ pub type InlineStep {
 /// ```
 pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
   let feature = config.feature
-  let children = build_suite_items(feature, config)
+  let scope =
+    ScenarioScope(
+      feature_name: feature.name,
+      source: feature.source,
+      registry: config.step_registry,
+      rule_groups: [],
+      tags: feature.tags,
+      background_steps: background_steps(feature.background),
+    )
+  let scenario_nodes = scenarios_to_nodes(scope, feature.scenarios, [])
+  let rule_nodes = rules_to_nodes(scope, feature.rules, [])
 
-  Root(seed: Nil, name: feature.name, tags: feature.tags, children: children)
+  Root(
+    seed: Nil,
+    name: feature.name,
+    tags: feature.tags,
+    children: list.append(scenario_nodes, rule_nodes),
+  )
 }
 
-fn build_suite_items(
-  feature: gherkin_types.Feature,
-  config: FeatureConfig,
+/// What the scenarios of a Feature or a Rule share.
+type ScenarioScope {
+  ScenarioScope(
+    feature_name: String,
+    source: Option(String),
+    registry: StepRegistry,
+    rule_groups: List(String),
+    tags: List(String),
+    background_steps: List(gherkin_types.Step),
+  )
+}
+
+fn background_steps(
+  background: Option(gherkin_types.Background),
+) -> List(gherkin_types.Step) {
+  case background {
+    Some(background) -> background.steps
+    None -> []
+  }
+}
+
+fn rules_to_nodes(
+  scope: ScenarioScope,
+  rules: List(gherkin_types.Rule),
+  nodes_newest_first: List(Node(Nil)),
 ) -> List(Node(Nil)) {
-  build_suite_items_loop(feature, feature.scenarios, config, [])
+  case rules {
+    [] -> list.reverse(nodes_newest_first)
+    [rule, ..rest] ->
+      rules_to_nodes(scope, rest, [
+        rule_to_node(scope, rule),
+        ..nodes_newest_first
+      ])
+  }
 }
 
-fn build_suite_items_loop(
-  feature: gherkin_types.Feature,
+fn rule_to_node(scope: ScenarioScope, rule: gherkin_types.Rule) -> Node(Nil) {
+  let group_name = string.trim_end("Rule: " <> rule.name)
+  let rule_scope =
+    ScenarioScope(
+      ..scope,
+      rule_groups: [group_name],
+      tags: list.append(scope.tags, rule.tags),
+      background_steps: list.append(
+        scope.background_steps,
+        background_steps(rule.background),
+      ),
+    )
+  Group(
+    name: group_name,
+    tags: [],
+    children: scenarios_to_nodes(rule_scope, rule.scenarios, []),
+  )
+}
+
+fn scenarios_to_nodes(
+  scope: ScenarioScope,
   scenarios: List(gherkin_types.Scenario),
-  config: FeatureConfig,
-  acc_rev: List(Node(Nil)),
+  nodes_newest_first: List(Node(Nil)),
 ) -> List(Node(Nil)) {
   case scenarios {
-    [] -> list.reverse(acc_rev)
-    [scenario, ..rest] -> {
-      let items = scenario_to_suite_items(feature, scenario, config)
-      build_suite_items_loop(
-        feature,
+    [] -> list.reverse(nodes_newest_first)
+    [scenario, ..rest] ->
+      scenarios_to_nodes(
+        scope,
         rest,
-        config,
-        reverse_append(items, acc_rev),
+        reverse_append(scenario_to_nodes(scope, scenario), nodes_newest_first),
       )
-    }
   }
 }
 
@@ -192,127 +262,115 @@ fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
   }
 }
 
-fn scenario_to_suite_items(
-  feature: gherkin_types.Feature,
+fn scenario_to_nodes(
+  scope: ScenarioScope,
   scenario: gherkin_types.Scenario,
-  config: FeatureConfig,
 ) -> List(Node(Nil)) {
-  case scenario {
-    gherkin_types.Scenario(name, tags, steps) -> {
-      let test_node =
-        build_scenario_test_node(feature, name, tags, steps, config, None)
-      [test_node]
-    }
-    gherkin_types.ScenarioOutline(name, tags, steps, examples) -> {
-      expand_scenario_outline(feature, name, tags, steps, examples, config)
-    }
+  case scenario.examples {
+    [] -> [
+      scenario_node(
+        scope,
+        ScenarioRun(
+          name: scenario.name,
+          tags: scenario.tags,
+          steps: scenario.steps,
+        ),
+      ),
+    ]
+    examples -> examples_to_nodes(scope, scenario, examples, 1, [])
   }
 }
 
-fn build_scenario_test_node(
-  feature: gherkin_types.Feature,
-  scenario_name: String,
-  scenario_tags: List(String),
-  steps: List(gherkin_types.Step),
-  config: FeatureConfig,
-  example_suffix: Option(String),
-) -> Node(Nil) {
-  let full_name = build_full_name(feature.name, scenario_name, example_suffix)
-  let scenario_id = string.join(full_name, "::")
-  let all_tags = list.append(feature.tags, scenario_tags)
+/// One test to build: its name, its own tags and its steps.
+type ScenarioRun {
+  ScenarioRun(name: String, tags: List(String), steps: List(gherkin_types.Step))
+}
 
-  // Combine background and scenario steps
-  let all_steps = case feature.background {
-    Some(gherkin_types.Background(background_steps)) ->
-      list.append(background_steps, steps)
-    None -> steps
-  }
+fn scenario_node(scope: ScenarioScope, run: ScenarioRun) -> Node(Nil) {
+  let full_name =
+    list.flatten([[scope.feature_name], scope.rule_groups, [run.name]])
+  let scenario_id = string.join(full_name, "::")
+  let all_tags = list.append(scope.tags, run.tags)
+  let all_steps = list.append(scope.background_steps, run.steps)
+  let registry = scope.registry
+
   Test(
-    name: scenario_name,
+    name: run.name,
     tags: all_tags,
     kind: GherkinScenario(scenario_id),
     run: fn(_nil: Nil) {
-      Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
+      Ok(execute_scenario(scenario_id, all_steps, registry))
     },
     timeout_ms: None,
-    source: feature.source,
+    source: scope.source,
   )
 }
 
-fn build_full_name(
-  feature_name: String,
-  scenario_name: String,
-  example_suffix: Option(String),
-) -> List(String) {
-  case example_suffix {
-    None -> [feature_name, scenario_name]
-    Some(suffix) -> [feature_name, scenario_name <> " " <> suffix]
+/// Build the tests of every row of every Examples table. `index` counts the
+/// rows of all tables of the scenario, from 1.
+fn examples_to_nodes(
+  scope: ScenarioScope,
+  scenario: gherkin_types.Scenario,
+  examples: List(gherkin_types.Examples),
+  index: Int,
+  nodes_newest_first: List(Node(Nil)),
+) -> List(Node(Nil)) {
+  case examples {
+    [] -> list.reverse(nodes_newest_first)
+    [gherkin_types.Examples(table: None, ..), ..rest] ->
+      examples_to_nodes(scope, scenario, rest, index, nodes_newest_first)
+    [gherkin_types.Examples(table: Some(table), ..) as section, ..rest] -> {
+      let rows =
+        ExampleRows(
+          scenario: scenario,
+          section: section,
+          headers: table.headers,
+        )
+      let #(next_index, nodes) =
+        rows_to_nodes(scope, rows, table.rows, index, nodes_newest_first)
+      examples_to_nodes(scope, scenario, rest, next_index, nodes)
+    }
   }
 }
 
-fn expand_scenario_outline(
-  feature: gherkin_types.Feature,
-  name: String,
-  tags: List(String),
-  steps: List(gherkin_types.Step),
-  examples: gherkin_types.ExamplesTable,
-  config: FeatureConfig,
-) -> List(Node(Nil)) {
-  let headers = examples.headers
-
-  expand_scenario_outline_rows_loop(
-    feature,
-    name,
-    tags,
-    steps,
-    config,
-    headers,
-    examples.rows,
-    0,
-    [],
+/// The rows of one Examples table, with the scenario they expand.
+type ExampleRows {
+  ExampleRows(
+    scenario: gherkin_types.Scenario,
+    section: gherkin_types.Examples,
+    headers: List(String),
   )
 }
 
-fn expand_scenario_outline_rows_loop(
-  feature: gherkin_types.Feature,
-  name: String,
-  tags: List(String),
-  steps: List(gherkin_types.Step),
-  config: FeatureConfig,
-  headers: List(String),
-  rows: List(List(String)),
+fn rows_to_nodes(
+  scope: ScenarioScope,
+  rows: ExampleRows,
+  values: List(List(String)),
   index: Int,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case rows {
-    [] -> list.reverse(acc_rev)
+  nodes_newest_first: List(Node(Nil)),
+) -> #(Int, List(Node(Nil))) {
+  case values {
+    [] -> #(index, nodes_newest_first)
     [row, ..rest] -> {
-      let substitutions = build_substitution_map(headers, row)
-      let expanded_steps = substitute_steps(steps, substitutions)
-      let suffix = "(Example " <> int.to_string(index + 1) <> ")"
-
-      let node =
-        build_scenario_test_node(
-          feature,
-          name,
-          tags,
-          expanded_steps,
-          config,
-          Some(suffix),
+      let substitutions = build_substitution_map(rows.headers, row)
+      let run =
+        ScenarioRun(
+          name: rows.scenario.name <> " (" <> example_label(rows, index) <> ")",
+          tags: list.append(rows.scenario.tags, rows.section.tags),
+          steps: substitute_steps(rows.scenario.steps, substitutions),
         )
-
-      expand_scenario_outline_rows_loop(
-        feature,
-        name,
-        tags,
-        steps,
-        config,
-        headers,
-        rest,
-        index + 1,
-        [node, ..acc_rev],
-      )
+      rows_to_nodes(scope, rows, rest, index + 1, [
+        scenario_node(scope, run),
+        ..nodes_newest_first
+      ])
     }
+  }
+}
+
+fn example_label(rows: ExampleRows, index: Int) -> String {
+  case rows.section.name {
+    "" -> "Example " <> int.to_string(index)
+    name -> name <> ", Example " <> int.to_string(index)
   }
 }
 
@@ -608,6 +666,7 @@ pub fn feature(
       tags: [],
       background: None,
       scenarios: parsed_scenarios,
+      rules: [],
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
@@ -742,9 +801,12 @@ pub fn asterisk(text text: String) -> InlineStep {
 fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {
   let parsed_steps = list.map(inline.steps, inline_to_parsed_step)
   gherkin_types.Scenario(
+    keyword: gherkin_types.KeywordScenario,
     name: inline.name,
+    description: None,
     tags: inline.tags,
     steps: parsed_steps,
+    examples: [],
   )
 }
 
@@ -814,8 +876,13 @@ pub fn feature_with_background(
       source: None,
       description: None,
       tags: [],
-      background: Some(gherkin_types.Background(steps: background_steps)),
+      background: Some(gherkin_types.Background(
+        name: "",
+        description: None,
+        steps: background_steps,
+      )),
       scenarios: parsed_scenarios,
+      rules: [],
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)

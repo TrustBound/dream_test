@@ -106,6 +106,92 @@ pub fn tests() {
       |> or_fail_with("each examples row should run with its value")
     }),
 
+    it("to_test_suite puts each Rule in a group named Rule: <name>", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(group_and_name)
+      |> should
+      |> be_equal([
+        #(["F"], "Outside"),
+        #(["F", "Rule: Stock"], "Sell"),
+        #(["F", "Rule:"], "Nameless"),
+      ])
+      |> or_fail_with("expected one group for each Rule")
+    }),
+
+    it("to_test_suite gives a Rule scenario the Feature and Rule tags", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(result_tags)
+      |> should
+      |> be_equal([["f", "f", "outside"], ["f", "f", "r", "sell"], ["f", "f"]])
+      |> or_fail_with(
+        "expected Feature tags, then Rule tags, then scenario tags",
+      )
+    }),
+
+    it(
+      "to_test_suite runs the Feature Background, then the Rule Background",
+      fn() {
+        run_parsed(rules_feature(), rules_registry())
+        |> list.map(result_status)
+        |> should
+        |> be_equal([test_types.Passed, test_types.Passed, test_types.Passed])
+        |> or_fail_with("expected the Background steps to run in order")
+      },
+    ),
+
+    it("to_test_suite gives the Rule scenario id the Rule group", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(result_kind)
+      |> should
+      |> be_equal([
+        test_types.GherkinScenario("F::Outside"),
+        test_types.GherkinScenario("F::Rule: Stock::Sell"),
+        test_types.GherkinScenario("F::Rule:::Nameless"),
+      ])
+      |> or_fail_with("expected the Rule group in each id")
+    }),
+
+    it("to_test_suite names example rows after their Examples section", fn() {
+      run_parsed(examples_feature(), examples_registry())
+      |> list.map(result_name)
+      |> should
+      |> be_equal([
+        "O (Small, Example 1)",
+        "O (Small, Example 2)",
+        "O (Example 3)",
+      ])
+      |> or_fail_with("expected the Examples name and a running count")
+    }),
+
+    it("to_test_suite gives example rows the Examples tags", fn() {
+      run_parsed(examples_feature(), examples_registry())
+      |> list.map(result_tags)
+      |> should
+      |> be_equal([["o", "small"], ["o", "small"], ["o", "big"]])
+      |> or_fail_with("expected the scenario tags, then the Examples tags")
+    }),
+
+    it("to_test_suite runs no test for Examples without a table", fn() {
+      run_parsed(
+        "Feature: F\n  Scenario Outline: O\n    Given the value is <n>\n    Examples:\n",
+        examples_registry(),
+      )
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected no test")
+    }),
+
+    it("to_test_suite runs a scenario outline without Examples one time", fn() {
+      run_parsed(
+        "Feature: F\n  Scenario Outline: O\n    Given the value is 1\n",
+        examples_registry(),
+      )
+      |> list.map(result_name)
+      |> should
+      |> be_equal(["O"])
+      |> or_fail_with("expected one test")
+    }),
+
     it("to_test_suite gives the DataTable and DocString to the handlers", fn() {
       let content =
         "Feature: F\n"
@@ -469,4 +555,82 @@ fn gherkin_step_ok(
   _context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Ok(test_types.AssertionOk)
+}
+
+fn rules_feature() -> String {
+  "@f
+Feature: F
+  Background:
+    Given feature setup
+
+  @outside
+  Scenario: Outside
+    Then done
+
+  @r
+  Rule: Stock
+    Background:
+      And rule setup
+
+    @sell
+    Scenario: Sell
+      Then done
+
+  Rule:
+    Scenario: Nameless
+      Then done
+"
+}
+
+fn rules_registry() -> steps.StepRegistry {
+  steps.new()
+  |> steps.given("feature setup", gherkin_step_ok)
+  |> steps.given("rule setup", gherkin_step_ok)
+  |> steps.then_("done", gherkin_step_ok)
+}
+
+fn examples_feature() -> String {
+  "Feature: F
+  @o
+  Scenario Outline: O
+    Given the value is <n>
+
+    @small
+    Examples: Small
+      | n |
+      | 1 |
+      | 2 |
+
+    Examples: Empty
+
+    @big
+    Examples:
+      | n |
+      | 3 |
+"
+}
+
+fn examples_registry() -> steps.StepRegistry {
+  steps.new()
+  |> steps.given("the value is {int}", gherkin_step_ok)
+}
+
+fn group_and_name(result: test_types.TestResult) -> #(List(String), String) {
+  #(result.groups, result.name)
+}
+
+fn result_name(result: test_types.TestResult) -> String {
+  result.name
+}
+
+fn result_tags(result: test_types.TestResult) -> List(String) {
+  result.tags
+}
+
+fn result_status(result: test_types.TestResult) -> test_types.Status {
+  result.status
+}
+
+fn result_kind(result: test_types.TestResult) -> test_types.TestKind {
+  result.kind
 }

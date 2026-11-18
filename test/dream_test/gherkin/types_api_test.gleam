@@ -15,6 +15,24 @@ pub fn tests() {
       |> or_fail_with("keyword_to_string(Given) should be Given")
     }),
 
+    it("scenario_keyword_to_string gives the text of every keyword", fn() {
+      [
+        types.KeywordScenario,
+        types.KeywordExample,
+        types.KeywordScenarioOutline,
+        types.KeywordScenarioTemplate,
+      ]
+      |> list.map(types.scenario_keyword_to_string)
+      |> should
+      |> be_equal([
+        "Scenario",
+        "Example",
+        "Scenario Outline",
+        "Scenario Template",
+      ])
+      |> or_fail_with("expected the keyword texts")
+    }),
+
     it("keyword_from_string returns None for unknown keywords", fn() {
       types.keyword_from_string("Nope")
       |> should
@@ -53,7 +71,7 @@ pub fn tests() {
     it("empty_background produces an empty background", fn() {
       types.empty_background()
       |> should
-      |> be_equal(types.Background(steps: []))
+      |> be_equal(types.Background(name: "", description: None, steps: []))
       |> or_fail_with("empty_background should be empty")
     }),
 

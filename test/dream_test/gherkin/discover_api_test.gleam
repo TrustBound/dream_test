@@ -1,5 +1,6 @@
 import dream_test/file
 import dream_test/gherkin/discover
+import dream_test/gherkin/parser
 import dream_test/gherkin/steps
 import dream_test/matchers.{
   be_empty, be_equal, contain, have_length, or_fail_with, should,
@@ -126,7 +127,16 @@ pub fn tests() {
       errors
       |> should
       |> be_equal([
-        "test/tmp/features/discover_text.feature: No Feature found in content",
+        parser.InvalidFeatureFile(
+          path: "test/tmp/features/discover_text.feature",
+          error: parser.ParseError(
+            line: 1,
+            problem: parser.UnexpectedLine("NOT", [
+              parser.TagLine,
+              parser.FeatureLine,
+            ]),
+          ),
+        ),
       ])
       |> or_fail_with("the error should name the path and the message")
     }),
@@ -142,7 +152,7 @@ pub fn tests() {
       test_names(suite.children)
       |> should
       |> be_equal([
-        "Parse Error: test/tmp/features/discover_name.feature: No Feature found in content",
+        "Parse Error: test/tmp/features/discover_name.feature: line 1: Found \"NOT\", but expected a tag line or a Feature line.",
       ])
       |> or_fail_with("the test name should hold the path and the message")
     }),

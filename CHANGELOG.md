@@ -41,6 +41,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gherkin/steps.validate` returns the duplicate step definitions of a
   registry, one line for each.
 
+- Gherkin `Rule:` sections. `gherkin/types.Rule` holds the name,
+  description, tags, an optional Background and the scenarios of a Rule.
+  `Feature.rules` holds the Rules. The steps of the Feature Background run
+  first, then the steps of the Rule Background, then the scenario steps.
+  Each Rule runs as a group named `Rule: <name>`, so the full name of a
+  scenario in a Rule is `Feature > Rule: <name> > Scenario`. The Gherkin
+  reporter prints the Rule as a heading under its feature.
+- More than one `Examples` section for each scenario. `gherkin/types.Examples`
+  holds the name, description, tags and table of a section, and every row
+  of every section runs. The tags of a section apply to the tests that its
+  rows make. A test of an `Examples` row is named
+  `<scenario> (<examples name>, Example N)`, or `<scenario> (Example N)`
+  when the section has no name. N counts the rows of all sections, from 1.
+- The English keyword synonyms of Gherkin: `Business Need:` and `Ability:`
+  for `Feature:`, `Example:` for `Scenario:`, `Scenario Template:` for
+  `Scenario Outline:`, `Scenarios:` for `Examples:`, and the ```` ``` ````
+  DocString separator.
+- `gherkin/types.ScenarioKeyword` and
+  `gherkin/types.scenario_keyword_to_string`: the keyword that starts a
+  scenario.
+- The name and description of a Background, and the description of a
+  scenario, a Rule and an `Examples` section.
+- `gherkin/parser.ParseError`, `ParseProblem`, `TokenKind` and
+  `FeatureFileError`: typed parse errors, with one `ParseProblem` variant
+  for each kind of problem. `parser.problem_to_string`,
+  `parser.parse_error_to_string`, `parser.feature_file_error_to_string` and
+  `parser.token_kind_to_string` give the messages.
+
 ### Changed
 
 - `runner.exit_on_failure` now stops the BEAM with `init:stop(1)` in place
@@ -145,6 +173,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `And` or `But` line there was dropped. A `* ` list item in a description
   stays description text.
 
+- BREAKING: `gherkin/types.Scenario` is now one record,
+  `Scenario(keyword, name, description, tags, steps, examples)`, with
+  `examples: List(Examples)`. The `ScenarioOutline` variant is removed.
+  Before: `ScenarioOutline(name: "O", tags: [], steps: steps, examples: table)`.
+  After: `Scenario(keyword: KeywordScenarioOutline, name: "O", description: None, tags: [], steps: steps, examples: [Examples(name: "", description: None, tags: [], table: Some(table))])`.
+- BREAKING: `gherkin/types.Background` now holds `name` and `description`.
+  Before: `Background(steps: steps)`. After:
+  `Background(name: "", description: None, steps: steps)`.
+- BREAKING: `gherkin/types.Feature` has a new field, `rules: List(Rule)`.
+  Add `rules: []` where you build a `Feature`.
+- BREAKING: `gherkin/parser.parse_string` now returns
+  `Result(Feature, ParseError)` in place of `Result(Feature, String)`.
+  `parser.parse_error_to_string` gives the old `line N: ...` text.
+- BREAKING: `gherkin/parser.parse_file` now returns
+  `Result(Feature, FeatureFileError)` in place of `Result(Feature, String)`.
+  `parser.feature_file_error_to_string` gives the message: `<path>: line N:
+  ...` for an invalid file, and `Failed to read feature file: ...` for a
+  file that cannot be read.
+- BREAKING: `gherkin/discover.LoadResult.errors` is now
+  `List(parser.FeatureFileError)` in place of `List(String)`. Use
+  `parser.feature_file_error_to_string` for the old text.
+- BREAKING: The Gherkin parser now follows the official Gherkin grammar.
+  A line that the grammar does not permit at its position is now an
+  `UnexpectedLine` error. Before, the parser ignored it. Examples: text
+  after the steps of a scenario, a Background after a scenario, and a step
+  after an `Examples` table. Text below a header line (also a line that
+  starts with `|` or `"""`) is the description of that header, as in
+  Gherkin.
+- BREAKING: Every parse error message now starts with `line N:`. The
+  messages for an unclosed DocString and for an unexpected line changed:
+  `DocString is not closed` is now
+  `The DocString that starts on line N is not closed`.
+- BREAKING: A description now keeps the leading whitespace of each line and
+  the empty lines between its text lines, as Gherkin does. Before:
+  `Some("First line\nSecond line")`. After:
+  `Some("  First line\n\n  Second line")`.
+- BREAKING: The test of an `Examples` row now has the row label in its
+  name. Before, each row test was named `<scenario>` and only its id had
+  `(Example N)`. After: `<scenario> (Example N)`, or
+  `<scenario> (<examples name>, Example N)`.
+- BREAKING: A scenario with no `Examples` section now runs one time, also
+  when its keyword is `Scenario Outline`. Before, an outline with no
+  `Examples` made no tests.
+- BREAKING: A tag line is now read as Gherkin reads it. `@a@b` is two tags,
+  `@tag #comment` ignores the comment, and a tag with whitespace in it
+  (`@a b`) is a `TagContainsWhitespace` error. Before, `@a b` gave the tag
+  `a`.
+- BREAKING: A `# language:` line before the Feature must name `en`.
+  Another language is an `UnsupportedLanguage` error. Before, the line was
+  a comment.
+
 ### Fixed
 
 - Coverage no longer counts the line of a function with an
@@ -206,6 +285,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The BDD reporter without colour now writes the skipped, pending, timed out
   and setup failed counts of its summary as plain text. Before, it put ANSI
   colour codes around these counts, also when colour was off.
+
+- A table cell can now be empty. Before, `| a | | b |` gave `["a", "b"]`.
+  Now it gives `["a", "", "b"]`.
+- A table cell now unescapes `\|`, `\\` and `\n`. The text before the
+  first `|` and after the last `|` of a row is not a cell.
+- A table row with a different number of cells than the first row of its
+  table is now an `InconsistentCellCount` error.
+- The Gherkin reporter now uses the feature name for the `Feature:` line
+  of a discovered feature. Before, it used the suite name, because the
+  suite name is the first group.
 
 ## [2.2.0] - 2026-11-17
 

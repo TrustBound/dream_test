@@ -219,8 +219,9 @@ Use `*` (the `asterisk` helper in the inline DSL) for a list of steps where Give
 Rules for the first step:
 
 - The first step of a Background must use Given, When or Then.
-- The first step of a Scenario or Scenario Outline must use Given, When or Then, unless the Background has steps.
-- When the Background has steps, a Scenario can start with `And`, `But` or `*`. That step takes the phase of the last Background step.
+- The first step of a Scenario or Scenario Outline must use Given, When or Then, unless a Background step runs before it.
+- When a Background step runs before it, a Scenario can start with `And`, `But` or `*`. That step takes the phase of the last Background step.
+- In a Rule, the Feature Background steps and the Rule Background steps both run before the scenario.
 
 A `.feature` file that breaks these rules does not parse. The error names the file and the line.
 An inline feature that breaks these rules fails each scenario with the same message, before any step runs.
@@ -381,6 +382,182 @@ pub fn main() {
   |> runner.run()
 }
 ```
+
+### Rules, Examples sections and keyword synonyms
+
+A `Rule` groups the scenarios that show one business rule.
+A Rule can have its own Background.
+The Feature Background steps run first, then the Rule Background steps, then the scenario steps.
+So the first step of a Rule Background, or of a scenario in a Rule, can use `And`, `But` or `*` when a Background step runs before it.
+
+A scenario can have more than one `Examples` section, and every row of every section runs.
+The tags of an `Examples` section apply to the tests that its rows make.
+
+#### A feature with Rules and two Examples sections <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/features/stock.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gherkin
+@stock
+Feature: Stock control
+  The shop sells items from its stock.
+
+  Background:
+    Given the shop is open
+
+  Rule: An item can be sold only when it is in stock
+
+    Background:
+      And the stock holds 5 items
+
+    Example: Sell from stock
+      When I sell 2 items
+      Then the stock holds 3 items
+
+    Scenario Outline: Sell different amounts
+      When I sell <sold> items
+      Then the stock holds <left> items
+
+      @small
+      Examples: Small orders
+        | sold | left |
+        | 1    | 4    |
+        | 2    | 3    |
+
+      @large
+      Scenarios: Large orders
+        | sold | left |
+        | 5    | 0    |
+
+  Rule: A sold-out shop sells nothing
+
+    Background:
+      * the stock holds 0 items
+
+    Scenario: Nothing to sell
+      Then the stock holds 0 items
+```
+
+#### Run the feature <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/parser
+import dream_test/gherkin/steps.{type StepContext, get_int}
+import dream_test/gherkin/world.{get_or, put}
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import gleam/result
+
+fn step_shop_open(context: StepContext) {
+  put(context.world, "open", True)
+  Ok(succeed())
+}
+
+fn step_set_stock(context: StepContext) {
+  let count = get_int(context.captures, 0) |> result.unwrap(0)
+  put(context.world, "stock", count)
+  Ok(succeed())
+}
+
+fn step_sell(context: StepContext) {
+  let stock = get_or(context.world, "stock", 0)
+  let sold = get_int(context.captures, 0) |> result.unwrap(0)
+  put(context.world, "stock", stock - sold)
+  Ok(succeed())
+}
+
+fn step_check_stock(context: StepContext) {
+  let expected = get_int(context.captures, 0) |> result.unwrap(0)
+  get_or(context.world, "stock", 0)
+  |> should
+  |> be_equal(expected)
+  |> or_fail_with("Stock count mismatch")
+}
+
+pub fn tests() {
+  let steps =
+    steps.new()
+    |> steps.given("the shop is open", step_shop_open)
+    |> steps.given("the stock holds {int} items", step_set_stock)
+    |> steps.when_("I sell {int} items", step_sell)
+    |> steps.then_("the stock holds {int} items", step_check_stock)
+
+  // Each Rule becomes a group named "Rule: <name>".
+  // Each Examples row becomes one test, for example
+  // "Sell different amounts (Small orders, Example 1)".
+  let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
+  to_test_suite(FeatureConfig(feature: feature, step_registry: steps))
+}
+```
+
+How the tests get their names and tags:
+
+- Each Rule becomes a group named `Rule: <name>` (or `Rule:` when the Rule has no name). The full name of a scenario in a Rule is `Feature > Rule: <name> > Scenario`.
+- Each Examples row becomes one test named `<scenario> (Example N)`. When the `Examples` section has a name, the test is named `<scenario> (<examples name>, Example N)`. N counts the rows of all `Examples` sections of the scenario, from 1, so each name is different.
+- A scenario with no `Examples` section runs one time, also when its keyword is `Scenario Outline`. An `Examples` section with no table rows makes no tests.
+- The tags of a test are the Feature tags, then the Rule tags, then the scenario tags, then the `Examples` tags. Tag filters see all of them.
+
+#### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/2.2.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/parser
+import dream_test/gherkin/steps
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/runner
+import dream_test/types.{type TestResult}
+import dream_test/unit.{describe, it}
+import gleam/list
+import gleam/string
+
+fn full_name(result: TestResult) -> String {
+  string.join(types.full_name(result.groups, result.name), " > ")
+}
+
+pub fn tests() {
+  describe("Gherkin Rules and Examples", [
+    it("names each test after its Rule and its Examples section", fn() {
+      let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
+      let suite =
+        to_test_suite(FeatureConfig(
+          feature: feature,
+          step_registry: steps.new(),
+        ))
+
+      runner.new([suite])
+      |> runner.run()
+      |> list.map(full_name)
+      |> should
+      |> be_equal([
+        "Stock control > Rule: An item can be sold only when it is in stock > Sell from stock",
+        "Stock control > Rule: An item can be sold only when it is in stock > Sell different amounts (Small orders, Example 1)",
+        "Stock control > Rule: An item can be sold only when it is in stock > Sell different amounts (Small orders, Example 2)",
+        "Stock control > Rule: An item can be sold only when it is in stock > Sell different amounts (Large orders, Example 3)",
+        "Stock control > Rule: A sold-out shop sells nothing > Nothing to sell",
+      ])
+      |> or_fail_with("expected the Rule group and the Examples name")
+    }),
+  ])
+}
+```
+
+The parser knows these English keywords and synonyms:
+
+| Keyword | Synonyms |
+|---|---|
+| `Feature:` | `Business Need:`, `Ability:` |
+| `Scenario:` | `Example:` |
+| `Scenario Outline:` | `Scenario Template:` |
+| `Examples:` | `Scenarios:` |
+| DocString `"""` | DocString ```` ``` ```` |
+
+A `# language:` line must name `en`, because the parser knows only English.
+
+#### Parse errors
+
+`parser.parse_string` returns a `ParseError(line, problem)`.
+`parser.parse_file` returns a `FeatureFileError`: `UnreadableFeatureFile(error)` when the file cannot be read, or `InvalidFeatureFile(path, error)` when the text is not valid Gherkin.
+`ParseProblem` has one variant for each kind of problem, for example `UnexpectedLine`, `InconsistentCellCount` or `MissingPreviousStep`.
+Use `parser.feature_file_error_to_string` for a message such as `test/cart.feature: line 3: ...`.
+`discover.load` gives the same `FeatureFileError` values in `LoadResult.errors`.
 
 ### Feature discovery (load `.feature` files)
 

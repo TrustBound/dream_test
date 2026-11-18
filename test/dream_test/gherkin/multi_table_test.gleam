@@ -43,6 +43,7 @@ pub fn tests() {
 
 fn parse_content(content: String) -> Result(gtypes.Feature, String) {
   parser.parse_string(content)
+  |> result.map_error(parser.parse_error_to_string)
 }
 
 fn get_single_scenario(
@@ -57,11 +58,7 @@ fn get_single_scenario(
 fn get_two_steps(
   scenario: gtypes.Scenario,
 ) -> Result(#(gtypes.Step, gtypes.Step), String) {
-  case scenario {
-    gtypes.Scenario(_, _, steps) -> extract_two_steps(steps)
-    gtypes.ScenarioOutline(_, _, _, _) ->
-      Error("Expected Scenario, got ScenarioOutline")
-  }
+  extract_two_steps(scenario.steps)
 }
 
 fn extract_two_steps(
