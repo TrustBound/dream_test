@@ -14,7 +14,7 @@
 ////   number of tear-down hooks that failed
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
 //// - `teardown_failures`: one object for each tear-down hook that failed
-////   and each lost scope, in the order that they happened. Each object
+////   and each set-up that stopped, in the order that they happened. Each object
 ////   has `kind`, `hook`, `scope` and `message`:
 ////   - `kind` `"hook_failed"`: a tear-down hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
@@ -23,12 +23,12 @@
 ////     the group path for `after_all`, the suite name for
 ////     `after_each_suite`, `[]` for `after_all_suites`. `message` is the
 ////     error message or the crash text.
-////   - `kind` `"scope_lost"`: the owner process of a scope stopped while
-////     its tests ran. `hook` is the set-up hook that started the owner:
+////   - `kind` `"setup_stopped"`: the process that keeps a set-up alive
+////     exited while its tests ran. `hook` is the set-up hook:
 ////     `"before_all"`, `"before_each_suite"` or `"before_all_suites"`.
 ////     `scope` is the group path for `before_all`, the suite name for
 ////     `before_each_suite`, `[]` for `before_all_suites`. `message` is the
-////     exit reason of the owner.
+////     exit reason of the process.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
 //// count and no `teardown_failures` list: a failed tear-down hook was a
@@ -72,7 +72,7 @@ import dream_test/types.{
   type TeardownFailure, type TestKind, type TestResult, BooleanFailure,
   CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
   Failed, GherkinScenario, Integration, OptionFailure, Passed, Pending,
-  ResultFailure, ScopeLost, SetupFailed, Skipped, SnapshotFailure,
+  ResultFailure, SetupFailed, SetupStopped, Skipped, SnapshotFailure,
   StringMatchFailure, TeardownFailure, TimedOut, Unit,
 }
 import gleam/json.{type Json}
@@ -325,9 +325,9 @@ fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
         scope,
         message,
       )
-    ScopeLost(set_up: set_up, scope: scope, reason: reason) ->
+    SetupStopped(set_up: set_up, scope: scope, reason: reason) ->
       teardown_failure_object(
-        "scope_lost",
+        "setup_stopped",
         types.set_up_hook_name(set_up),
         scope,
         reason,

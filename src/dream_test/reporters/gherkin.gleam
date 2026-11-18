@@ -57,7 +57,7 @@ pub fn format(report report: RunReport) -> String {
   let summary_text = summary.format(report)
   let teardown_text = case types.report_teardown_failures(report) {
     [] -> ""
-    failures -> "\n" <> teardown.format(failures)
+    _ -> "\n" <> teardown.format(report)
   }
   string.concat([
     format_scenarios(types.report_tests(report)),

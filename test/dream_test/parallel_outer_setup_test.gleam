@@ -1,7 +1,7 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/parallel.{
-  type EnclosingScope, type RunRootParallelWithReporterResult,
-  EnclosingScopeAlive, EnclosingScopeLost,
+  type OuterSetup, type RunRootParallelWithReporterResult, SetupRunning,
+  SetupStopped,
 }
 import dream_test/sandbox
 import dream_test/types.{
@@ -14,8 +14,8 @@ import gleam/list
 import gleam/option.{None}
 
 pub fn tests() {
-  describe("dream_test/parallel enclosing scopes", [
-    it("a lost enclosing scope gives SetupFailed to each test", fn() {
+  describe("dream_test/parallel outer set-ups", [
+    it("a stopped outer set-up gives SetupFailed to each test", fn() {
       let reports = process.new_subject()
       describe("suite", [
         unit.before_all(fn() {
@@ -25,12 +25,8 @@ pub fn tests() {
         it("a", passing_test),
         unit.group("inner", [it("b", passing_test)]),
       ])
-      |> run_in_scopes([
-        EnclosingScopeLost(
-          set_up: BeforeAllSuitesHook,
-          scope: [],
-          reason: "Boom",
-        ),
+      |> run_in_setups([
+        SetupStopped(set_up: BeforeAllSuitesHook, scope: [], reason: "Boom"),
       ])
       |> summary
       |> with_report(reports)
@@ -39,23 +35,29 @@ pub fn tests() {
         Summary(
           tests: [
             #("a", SetupFailed, [
-              #("before_all_suites", "before_all_suites process exited: Boom"),
+              #(
+                "before_all_suites",
+                "not run: the set-up from before_all_suites stopped (Boom)",
+              ),
             ]),
             #("b", SetupFailed, [
-              #("before_all_suites", "before_all_suites process exited: Boom"),
+              #(
+                "before_all_suites",
+                "not run: the set-up from before_all_suites stopped (Boom)",
+              ),
             ]),
           ],
-          scopes: [#(BeforeAllSuitesHook, Lost("Boom"))],
+          setups: [#(BeforeAllSuitesHook, Stopped("Boom"))],
         ),
         Error(Nil),
       ))
-      |> or_fail_with("no hook or test should run in a lost scope")
+      |> or_fail_with("no hook or test should run after the set-up stopped")
     }),
 
-    it("a scope whose check gives an error is lost", fn() {
+    it("a set-up whose check gives an error is stopped", fn() {
       describe("suite", [it("a", passing_test)])
-      |> run_in_scopes([
-        EnclosingScopeAlive(
+      |> run_in_setups([
+        SetupRunning(
           set_up: BeforeEachSuiteHook,
           scope: ["suite"],
           check_owner: fn() { Error("Boom") },
@@ -69,44 +71,38 @@ pub fn tests() {
             #("a", SetupFailed, [
               #(
                 "before_each_suite",
-                "before_each_suite process exited in suite: Boom",
+                "not run: the set-up from before_each_suite in \"suite\" stopped (Boom)",
               ),
             ]),
           ],
-          scopes: [#(BeforeEachSuiteHook, Lost("Boom"))],
+          setups: [#(BeforeEachSuiteHook, Stopped("Boom"))],
         ),
       )
-      |> or_fail_with("a failed check should make the scope lost")
+      |> or_fail_with("a failed check should make the set-up stopped")
     }),
 
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
       describe("suite", [it("a", passing_test)])
-      |> run_in_scopes([
-        EnclosingScopeAlive(
-          set_up: BeforeAllSuitesHook,
-          scope: [],
-          check_owner: fn() { Ok(Nil) },
-        ),
+      |> run_in_setups([
+        SetupRunning(set_up: BeforeAllSuitesHook, scope: [], check_owner: fn() {
+          Ok(Nil)
+        }),
       ])
       |> summary
       |> should
       |> be_equal(
-        Summary(tests: [#("a", Passed, [])], scopes: [
-          #(BeforeAllSuitesHook, Alive),
+        Summary(tests: [#("a", Passed, [])], setups: [
+          #(BeforeAllSuitesHook, Running),
         ]),
       )
       |> or_fail_with("the test should run while the scope is alive")
     }),
 
-    it("the outermost lost scope is the failure of a test", fn() {
+    it("the outermost stopped set-up is the failure of a test", fn() {
       describe("suite", [it("a", passing_test)])
-      |> run_in_scopes([
-        EnclosingScopeLost(
-          set_up: BeforeAllSuitesHook,
-          scope: [],
-          reason: "outer",
-        ),
-        EnclosingScopeLost(
+      |> run_in_setups([
+        SetupStopped(set_up: BeforeAllSuitesHook, scope: [], reason: "outer"),
+        SetupStopped(
           set_up: BeforeEachSuiteHook,
           scope: ["suite"],
           reason: "inner",
@@ -118,89 +114,98 @@ pub fn tests() {
         Summary(
           tests: [
             #("a", SetupFailed, [
-              #("before_all_suites", "before_all_suites process exited: outer"),
+              #(
+                "before_all_suites",
+                "not run: the set-up from before_all_suites stopped (outer)",
+              ),
             ]),
           ],
-          scopes: [
-            #(BeforeAllSuitesHook, Lost("outer")),
-            #(BeforeEachSuiteHook, Lost("inner")),
+          setups: [
+            #(BeforeAllSuitesHook, Stopped("outer")),
+            #(BeforeEachSuiteHook, Stopped("inner")),
           ],
         ),
       )
       |> or_fail_with("the run scope should be the failure")
     }),
 
-    it("a scope lost while the tests run stops the tests not started", fn() {
-      let owner = process.spawn_unlinked(fn() { process.sleep_forever() })
-      let monitor = process.monitor(owner)
-      describe("suite", [
-        it("a", fn() {
-          process.kill(owner)
-          process.sleep(10)
-          Ok(AssertionOk)
-        }),
-        it("b", passing_test),
-      ])
-      |> run_with_concurrency_one([
-        EnclosingScopeAlive(
-          set_up: BeforeAllSuitesHook,
-          scope: [],
-          check_owner: fn() { check_process(monitor) },
-        ),
-      ])
-      |> summary
-      |> should
-      |> be_equal(
-        Summary(
-          tests: [
-            #("a", Passed, []),
-            #("b", SetupFailed, [
-              #("before_all_suites", "before_all_suites process exited: killed"),
-            ]),
-          ],
-          scopes: [#(BeforeAllSuitesHook, Lost("killed"))],
-        ),
-      )
-      |> or_fail_with("b should not start after the scope is lost")
-    }),
+    it(
+      "a set-up that stops while the tests run stops the tests not started",
+      fn() {
+        let owner = process.spawn_unlinked(fn() { process.sleep_forever() })
+        let monitor = process.monitor(owner)
+        describe("suite", [
+          it("a", fn() {
+            process.kill(owner)
+            process.sleep(10)
+            Ok(AssertionOk)
+          }),
+          it("b", passing_test),
+        ])
+        |> run_with_concurrency_one([
+          SetupRunning(
+            set_up: BeforeAllSuitesHook,
+            scope: [],
+            check_owner: fn() { check_process(monitor) },
+          ),
+        ])
+        |> summary
+        |> should
+        |> be_equal(
+          Summary(
+            tests: [
+              #("a", Passed, []),
+              #("b", SetupFailed, [
+                #(
+                  "before_all_suites",
+                  "not run: the set-up from before_all_suites stopped (killed)",
+                ),
+              ]),
+            ],
+            setups: [#(BeforeAllSuitesHook, Stopped("killed"))],
+          ),
+        )
+        |> or_fail_with("b should not start after the set-up stopped")
+      },
+    ),
   ])
 }
 
-/// What a test sees of the result: each test, and each enclosing scope.
+/// What a test sees of the result: each test, and each outer set-up.
 type Summary {
   Summary(
     tests: List(#(String, Status, List(#(String, String)))),
-    scopes: List(#(types.SetUpHook, ScopeState)),
+    setups: List(#(types.SetUpHook, SetupState)),
   )
 }
 
-type ScopeState {
-  Alive
-  Lost(reason: String)
+type SetupState {
+  Running
+  Stopped(reason: String)
 }
 
-fn run_in_scopes(
+fn run_in_setups(
   suite: types.TestSuite(Nil),
-  scopes: List(EnclosingScope),
+  setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {
-  run_with_config(suite, parallel.default_config(), scopes)
+  run_with_config(suite, parallel.default_config(), setups)
 }
 
 fn run_with_concurrency_one(
   suite: types.TestSuite(Nil),
-  scopes: List(EnclosingScope),
+  setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {
   run_with_config(
     suite,
     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 1000),
-    scopes,
+    setups,
   )
 }
 
 fn run_with_config(
   suite: types.TestSuite(Nil),
   config: parallel.ParallelConfig,
-  scopes: List(EnclosingScope),
+  setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {
   parallel.run_root_parallel_with_reporter(
     parallel.RunRootParallelWithReporterConfig(
@@ -212,7 +217,7 @@ fn run_with_config(
       completed: 0,
       runner_before_each_test: [],
       runner_after_each_test: [],
-      enclosing_scopes: scopes,
+      outer_setups: setups,
     ),
   )
 }
@@ -220,7 +225,7 @@ fn run_with_config(
 fn summary(result: RunRootParallelWithReporterResult) -> Summary {
   Summary(
     tests: list.map(result.results, test_summary),
-    scopes: list.map(result.enclosing_scopes, scope_summary),
+    setups: list.map(result.outer_setups, setup_summary),
   )
 }
 
@@ -236,15 +241,12 @@ fn test_summary(
   )
 }
 
-fn scope_summary(scope: EnclosingScope) -> #(types.SetUpHook, ScopeState) {
-  case scope {
-    EnclosingScopeAlive(set_up: set_up, scope: _, check_owner: _) -> #(
+fn setup_summary(setup: OuterSetup) -> #(types.SetUpHook, SetupState) {
+  case setup {
+    SetupRunning(set_up: set_up, scope: _, check_owner: _) -> #(set_up, Running)
+    SetupStopped(set_up: set_up, scope: _, reason: reason) -> #(
       set_up,
-      Alive,
-    )
-    EnclosingScopeLost(set_up: set_up, scope: _, reason: reason) -> #(
-      set_up,
-      Lost(reason),
+      Stopped(reason),
     )
   }
 }

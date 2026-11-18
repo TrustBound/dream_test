@@ -50,8 +50,7 @@ import dream_test/types.{
   type TestSuite, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
   AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
   AssertionSkipped, BeforeAll, BeforeAllHook, BeforeEach, Failed, Group, Passed,
-  Root, ScopeLost, SetupFailed, Skipped, TeardownFailure, Test, TestResult,
-  TimedOut,
+  Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
@@ -112,10 +111,10 @@ pub type ParallelConfig {
 /// This is an advanced API intended for building custom runners that want to
 /// drive a reporter while executing a single suite.
 ///
-/// `enclosing_scopes` are the scopes around the suite whose set-up hooks
-/// keep resources in an owner process, outermost first: for example the
-/// `before_all_suites` scope of the whole run and the `before_each_suite`
-/// scope of the suite. Give `[]` when the suite has no such scope.
+/// `outer_setups` are the set-ups around the suite that keep their
+/// resources alive in a process, outermost first: for example the
+/// `before_all_suites` set-up of the whole run and the `before_each_suite`
+/// set-up of the suite. Give `[]` when the suite has no such set-up.
 pub type RunRootParallelWithReporterConfig(context) {
   RunRootParallelWithReporterConfig(
     config: ParallelConfig,
@@ -128,43 +127,43 @@ pub type RunRootParallelWithReporterConfig(context) {
       fn(TestInfo, context) -> Result(context, String),
     ),
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-    enclosing_scopes: List(EnclosingScope),
+    outer_setups: List(OuterSetup),
   )
 }
 
-/// A scope around a suite whose set-up hooks keep their resources in an
-/// owner process, for `run_root_parallel_with_reporter`.
+/// A set-up around a suite that keeps its resources alive in a process,
+/// for `run_root_parallel_with_reporter`.
 ///
-/// The executor checks each enclosing scope before each test and each
-/// group starts. After the owner of a scope stopped, no test or hook of
-/// the suite starts: each test that did not start is `SetupFailed` with
-/// the failure `<set-up hook> process exited in <scope>: <reason>` (only
-/// `<set-up hook> process exited: <reason>` when `scope` is `[]`), with
-/// the operator `<set-up hook>`. Tests that started finish, and the
+/// The executor checks each outer set-up before each test and each group
+/// starts. After the process of a set-up stopped, no test or hook of the
+/// suite starts: each test that did not start is `SetupFailed` with the
+/// failure of `types.setup_stopped_failure`, for example
+/// `not run: the set-up from before_each_suite in "suite" stopped (<reason>)`,
+/// with the operator `<set-up hook>`. Tests that started finish, and the
 /// `after_all` hooks of the groups that started still run. The executor
-/// does not report the loss as a tear-down failure: the caller owns the
-/// scope, so the caller reports it once, for example as
-/// `types.ScopeLost`, and runs its tear-down hooks.
+/// does not report the stopped set-up as a tear-down failure: the caller
+/// owns the set-up, so the caller reports it once, for example as
+/// `types.SetupStopped`, and runs its tear-down hooks.
 ///
 /// ## Variants
 ///
-/// - `EnclosingScopeAlive(set_up, scope, check_owner)`: the owner was alive
-///   at the last check. `check_owner` checks it again and gives `Ok(Nil)`
-///   while it is alive, or `Error(reason)` after it stopped. The executor
-///   does not call `check_owner` again after it gave `Error`. With
-///   `sandbox.Owner`, use `sandbox.check_owner`.
-/// - `EnclosingScopeLost(set_up, scope, reason)`: the owner stopped with
-///   `reason`.
+/// - `SetupRunning(set_up, scope, check_owner)`: the process of the set-up
+///   was alive at the last check. `check_owner` checks it again and gives
+///   `Ok(Nil)` while it is alive, or `Error(reason)` after it stopped. The
+///   executor does not call `check_owner` again after it gave `Error`.
+///   With `sandbox.Owner`, use `sandbox.check_owner`.
+/// - `SetupStopped(set_up, scope, reason)`: the process of the set-up
+///   exited with `reason`.
 ///
 /// `set_up` is the set-up hook of the scope. `scope` is `[]` for the whole
 /// run, or the names of the scope, for example `[suite name]`.
-pub type EnclosingScope {
-  EnclosingScopeAlive(
+pub type OuterSetup {
+  SetupRunning(
     set_up: SetUpHook,
     scope: List(String),
     check_owner: fn() -> Result(Nil, String),
   )
-  EnclosingScopeLost(set_up: SetUpHook, scope: List(String), reason: String)
+  SetupStopped(set_up: SetUpHook, scope: List(String), reason: String)
 }
 
 /// Result of `run_root_parallel_with_reporter`.
@@ -173,17 +172,17 @@ pub type EnclosingScope {
 /// fields and avoid positional destructuring. A tear-down failure is not a
 /// test result, so it is in `teardown_failures`, not in `results`.
 ///
-/// `enclosing_scopes` are the scopes of the config in the same order, as
-/// the executor saw them last. A scope whose owner stopped during the run
-/// is `EnclosingScopeLost`, and its `check_owner` will not tell again: use
-/// this list, not `check_owner`, to learn that the scope is lost.
+/// `outer_setups` are the set-ups of the config in the same order, as the
+/// executor saw them last. A set-up whose process stopped during the run
+/// is `SetupStopped`, and its `check_owner` will not tell again: use this
+/// list, not `check_owner`, to learn that the set-up stopped.
 pub type RunRootParallelWithReporterResult {
   RunRootParallelWithReporterResult(
     results: List(TestResult),
     teardown_failures: List(TeardownFailure),
     completed: Int,
     progress_reporter: Option(progress.ProgressReporter),
-    enclosing_scopes: List(EnclosingScope),
+    outer_setups: List(OuterSetup),
   )
 }
 
@@ -399,10 +398,10 @@ type ScopeOwner(context) {
   OwnerGone(scope: List(String), reason: String)
 }
 
-/// The owners of the scopes around a test: the enclosing scopes of the
+/// The owners of the scopes around a test: the outer set-ups of the
 /// suite, then the group scopes, each list outermost first.
 type Owners(context) {
-  Owners(enclosing: List(EnclosingScope), groups: List(ScopeOwner(context)))
+  Owners(outer: List(OuterSetup), groups: List(ScopeOwner(context)))
 }
 
 /// Default executor configuration.
@@ -509,7 +508,7 @@ pub fn run_root_parallel(
       total: 0,
       completed: 0,
       collected: empty_collected(),
-      owners: Owners(enclosing: [], groups: []),
+      owners: Owners(outer: [], groups: []),
     )
 
   let #(collected, _completed, _owners) = execute_node(executor_input)
@@ -559,7 +558,7 @@ pub fn run_root_parallel(
 ///         completed: completed,
 ///         runner_before_each_test: [],
 ///         runner_after_each_test: [],
-///         enclosing_scopes: [],
+///         outer_setups: [],
 ///       ),
 ///     )
 ///   let parallel.RunRootParallelWithReporterResult(
@@ -567,7 +566,7 @@ pub fn run_root_parallel(
 ///     teardown_failures: _teardown_failures,
 ///     completed: _completed_after_suite,
 ///     progress_reporter: _progress_reporter,
-///     enclosing_scopes: _enclosing_scopes,
+///     outer_setups: _outer_setups,
 ///   ) = parallel_result
 ///   results
 /// }
@@ -583,9 +582,9 @@ pub fn run_root_parallel(
 /// - `completed`: number of tests already completed before this suite starts
 /// - `runner_before_each_test` and `runner_after_each_test`: hooks that run
 ///   around each test, outside its `before_each` and `after_each` hooks
-/// - `enclosing_scopes`: the scopes around the suite whose owner process
-///   holds resources, outermost first. After the owner of one stopped, no
-///   test or hook of the suite starts (see `EnclosingScope`)
+/// - `outer_setups`: the set-ups around the suite that keep their
+///   resources alive in a process, outermost first. After the process of
+///   one stopped, no test or hook of the suite starts (see `OuterSetup`)
 ///
 /// ## Returns
 ///
@@ -595,8 +594,8 @@ pub fn run_root_parallel(
 ///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
-/// - `enclosing_scopes`: the enclosing scopes as the executor saw them last;
-///   a scope whose owner stopped is `EnclosingScopeLost`
+/// - `outer_setups`: the outer set-ups as the executor saw them last; a
+///   set-up whose process stopped is `SetupStopped`
 pub fn run_root_parallel_with_reporter(
   config config: RunRootParallelWithReporterConfig(context),
 ) -> RunRootParallelWithReporterResult {
@@ -609,11 +608,11 @@ pub fn run_root_parallel_with_reporter(
     completed: completed,
     runner_before_each_test: runner_before_each_test,
     runner_after_each_test: runner_after_each_test,
-    enclosing_scopes: enclosing_scopes,
+    outer_setups: outer_setups,
   ) = config
 
   let Root(seed: seed, name: name, tags: tags, children: children) = suite
-  let owners = refresh_owners(Owners(enclosing: enclosing_scopes, groups: []))
+  let owners = refresh_owners(Owners(outer: outer_setups, groups: []))
   let executor_input =
     ExecuteNodeConfig(
       config: executor_config,
@@ -633,13 +632,13 @@ pub fn run_root_parallel_with_reporter(
     )
 
   let #(collected, completed_after_suite, owners_after_suite) =
-    execute_or_fail_group(executor_input, lost_scope_failure(owners))
+    execute_or_fail_group(executor_input, stopped_setup_failure(owners))
   RunRootParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
     completed: completed_after_suite,
     progress_reporter: progress_reporter,
-    enclosing_scopes: owners_after_suite.enclosing,
+    outer_setups: owners_after_suite.outer,
   )
 }
 
@@ -832,32 +831,31 @@ fn alive_owner(
 
 /// Look again at each owner that was alive. The check takes the down
 /// message of a stopped owner, so its reason is kept in `OwnerGone` and
-/// `EnclosingScopeLost`.
+/// `SetupStopped`.
 fn refresh_owners(owners: Owners(context)) -> Owners(context) {
   Owners(
-    enclosing: list.map(owners.enclosing, refresh_enclosing_scope),
+    outer: list.map(owners.outer, refresh_outer_setup),
     groups: list.map(owners.groups, refresh_owner),
   )
 }
 
-fn refresh_enclosing_scope(scope: EnclosingScope) -> EnclosingScope {
+fn refresh_outer_setup(scope: OuterSetup) -> OuterSetup {
   case scope {
-    EnclosingScopeAlive(set_up: set_up, scope: names, check_owner: check) ->
-      checked_enclosing_scope(scope, set_up, names, check())
-    EnclosingScopeLost(..) -> scope
+    SetupRunning(set_up: set_up, scope: names, check_owner: check) ->
+      checked_outer_setup(scope, set_up, names, check())
+    SetupStopped(..) -> scope
   }
 }
 
-fn checked_enclosing_scope(
-  scope: EnclosingScope,
+fn checked_outer_setup(
+  scope: OuterSetup,
   set_up: SetUpHook,
   names: List(String),
   checked: Result(Nil, String),
-) -> EnclosingScope {
+) -> OuterSetup {
   case checked {
     Ok(Nil) -> scope
-    Error(reason) ->
-      EnclosingScopeLost(set_up: set_up, scope: names, reason: reason)
+    Error(reason) -> SetupStopped(set_up: set_up, scope: names, reason: reason)
   }
 }
 
@@ -880,58 +878,34 @@ fn checked_owner(
   }
 }
 
-/// The outermost scope whose owner stopped, as the failure of a test that
-/// does not run because of it. The enclosing scopes are outside the group
-/// scopes.
-fn lost_scope_failure(owners: Owners(context)) -> Option(AssertionFailure) {
+/// The outermost set-up whose process stopped, as the failure of a test
+/// that does not run because of it. The outer set-ups are outside the
+/// group scopes.
+fn stopped_setup_failure(owners: Owners(context)) -> Option(AssertionFailure) {
   case
-    list.find_map(owners.enclosing, lost_enclosing_failure),
-    list.find_map(owners.groups, lost_group_failure)
+    list.find_map(owners.outer, stopped_outer_failure),
+    list.find_map(owners.groups, stopped_group_failure)
   {
     Ok(failure), _ | Error(Nil), Ok(failure) -> Some(failure)
     Error(Nil), Error(Nil) -> None
   }
 }
 
-fn lost_enclosing_failure(
-  scope: EnclosingScope,
-) -> Result(AssertionFailure, Nil) {
+fn stopped_outer_failure(scope: OuterSetup) -> Result(AssertionFailure, Nil) {
   case scope {
-    EnclosingScopeLost(set_up: set_up, scope: names, reason: reason) ->
-      Ok(scope_lost_failure(set_up, names, reason))
-    EnclosingScopeAlive(..) -> Error(Nil)
+    SetupStopped(set_up: set_up, scope: names, reason: reason) ->
+      Ok(types.setup_stopped_failure(set_up:, scope: names, reason:))
+    SetupRunning(..) -> Error(Nil)
   }
 }
 
-fn lost_group_failure(
+fn stopped_group_failure(
   owner: ScopeOwner(context),
 ) -> Result(AssertionFailure, Nil) {
   case owner {
     OwnerGone(scope: scope, reason: reason) ->
-      Ok(scope_lost_failure(BeforeAllHook, scope, reason))
+      Ok(types.setup_stopped_failure(set_up: BeforeAllHook, scope:, reason:))
     OwnerAlive(..) -> Error(Nil)
-  }
-}
-
-/// The failure of a test that did not start because the owner of `scope`
-/// stopped: `<set-up hook> process exited in <scope>: <reason>`, or
-/// `<set-up hook> process exited: <reason>` for the scope `[]`.
-fn scope_lost_failure(
-  set_up: SetUpHook,
-  scope: List(String),
-  reason: String,
-) -> AssertionFailure {
-  let name = types.set_up_hook_name(set_up)
-  hook_failure(
-    name,
-    name <> " process exited" <> scope_suffix(scope) <> ": " <> reason,
-  )
-}
-
-fn scope_suffix(scope: List(String)) -> String {
-  case scope {
-    [] -> ""
-    _ -> " in " <> string.join(scope, " > ")
   }
 }
 
@@ -1206,7 +1180,7 @@ fn finish_group_scope(
     None, _ -> run_after_all_hooks(config, scope, None, context, hooks, [])
     Some(OwnerGone(scope: _, reason: reason)), _ ->
       run_after_all_hooks(config, scope, None, context, hooks, [
-        group_scope_lost(scope, reason),
+        group_setup_stopped(scope, reason),
       ])
     Some(OwnerAlive(scope: _, owner: alive)), [] ->
       stop_checked_owner(scope, sandbox.check_owner(alive))
@@ -1241,12 +1215,12 @@ fn stop_checked_owner(
       sandbox.stop_owner(owner)
       []
     }
-    Error(reason) -> [group_scope_lost(scope, reason)]
+    Error(reason) -> [group_setup_stopped(scope, reason)]
   }
 }
 
-fn group_scope_lost(scope: List(String), reason: String) -> TeardownFailure {
-  ScopeLost(set_up: BeforeAllHook, scope: scope, reason: reason)
+fn group_setup_stopped(scope: List(String), reason: String) -> TeardownFailure {
+  types.SetupStopped(set_up: BeforeAllHook, scope: scope, reason: reason)
 }
 
 /// Run every `after_all` hook of a group, also after one fails, and give
@@ -1295,8 +1269,8 @@ type AfterAllStep(context) {
 }
 
 /// Record the result of an `after_all` hook and run the hooks after it.
-/// An owner that stopped before the hook started is a lost scope: the hook
-/// runs again in a new owner, so it never stays not run.
+/// An owner that stopped before the hook started means that the set-up
+/// stopped: the hook runs again in a new owner, so it never stays not run.
 fn after_all_result(
   step: AfterAllStep(context),
   owner_result: OwnerResult(GroupHookCall(context), Result(context, String)),
@@ -1372,7 +1346,7 @@ fn after_all_result(
       )
     OwnerLost(reason: reason) ->
       run_after_all_chain(config, scope, None, context, [hook, ..rest], [
-        group_scope_lost(scope, reason),
+        group_setup_stopped(scope, reason),
         ..failures_rev
       ])
   }
@@ -1429,7 +1403,7 @@ fn run_child_groups_sequentially(
       let #(next_collected, next_completed, next_owners) =
         execute_or_fail_group(
           node_config,
-          lost_scope_failure(node_config.owners),
+          stopped_setup_failure(node_config.owners),
         )
       run_child_groups_sequentially(
         config,
@@ -1451,14 +1425,14 @@ fn run_child_groups_sequentially(
   }
 }
 
-/// Run a child group while the owner of each enclosing scope is alive.
-/// After an owner stopped, the group does not start: no hook of it runs,
-/// and each of its tests is `SetupFailed` with `lost`.
+/// Run a child group while the process of each set-up around it is alive.
+/// After one stopped, the group does not start: no hook of it runs, and
+/// each of its tests is `SetupFailed` with `stopped`.
 fn execute_or_fail_group(
   node_config: ExecuteNodeConfig(context),
-  lost: Option(AssertionFailure),
+  stopped: Option(AssertionFailure),
 ) -> #(Collected, Int, Owners(context)) {
-  case lost {
+  case stopped {
     None -> execute_node(node_config)
     Some(failure) -> {
       let results_rev =
@@ -1601,12 +1575,12 @@ fn start_or_fail_next(
   now: Int,
 ) -> LoopState(context) {
   let #(index, test_case) = next
-  case lost_scope_failure(state.owners) {
+  case stopped_setup_failure(state.owners) {
     Some(failure) ->
       add_results(
         group,
         LoopState(..state, pending: []),
-        lost_scope_results(group, failure, [next, ..rest], []),
+        not_run_results(group, failure, [next, ..rest], []),
       )
     None ->
       start_tests_up_to_limit(
@@ -1621,7 +1595,7 @@ fn start_or_fail_next(
 }
 
 /// A `SetupFailed` result with `failure` for each test that waits.
-fn lost_scope_results(
+fn not_run_results(
   group: GroupRun(context),
   failure: AssertionFailure,
   pending: List(#(Int, TestCase(context))),
@@ -1630,7 +1604,7 @@ fn lost_scope_results(
   case pending {
     [] -> list.reverse(results_rev)
     [#(index, test_case), ..rest] ->
-      lost_scope_results(group, failure, rest, [
+      not_run_results(group, failure, rest, [
         IndexedResult(
           index: index,
           outcome: TestOutcome(

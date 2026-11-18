@@ -259,9 +259,9 @@ pub fn tests() {
         )
       }),
 
-      it("writes a lost scope with its set-up hook and reason", fn() {
+      it("writes a stopped set-up with its set-up hook and reason", fn() {
         types.run_report(tests: [], teardown_failures: [
-          types.ScopeLost(
+          types.SetupStopped(
             set_up: types.BeforeAllHook,
             scope: ["root"],
             reason: "Boom",
@@ -271,9 +271,9 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"scope_lost\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\"}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"scope\":[\"root\"],\"message\":\"Boom\"}]}",
         )
-        |> or_fail_with("a lost scope should have its own kind")
+        |> or_fail_with("a stopped set-up should have its own kind")
       }),
 
       it("counts every status in the summary", fn() {

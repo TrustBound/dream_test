@@ -10,8 +10,8 @@ For runner-level hooks (per-test/per-suite/per-run), see [Runner & execution](07
 
 Hooks are part of the nested test structure that the runner executes around tests:
 
-- Setup flows **enclosing scope → nested scope**
-- Teardown flows **nested scope → enclosing scope**
+- Setup flows **outer scope → nested scope**
+- Teardown flows **nested scope → outer scope**
 - If a setup hook fails, Dream Test fails the affected tests **without running the test body**
 
 Hooks let you run setup/teardown logic around tests while keeping the test bodies focused on behavior.
@@ -74,11 +74,11 @@ Expected print order:
 3. nested after_each
 4. enclosing after_each
 
-#### Diagram: enclosing scope vs nested scope
+#### Diagram: outer scope vs nested scope
 
 ```mermaid
 sequenceDiagram
-  participant Enclosing as Enclosing scope (surrounding describe/group)
+  participant Enclosing as Outer scope (surrounding describe/group)
   participant Nested as Nested scope (nested group)
   participant Test as Test body
 
@@ -356,7 +356,7 @@ A hook can start a resource that its tests use, for example a pool or an ETS tab
 - The runner waits for each hook with its timeout. A set-up hook that never returns gives `SetupFailed` with `hook timed out in <scope>`. A tear-down hook that never returns is a tear-down failure with the same message. The run goes on.
 - A crash in a hook, or a crash of the process that runs it, does not stop the run. The runner records it as a failure of that hook.
 - After a timeout or a crash of its owner, the next hook of the scope runs in a new owner process.
-- If the owner of a scope stops after its set-up hooks, for example because a process that a `before_all` hook linked to it crashed, the scope is lost. The run report gets a `types.ScopeLost(set_up:, scope:, reason:)` failure, and the reporters show it as `lost scope of before_all in <scope>`. The tests of the scope that did not start yet do not run: each one is `SetupFailed` with `before_all process exited in <scope>: <reason>`, `before_each_suite process exited in <suite>: <reason>` or `before_all_suites process exited: <reason>`. No hook of a group or suite in the lost scope starts. The tests that started keep their results. The tear-down hooks of the scope run in a new owner process. The runner checks the owner of each enclosing scope (the whole run, the suite and the groups) before each test and each group starts.
+- If the process that keeps a set-up alive stops after its set-up hooks, for example because a process that a `before_all` hook linked to it crashed, the set-up stopped. The run report gets a `types.SetupStopped(set_up:, scope:, reason:)` failure, and the reporters show it as `before_all in "<scope>" stopped: the process that keeps its set-up alive exited with <reason>.`, with the line `<count> tests in "<scope>" that had not started were not run.` when tests were not run. The tests of the scope that did not start yet are not run: each one is `SetupFailed` with `not run: the set-up from before_all in "<scope>" stopped (<reason>)`, `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)` or `not run: the set-up from before_all_suites stopped (<reason>)`. No hook of a group or suite under the stopped set-up starts. The tests that started keep their results. The tear-down hooks of the scope run in a new owner process. The runner checks the process of each set-up around a test (the whole run, the suite and the groups) before each test and each group starts.
 - If the body of a test times out, or the test process stops, the `after_each` and `after_each_test` hooks that did not run yet still run, in a new process with their own timeouts. They get the context after the last `before_each` hook that returned. The test keeps its status, for example `TimedOut`.
 - When a scope ends, its owner process exits with reason `normal`. An ETS table that the owner made is deleted, and a linked process that traps exits, such as a supervisor, stops.
 

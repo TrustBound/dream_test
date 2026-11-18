@@ -63,7 +63,8 @@
 ////
 
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option.{type Option, None}
+import gleam/string
 
 /// Error type for test execution.
 ///
@@ -662,7 +663,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
   }
 }
 
-/// The set-up hook that starts the owner process of a scope. A `ScopeLost`
+/// The set-up hook whose resources a process keeps alive. A `SetupStopped`
 /// failure names it.
 ///
 /// Each variant is the hook of the builder function with the same name:
@@ -706,8 +707,66 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
   }
 }
 
+/// The failure of a test that was not run because a set-up stopped.
+///
+/// The runner gives this failure to each test of the scope of a
+/// `SetupStopped` that had not started. The operator is the name of the
+/// set-up hook.
+///
+/// ## Parameters
+///
+/// - `set_up`: the set-up hook that stopped
+/// - `scope`: the scope of the set-up, `[]` for the whole run
+/// - `reason`: the exit reason of the process that kept the set-up alive
+///
+/// ## Returns
+///
+/// An `AssertionFailure` with the message
+/// `not run: the set-up from <set-up hook> in "<scope>" stopped (<reason>)`,
+/// or `not run: the set-up from <set-up hook> stopped (<reason>)` when
+/// `scope` is `[]`.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.setup_stopped_failure(
+///   set_up: types.BeforeAllHook,
+///   scope: ["Database"],
+///   reason: "killed",
+/// ).message
+/// |> should
+/// |> be_equal("not run: the set-up from before_all in \"Database\" stopped (killed)")
+/// |> or_fail_with("expected the not-run message")
+/// ```
+pub fn setup_stopped_failure(
+  set_up set_up: SetUpHook,
+  scope scope: List(String),
+  reason reason: String,
+) -> AssertionFailure {
+  let name = set_up_hook_name(set_up)
+  AssertionFailure(
+    operator: name,
+    message: "not run: the set-up from "
+      <> name
+      <> scope_text(scope)
+      <> " stopped ("
+      <> reason
+      <> ")",
+    payload: None,
+  )
+}
+
+/// ` in "<scope>"` for a scope, with its names joined by ` > `, or `""`
+/// for the whole run.
+fn scope_text(scope: List(String)) -> String {
+  case scope {
+    [] -> ""
+    _ -> " in \"" <> string.join(scope, " > ") <> "\""
+  }
+}
+
 /// A failure at the end of a scope: a tear-down hook that returned `Error`
-/// or crashed, or a scope whose owner process stopped.
+/// or crashed, or a set-up that stopped.
 ///
 /// A tear-down failure does not change the status of a test. The run keeps
 /// it in its own list, and the run fails.
@@ -720,15 +779,16 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 ///   the group path. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
-/// - `ScopeLost(set_up, scope, reason)`: the owner process of a scope
-///   stopped after its set-up hooks, for example because a process that a
-///   `before_all` hook linked to it crashed. `set_up` is the hook that
-///   started the owner. `scope` is the group path for `BeforeAllHook`, the
-///   suite name for `BeforeEachSuiteHook` and `[]` for
-///   `BeforeAllSuitesHook`. `reason` is the exit reason of the owner. The
-///   tests of the scope that had not started do not run: each one is
-///   `SetupFailed`. The tear-down hooks of the scope run in a new owner
-///   process.
+/// - `SetupStopped(set_up, scope, reason)`: a set-up stopped. The process
+///   that keeps its set-up alive exited after its set-up hooks, for
+///   example because a process that a `before_all` hook linked to it
+///   crashed. `set_up` is the set-up hook. `scope` is the group path for
+///   `BeforeAllHook`, the suite name for `BeforeEachSuiteHook` and `[]`
+///   for `BeforeAllSuitesHook`. `reason` is the exit reason of the
+///   process. The tests of the scope that had not started are not run:
+///   each one is `SetupFailed` with the failure of
+///   `setup_stopped_failure`. The tear-down hooks of the scope run in a
+///   new process.
 ///
 /// ## Example
 ///
@@ -741,7 +801,7 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 /// ```
 pub type TeardownFailure {
   TeardownFailure(hook: TeardownHook, scope: List(String), message: String)
-  ScopeLost(set_up: SetUpHook, scope: List(String), reason: String)
+  SetupStopped(set_up: SetUpHook, scope: List(String), reason: String)
 }
 
 /// The result of a run: the result of each test, and the tear-down hooks

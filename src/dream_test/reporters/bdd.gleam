@@ -128,8 +128,7 @@ fn render_bdd_sections(
 ) -> String {
   let summary = format_summary(color, report)
   let results = types.report_tests(report)
-  let teardown_text =
-    format_teardown_section(color, types.report_teardown_failures(report))
+  let teardown_text = format_teardown_section(color, report)
 
   case mode {
     reporter_types.BddSummaryOnly -> summary
@@ -178,14 +177,11 @@ fn format_summary(color: Bool, report: RunReport) -> String {
 
 /// The tear-down section with a blank line before it, or `""` when no
 /// tear-down hook failed.
-fn format_teardown_section(
-  color: Bool,
-  failures: List(types.TeardownFailure),
-) -> String {
-  case failures, color {
+fn format_teardown_section(color: Bool, report: RunReport) -> String {
+  case types.report_teardown_failures(report), color {
     [], _ -> ""
-    _, True -> "\n" <> teardown.format_in_color(failures)
-    _, False -> "\n" <> teardown.format(failures)
+    _, True -> "\n" <> teardown.format_in_color(report)
+    _, False -> "\n" <> teardown.format(report)
   }
 }
 
@@ -236,8 +232,7 @@ pub fn format(report report: RunReport) -> String {
 
   // Combine with single summary
   let summary_text = summary.format(report)
-  let teardown_text =
-    format_teardown_section(False, types.report_teardown_failures(report))
+  let teardown_text = format_teardown_section(False, report)
   string.concat([unit_text, gherkin_text, teardown_text, "\n", summary_text])
 }
 

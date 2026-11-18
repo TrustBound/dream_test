@@ -66,7 +66,7 @@ import dream_test/types.{
   type TeardownFailure, type TeardownHook, type TestResult, type TestSuite,
   AfterAll, AfterAllSuitesHook, AfterEach, AfterEachSuiteHook, BeforeAll,
   BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, Group, Passed, Root,
-  ScopeLost, SetupFailed, TeardownFailure, Test,
+  SetupFailed, SetupStopped, TeardownFailure, Test,
 }
 import gleam/io
 import gleam/list
@@ -1147,7 +1147,7 @@ type SuiteSetUp(input) {
 
 /// The tear-down hooks of a suite-level scope, the kind of hook that they
 /// are in a `TeardownFailure`, and the set-up hook of the scope for a
-/// `ScopeLost` failure.
+/// `SetupStopped` failure.
 type SuiteTearDown(input) {
   SuiteTearDown(
     hooks: List(fn(input) -> Result(Nil, String)),
@@ -1256,7 +1256,9 @@ fn finish_suite_scope(
   case owner, tear_down.hooks {
     None, _ -> run_suite_teardown(tear_down, None, [])
     Some(SuiteOwnerGone(reason: reason)), _ ->
-      run_suite_teardown(tear_down, None, [suite_scope_lost(tear_down, reason)])
+      run_suite_teardown(tear_down, None, [
+        suite_setup_stopped(tear_down, reason),
+      ])
     Some(SuiteOwnerAlive(owner: alive)), [] ->
       stop_checked_suite_owner(tear_down, sandbox.check_owner(alive))
     Some(SuiteOwnerAlive(owner: alive)), _ ->
@@ -1287,22 +1289,22 @@ fn stop_checked_suite_owner(
       sandbox.stop_owner(owner)
       []
     }
-    Error(reason) -> [suite_scope_lost(tear_down, reason)]
+    Error(reason) -> [suite_setup_stopped(tear_down, reason)]
   }
 }
 
-fn suite_scope_lost(
+fn suite_setup_stopped(
   tear_down: SuiteTearDown(input),
   reason: String,
 ) -> TeardownFailure {
-  ScopeLost(set_up: tear_down.set_up, scope: tear_down.scope, reason: reason)
+  SetupStopped(set_up: tear_down.set_up, scope: tear_down.scope, reason: reason)
 }
 
 /// Run every suite-level tear-down hook, also after one fails, and give
 /// the failures newest first, in front of `failures_rev`. After a timeout
 /// or an exit of the owner, the next hook runs in a new owner. An owner
-/// that stopped before a hook started is a lost scope: the hook runs again
-/// in a new owner, so it never stays not run.
+/// that stopped before a hook started means that the set-up stopped: the
+/// hook runs again in a new owner, so it never stays not run.
 fn run_suite_teardown_hooks(
   tear_down: SuiteTearDown(input),
   hooks: List(fn(input) -> Result(Nil, String)),
@@ -1379,7 +1381,7 @@ fn suite_tear_down_result(
       )
     OwnerLost(reason: reason) ->
       run_suite_teardown_hooks(tear_down, [hook, ..rest], None, [
-        suite_scope_lost(tear_down, reason),
+        suite_setup_stopped(tear_down, reason),
         ..failures_rev
       ])
   }
@@ -1509,7 +1511,7 @@ fn run_suite_in_run(
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   case all_suites_owner {
     Some(SuiteOwnerGone(reason: _)) ->
-      run_suite_in_lost_run(suite_run, all_suites_owner)
+      run_suite_after_run_setup_stopped(suite_run, all_suites_owner)
     _ ->
       run_one_suite(
         suite_run,
@@ -1522,14 +1524,14 @@ fn run_suite_in_run(
 
 /// Run a suite after the owner of the whole run stopped. No suite-level
 /// hook runs, and the executor gives `SetupFailed` to each test.
-fn run_suite_in_lost_run(
+fn run_suite_after_run_setup_stopped(
   suite_run: SuiteTests(ctx),
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   let result =
     run_suite_tests(
       suite_run,
-      enclosing_scope(BeforeAllSuitesHook, [], all_suites_owner),
+      outer_setup(BeforeAllSuitesHook, [], all_suites_owner),
     )
   #(
     Collected(
@@ -1591,8 +1593,8 @@ fn run_one_suite(
         run_suite_tests(
           suite_run,
           list.append(
-            enclosing_scope(BeforeAllSuitesHook, [], all_suites_owner),
-            enclosing_scope(BeforeEachSuiteHook, suite_scope, suite_owner),
+            outer_setup(BeforeAllSuitesHook, [], all_suites_owner),
+            outer_setup(BeforeEachSuiteHook, suite_scope, suite_owner),
           ),
         )
       #(
@@ -1601,15 +1603,15 @@ fn run_one_suite(
           teardown_failures: result.teardown_failures,
         ),
         result.completed,
-        lost_suite_owner(
+        stopped_suite_owner(
           all_suites_owner,
           BeforeAllSuitesHook,
-          result.enclosing_scopes,
+          result.outer_setups,
         ),
-        lost_suite_owner(
+        stopped_suite_owner(
           suite_owner,
           BeforeEachSuiteHook,
-          result.enclosing_scopes,
+          result.outer_setups,
         ),
       )
     }
@@ -1639,10 +1641,10 @@ fn run_one_suite(
   )
 }
 
-/// Run the tests of one suite in the executor, inside `enclosing_scopes`.
+/// Run the tests of one suite in the executor, inside `outer_setups`.
 fn run_suite_tests(
   suite_run: SuiteTests(ctx),
-  enclosing_scopes: List(parallel.EnclosingScope),
+  outer_setups: List(parallel.OuterSetup),
 ) -> parallel.RunRootParallelWithReporterResult {
   parallel.run_root_parallel_with_reporter(
     parallel.RunRootParallelWithReporterConfig(
@@ -1654,29 +1656,27 @@ fn run_suite_tests(
       completed: suite_run.completed,
       runner_before_each_test: suite_run.runner_before_each_test,
       runner_after_each_test: suite_run.runner_after_each_test,
-      enclosing_scopes: enclosing_scopes,
+      outer_setups: outer_setups,
     ),
   )
 }
 
-/// The suite-level scope of `owner` as the executor sees it: no scope when
-/// it has no owner.
-fn enclosing_scope(
+/// The suite-level set-up of `owner` as the executor sees it: no set-up
+/// when it has no owner.
+fn outer_setup(
   set_up: SetUpHook,
   scope: List(String),
   owner: Option(SuiteScopeOwner(input)),
-) -> List(parallel.EnclosingScope) {
+) -> List(parallel.OuterSetup) {
   case owner {
     None -> []
     Some(SuiteOwnerAlive(owner: alive)) -> [
-      parallel.EnclosingScopeAlive(
-        set_up: set_up,
-        scope: scope,
-        check_owner: fn() { check_suite_owner(alive) },
-      ),
+      parallel.SetupRunning(set_up: set_up, scope: scope, check_owner: fn() {
+        check_suite_owner(alive)
+      }),
     ]
     Some(SuiteOwnerGone(reason: reason)) -> [
-      parallel.EnclosingScopeLost(set_up: set_up, scope: scope, reason: reason),
+      parallel.SetupStopped(set_up: set_up, scope: scope, reason: reason),
     ]
   }
 }
@@ -1686,27 +1686,27 @@ fn check_suite_owner(owner: SuiteOwner(input)) -> Result(Nil, String) {
   |> result.replace(Nil)
 }
 
-/// The owner after the executor ran: gone when the executor saw the scope
-/// of `set_up` lost. The check of the executor took the down message of
-/// the owner, so its reason comes from `enclosing_scopes`.
-fn lost_suite_owner(
+/// The owner after the executor ran: gone when the executor saw the
+/// set-up `set_up` stopped. The check of the executor took the down message of
+/// the owner, so its reason comes from `outer_setups`.
+fn stopped_suite_owner(
   owner: Option(SuiteScopeOwner(input)),
   set_up: SetUpHook,
-  enclosing_scopes: List(parallel.EnclosingScope),
+  outer_setups: List(parallel.OuterSetup),
 ) -> Option(SuiteScopeOwner(input)) {
-  case owner, list.find_map(enclosing_scopes, lost_reason(_, set_up)) {
+  case owner, list.find_map(outer_setups, stopped_reason(_, set_up)) {
     Some(_), Ok(reason) -> Some(SuiteOwnerGone(reason: reason))
     _, _ -> owner
   }
 }
 
-fn lost_reason(
-  scope: parallel.EnclosingScope,
+fn stopped_reason(
+  outer_setup: parallel.OuterSetup,
   set_up: SetUpHook,
 ) -> Result(String, Nil) {
-  case scope {
-    parallel.EnclosingScopeLost(set_up: lost, scope: _, reason: reason)
-      if lost == set_up
+  case outer_setup {
+    parallel.SetupStopped(set_up: stopped, scope: _, reason: reason)
+      if stopped == set_up
     -> Ok(reason)
     _ -> Error(Nil)
   }

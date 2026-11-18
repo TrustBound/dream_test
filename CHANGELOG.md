@@ -30,14 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
   `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
   `types.teardown_hook_name`.
-- `types.ScopeLost(set_up:, scope:, reason:)`, a variant of
-  `types.TeardownFailure` for a scope whose owner process stopped after
-  its set-up hooks, and `types.SetUpHook` (`BeforeAllHook`,
-  `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
-  `types.set_up_hook_name`. The BDD and Gherkin reporters show it as
-  `lost scope of <set-up hook> in <scope>` and
-  `the owner process exited: <reason>`. The JSON reporter gives it as
-  `{"kind": "scope_lost", "hook": "before_all", "scope": [...],
+- `types.SetupStopped(set_up:, scope:, reason:)`, a variant of
+  `types.TeardownFailure` for a set-up that stopped: the process that
+  keeps its set-up alive exited after its set-up hooks. Also
+  `types.SetUpHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
+  `BeforeAllSuitesHook`) with `types.set_up_hook_name`, and
+  `types.setup_stopped_failure(set_up:, scope:, reason:)`, the failure of
+  each test that was not run. The BDD and Gherkin reporters show a
+  stopped set-up as
+  `before_all in "<scope>" stopped: the process that keeps its set-up alive exited with <reason>.`
+  and `<count> tests in "<scope>" that had not started were not run.`
+  (the second line only when tests were not run). The JSON reporter gives
+  it as `{"kind": "setup_stopped", "hook": "before_all", "scope": [...],
   "message": "<reason>"}`, and each failed tear-down hook now has
   `"kind": "hook_failed"`.
 - `sandbox.OwnerLost(reason)`: `run_in_owner` gives it when the owner had
@@ -47,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types.failed` use it.
 - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
   `Tear-down failures:` section that the BDD and Gherkin reporters show.
+  Each function takes a `types.RunReport`, so it can count the tests that
+  a stopped set-up did not run.
 - `sandbox.run_catching(run:, input:)` runs a function in the calling
   process and gives `Ok(value)`, or `Error("class:reason")` when the
   function crashes. No new process starts, so a resource that the function
@@ -207,28 +213,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite) |> list.length`. After: `run_root_parallel(config, suite) |>
   types.report_tests |> list.length`.
 - BREAKING: `parallel.RunRootParallelWithReporterConfig` has a new field
-  `enclosing_scopes: List(parallel.EnclosingScope)`, and
+  `outer_setups: List(parallel.OuterSetup)`, and
   `parallel.RunRootParallelWithReporterResult` has a new field
-  `enclosing_scopes` that gives the same scopes after the run. An
-  `EnclosingScope` is a scope around the suite whose owner process holds
-  resources, for example the `before_all_suites` or `before_each_suite`
-  scope: `EnclosingScopeAlive(set_up:, scope:, check_owner:)` or
-  `EnclosingScopeLost(set_up:, scope:, reason:)`. The executor checks
-  each one before each test and each group starts. After an owner
-  stopped, the tests of the suite that did not start are `SetupFailed`
-  and no hook of the suite starts. Before:
+  `outer_setups` that gives the same set-ups after the run. An
+  `OuterSetup` is a set-up around the suite that keeps its resources
+  alive in a process, for example the `before_all_suites` or
+  `before_each_suite` set-up: `SetupRunning(set_up:, scope:,
+  check_owner:)` or `SetupStopped(set_up:, scope:, reason:)`. The
+  executor checks each one before each test and each group starts. After
+  a set-up stopped, the tests of the suite that did not start are
+  `SetupFailed` and no hook of the suite starts. Before:
   `RunRootParallelWithReporterConfig(config:, suite:, progress_reporter:,
   write:, total:, completed:, runner_before_each_test:,
-  runner_after_each_test:)`. After: add `enclosing_scopes: []` to the
-  config, and `enclosing_scopes: _enclosing_scopes` to a pattern that
-  takes the result apart.
-- When the owner of the whole run (`before_all_suites`) or of a suite
+  runner_after_each_test:)`. After: add `outer_setups: []` to the config,
+  and `outer_setups: _outer_setups` to a pattern that takes the result
+  apart.
+- When the set-up of the whole run (`before_all_suites`) or of a suite
   (`before_each_suite`) stops while the tests of a suite run, the tests of
-  that suite that did not start do not run. Before, they ran, and only the
-  later suites stopped. Each one is `SetupFailed` with
-  `before_all_suites process exited: <reason>` or
-  `before_each_suite process exited in <suite>: <reason>`, and the loss is
-  reported once as `types.ScopeLost`.
+  that suite that did not start are not run. Before, they ran, and only
+  the later suites stopped. Each one is `SetupFailed` with
+  `not run: the set-up from before_all_suites stopped (<reason>)` or
+  `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)`,
+  and the stopped set-up is reported once as `types.SetupStopped`.
 - BREAKING: the reporter functions that format a whole run take a
   `types.RunReport`: `bdd.render`, `bdd.format`, `bdd.report`,
   `bdd.format_summary_only`, `json.render`, `json.format`,
@@ -471,14 +477,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A hook that kills its owner process no longer stops the run. The runner
   monitors the owner and records `hook crashed in <scope>: <reason>`. The
   next hook of the scope runs in a new owner process.
-- An owner process that stops while the tests of its scope run is now
-  reported as a lost scope, `types.ScopeLost`, not as a failure of a
-  tear-down hook. The tests of the scope that did not start yet do not
+- A set-up whose process stops while the tests of its scope run is now
+  reported as a stopped set-up, `types.SetupStopped`, not as a failure of
+  a tear-down hook. The tests of the scope that did not start yet are not
   run: each one is `SetupFailed` with
-  `before_all process exited in <group>: <reason>`,
-  `before_each_suite process exited in <suite>: <reason>` or
-  `before_all_suites process exited: <reason>`. The tear-down hooks of the
-  scope run in a new owner process.
+  `not run: the set-up from before_all in "<group>" stopped (<reason>)`,
+  `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)`
+  or `not run: the set-up from before_all_suites stopped (<reason>)`. The
+  tear-down hooks of the scope run in a new owner process.
 - A tear-down hook always runs when the owner of its scope stops just
   before the hook starts. Before, the hook was reported as crashed and did
   not run. `run_in_owner` now knows if the owner started the function, and
