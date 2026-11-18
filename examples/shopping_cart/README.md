@@ -4,7 +4,7 @@ This example demonstrates **Cucumber/Gherkin-style BDD testing** with Dream Test
 
 ## Project Structure
 
-```
+```text
 shopping_cart/
 ├── src/shopping_cart/
 │   ├── types.gleam             # Core domain types
@@ -133,7 +133,7 @@ make test
 
 ## Output
 
-```
+```text
 Shopping Cart — Gherkin BDD Example
 ====================================
 

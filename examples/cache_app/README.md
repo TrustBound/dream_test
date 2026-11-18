@@ -66,7 +66,7 @@ It's intentionally simple — the focus is on testing patterns, not cache implem
 
 Copy this structure for your own projects:
 
-```
+```text
 your_app/
 ├── gleam.toml
 ├── src/

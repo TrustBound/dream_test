@@ -22,6 +22,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # The docs check in the snippet tests compares the 2.x code blocks
+          # of the upgrade guide with tag 2.1.3, so it needs the tags.
+          fetch-depth: 0
 
       - name: Install Erlang and Gleam
         uses: erlef/setup-beam@v1
