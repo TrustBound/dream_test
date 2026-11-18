@@ -218,7 +218,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     counted, because Gleam code never calls the wrapper that Gleam compiles
     for it. A function without the attribute whose body only calls an
     external is counted
-  - `coverage.RunOutcome` has the count `teardown_failed`
+  - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
+    coverage failure: the passed and failed tests, the tear-down hooks that
+    failed (`teardown_failed`), and whether the runner exits on failure
   - dream_test measures itself: its own tests cover 100% of the lines in
     `src`, with no exclusions
 
