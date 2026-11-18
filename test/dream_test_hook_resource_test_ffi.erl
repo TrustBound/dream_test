@@ -1,6 +1,6 @@
 -module(dream_test_hook_resource_test_ffi).
 -export([new_named_table/1, table_exists/1, delete_table/1, start_linked_crash/1,
-         crash_owner/1]).
+         crash_owner/1, links_alive/1, table_owner_alive/1]).
 
 %% Helpers for the hook resource tests. A test helper that owns an ETS table
 %% is the simplest resource a hook can start: the table lives only while the
@@ -49,4 +49,29 @@ crash_owner(Name) ->
     Monitor = erlang:monitor(process, Owner),
     receive
         {'DOWN', Monitor, process, Owner, _Reason} -> nil
+    end.
+
+%% True when the process is alive, links to at least one process, and every
+%% process that it links to is alive and not exiting. A pool links to the
+%% process that started it, so this says that the process of the hook
+%% still runs, with no wait.
+links_alive(Pid) ->
+    case erlang:process_info(Pid, links) of
+        {links, [_ | _] = Links} -> lists:all(fun is_running/1, Links);
+        _ -> false
+    end.
+
+%% True when the named table exists and its owner is alive and not exiting.
+table_owner_alive(Name) ->
+    case ets:info(Name, owner) of
+        undefined -> false;
+        Owner -> is_running(Owner)
+    end.
+
+%% A process that exits is `exiting` for a short time before it is gone.
+is_running(Pid) ->
+    case erlang:process_info(Pid, status) of
+        {status, exiting} -> false;
+        {status, _} -> true;
+        undefined -> false
     end.

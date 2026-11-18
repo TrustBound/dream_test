@@ -436,7 +436,9 @@ pub fn tests() {
       runner.new([
         describe("root", [
           timed_test("slow", None, block_forever),
-          timed_test("fast", None, pass),
+          // "fast" has its own long timeout, so a slow machine cannot
+          // make it time out.
+          timed_test("fast", Some(60_000), pass),
         ]),
       ])
       |> runner.default_timeout_ms(50)

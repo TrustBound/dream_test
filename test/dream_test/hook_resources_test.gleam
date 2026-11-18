@@ -1255,9 +1255,6 @@ type PoolContext {
 @external(erlang, "dream_test_hook_resource_test_ffi", "new_named_table")
 fn new_named_table(name: Atom) -> Nil
 
-@external(erlang, "dream_test_hook_resource_test_ffi", "table_exists")
-fn table_exists(name: Atom) -> Bool
-
 @external(erlang, "dream_test_hook_resource_test_ffi", "delete_table")
 fn delete_table(name: Atom) -> Nil
 
@@ -1298,19 +1295,19 @@ fn stop_pool_in_context(context: PoolContext) -> Result(Nil, String) {
   }
 }
 
-/// Wait a short time first, so that a pool that dies with the process that
-/// started it is gone before the check.
+/// The pool is alive, and so is the process that it links to: the process
+/// of the hook that started it. A pool whose hook process had stopped
+/// would have no live link, so the check needs no wait.
 fn pool_in_context_is_alive(
   context: PoolContext,
 ) -> Result(AssertionResult, String) {
-  process.sleep(100)
   case context {
     NoPool -> Error("before_all gave no pool")
     Pool(pid) ->
-      process.is_alive(pid)
+      links_alive(pid)
       |> should
       |> be_equal(True)
-      |> or_fail_with("the pool should be alive")
+      |> or_fail_with("the pool and the process of its hook should be alive")
   }
 }
 
@@ -1340,12 +1337,11 @@ fn stop_named_pool(name: Name(Nil)) -> Result(Nil, String) {
 }
 
 fn named_pool_is_alive(name: Name(Nil)) -> Result(AssertionResult, String) {
-  process.sleep(100)
   process.named(name)
-  |> result.map(process.is_alive)
+  |> result.map(links_alive)
   |> should
   |> be_equal(Ok(True))
-  |> or_fail_with("the pool should be alive")
+  |> or_fail_with("the pool and the process of its hook should be alive")
 }
 
 fn make_table(name: Atom) -> Result(Atom, String) {
@@ -1358,13 +1354,23 @@ fn remove_table(name: Atom) -> Result(Nil, String) {
   Ok(Nil)
 }
 
+/// The table exists and the process that owns it is alive, so the table
+/// lives on; the check needs no wait.
 fn table_in_context_exists(name: Atom) -> Result(AssertionResult, String) {
-  process.sleep(100)
-  table_exists(name)
+  table_owner_alive(name)
   |> should
   |> be_equal(True)
-  |> or_fail_with("the ETS table should exist")
+  |> or_fail_with("the ETS table and its owner should exist")
 }
+
+/// True when the process is alive, it links to at least one process, and
+/// every process that it links to is alive.
+@external(erlang, "dream_test_hook_resource_test_ffi", "links_alive")
+fn links_alive(pid: Pid) -> Bool
+
+/// True when the named table exists and the process that owns it is alive.
+@external(erlang, "dream_test_hook_resource_test_ffi", "table_owner_alive")
+fn table_owner_alive(name: Atom) -> Bool
 
 /// The tests and tear-down failures of a run, in a form that a sandbox
 /// can return.
