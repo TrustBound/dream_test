@@ -31,6 +31,7 @@ pub fn tests() {
             completed: 1,
             total: 1,
             teardown_failures: 0,
+            setup_stopped: 0,
           ),
         )
 

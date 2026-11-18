@@ -88,6 +88,7 @@ pub fn tests() {
             completed: 5,
             total: 2,
             teardown_failures: 0,
+            setup_stopped: 0,
           ),
         )
         |> should
@@ -116,11 +117,28 @@ pub fn tests() {
             completed: 2,
             total: 2,
             teardown_failures: 1,
+            setup_stopped: 0,
           ),
         )
         |> should
         |> be_equal("2/2 [█████████████] 100% done, 1 tear-down failed ")
         |> or_fail_with("the last line should count the tear-down failures")
+      }),
+
+      it("counts failed tear-down hooks and stopped set-ups apart", fn() {
+        progress.render(
+          80,
+          progress.RunFinishedProgress(
+            completed: 2,
+            total: 2,
+            teardown_failures: 1,
+            setup_stopped: 2,
+          ),
+        )
+        |> string.contains("] 100% done, 1 tear-down failed, 2 set-up stopped ")
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("the last line should show both counts")
       }),
     ]),
 
@@ -158,6 +176,7 @@ pub fn tests() {
               completed: 2,
               total: 2,
               teardown_failures: 0,
+              setup_stopped: 0,
             ),
           )
         })
@@ -174,6 +193,7 @@ pub fn tests() {
               completed: 2,
               total: 2,
               teardown_failures: 1,
+              setup_stopped: 0,
             ),
           )
         })

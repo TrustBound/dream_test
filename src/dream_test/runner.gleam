@@ -56,6 +56,7 @@ import dream_test/reporters/bdd
 import dream_test/reporters/coverage as coverage_reporter
 import dream_test/reporters/json
 import dream_test/reporters/progress
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/sandbox.{
   type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerLost,
@@ -947,6 +948,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
       ),
     )
 
+  let counts = summary.count(report)
   case progress_reporter0 {
     None -> Nil
     Some(progress_reporter) ->
@@ -955,7 +957,8 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
         progress.RunFinishedProgress(
           completed: completed2,
           total: total,
-          teardown_failures: list.length(types.report_teardown_failures(report)),
+          teardown_failures: counts.teardown_failed,
+          setup_stopped: counts.setup_stopped,
         ),
         output,
       )
@@ -2237,10 +2240,12 @@ fn run_outcome(
   exit_on_failure: Bool,
 ) -> coverage_reporter.RunOutcome {
   let tests = types.report_tests(report)
+  let counts = summary.count(report)
   coverage_reporter.RunOutcome(
     passed: list.count(tests, is_passed),
     failed: list.count(tests, is_failure),
-    teardown_failed: list.length(types.report_teardown_failures(report)),
+    teardown_failed: counts.teardown_failed,
+    setup_stopped: counts.setup_stopped,
     exit_on_failure: exit_on_failure,
   )
 }

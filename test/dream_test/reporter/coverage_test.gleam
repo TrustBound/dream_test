@@ -155,7 +155,13 @@ fn green(text: String) -> String {
 }
 
 fn passing_outcome() {
-  RunOutcome(passed: 3, failed: 0, teardown_failed: 0, exit_on_failure: True)
+  RunOutcome(
+    passed: 3,
+    failed: 0,
+    teardown_failed: 0,
+    setup_stopped: 0,
+    exit_on_failure: True,
+  )
 }
 
 fn render_failure_for(error: CoverageError) -> String {
@@ -1216,6 +1222,7 @@ pub fn tests() {
             passed: 3,
             failed: 2,
             teardown_failed: 0,
+            setup_stopped: 0,
             exit_on_failure: True,
           ),
         )
@@ -1236,6 +1243,7 @@ pub fn tests() {
             passed: 3,
             failed: 0,
             teardown_failed: 1,
+            setup_stopped: 0,
             exit_on_failure: True,
           ),
         )
@@ -1256,6 +1264,7 @@ pub fn tests() {
             passed: 3,
             failed: 2,
             teardown_failed: 1,
+            setup_stopped: 0,
             exit_on_failure: True,
           ),
         )
@@ -1267,6 +1276,31 @@ pub fn tests() {
         ))
         |> or_fail_with("expected the failed tests and the tear-down failures")
       }),
+      it("names a stopped set-up together with a coverage error", fn() {
+        last_line(NoSourceFiles("lib"), 0, 1)
+        |> should
+        |> be_equal(Ok(
+          "Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.\n",
+        ))
+        |> or_fail_with("expected the stopped set-up")
+      }),
+      it("names a failed tear-down hook and a stopped set-up together", fn() {
+        last_line(
+          BelowMinimumPercent(
+            hit: 2,
+            total: 6,
+            minimum_percent: 50.0,
+            lines_needed: 3,
+          ),
+          1,
+          2,
+        )
+        |> should
+        |> be_equal(Ok(
+          "Tests: 3 passed, 1 tear-down failed, 2 set-up stopped. Exit status 1, because a tear-down hook failed, a set-up stopped and coverage is below the minimum.\n",
+        ))
+        |> or_fail_with("expected both counts and both causes")
+      }),
       it("says the exit status is unchanged without exit_on_failure", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
@@ -1274,6 +1308,7 @@ pub fn tests() {
             passed: 3,
             failed: 0,
             teardown_failed: 0,
+            setup_stopped: 0,
             exit_on_failure: False,
           ),
         )
@@ -1339,6 +1374,7 @@ pub fn tests() {
             passed: 3,
             failed: 1,
             teardown_failed: 0,
+            setup_stopped: 0,
             exit_on_failure: True,
           ),
         )
@@ -1354,4 +1390,25 @@ pub fn tests() {
       }),
     ]),
   ])
+}
+
+/// The last line of the failure block for 3 passed tests and the given
+/// tear-down failures and stopped set-ups.
+fn last_line(
+  error: CoverageError,
+  teardown_failed: Int,
+  setup_stopped: Int,
+) -> Result(String, Nil) {
+  coverage_reporter.render_failure(
+    error: error,
+    outcome: RunOutcome(
+      passed: 3,
+      failed: 0,
+      teardown_failed: teardown_failed,
+      setup_stopped: setup_stopped,
+      exit_on_failure: True,
+    ),
+  )
+  |> string.split("\n\n")
+  |> list.last
 }

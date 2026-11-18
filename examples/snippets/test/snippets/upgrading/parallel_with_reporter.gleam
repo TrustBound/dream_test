@@ -1,9 +1,9 @@
 import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
+import dream_test/reporters/summary
 import dream_test/types.{type TestSuite}
 import dream_test/unit.{describe, it}
-import gleam/list
 import gleam/option.{Some}
 
 pub fn suite() -> TestSuite(Nil) {
@@ -44,12 +44,20 @@ pub fn main() {
     outer_setups: _outer_setups,
   ) = parallel_result
 
+  // Count failed tear-down hooks and stopped set-ups apart.
+  let counts =
+    summary.count(types.run_report(
+      tests: results,
+      teardown_failures: teardown_failures,
+    ))
+
   progress.line(
     reporter,
     progress.RunFinishedProgress(
       completed: completed_after_suite,
       total: total,
-      teardown_failures: list.length(teardown_failures),
+      teardown_failures: counts.teardown_failed,
+      setup_stopped: counts.setup_stopped,
     ),
   )
   |> write

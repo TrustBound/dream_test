@@ -8,6 +8,7 @@
 //// hook that never returns or kills its process does not stop the run.
 
 import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/sandbox.{type SandboxResult, SandboxCompleted, SandboxConfig}
 import dream_test/types.{
@@ -24,6 +25,7 @@ import gleam/list
 import gleam/otp/actor
 import gleam/otp/static_supervisor
 import gleam/result
+import gleam/string
 
 pub fn tests() {
   describe("hook resources", [
@@ -741,6 +743,29 @@ pub fn tests() {
         ),
       )
       |> or_fail_with("a killed after_all process should be reported")
+    }),
+
+    it("the last progress line counts a stopped set-up as stopped", fn() {
+      let writes = process.new_subject()
+      let _report =
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.before_all_suites(fn(_suites) { kill_self() })
+        |> runner.progress_reporter(progress.new())
+        |> runner.output(
+          runner.Output(
+            out: fn(text) { process.send(writes, text) },
+            error: fn(_text) { Nil },
+          ),
+        )
+        |> runner.run()
+      let text = string.concat(drain(writes, []))
+      #(
+        string.contains(text, " done, 1 set-up stopped "),
+        string.contains(text, "tear-down failed"),
+      )
+      |> should
+      |> be_equal(#(True, False))
+      |> or_fail_with("expected done, 1 set-up stopped")
     }),
 
     it(
@@ -1477,4 +1502,15 @@ fn failures(
       }),
     )
   })
+}
+
+/// Every text in the mailbox of `writes`, in order.
+fn drain(
+  writes: process.Subject(String),
+  texts_rev: List(String),
+) -> List(String) {
+  case process.receive(writes, 0) {
+    Ok(text) -> drain(writes, [text, ..texts_rev])
+    Error(Nil) -> list.reverse(texts_rev)
+  }
 }

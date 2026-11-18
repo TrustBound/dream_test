@@ -123,12 +123,14 @@ import gleam/string
 /// - `passed`: tests with status `Passed`
 /// - `failed`: tests with status `Failed`, `SetupFailed` or `TimedOut`
 /// - `teardown_failed`: tear-down hooks that failed
+/// - `setup_stopped`: set-ups whose process stopped while their tests ran
 /// - `exit_on_failure`: whether the runner exits with status 1 on failure
 pub type RunOutcome {
   RunOutcome(
     passed: Int,
     failed: Int,
     teardown_failed: Int,
+    setup_stopped: Int,
     exit_on_failure: Bool,
   )
 }
@@ -688,6 +690,7 @@ fn render_inexact_line_warning(source_paths: List(String)) -> String {
 ///     passed: 3,
 ///     failed: 0,
 ///     teardown_failed: 0,
+///     setup_stopped: 0,
 ///     exit_on_failure: True,
 ///   ),
 /// )
@@ -718,12 +721,11 @@ fn indent_line(line: String) -> String {
   "  " <> line <> "\n"
 }
 
+/// Why coverage made the run fail: `alone` when nothing else failed, and
+/// `coverage` to follow the other causes, as in
+/// `tests failed and <coverage>`.
 type ExitReason {
-  ExitReason(
-    alone: String,
-    with_failed_tests: String,
-    with_teardown_failures: String,
-  )
+  ExitReason(alone: String, coverage: String)
 }
 
 fn exit_reason(error: CoverageError) -> ExitReason {
@@ -731,42 +733,58 @@ fn exit_reason(error: CoverageError) -> ExitReason {
     BelowMinimumPercent(..) | FilesBelowMinimumPercent(..) ->
       ExitReason(
         alone: "coverage is below the minimum",
-        with_failed_tests: "tests failed and coverage is below the minimum",
-        with_teardown_failures: "a tear-down hook failed and coverage is below the minimum",
+        coverage: "coverage is below the minimum",
       )
     _ ->
       ExitReason(
         alone: "coverage was requested and did not complete",
-        with_failed_tests: "tests failed and coverage did not complete",
-        with_teardown_failures: "a tear-down hook failed and coverage did not complete",
+        coverage: "coverage did not complete",
       )
   }
 }
 
 fn outcome_line(outcome: RunOutcome, reason: ExitReason) -> String {
-  let tests =
-    tests_line(outcome.passed, outcome.failed, outcome.teardown_failed)
-  case outcome.exit_on_failure, outcome.failed, outcome.teardown_failed {
-    True, 0, 0 -> tests <> " Exit status 1, because " <> reason.alone <> "."
-    True, 0, _ ->
-      tests
-      <> " Exit status 1, because "
-      <> reason.with_teardown_failures
-      <> "."
-    True, _, _ ->
-      tests <> " Exit status 1, because " <> reason.with_failed_tests <> "."
-    False, _, _ ->
+  let tests = tests_line(outcome)
+  case outcome.exit_on_failure {
+    True ->
+      tests <> " Exit status 1, because " <> causes(outcome, reason) <> "."
+    False ->
       tests
       <> " The exit status is not changed, because exit_on_failure is off."
   }
 }
 
-fn tests_line(passed: Int, failed: Int, teardown_failed: Int) -> String {
+/// The causes of the exit status 1, in a sentence. Failed tests come
+/// first and alone; else each failed tear-down hook and stopped set-up.
+fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
+  case outcome.failed, hook_causes(outcome) {
+    0, [] -> reason.alone
+    0, hooks -> string.join(hooks, ", ") <> " and " <> reason.coverage
+    _, _ -> "tests failed and " <> reason.coverage
+  }
+}
+
+fn hook_causes(outcome: RunOutcome) -> List(String) {
+  list.flatten([
+    cause_when(outcome.teardown_failed, "a tear-down hook failed"),
+    cause_when(outcome.setup_stopped, "a set-up stopped"),
+  ])
+}
+
+fn cause_when(count: Int, cause: String) -> List(String) {
+  case count {
+    0 -> []
+    _ -> [cause]
+  }
+}
+
+fn tests_line(outcome: RunOutcome) -> String {
   "Tests: "
-  <> int.to_string(passed)
+  <> int.to_string(outcome.passed)
   <> " passed"
-  <> count_part(failed, " failed")
-  <> count_part(teardown_failed, " tear-down failed")
+  <> count_part(outcome.failed, " failed")
+  <> count_part(outcome.teardown_failed, " tear-down failed")
+  <> count_part(outcome.setup_stopped, " set-up stopped")
   <> "."
 }
 

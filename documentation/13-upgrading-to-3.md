@@ -712,15 +712,15 @@ pub fn main() {
 }
 ```
 
-##### 3.0.0: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L1-L58"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L1-L66"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
+import dream_test/reporters/summary
 import dream_test/types.{type TestSuite}
 import dream_test/unit.{describe, it}
-import gleam/list
 import gleam/option.{Some}
 
 pub fn suite() -> TestSuite(Nil) {
@@ -761,12 +761,20 @@ pub fn main() {
     outer_setups: _outer_setups,
   ) = parallel_result
 
+  // Count failed tear-down hooks and stopped set-ups apart.
+  let counts =
+    summary.count(types.run_report(
+      tests: results,
+      teardown_failures: teardown_failures,
+    ))
+
   progress.line(
     reporter,
     progress.RunFinishedProgress(
       completed: completed_after_suite,
       total: total,
-      teardown_failures: list.length(teardown_failures),
+      teardown_failures: counts.teardown_failed,
+      setup_stopped: counts.setup_stopped,
     ),
   )
   |> write

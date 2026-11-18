@@ -84,6 +84,7 @@ fn render_failure_for(error: CoverageError) -> String {
       passed: 3,
       failed: 0,
       teardown_failed: 0,
+      setup_stopped: 0,
       exit_on_failure: True,
     ),
   )

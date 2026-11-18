@@ -55,14 +55,21 @@ pub fn new() -> ProgressReporter {
 /// - `RunStartedProgress`: the run starts. `total` is the number of tests.
 /// - `TestFinishedProgress`: one more test finished. `completed` counts the
 ///   finished tests, this one included.
-/// - `RunFinishedProgress`: the run finished.
+/// - `RunFinishedProgress`: the run finished. `teardown_failures` is the
+///   number of tear-down hooks that failed, and `setup_stopped` the number
+///   of set-ups whose process stopped while their tests ran.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// progress.line(
 ///   progress.new(),
-///   progress.RunFinishedProgress(completed: 4, total: 4),
+///   progress.RunFinishedProgress(
+///     completed: 4,
+///     total: 4,
+///     teardown_failures: 0,
+///     setup_stopped: 0,
+///   ),
 /// )
 /// |> string.ends_with("\n")
 /// |> should
@@ -72,7 +79,12 @@ pub fn new() -> ProgressReporter {
 pub type ProgressEvent {
   RunStartedProgress(total: Int)
   TestFinishedProgress(completed: Int, total: Int, result: TestResult)
-  RunFinishedProgress(completed: Int, total: Int, teardown_failures: Int)
+  RunFinishedProgress(
+    completed: Int,
+    total: Int,
+    teardown_failures: Int,
+    setup_stopped: Int,
+  )
 }
 
 /// The text that updates the progress bar for one point of a run.
@@ -151,16 +163,30 @@ pub fn render(columns columns: Int, event event: ProgressEvent) -> String {
       completed: completed,
       total: total,
       teardown_failures: teardown_failures,
-    ) -> render_line(width, completed, total, done_label(teardown_failures))
+      setup_stopped: setup_stopped,
+    ) ->
+      render_line(
+        width,
+        completed,
+        total,
+        done_label(teardown_failures, setup_stopped),
+      )
   }
 }
 
-/// `done` at the end of a run, with the number of tear-down failures when
-/// a tear-down hook failed.
-fn done_label(teardown_failures: Int) -> String {
-  case teardown_failures {
-    0 -> "done"
-    count -> "done, " <> int.to_string(count) <> " tear-down failed"
+/// `done` at the end of a run, with the number of tear-down hooks that
+/// failed and of set-ups that stopped, when not zero.
+fn done_label(teardown_failures: Int, setup_stopped: Int) -> String {
+  "done"
+  <> count_label(teardown_failures, " tear-down failed")
+  <> count_label(setup_stopped, " set-up stopped")
+}
+
+/// `, <count><label>`, or `""` for a count of 0.
+fn count_label(count: Int, label: String) -> String {
+  case count {
+    0 -> ""
+    _ -> ", " <> int.to_string(count) <> label
   }
 }
 

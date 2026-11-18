@@ -222,7 +222,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     external is counted
   - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
     coverage failure: the passed and failed tests, the tear-down hooks that
-    failed (`teardown_failed`), and whether the runner exits on failure
+    failed (`teardown_failed`), the set-ups that stopped (`setup_stopped`),
+    and whether the runner exits on failure, for example
+    `Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.`
   - dream_test measures itself: its own tests cover 100% of the lines in
     `src`, with no exclusions
 
@@ -453,7 +455,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     then `These tests had not started and were not run:` and the full name
     of each test, for example `root > b`
   - The last progress line says `done, 1 tear-down failed` when a tear-down
-    hook failed
+    hook failed, and `done, 1 set-up stopped` when a set-up stopped
+    (`progress.RunFinishedProgress` has `teardown_failures` and
+    `setup_stopped`)
 
 - **Gherkin**
 
