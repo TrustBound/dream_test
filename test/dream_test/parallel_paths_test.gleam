@@ -410,8 +410,8 @@ pub fn tests() {
 
     it("a test past its deadline during a slow progress write times out", fn() {
       // Each progress write takes 100ms. While the runner writes the line of
-      // "fast", the 50ms sandbox timeout of "slow" ends its body. The sandbox
-      // timeout is the only deadline, so "slow" times out.
+      // "fast", the 50ms deadline of the body of "slow" passes. The runner
+      // checks the deadline after the write, so "slow" times out.
       runner.new([
         describe("root", [
           timed_test("slow", None, 1000),
@@ -437,8 +437,9 @@ pub fn tests() {
     }),
 
     it("a worker killed from outside fails its test", fn() {
-      // The first test kills its own worker. The parallel run must give a
-      // failed result for it and go on, so the sandbox deadline is never met.
+      // The first test kills its own test process. The parallel run must
+      // give a failed result for it and go on, so the sandbox deadline is
+      // never met.
       sandbox.run_isolated(
         sandbox.SandboxConfig(timeout_ms: 2000, show_crash_reports: False),
         run_suite_that_kills_a_worker,
@@ -499,11 +500,9 @@ fn run_suite_that_kills_a_worker(
   |> summaries
 }
 
-/// The body runs in a sandbox process that the worker started, so the
-/// parent of the body process is the worker.
+/// The body runs in the test process, so the body kills that process.
 fn kill_worker_then_pass() -> Result(AssertionResult, String) {
-  let #(_parent, worker) = process_info(process.self(), atom.create("parent"))
-  process.kill(worker)
+  process.kill(process.self())
   Ok(AssertionOk)
 }
 
@@ -552,9 +551,6 @@ fn summaries(
 
 @external(erlang, "erlang", "error")
 fn erlang_error(reason: Atom) -> a
-
-@external(erlang, "erlang", "process_info")
-fn process_info(pid: process.Pid, item: Atom) -> #(Atom, process.Pid)
 
 fn teardown_failures_default(
   suite: types.TestSuite(Nil),

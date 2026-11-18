@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text of the progress bar for the start of a run, a finished test, or the
   end of a run. It always gives a line, because `ProgressEvent` has no hook
   events. The runner now uses it in place of `progress.handle_event`.
+- `sandbox.run_in_owner`, `sandbox.check_owner` and `sandbox.stop_owner`
+  with the types `sandbox.Owner` and `sandbox.OwnerResult`. An owner
+  process runs functions one after another with a timeout for each, and
+  stays alive between them, so a pool or an ETS table that one function
+  starts lives for the next function. The runner uses owners for the
+  hooks of each scope.
 - `sandbox.format_exit_reason` gives the text of a process exit reason, in
   the same form that `run_isolated` and the parallel runner use for a crash
   (`"normal"`, `"killed"`, or the inspected reason). Use it in a custom
@@ -157,11 +163,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `coverage.RunOutcome` has a new field `teardown_failed`.
 - `exit_on_failure` stops with status 1 when a tear-down hook failed, also
   when every test passed.
-- BREAKING: group `before_all` and `after_all` hooks run in the runner
-  process, not in a sandbox process, so no timeout applies to them. Before:
-  a `before_all` that ran longer than the timeout gave `SetupFailed` with
-  `hook timed out in <group>`. After: the runner waits until the hook
-  returns. A crash is still caught and gives `hook crashed in <group>: ...`.
+- Each scope has one owner process for its hooks. The `before_all` and
+  `after_all` hooks of a group run in one owner process of the group, the
+  `before_each_suite` and `after_each_suite` hooks in one owner process of
+  the suite, and `before_all_suites` and `after_all_suites` in one owner
+  process of the run. The owner lives while the tests of its scope run.
+  Each hook still gets the default timeout, and the messages are the same
+  as before: `hook timed out in <scope>` and `hook crashed in <scope>: ...`.
+- BREAKING: A test runs in one process: the `before_each_test` hooks, the
+  `before_each` hooks, the body, the `after_each` hooks and the
+  `after_each_test` hooks. Before, each hook and the body ran in its own
+  process. The runner waits for each step with its timeout: the default
+  timeout for a hook, the test timeout for the body. A body that sees
+  `process.self()` now sees the same process as its hooks. A test process
+  that stops during the body gives `Failed` with
+  `crash: worker crashed in <group>: <reason>`. Before, a body that killed
+  its own process gave `crash: killed`.
 - BREAKING: `sandbox.run_isolated` now takes the function and its input as
   two parameters: `run_isolated(config:, run: fn(input) -> a, input:)` in
   place of `run_isolated(config:, test_function: fn() -> a)`. The function
@@ -179,7 +196,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BREAKING: A test body that runs past its timeout is now always
   `TimedOut`. Before, a sequential run (`max_concurrency` 1) gave
   `Failed`, and a parallel run gave `TimedOut` or `Failed`, by which of two
-  deadlines ended first. Now the sandbox timeout of the body is the only
+  deadlines ended first. Now the timeout of the body is the only
   deadline. It counts from the start of the body, and each hook has its own
   timeout. The failure is still `timeout: test timed out`, and the
   `after_each` hooks still run.
@@ -347,8 +364,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `after_each_suite`, `after_all_suites`) no longer stops the whole run.
   The runner catches it and records it as a failure of that hook, with the
   message `hook crashed: <reason>` or `hook crashed in <suite>: <reason>`.
-  These hooks still run in the runner process, so the resources that they
-  start live until the run ends or a later hook stops them.
+  These hooks run in the owner process of their scope, so the resources
+  that they start live until the tear-down hooks of the scope end.
+- A resource that a `before_each` hook starts now lives for the body and
+  the `after_each` hooks of the test. Before, the hook ran in a
+  short-lived process, so a pool and an ETS table stopped before the body
+  ran.
+- A suite-level hook or a group `before_all` or `after_all` hook that never
+  returns no longer stops the run. A set-up hook gives `SetupFailed` with
+  `hook timed out` or `hook timed out in <scope>`, and a tear-down hook
+  gives a tear-down failure with the same message.
+- A hook that kills its owner process no longer stops the run. The runner
+  monitors the owner and records `hook crashed in <scope>: <reason>`. The
+  next hook of the scope runs in a new owner process.
+- An owner process that stops while the tests of its scope run is now
+  reported as a tear-down failure, for example
+  `before_all process exited in <group>: <reason>`. The tear-down hooks of
+  the scope then run in a new owner process.
+- The `after_each` and `after_each_test` hooks now run when the test
+  process stops, for example when a linked process crashes. Before, a
+  test process that stopped skipped them. They run in a new process with
+  their own timeouts and get the context after the last `before_each` hook
+  that returned. The test keeps its status.
 - Coverage no longer counts the line of a function with an
   `@external(erlang, ...)` attribute. Gleam code never calls the wrapper
   that Gleam compiles for such a function, so the line was always shown as

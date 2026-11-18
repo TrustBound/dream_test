@@ -16,6 +16,10 @@
 //// `run_isolated` runs the function in a separate BEAM process, so the caller
 //// stays healthy even if the function crashes.
 ////
+//// `run_in_owner` runs functions one after another in an owner process that
+//// stays alive between them, so a resource that one function starts lives
+//// for the next one. The runner uses one owner for the hooks of each scope.
+////
 //// ## Selective crash reports
 ////
 //// When a test process crashes (e.g. `panic as "boom"`), Erlang can print a
@@ -93,9 +97,11 @@
 
 import gleam/erlang/process.{
   type Monitor, type Pid, type Selector, type Subject, demonitor_process, kill,
-  monitor, new_selector, new_subject, select, select_specific_monitor,
-  selector_receive, send, spawn_unlinked,
+  monitor, new_selector, new_subject, receive_forever, select, select_map,
+  select_specific_monitor, selector_receive, selector_receive_forever, send,
+  spawn_unlinked,
 }
+import gleam/option.{type Option, None, Some}
 import gleam/string
 
 /// Configuration for sandboxed test execution.
@@ -466,4 +472,339 @@ pub fn default_config() -> SandboxConfig {
 /// A new `SandboxConfig` with `show_crash_reports: True`.
 pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
   SandboxConfig(..config, show_crash_reports: True)
+}
+
+// =============================================================================
+// Owner processes
+// =============================================================================
+
+/// A process that runs functions one after another and stays alive between
+/// them, so that what a function starts lives until the owner stops.
+///
+/// An owner is the process of one scope: for example, the `before_all`
+/// hook of a group starts a pool in the owner, the tests of the group use
+/// the pool, and the `after_all` hook stops the pool in the same owner. A
+/// process that a function links to, and an ETS table that it makes, live
+/// as long as the owner.
+///
+/// Get an owner from `run_in_owner`, and stop it with `stop_owner`. The
+/// value is opaque, so only an owner that answered can be used again.
+pub opaque type Owner(input, output) {
+  Owner(
+    pid: Pid,
+    monitor: Monitor,
+    requests: Subject(OwnerRequest(input, output)),
+  )
+}
+
+/// The result of `run_in_owner`.
+///
+/// ## Variants
+///
+/// - `OwnerReturned(owner, value)`: the function returned `value`. The
+///   owner is alive and can run the next function.
+/// - `OwnerCaught(owner, reason)`: the function crashed (`panic`,
+///   `erlang:error`, `throw` or `exit` in the owner) and the owner caught
+///   the crash. `reason` is `"class:reason"`, as from `run_catching`. The
+///   owner is alive and can run the next function.
+/// - `OwnerTimedOut`: the function did not return in time. The owner was
+///   killed, so a process that links to it stops too.
+/// - `OwnerExited(reason)`: the owner stopped before the function
+///   returned, for example because a process that links to it crashed.
+///   `reason` is the exit reason as text, from `format_exit_reason`.
+pub type OwnerResult(input, output) {
+  OwnerReturned(owner: Owner(input, output), value: output)
+  OwnerCaught(owner: Owner(input, output), reason: String)
+  OwnerTimedOut
+  OwnerExited(reason: String)
+}
+
+/// A message to an owner: run a function, or stop.
+type OwnerRequest(input, output) {
+  RunRequest(
+    run: fn(input) -> output,
+    input: input,
+    reply: Subject(OwnerReply(input, output)),
+  )
+  StopRequest
+}
+
+/// The answer of an owner to a `RunRequest`. It names the subject of the
+/// owner, so the first answer tells the caller where to send later
+/// requests.
+type OwnerReply(input, output) {
+  OwnerReply(
+    requests: Subject(OwnerRequest(input, output)),
+    result: Result(output, String),
+  )
+}
+
+/// What the caller gets while it waits for an owner.
+type OwnerEvent(input, output) {
+  OwnerAnswered(reply: OwnerReply(input, output))
+  OwnerWentDown(reason: String)
+}
+
+/// Run a function with its input in an owner process, and wait for it with
+/// a timeout.
+///
+/// With `None`, a new owner starts and runs the function. With
+/// `Some(owner)`, that owner runs the function, so the function sees what
+/// earlier functions started there. The caller monitors the owner, so a
+/// crash of the owner never stops the caller.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn value(result: sandbox.OwnerResult(Int, Int)) -> Result(Int, Nil) {
+///   case result {
+///     OwnerReturned(owner: owner, value: value) -> {
+///       sandbox.stop_owner(owner)
+///       Ok(value)
+///     }
+///     _ -> Error(Nil)
+///   }
+/// }
+///
+/// pub fn tests() {
+///   describe("Owner processes", [
+///     it("run_in_owner returns the value of the function", fn() {
+///       sandbox.run_in_owner(None, 100, double, 21)
+///       |> value
+///       |> should
+///       |> be_equal(Ok(42))
+///       |> or_fail_with("expected Ok(42)")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `owner`: the owner that runs the function, or `None` for a new owner
+/// - `timeout_ms`: how long to wait before the owner is killed
+/// - `run`: the function to run in the owner
+/// - `input`: the argument that `run` gets
+///
+/// ## Returns
+///
+/// An `OwnerResult`: the value or caught crash with the owner that is still
+/// alive, or the timeout or exit of the owner.
+pub fn run_in_owner(
+  owner owner: Option(Owner(input, output)),
+  timeout_ms timeout_ms: Int,
+  run run: fn(input) -> output,
+  input input: input,
+) -> OwnerResult(input, output) {
+  let reply = new_subject()
+  let request = RunRequest(run: run, input: input, reply: reply)
+  let #(pid, owner_monitor) = send_owner_request(owner, request)
+  let selector =
+    new_selector()
+    |> select_map(reply, OwnerAnswered)
+    |> select_specific_monitor(owner_monitor, owner_went_down)
+  case selector_receive(selector, timeout_ms) {
+    Ok(OwnerAnswered(OwnerReply(requests: requests, result: Ok(value)))) ->
+      OwnerReturned(
+        owner: Owner(pid: pid, monitor: owner_monitor, requests: requests),
+        value: value,
+      )
+    Ok(OwnerAnswered(OwnerReply(requests: requests, result: Error(reason)))) ->
+      OwnerCaught(
+        owner: Owner(pid: pid, monitor: owner_monitor, requests: requests),
+        reason: reason,
+      )
+    Ok(OwnerWentDown(reason: reason)) -> OwnerExited(reason: reason)
+    Error(Nil) -> {
+      kill(pid)
+      demonitor_process(owner_monitor)
+      OwnerTimedOut
+    }
+  }
+}
+
+/// Give the request to the owner, or start a new owner with it. Gives the
+/// process and the monitor of the owner.
+fn send_owner_request(
+  owner: Option(Owner(input, output)),
+  request: OwnerRequest(input, output),
+) -> #(Pid, Monitor) {
+  case owner {
+    Some(Owner(pid: pid, monitor: owner_monitor, requests: requests)) -> {
+      send(requests, request)
+      #(pid, owner_monitor)
+    }
+    None -> {
+      let pid = spawn_unlinked(fn() { start_owner(request) })
+      #(pid, monitor(pid))
+    }
+  }
+}
+
+fn owner_went_down(down: process.Down) -> OwnerEvent(input, output) {
+  OwnerWentDown(reason: format_exit_reason(down.reason))
+}
+
+/// The body of an owner process: make the subject for later requests, then
+/// serve the first request.
+fn start_owner(first: OwnerRequest(input, output)) -> Nil {
+  serve_owner(new_subject(), first)
+}
+
+/// Run each request in the owner process until a `StopRequest`. A crash of
+/// a function is caught, so the owner stays alive.
+fn serve_owner(
+  requests: Subject(OwnerRequest(input, output)),
+  request: OwnerRequest(input, output),
+) -> Nil {
+  case request {
+    RunRequest(run: run, input: input, reply: reply) -> {
+      send(
+        reply,
+        OwnerReply(requests: requests, result: run_catching(run, input)),
+      )
+      serve_owner(requests, receive_forever(requests))
+    }
+    StopRequest -> Nil
+  }
+}
+
+/// Check that an owner is still alive before the caller gives it more
+/// work.
+///
+/// An owner can stop between two functions, for example when a process
+/// that links to it crashes while the tests of its scope run. Use this
+/// function before the tear-down of a scope, to report that exit and to
+/// run the tear-down in a new owner.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn still_alive(result: sandbox.OwnerResult(Int, Int)) -> Bool {
+///   case result {
+///     OwnerReturned(owner: owner, value: _) -> {
+///       let alive = case sandbox.check_owner(owner) {
+///         Ok(_owner) -> True
+///         Error(_reason) -> False
+///       }
+///       sandbox.stop_owner(owner)
+///       alive
+///     }
+///     _ -> False
+///   }
+/// }
+///
+/// pub fn tests() {
+///   describe("Owner processes", [
+///     it("check_owner gives back an owner that is alive", fn() {
+///       sandbox.run_in_owner(None, 100, double, 21)
+///       |> still_alive
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("expected the owner to be alive")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `owner`: an owner from `run_in_owner`
+///
+/// ## Returns
+///
+/// `Ok(owner)` when the owner is alive, or `Error(reason)` with the exit
+/// reason as text when it stopped. After `Error`, do not use the owner
+/// again.
+pub fn check_owner(
+  owner owner: Owner(input, output),
+) -> Result(Owner(input, output), String) {
+  let selector =
+    new_selector()
+    |> select_specific_monitor(owner.monitor, owner_down_reason)
+  case selector_receive(selector, 0) {
+    Ok(reason) -> Error(reason)
+    Error(Nil) -> Ok(owner)
+  }
+}
+
+fn owner_down_reason(down: process.Down) -> String {
+  format_exit_reason(down.reason)
+}
+
+/// Stop an owner and wait until it has exited.
+///
+/// The owner exits with reason `normal`. An ETS table that it made is
+/// deleted, and a process that links to it and traps exits, such as a
+/// supervisor, gets the exit signal and stops. When `stop_owner` returns,
+/// the owner has exited, so a later scope can make a table with the same
+/// name. An owner that stopped already is not an error.
+///
+/// ## Example
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn stop(result: sandbox.OwnerResult(Int, Int)) -> Bool {
+///   case result {
+///     OwnerReturned(owner: owner, value: _) -> {
+///       sandbox.stop_owner(owner)
+///       True
+///     }
+///     _ -> False
+///   }
+/// }
+///
+/// pub fn tests() {
+///   describe("Owner processes", [
+///     it("stop_owner stops an owner", fn() {
+///       sandbox.run_in_owner(None, 100, double, 21)
+///       |> stop
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("expected the owner to stop")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `owner`: an owner from `run_in_owner`
+///
+/// ## Returns
+///
+/// `Nil`, after the owner has exited.
+pub fn stop_owner(owner owner: Owner(input, output)) -> Nil {
+  send(owner.requests, StopRequest)
+  let selector =
+    new_selector()
+    |> select_specific_monitor(owner.monitor, owner_down_reason)
+  let _reason = selector_receive_forever(selector)
+  Nil
 }

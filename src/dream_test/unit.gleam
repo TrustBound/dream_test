@@ -350,9 +350,9 @@ pub fn skip(
 
 /// Run once before any tests in the current suite/group.
 ///
-/// - Runs in the runner process, so a resource that it starts (for example
-///   a pool that links to the caller, or an ETS table) lives for all the
-///   tests of the scope. No timeout applies to it.
+/// - Runs in the owner process of the group, so a resource that it starts
+///   (for example a pool that links to the caller, or an ETS table) lives
+///   for all the tests of the scope. It gets the default timeout.
 /// - If it returns `Error("message")` or crashes, all tests under this
 ///   scope become `SetupFailed`, and the `after_all` hooks still run.
 ///
@@ -439,7 +439,9 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 
 /// Run before each test in the current scope.
 ///
-/// - Runs in a sandboxed process.
+/// - Runs in the process of the test, before the body, so a resource that
+///   it starts lives for the body and the `after_each` hooks. It gets the
+///   default timeout.
 /// - If it returns `Error("message")`, that test becomes `SetupFailed` and the
 ///   body does not run.
 ///
@@ -530,7 +532,9 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 /// failures). Every `after_each` hook runs, also after one fails. If it
 /// returns `Error("message")` or crashes, the status of the test does not
 /// change: the run report gets a `types.TeardownFailure` with hook
-/// `AfterEachHook`, and the run fails.
+/// `AfterEachHook`, and the run fails. It runs in the process of the test
+/// with the default timeout. If the body times out or the test process
+/// stops, it still runs, in a new process.
 ///
 /// ## Example
 ///
@@ -615,8 +619,8 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 
 /// Run once after all tests in the current scope.
 ///
-/// It runs in the runner process, with no timeout, so it can stop a
-/// resource that `before_all` started. Every `after_all` hook runs, also
+/// It runs in the owner process of the group, with the default timeout,
+/// so it can stop a resource that `before_all` started. Every `after_all` hook runs, also
 /// after one fails. If it returns `Error("message")` or crashes, the run
 /// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
 /// group path as scope, and the run fails. No test result is added.

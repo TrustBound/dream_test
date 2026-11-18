@@ -38,7 +38,10 @@
 //// ```
 
 import dream_test/reporters/progress
-import dream_test/sandbox
+import dream_test/sandbox.{
+  type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerReturned,
+  OwnerTimedOut,
+}
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
@@ -51,11 +54,13 @@ import dream_test/types.{
 }
 import gleam/erlang/process.{
   type Down, type Monitor, type Pid, type Selector, type Subject,
-  demonitor_process, monitor, new_selector, new_subject, select,
-  select_specific_monitor, selector_receive_forever, send, spawn_unlinked,
+  demonitor_process, kill, monitor, new_selector, new_subject, select,
+  select_specific_monitor, selector_receive, send, spawn_unlinked,
 }
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 /// Configuration for the parallel executor.
@@ -190,13 +195,6 @@ type IndexedResult {
   IndexedResult(index: Int, outcome: TestOutcome)
 }
 
-/// A worker that the loop started and that has not given a result yet. The
-/// loop monitors it, so a worker that exits before it sends its result
-/// still gives a result.
-type RunningWorker(context) {
-  RunningWorker(monitor: Monitor, index: Int, test_case: TestCase(context))
-}
-
 /// One test of a group, taken from its `Test` node.
 type TestCase(context) {
   TestCase(
@@ -209,10 +207,94 @@ type TestCase(context) {
   )
 }
 
-type RunParallelLoopConfig(context) {
-  RunParallelLoopConfig(
+/// One step of a test. The test process runs the steps in this order:
+/// the runner `before_each_test` hooks, the `before_each` hooks, the body,
+/// the `after_each` hooks and the runner `after_each_test` hooks.
+type TestStep(context) {
+  RunnerBeforeEachStep(hook: fn(TestInfo, context) -> Result(context, String))
+  BeforeEachStep(hook: Callback(context, Result(context, String)))
+  BodyStep
+  AfterEachStep(hook: Callback(context, Result(Nil, String)))
+  RunnerAfterEachStep(hook: fn(TestInfo, context) -> Result(Nil, String))
+}
+
+/// What is known about one test when a step starts.
+///
+/// `status` is `Passed` until a set-up step or the body fails. While it is
+/// `Passed`, set-up steps and the body run; tear-down steps always run.
+/// `context` is the context after the last set-up step that returned, so
+/// a tear-down step gets the context that it would get after a body that
+/// finished.
+type TestState(context) {
+  TestState(
+    context: context,
+    status: Status,
+    failures_rev: List(AssertionFailure),
+    teardown_failures_rev: List(TeardownFailure),
+    started_ms: Int,
+  )
+}
+
+/// What a test process needs: the test, the steps to run from the first
+/// one, and the state when the first step starts.
+type TestJob(context) {
+  TestJob(
+    subject: Subject(WorkerMessage(context)),
+    index: Int,
+    scope: List(String),
+    info: TestInfo,
+    test_case: TestCase(context),
+    first_step: TestStep(context),
+    later_steps: List(TestStep(context)),
+    state: TestState(context),
+    default_timeout_ms: Int,
+  )
+}
+
+/// A test process that the loop started and that has not finished. The
+/// loop knows its current step, the state when that step started, and the
+/// deadline of the step. The loop monitors the process, so a process that
+/// stops before it finishes still gives a result.
+type RunningWorker(context) {
+  RunningWorker(
+    job: TestJob(context),
+    pid: Pid,
+    monitor: Monitor,
+    step: TestStep(context),
+    later_steps: List(TestStep(context)),
+    state: TestState(context),
+    deadline_ms: Int,
+  )
+}
+
+/// A message to the loop about one test process. `StepStarted` comes at
+/// the start of each step that runs, with the time on the clock of
+/// `timing.now_ms`. `WorkerFinished` comes after the last step.
+/// `WorkerDown` comes from the monitor of a process that stopped before
+/// it finished.
+type WorkerMessage(context) {
+  StepStarted(
+    worker: Pid,
+    step: TestStep(context),
+    later_steps: List(TestStep(context)),
+    state: TestState(context),
+    started_ms: Int,
+  )
+  WorkerFinished(worker: Pid, outcome: TestOutcome)
+  WorkerDown(down: Down)
+}
+
+/// Why a step did not finish in its test process.
+type StepEnd {
+  StepTimedOut
+  StepExited(reason: String)
+}
+
+/// What stays the same while the tests of one group run.
+type GroupRun(context) {
+  GroupRun(
     config: ParallelConfig,
-    subject: Subject(WorkerMessage),
+    subject: Subject(WorkerMessage(context)),
     scope: List(String),
     inherited_tags: List(String),
     context: context,
@@ -222,61 +304,37 @@ type RunParallelLoopConfig(context) {
     runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
     before_each_hooks: List(Callback(context, Result(context, String))),
     after_each_hooks: List(Callback(context, Result(Nil, String))),
-    failures_rev: List(AssertionFailure),
+    progress_output: Option(ProgressOutput),
+    total: Int,
+    max_concurrency: Int,
+  )
+}
+
+/// What changes while the tests of one group run: the tests that wait,
+/// the test processes that run, the outcomes that wait for the outcomes
+/// before them, and the outcomes in declaration order, newest first.
+type LoopState(context) {
+  LoopState(
     pending: List(#(Int, TestCase(context))),
     running: List(RunningWorker(context)),
     pending_emit: List(IndexedResult),
     emitted_rev: List(TestOutcome),
     next_emit_index: Int,
-    progress_output: Option(ProgressOutput),
-    total: Int,
-    completed: Int,
-    max_concurrency: Int,
-  )
-}
-
-type StartWorkersUpToLimitConfig(context) {
-  StartWorkersUpToLimitConfig(
-    config: ParallelConfig,
-    subject: Subject(WorkerMessage),
-    scope: List(String),
-    inherited_tags: List(String),
-    context: context,
-    runner_before_each_test: List(
-      fn(TestInfo, context) -> Result(context, String),
-    ),
-    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-    before_each_hooks: List(Callback(context, Result(context, String))),
-    after_each_hooks: List(Callback(context, Result(Nil, String))),
-    failures_rev: List(AssertionFailure),
-    pending: List(#(Int, TestCase(context))),
-    running: List(RunningWorker(context)),
-    max_concurrency: Int,
-  )
-}
-
-type WaitForResultConfig(context) {
-  WaitForResultConfig(
-    subject: Subject(WorkerMessage),
-    scope: List(String),
-    inherited_tags: List(String),
-    running: List(RunningWorker(context)),
-    pending_emit: List(IndexedResult),
-    progress_output: Option(ProgressOutput),
-    total: Int,
     completed: Int,
   )
 }
 
-/// A message to the loop about one worker. A worker sends `WorkerFinished`
-/// when its test finished; a test that timed out or crashed has a result
-/// too. `WorkerDown` comes from the monitor of a worker, for a worker that
-/// exited before it sent its result, for example when a process outside
-/// dream_test killed it.
-type WorkerMessage {
-  WorkerFinished(index: Int, outcome: TestOutcome)
-  WorkerDown(down: Down)
+/// A group hook with the context that it gets, so that the owner process
+/// of the group can run it.
+type GroupHookCall(context) {
+  SetUpCall(hook: Callback(context, Result(context, String)), context: context)
+  TearDownCall(hook: Callback(context, Result(Nil, String)), context: context)
 }
+
+/// The owner process of a group, for its `before_all` and `after_all`
+/// hooks.
+type GroupOwner(context) =
+  Owner(GroupHookCall(context), Result(context, String))
 
 /// Default executor configuration.
 ///
@@ -500,7 +558,7 @@ pub fn run_root_parallel_with_reporter(
 }
 
 // =============================================================================
-// Execution (sequential groups, tests executed with sandbox + timeout)
+// Execution (sequential groups, one process per test)
 // =============================================================================
 
 fn execute_node(
@@ -535,18 +593,17 @@ fn execute_node(
         )
       let #(hooks, tests, groups) =
         collect_children(children, empty_hooks, [], [])
-      let #(ctx2, _before_each2, _after_each2, failures_rev) =
+      let #(owner, ctx2, failures) =
         run_before_all_chain(
+          config,
           group_scope,
+          None,
           context,
           hooks.before_all,
-          inherited_before_each,
-          inherited_after_each,
-          [],
         )
 
-      case list.is_empty(failures_rev) {
-        False -> {
+      case failures {
+        [_, ..] -> {
           // If before_all fails, do not execute any tests in this scope.
           // Instead, mark all tests under this group as SetupFailed and skip
           // their bodies.
@@ -556,10 +613,10 @@ fn execute_node(
               combined_tags,
               tests,
               groups,
-              failures_rev,
+              failures,
               [],
             )
-          // These tests were never spawned as workers, so we must still emit
+          // These tests never ran in a process, so we must still emit
           // progress events for them to keep the progress bar in sync with
           // `total`.
           let completed_after_failures =
@@ -571,7 +628,13 @@ fn execute_node(
             )
 
           let teardown_failures_rev =
-            run_after_all_chain(group_scope, ctx2, hooks.after_all, [])
+            finish_group_scope(
+              config,
+              group_scope,
+              owner,
+              ctx2,
+              hooks.after_all,
+            )
 
           #(
             add_collected(
@@ -585,7 +648,7 @@ fn execute_node(
           )
         }
 
-        True -> {
+        [] -> {
           let combined_before_each =
             list.append(inherited_before_each, hooks.before_each)
           let combined_after_each =
@@ -593,18 +656,21 @@ fn execute_node(
 
           let #(group_outcomes_rev, completed_after_tests) =
             run_tests_in_group(
-              config,
-              group_scope,
-              combined_tags,
-              ctx2,
-              runner_before_each_test,
-              runner_after_each_test,
-              combined_before_each,
-              combined_after_each,
+              GroupRun(
+                config: config,
+                subject: new_subject(),
+                scope: group_scope,
+                inherited_tags: combined_tags,
+                context: ctx2,
+                runner_before_each_test: runner_before_each_test,
+                runner_after_each_test: runner_after_each_test,
+                before_each_hooks: combined_before_each,
+                after_each_hooks: combined_after_each,
+                progress_output: progress_output,
+                total: total,
+                max_concurrency: int.max(config.max_concurrency, 1),
+              ),
               tests,
-              failures_rev,
-              progress_output,
-              total,
               completed,
             )
 
@@ -626,7 +692,13 @@ fn execute_node(
             )
 
           let teardown_failures_rev =
-            run_after_all_chain(group_scope, ctx2, hooks.after_all, [])
+            finish_group_scope(
+              config,
+              group_scope,
+              owner,
+              ctx2,
+              hooks.after_all,
+            )
 
           #(
             add_collected(
@@ -688,19 +760,19 @@ fn fail_tests_due_to_before_all(
   inherited_tags: List(String),
   tests: List(TestCase(context)),
   groups: List(Node(context)),
-  failures_rev: List(AssertionFailure),
+  failures: List(AssertionFailure),
   acc_rev: List(TestResult),
 ) -> List(TestResult) {
   let after_tests =
-    fail_test_nodes(scope, inherited_tags, tests, failures_rev, acc_rev)
-  fail_group_nodes(scope, inherited_tags, groups, failures_rev, after_tests)
+    fail_test_nodes(scope, inherited_tags, tests, failures, acc_rev)
+  fail_group_nodes(scope, inherited_tags, groups, failures, after_tests)
 }
 
 fn fail_test_nodes(
   scope: List(String),
   inherited_tags: List(String),
   test_cases: List(TestCase(context)),
-  failures_rev: List(AssertionFailure),
+  failures: List(AssertionFailure),
   acc_rev: List(TestResult),
 ) -> List(TestResult) {
   case test_cases {
@@ -713,13 +785,10 @@ fn fail_test_nodes(
           status: SetupFailed,
           duration_ms: 0,
           tags: list.append(inherited_tags, test_case.tags),
-          failures: list.reverse(failures_rev),
+          failures: failures,
           kind: test_case.kind,
         )
-      fail_test_nodes(scope, inherited_tags, rest, failures_rev, [
-        result,
-        ..acc_rev
-      ])
+      fail_test_nodes(scope, inherited_tags, rest, failures, [result, ..acc_rev])
     }
   }
 }
@@ -728,7 +797,7 @@ fn fail_group_nodes(
   scope: List(String),
   inherited_tags: List(String),
   nodes: List(Node(context)),
-  failures_rev: List(AssertionFailure),
+  failures: List(AssertionFailure),
   acc_rev: List(TestResult),
 ) -> List(TestResult) {
   case nodes {
@@ -751,13 +820,13 @@ fn fail_group_nodes(
           combined_tags,
           tests,
           groups,
-          failures_rev,
+          failures,
           acc_rev,
         )
-      fail_group_nodes(scope, inherited_tags, rest, failures_rev, next)
+      fail_group_nodes(scope, inherited_tags, rest, failures, next)
     }
     [_other, ..rest] ->
-      fail_group_nodes(scope, inherited_tags, rest, failures_rev, acc_rev)
+      fail_group_nodes(scope, inherited_tags, rest, failures, acc_rev)
   }
 }
 
@@ -776,20 +845,16 @@ fn collect_children(
   tests_rev: List(TestCase(context)),
   groups_rev: List(Node(context)),
 ) -> #(GroupHooks(context), List(TestCase(context)), List(Node(context))) {
-  let hooks0 = case hooks {
-    GroupHooks(..) -> hooks
-  }
-
   case children {
-    [] -> #(hooks0, list.reverse(tests_rev), list.reverse(groups_rev))
+    [] -> #(hooks, list.reverse(tests_rev), list.reverse(groups_rev))
     [child, ..rest] ->
       case child {
         BeforeAll(run) ->
           collect_children(
             rest,
             GroupHooks(
-              ..hooks0,
-              before_all: list.append(hooks0.before_all, [run]),
+              ..hooks,
+              before_all: list.append(hooks.before_all, [run]),
             ),
             tests_rev,
             groups_rev,
@@ -798,8 +863,8 @@ fn collect_children(
           collect_children(
             rest,
             GroupHooks(
-              ..hooks0,
-              before_each: list.append(hooks0.before_each, [run]),
+              ..hooks,
+              before_each: list.append(hooks.before_each, [run]),
             ),
             tests_rev,
             groups_rev,
@@ -808,8 +873,8 @@ fn collect_children(
           collect_children(
             rest,
             GroupHooks(
-              ..hooks0,
-              after_each: list.append(hooks0.after_each, [run]),
+              ..hooks,
+              after_each: list.append(hooks.after_each, [run]),
             ),
             tests_rev,
             groups_rev,
@@ -817,700 +882,242 @@ fn collect_children(
         AfterAll(run) ->
           collect_children(
             rest,
-            GroupHooks(
-              ..hooks0,
-              after_all: list.append(hooks0.after_all, [run]),
-            ),
+            GroupHooks(..hooks, after_all: list.append(hooks.after_all, [run])),
             tests_rev,
             groups_rev,
           )
         Test(name, tags, kind, run, timeout_ms, source) ->
           collect_children(
             rest,
-            hooks0,
+            hooks,
             [TestCase(name, tags, kind, run, timeout_ms, source), ..tests_rev],
             groups_rev,
           )
         Group(..) ->
-          collect_children(rest, hooks0, tests_rev, [child, ..groups_rev])
+          collect_children(rest, hooks, tests_rev, [child, ..groups_rev])
       }
   }
 }
 
+// =============================================================================
+// The owner process of a group
+// =============================================================================
+
+/// Run a group hook in the owner process of the group. A tear-down hook
+/// gives back the context that it got, so both kinds of hook have one
+/// result type.
+fn run_group_hook(call: GroupHookCall(context)) -> Result(context, String) {
+  case call {
+    SetUpCall(hook: hook, context: context) -> types.call(hook, context)
+    TearDownCall(hook: hook, context: context) ->
+      types.call(hook, context)
+      |> result.replace(context)
+  }
+}
+
+/// Run the `before_all` hooks of a group in the owner process of the
+/// group, and stop at the first failure. The first hook starts the owner.
+/// Each hook gets the default timeout.
+///
+/// Gives the owner (`None` when no owner is alive), the context after the
+/// last hook that returned, and the failure (an empty list when every
+/// hook returned).
 fn run_before_all_chain(
+  config: ParallelConfig,
   scope: List(String),
+  owner: Option(GroupOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(context, String))),
-  inherited_before_each: List(Callback(context, Result(context, String))),
-  inherited_after_each: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(AssertionFailure),
-) -> #(
-  context,
-  List(Callback(context, Result(context, String))),
-  List(Callback(context, Result(Nil, String))),
-  List(AssertionFailure),
-) {
+) -> #(Option(GroupOwner(context)), context, List(AssertionFailure)) {
   case hooks {
-    [] -> #(
+    [] -> #(owner, context, [])
+    [hook, ..rest] ->
+      before_all_result(
+        config,
+        scope,
+        context,
+        rest,
+        sandbox.run_in_owner(
+          owner,
+          config.default_timeout_ms,
+          run_group_hook,
+          SetUpCall(hook: hook, context: context),
+        ),
+      )
+  }
+}
+
+fn before_all_result(
+  config: ParallelConfig,
+  scope: List(String),
+  context: context,
+  rest: List(Callback(context, Result(context, String))),
+  owner_result: OwnerResult(GroupHookCall(context), Result(context, String)),
+) -> #(Option(GroupOwner(context)), context, List(AssertionFailure)) {
+  case owner_result {
+    OwnerReturned(owner: owner, value: Ok(next)) ->
+      run_before_all_chain(config, scope, Some(owner), next, rest)
+    OwnerReturned(owner: owner, value: Error(message)) -> #(
+      Some(owner),
       context,
-      list.append(inherited_before_each, []),
-      list.append([], inherited_after_each),
+      [hook_failure("before_all", message)],
+    )
+    OwnerCaught(owner: owner, reason: reason) -> #(Some(owner), context, [
+      hook_failure("before_all", hook_crash_message(scope, reason)),
+    ])
+    OwnerTimedOut -> #(None, context, [
+      hook_failure("before_all", hook_timeout_message(scope)),
+    ])
+    OwnerExited(reason: reason) -> #(None, context, [
+      hook_failure("before_all", hook_crash_message(scope, reason)),
+    ])
+  }
+}
+
+/// End the scope of a group: report an owner that stopped while the tests
+/// ran, run every `after_all` hook (in the owner while it is alive, else
+/// in a new owner), then stop the owner. Gives the tear-down failures
+/// newest first.
+fn finish_group_scope(
+  config: ParallelConfig,
+  scope: List(String),
+  owner: Option(GroupOwner(context)),
+  context: context,
+  hooks: List(Callback(context, Result(Nil, String))),
+) -> List(TeardownFailure) {
+  let #(checked_owner, exit_failures_rev) = check_group_owner(scope, owner)
+  let #(last_owner, failures_rev) =
+    run_after_all_chain(
+      config,
+      scope,
+      checked_owner,
+      context,
+      hooks,
+      exit_failures_rev,
+    )
+  let _stopped = option.map(last_owner, sandbox.stop_owner)
+  failures_rev
+}
+
+fn check_group_owner(
+  scope: List(String),
+  owner: Option(GroupOwner(context)),
+) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
+  case owner {
+    None -> #(None, [])
+    Some(owner) -> group_owner_check_result(scope, sandbox.check_owner(owner))
+  }
+}
+
+fn group_owner_check_result(
+  scope: List(String),
+  checked: Result(GroupOwner(context), String),
+) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
+  case checked {
+    Ok(owner) -> #(Some(owner), [])
+    Error(reason) -> #(None, [
+      TeardownFailure(
+        hook: AfterAllHook,
+        scope: scope,
+        message: "before_all process exited in "
+          <> string.join(scope, " > ")
+          <> ": "
+          <> reason,
+      ),
+    ])
+  }
+}
+
+/// Run every `after_all` hook of a group, also after one fails, and give
+/// the failures newest first, in front of `failures_rev`. Each hook gets
+/// the default timeout. After a timeout or an exit of the owner, the next
+/// hook runs in a new owner.
+fn run_after_all_chain(
+  config: ParallelConfig,
+  scope: List(String),
+  owner: Option(GroupOwner(context)),
+  context: context,
+  hooks: List(Callback(context, Result(Nil, String))),
+  failures_rev: List(TeardownFailure),
+) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
+  case hooks {
+    [] -> #(owner, failures_rev)
+    [hook, ..rest] -> {
+      let #(next_owner, next_failures_rev) =
+        after_all_result(
+          scope,
+          sandbox.run_in_owner(
+            owner,
+            config.default_timeout_ms,
+            run_group_hook,
+            TearDownCall(hook: hook, context: context),
+          ),
+          failures_rev,
+        )
+      run_after_all_chain(
+        config,
+        scope,
+        next_owner,
+        context,
+        rest,
+        next_failures_rev,
+      )
+    }
+  }
+}
+
+fn after_all_result(
+  scope: List(String),
+  owner_result: OwnerResult(GroupHookCall(context), Result(context, String)),
+  failures_rev: List(TeardownFailure),
+) -> #(Option(GroupOwner(context)), List(TeardownFailure)) {
+  case owner_result {
+    OwnerReturned(owner: owner, value: Ok(_context)) -> #(
+      Some(owner),
       failures_rev,
     )
-    [hook, ..rest] ->
-      case run_hook_in_process(scope, hook, context) {
-        Ok(next) ->
-          run_before_all_chain(
-            scope,
-            next,
-            rest,
-            inherited_before_each,
-            inherited_after_each,
-            failures_rev,
-          )
-        Error(message) -> #(
-          context,
-          inherited_before_each,
-          inherited_after_each,
-          [hook_failure("before_all", message), ..failures_rev],
-        )
-      }
-  }
-}
-
-fn run_tests_in_group(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  runner_before_each_test: List(
-    fn(TestInfo, context) -> Result(context, String),
-  ),
-  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(Callback(context, Result(context, String))),
-  after_each_hooks: List(Callback(context, Result(Nil, String))),
-  tests: List(TestCase(context)),
-  failures_rev: List(AssertionFailure),
-  progress_output: Option(ProgressOutput),
-  total: Int,
-  completed: Int,
-) -> #(List(TestOutcome), Int) {
-  let ParallelConfig(max_concurrency: max_concurrency, default_timeout_ms: _) =
-    config
-  case max_concurrency <= 1 {
-    True ->
-      run_tests_sequentially(
-        config,
+    OwnerReturned(owner: owner, value: Error(message)) -> #(
+      Some(owner),
+      add_teardown_failure(AfterAllHook, scope, message, failures_rev),
+    )
+    OwnerCaught(owner: owner, reason: reason) -> #(
+      Some(owner),
+      add_teardown_failure(
+        AfterAllHook,
         scope,
-        inherited_tags,
-        context,
-        runner_before_each_test,
-        runner_after_each_test,
-        before_each_hooks,
-        after_each_hooks,
-        tests,
+        hook_crash_message(scope, reason),
         failures_rev,
-        progress_output,
-        total,
-        completed,
-        [],
-      )
-    False ->
-      run_tests_parallel(
-        config,
-        scope,
-        inherited_tags,
-        context,
-        runner_before_each_test,
-        runner_after_each_test,
-        before_each_hooks,
-        after_each_hooks,
-        tests,
-        failures_rev,
-        progress_output,
-        total,
-        completed,
-      )
-  }
-}
-
-fn run_tests_parallel(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  runner_before_each_test: List(
-    fn(TestInfo, context) -> Result(context, String),
-  ),
-  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(Callback(context, Result(context, String))),
-  after_each_hooks: List(Callback(context, Result(Nil, String))),
-  tests: List(TestCase(context)),
-  failures_rev: List(AssertionFailure),
-  progress_output: Option(ProgressOutput),
-  total: Int,
-  completed: Int,
-) -> #(List(TestOutcome), Int) {
-  let subject = new_subject()
-  let indexed = index_tests(tests, 0, [])
-  let ParallelConfig(max_concurrency: max_concurrency, default_timeout_ms: _) =
-    config
-
-  run_parallel_loop(RunParallelLoopConfig(
-    config: config,
-    subject: subject,
-    scope: scope,
-    inherited_tags: inherited_tags,
-    context: context,
-    runner_before_each_test: runner_before_each_test,
-    runner_after_each_test: runner_after_each_test,
-    before_each_hooks: before_each_hooks,
-    after_each_hooks: after_each_hooks,
-    failures_rev: failures_rev,
-    pending: indexed,
-    running: [],
-    pending_emit: [],
-    emitted_rev: [],
-    next_emit_index: 0,
-    progress_output: progress_output,
-    total: total,
-    completed: completed,
-    max_concurrency: max_concurrency,
-  ))
-}
-
-fn index_tests(
-  test_cases: List(TestCase(context)),
-  next_index: Int,
-  acc_rev: List(#(Int, TestCase(context))),
-) -> List(#(Int, TestCase(context))) {
-  case test_cases {
-    [] -> list.reverse(acc_rev)
-    [test_case, ..rest] ->
-      index_tests(rest, next_index + 1, [#(next_index, test_case), ..acc_rev])
-  }
-}
-
-fn run_parallel_loop(
-  loop: RunParallelLoopConfig(context),
-) -> #(List(TestOutcome), Int) {
-  let RunParallelLoopConfig(
-    config: config,
-    subject: subject,
-    scope: scope,
-    inherited_tags: inherited_tags,
-    context: context,
-    runner_before_each_test: runner_before_each_test,
-    runner_after_each_test: runner_after_each_test,
-    before_each_hooks: before_each_hooks,
-    after_each_hooks: after_each_hooks,
-    failures_rev: failures_rev,
-    pending: pending,
-    running: running,
-    pending_emit: pending_emit,
-    emitted_rev: emitted_rev,
-    next_emit_index: next_emit_index,
-    progress_output: progress_output,
-    total: total,
-    completed: completed,
-    max_concurrency: max_concurrency,
-  ) = loop
-
-  let #(pending2, running2) =
-    start_workers_up_to_limit(StartWorkersUpToLimitConfig(
-      config: config,
-      subject: subject,
-      scope: scope,
-      inherited_tags: inherited_tags,
-      context: context,
-      runner_before_each_test: runner_before_each_test,
-      runner_after_each_test: runner_after_each_test,
-      before_each_hooks: before_each_hooks,
-      after_each_hooks: after_each_hooks,
-      failures_rev: failures_rev,
-      pending: pending,
-      running: running,
-      max_concurrency: max_concurrency,
-    ))
-
-  case list.is_empty(pending2) && list.is_empty(running2) {
-    True -> #(
-      list.append(
-        list.reverse(emit_all_results(pending_emit, next_emit_index, [])),
-        emitted_rev,
       ),
-      completed,
     )
-    False -> {
-      let #(running3, pending_emit2, completed2) =
-        wait_for_result(WaitForResultConfig(
-          subject: subject,
-          scope: scope,
-          inherited_tags: inherited_tags,
-          running: running2,
-          pending_emit: pending_emit,
-          progress_output: progress_output,
-          total: total,
-          completed: completed,
-        ))
-
-      let #(maybe_ready, remaining_emit) =
-        take_indexed_result(next_emit_index, pending_emit2, [])
-
-      case maybe_ready {
-        None ->
-          run_parallel_loop(
-            RunParallelLoopConfig(
-              ..loop,
-              pending: pending2,
-              running: running3,
-              pending_emit: remaining_emit,
-              completed: completed2,
-            ),
-          )
-        Some(IndexedResult(_, outcome)) ->
-          run_parallel_loop(
-            RunParallelLoopConfig(
-              ..loop,
-              pending: pending2,
-              running: running3,
-              pending_emit: remaining_emit,
-              emitted_rev: [outcome, ..emitted_rev],
-              next_emit_index: next_emit_index + 1,
-              completed: completed2,
-            ),
-          )
-      }
-    }
-  }
-}
-
-fn emit_all_results(
-  pending_emit: List(IndexedResult),
-  next_index: Int,
-  acc_rev: List(TestOutcome),
-) -> List(TestOutcome) {
-  let #(maybe_ready, remaining) =
-    take_indexed_result(next_index, pending_emit, [])
-  case maybe_ready {
-    None -> list.reverse(acc_rev)
-    Some(IndexedResult(_, outcome)) ->
-      emit_all_results(remaining, next_index + 1, [outcome, ..acc_rev])
-  }
-}
-
-fn start_workers_up_to_limit(
-  input: StartWorkersUpToLimitConfig(context),
-) -> #(List(#(Int, TestCase(context))), List(RunningWorker(context))) {
-  case input.pending, list.length(input.running) < input.max_concurrency {
-    [#(index, test_case), ..rest], True -> {
-      let worker = spawn_test_worker(input, index, test_case)
-      let running_worker =
-        RunningWorker(
-          monitor: monitor(worker),
-          index: index,
-          test_case: test_case,
-        )
-      start_workers_up_to_limit(
-        StartWorkersUpToLimitConfig(..input, pending: rest, running: [
-          running_worker,
-          ..input.running
-        ]),
-      )
-    }
-    _, _ -> #(input.pending, input.running)
-  }
-}
-
-/// Run one test in a new process that sends its result to the loop. The
-/// test can time out or crash only in its sandbox, so the worker always
-/// sends a result. The caller monitors the worker: if the worker exits
-/// before it sends its result, because something outside this module
-/// stopped it or because of a bug in this module, the down message gives
-/// a failed result with the exit reason.
-fn spawn_test_worker(
-  input: StartWorkersUpToLimitConfig(context),
-  index: Int,
-  test_case: TestCase(context),
-) -> Pid {
-  // The worker gets only what one test needs, not the queue of the loop.
-  let worker_input =
-    StartWorkersUpToLimitConfig(..input, pending: [], running: [])
-  spawn_unlinked(fn() { run_test_worker(worker_input, index, test_case) })
-}
-
-/// The body of a test worker process: run the test and send its result to
-/// the loop.
-fn run_test_worker(
-  input: StartWorkersUpToLimitConfig(context),
-  index: Int,
-  test_case: TestCase(context),
-) -> Nil {
-  let outcome =
-    execute_one_test_node(
-      input.config,
-      input.scope,
-      input.inherited_tags,
-      input.context,
-      input.runner_before_each_test,
-      input.runner_after_each_test,
-      input.before_each_hooks,
-      input.after_each_hooks,
-      input.failures_rev,
-      test_case,
-    )
-  send(input.subject, WorkerFinished(index: index, outcome: outcome))
-}
-
-fn worker_crash_result(
-  scope: List(String),
-  inherited_tags: List(String),
-  test_case: TestCase(context),
-  reason: String,
-) -> TestOutcome {
-  let result =
-    TestResult(
-      name: test_case.name,
-      groups: scope,
-      status: Failed,
-      duration_ms: 0,
-      tags: list.append(inherited_tags, test_case.tags),
-      failures: [
-        hook_failure(
-          "crash",
-          "worker crashed in " <> string.join(scope, " > ") <> ": " <> reason,
-        ),
-      ],
-      kind: test_case.kind,
-    )
-  TestOutcome(result: result, teardown_failures: [])
-}
-
-/// Wait for the next result of a worker. There is no deadline here: each
-/// test body and hook has its own deadline in its sandbox, so every worker
-/// sends a result or, if something stops it first, a down message.
-fn wait_for_result(
-  input: WaitForResultConfig(context),
-) -> #(List(RunningWorker(context)), List(IndexedResult), Int) {
-  let message =
-    new_selector()
-    |> select(input.subject)
-    |> select_worker_monitors(input.running)
-    |> selector_receive_forever()
-  let #(still_running, new_results) = case message {
-    WorkerFinished(index: index, outcome: outcome) -> #(
-      remove_finished_worker(input.running, index, []),
-      [IndexedResult(index: index, outcome: outcome)],
-    )
-    WorkerDown(down: down) ->
-      remove_down_worker(input, input.running, down, [], [])
-  }
-  let next_completed =
-    emit_test_finished_progress_results(
-      input.progress_output,
-      input.completed,
-      input.total,
-      list.map(new_results, indexed_result_value),
-    )
-  #(still_running, list.append(new_results, input.pending_emit), next_completed)
-}
-
-/// Select the down message of each running worker. Only these monitors are
-/// selected, so other down messages of the calling process stay in its
-/// mailbox.
-fn select_worker_monitors(
-  selector: Selector(WorkerMessage),
-  running: List(RunningWorker(context)),
-) -> Selector(WorkerMessage) {
-  case running {
-    [] -> selector
-    [worker, ..rest] ->
-      selector
-      |> select_specific_monitor(worker.monitor, WorkerDown)
-      |> select_worker_monitors(rest)
-  }
-}
-
-/// Remove the worker that sent the result for `index`. A worker sends its
-/// result before it exits, so the result comes before the down message;
-/// `demonitor_process` also removes a down message that is already in the
-/// mailbox.
-fn remove_finished_worker(
-  running: List(RunningWorker(context)),
-  index: Int,
-  kept_rev: List(RunningWorker(context)),
-) -> List(RunningWorker(context)) {
-  case running {
-    [] -> list.reverse(kept_rev)
-    [worker, ..rest] if worker.index == index -> {
-      demonitor_process(worker.monitor)
-      remove_finished_worker(rest, index, kept_rev)
-    }
-    [worker, ..rest] ->
-      remove_finished_worker(rest, index, [worker, ..kept_rev])
-  }
-}
-
-/// Remove the worker of the monitor that sent a down message, and give a
-/// failed result for its test: the worker exited before it sent its result.
-fn remove_down_worker(
-  input: WaitForResultConfig(context),
-  running: List(RunningWorker(context)),
-  down: Down,
-  kept_rev: List(RunningWorker(context)),
-  results: List(IndexedResult),
-) -> #(List(RunningWorker(context)), List(IndexedResult)) {
-  case running {
-    [] -> #(list.reverse(kept_rev), results)
-    [worker, ..rest] if worker.monitor == down.monitor ->
-      remove_down_worker(input, rest, down, kept_rev, [
-        IndexedResult(
-          index: worker.index,
-          outcome: worker_crash_result(
-            input.scope,
-            input.inherited_tags,
-            worker.test_case,
-            sandbox.format_exit_reason(down.reason),
-          ),
-        ),
-        ..results
-      ])
-    [worker, ..rest] ->
-      remove_down_worker(input, rest, down, [worker, ..kept_rev], results)
-  }
-}
-
-fn indexed_result_value(indexed_result: IndexedResult) -> TestResult {
-  indexed_result.outcome.result
-}
-
-fn emit_test_finished_progress(
-  progress_output: Option(ProgressOutput),
-  completed: Int,
-  total: Int,
-  result: TestResult,
-) -> Int {
-  let next_completed = completed + 1
-  case progress_output {
-    None -> next_completed
-    Some(ProgressOutput(reporter: reporter, write: write)) -> {
-      write(progress.line(
-        reporter,
-        progress.TestFinishedProgress(
-          completed: next_completed,
-          total: total,
-          result: result,
-        ),
-      ))
-      next_completed
-    }
-  }
-}
-
-fn emit_test_finished_progress_results(
-  progress_output: Option(ProgressOutput),
-  completed: Int,
-  total: Int,
-  results: List(TestResult),
-) -> Int {
-  case results {
-    [] -> completed
-    [result, ..rest] -> {
-      let next_completed =
-        emit_test_finished_progress(progress_output, completed, total, result)
-      emit_test_finished_progress_results(
-        progress_output,
-        next_completed,
-        total,
-        rest,
-      )
-    }
-  }
-}
-
-fn take_indexed_result(
-  index: Int,
-  items: List(IndexedResult),
-  acc_rev: List(IndexedResult),
-) -> #(Option(IndexedResult), List(IndexedResult)) {
-  case items {
-    [] -> #(None, list.reverse(acc_rev))
-    [item, ..rest] ->
-      case item.index == index {
-        True -> #(Some(item), list.append(list.reverse(acc_rev), rest))
-        False -> take_indexed_result(index, rest, [item, ..acc_rev])
-      }
-  }
-}
-
-fn execute_one_test_node(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  runner_before_each_test: List(
-    fn(TestInfo, context) -> Result(context, String),
-  ),
-  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(Callback(context, Result(context, String))),
-  after_each_hooks: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(AssertionFailure),
-  test_case: TestCase(context),
-) -> TestOutcome {
-  let TestCase(
-    name: name,
-    tags: tags,
-    kind: kind,
-    run: run,
-    timeout_ms: timeout_ms,
-    source: source,
-  ) = test_case
-  let all_tags = list.append(inherited_tags, tags)
-  let info =
-    types.TestInfo(
-      name: name,
-      groups: scope,
-      tags: all_tags,
-      kind: kind,
-      source: source,
-    )
-  let start = timing.now_ms()
-
-  let #(ctx_after_runner_setup, runner_setup_status, runner_setup_failures) =
-    run_runner_before_each_list(
-      config,
-      scope,
-      info,
-      context,
-      runner_before_each_test,
-      [],
-    )
-
-  let #(ctx_after_setup, setup_status, setup_failures) = case
-    runner_setup_status
-  {
-    SetupFailed -> #(ctx_after_runner_setup, SetupFailed, runner_setup_failures)
-    _ ->
-      run_before_each_list(
-        config,
+    OwnerTimedOut -> #(
+      None,
+      add_teardown_failure(
+        AfterAllHook,
         scope,
-        ctx_after_runner_setup,
-        before_each_hooks,
-        runner_setup_failures,
-      )
-  }
-
-  let #(status, failures) = case setup_status {
-    SetupFailed ->
-      setup_failed_status_and_failures(failures_rev, setup_failures)
-    _ -> {
-      run_in_sandbox(
-        config,
-        timeout_ms,
-        TestBody(run: run, context: ctx_after_setup),
-      )
-      |> sandbox_status_and_failures(failures_rev, setup_failures)
-    }
-  }
-
-  let test_name = types.full_name(scope, name)
-  let after_each_failures_rev =
-    run_after_each_list(
-      config,
-      scope,
-      test_name,
-      ctx_after_setup,
-      after_each_hooks,
-      [],
-    )
-
-  let teardown_failures_rev =
-    run_runner_after_each_list(
-      config,
-      scope,
-      test_name,
-      info,
-      ctx_after_setup,
-      runner_after_each_test,
-      after_each_failures_rev,
-    )
-
-  let duration = timing.now_ms() - start
-
-  TestOutcome(
-    result: TestResult(
-      name: name,
-      groups: scope,
-      status: status,
-      duration_ms: duration,
-      tags: all_tags,
-      failures: list.reverse(failures),
-      kind: kind,
-    ),
-    teardown_failures: list.reverse(teardown_failures_rev),
-  )
-}
-
-fn run_tests_sequentially(
-  config: ParallelConfig,
-  scope: List(String),
-  inherited_tags: List(String),
-  context: context,
-  runner_before_each_test: List(
-    fn(TestInfo, context) -> Result(context, String),
-  ),
-  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
-  before_each_hooks: List(Callback(context, Result(context, String))),
-  after_each_hooks: List(Callback(context, Result(Nil, String))),
-  tests: List(TestCase(context)),
-  failures_rev: List(AssertionFailure),
-  progress_output: Option(ProgressOutput),
-  total: Int,
-  completed: Int,
-  acc_rev: List(TestOutcome),
-) -> #(List(TestOutcome), Int) {
-  case tests {
-    [] -> #(acc_rev, completed)
-    [test_case, ..rest] -> {
-      let outcome =
-        execute_one_test_node(
-          config,
-          scope,
-          inherited_tags,
-          context,
-          runner_before_each_test,
-          runner_after_each_test,
-          before_each_hooks,
-          after_each_hooks,
-          failures_rev,
-          test_case,
-        )
-
-      let next_completed =
-        emit_test_finished_progress(
-          progress_output,
-          completed,
-          total,
-          outcome.result,
-        )
-      run_tests_sequentially(
-        config,
-        scope,
-        inherited_tags,
-        context,
-        runner_before_each_test,
-        runner_after_each_test,
-        before_each_hooks,
-        after_each_hooks,
-        rest,
+        hook_timeout_message(scope),
         failures_rev,
-        progress_output,
-        total,
-        next_completed,
-        [outcome, ..acc_rev],
-      )
-    }
+      ),
+    )
+    OwnerExited(reason: reason) -> #(
+      None,
+      add_teardown_failure(
+        AfterAllHook,
+        scope,
+        hook_crash_message(scope, reason),
+        failures_rev,
+      ),
+    )
   }
+}
+
+/// Put a failure of a tear-down hook in front of `failures_rev`.
+fn add_teardown_failure(
+  hook: TeardownHook,
+  scope: List(String),
+  message: String,
+  failures_rev: List(TeardownFailure),
+) -> List(TeardownFailure) {
+  [TeardownFailure(hook: hook, scope: scope, message: message), ..failures_rev]
 }
 
 fn run_child_groups_sequentially(
@@ -1568,54 +1175,734 @@ fn run_child_groups_sequentially(
   }
 }
 
-/// Run every `after_all` hook of a group, also after one fails, and give
-/// the failures newest first, in front of `failures_rev`.
-fn run_after_all_chain(
-  scope: List(String),
-  context: context,
-  hooks: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
-  case hooks {
-    [] -> failures_rev
-    [hook, ..rest] ->
-      run_after_all_chain(
-        scope,
-        context,
-        rest,
-        add_teardown_failure(
-          run_hook_in_process(scope, hook, context),
-          AfterAllHook,
-          scope,
-          failures_rev,
+// =============================================================================
+// The tests of a group: one process per test
+// =============================================================================
+
+/// Run the tests of a group, at most `max_concurrency` at a time, each in
+/// its own process. Gives the outcomes in declaration order, newest first,
+/// and the new count of completed tests.
+fn run_tests_in_group(
+  group: GroupRun(context),
+  tests: List(TestCase(context)),
+  completed: Int,
+) -> #(List(TestOutcome), Int) {
+  run_loop(
+    group,
+    LoopState(
+      pending: index_tests(tests, 0, []),
+      running: [],
+      pending_emit: [],
+      emitted_rev: [],
+      next_emit_index: 0,
+      completed: completed,
+    ),
+  )
+}
+
+fn index_tests(
+  test_cases: List(TestCase(context)),
+  next_index: Int,
+  acc_rev: List(#(Int, TestCase(context))),
+) -> List(#(Int, TestCase(context))) {
+  case test_cases {
+    [] -> list.reverse(acc_rev)
+    [test_case, ..rest] ->
+      index_tests(rest, next_index + 1, [#(next_index, test_case), ..acc_rev])
+  }
+}
+
+/// Start tests up to the limit, then wait for the next event, until no
+/// test waits and no test process runs. `max_concurrency` is at least 1,
+/// so no process runs only when no test waits.
+fn run_loop(
+  group: GroupRun(context),
+  state: LoopState(context),
+) -> #(List(TestOutcome), Int) {
+  let started = start_tests_up_to_limit(group, state, timing.now_ms())
+  case started.running {
+    [] -> #(started.emitted_rev, started.completed)
+    [first, ..] ->
+      run_loop(group, emit_ready(wait_for_event(group, started, first)))
+  }
+}
+
+/// Move the outcomes that are next in declaration order from
+/// `pending_emit` to `emitted_rev`.
+fn emit_ready(state: LoopState(context)) -> LoopState(context) {
+  case take_indexed_result(state.next_emit_index, state.pending_emit, []) {
+    #(None, _) -> state
+    #(Some(IndexedResult(_, outcome)), remaining) ->
+      emit_ready(
+        LoopState(
+          ..state,
+          pending_emit: remaining,
+          emitted_rev: [outcome, ..state.emitted_rev],
+          next_emit_index: state.next_emit_index + 1,
         ),
       )
   }
 }
 
-/// Put a failure of a tear-down hook in front of `failures_rev`. A hook
-/// that succeeded adds nothing.
-fn add_teardown_failure(
-  hook_result: Result(Nil, String),
-  hook: TeardownHook,
-  scope: List(String),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
-  case hook_result {
-    Ok(Nil) -> failures_rev
-    Error(message) -> [
-      TeardownFailure(hook: hook, scope: scope, message: message),
-      ..failures_rev
-    ]
+fn take_indexed_result(
+  index: Int,
+  items: List(IndexedResult),
+  acc_rev: List(IndexedResult),
+) -> #(Option(IndexedResult), List(IndexedResult)) {
+  case items {
+    [] -> #(None, list.reverse(acc_rev))
+    [item, ..rest] if item.index == index -> #(
+      Some(item),
+      list.append(list.reverse(acc_rev), rest),
+    )
+    [item, ..rest] -> take_indexed_result(index, rest, [item, ..acc_rev])
   }
+}
+
+fn start_tests_up_to_limit(
+  group: GroupRun(context),
+  state: LoopState(context),
+  now: Int,
+) -> LoopState(context) {
+  case state.pending, list.length(state.running) < group.max_concurrency {
+    [#(index, test_case), ..rest], True ->
+      start_tests_up_to_limit(
+        group,
+        LoopState(..state, pending: rest, running: [
+          spawn_test_process(new_test_job(group, index, test_case, now), now),
+          ..state.running
+        ]),
+        now,
+      )
+    _, _ -> state
+  }
+}
+
+/// The job of a new test: all its steps, from the first one.
+fn new_test_job(
+  group: GroupRun(context),
+  index: Int,
+  test_case: TestCase(context),
+  now: Int,
+) -> TestJob(context) {
+  let info =
+    types.TestInfo(
+      name: test_case.name,
+      groups: group.scope,
+      tags: list.append(group.inherited_tags, test_case.tags),
+      kind: test_case.kind,
+      source: test_case.source,
+    )
+  let set_up_steps =
+    list.append(
+      list.map(group.runner_before_each_test, RunnerBeforeEachStep),
+      list.map(group.before_each_hooks, BeforeEachStep),
+    )
+  let tear_down_steps =
+    list.append(
+      list.map(group.after_each_hooks, AfterEachStep),
+      list.map(group.runner_after_each_test, RunnerAfterEachStep),
+    )
+  let #(first_step, later_steps) = case set_up_steps {
+    [] -> #(BodyStep, tear_down_steps)
+    [first, ..rest] -> #(
+      first,
+      list.flatten([rest, [BodyStep], tear_down_steps]),
+    )
+  }
+  TestJob(
+    subject: group.subject,
+    index: index,
+    scope: group.scope,
+    info: info,
+    test_case: test_case,
+    first_step: first_step,
+    later_steps: later_steps,
+    state: TestState(
+      context: group.context,
+      status: Passed,
+      failures_rev: [],
+      teardown_failures_rev: [],
+      started_ms: now,
+    ),
+    default_timeout_ms: group.config.default_timeout_ms,
+  )
+}
+
+/// Start a process for a job and monitor it. The deadline of its first
+/// step counts from `now`.
+fn spawn_test_process(
+  job: TestJob(context),
+  now: Int,
+) -> RunningWorker(context) {
+  let pid = spawn_unlinked(fn() { run_test_process(job) })
+  RunningWorker(
+    job: job,
+    pid: pid,
+    monitor: monitor(pid),
+    step: job.first_step,
+    later_steps: job.later_steps,
+    state: job.state,
+    deadline_ms: now + step_timeout(job, job.first_step),
+  )
+}
+
+/// The timeout of a step: the timeout of the test for the body, and the
+/// default timeout for a hook.
+fn step_timeout(job: TestJob(context), step: TestStep(context)) -> Int {
+  case step {
+    BodyStep -> option.unwrap(job.test_case.timeout_ms, job.default_timeout_ms)
+    _ -> job.default_timeout_ms
+  }
+}
+
+/// Wait for the next message from a test process, until the earliest
+/// deadline of a step. A message that is already in the mailbox comes
+/// first, so a process that finished in time is never taken as late.
+fn wait_for_event(
+  group: GroupRun(context),
+  state: LoopState(context),
+  first: RunningWorker(context),
+) -> LoopState(context) {
+  let deadline = list.fold(state.running, first.deadline_ms, earliest_deadline)
+  let selector =
+    new_selector()
+    |> select(group.subject)
+    |> select_worker_monitors(state.running)
+  case selector_receive(selector, int.max(deadline - timing.now_ms(), 0)) {
+    Ok(StepStarted(
+      worker: worker,
+      step: step,
+      later_steps: later_steps,
+      state: step_state,
+      started_ms: started_ms,
+    )) ->
+      LoopState(
+        ..state,
+        running: record_step(
+          state.running,
+          StepStarted(
+            worker: worker,
+            step: step,
+            later_steps: later_steps,
+            state: step_state,
+            started_ms: started_ms,
+          ),
+          [],
+        ),
+      )
+    Ok(WorkerFinished(worker: worker, outcome: outcome)) -> {
+      let #(running, results) =
+        remove_finished_worker(state.running, worker, outcome, [], [])
+      add_results(group, LoopState(..state, running: running), results)
+    }
+    Ok(WorkerDown(down: down)) -> {
+      let #(running, results) = remove_down_worker(state.running, down, [], [])
+      add_results(group, LoopState(..state, running: running), results)
+    }
+    Error(Nil) -> {
+      let #(running, results) =
+        expire_workers(state.running, timing.now_ms(), [], [])
+      add_results(group, LoopState(..state, running: running), results)
+    }
+  }
+}
+
+fn earliest_deadline(deadline: Int, worker: RunningWorker(context)) -> Int {
+  int.min(deadline, worker.deadline_ms)
+}
+
+/// Select the down message of each running process. Only these monitors
+/// are selected, so other down messages of the calling process stay in
+/// its mailbox.
+fn select_worker_monitors(
+  selector: Selector(WorkerMessage(context)),
+  running: List(RunningWorker(context)),
+) -> Selector(WorkerMessage(context)) {
+  case running {
+    [] -> selector
+    [worker, ..rest] ->
+      selector
+      |> select_specific_monitor(worker.monitor, WorkerDown)
+      |> select_worker_monitors(rest)
+  }
+}
+
+/// Record the step that a process started: its state and the deadline of
+/// the step, from the time that the process gave.
+fn record_step(
+  running: List(RunningWorker(context)),
+  message: WorkerMessage(context),
+  kept_rev: List(RunningWorker(context)),
+) -> List(RunningWorker(context)) {
+  case running, message {
+    [], _ -> list.reverse(kept_rev)
+    [worker, ..rest],
+      StepStarted(
+        worker: pid,
+        step: step,
+        later_steps: later_steps,
+        state: state,
+        started_ms: started_ms,
+      )
+      if worker.pid == pid
+    ->
+      record_step(rest, message, [
+        RunningWorker(
+          ..worker,
+          step: step,
+          later_steps: later_steps,
+          state: state,
+          deadline_ms: started_ms + step_timeout(worker.job, step),
+        ),
+        ..kept_rev
+      ])
+    [worker, ..rest], _ -> record_step(rest, message, [worker, ..kept_rev])
+  }
+}
+
+/// Remove the process that sent its outcome. A process sends its outcome
+/// before it exits, so the outcome comes before the down message;
+/// `demonitor_process` also removes a down message that is already in the
+/// mailbox.
+fn remove_finished_worker(
+  running: List(RunningWorker(context)),
+  pid: Pid,
+  outcome: TestOutcome,
+  kept_rev: List(RunningWorker(context)),
+  results: List(IndexedResult),
+) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+  case running {
+    [] -> #(list.reverse(kept_rev), results)
+    [worker, ..rest] if worker.pid == pid -> {
+      demonitor_process(worker.monitor)
+      remove_finished_worker(rest, pid, outcome, kept_rev, [
+        IndexedResult(index: worker.job.index, outcome: outcome),
+        ..results
+      ])
+    }
+    [worker, ..rest] ->
+      remove_finished_worker(rest, pid, outcome, [worker, ..kept_rev], results)
+  }
+}
+
+/// Handle the process of a monitor that sent a down message: the process
+/// stopped in its current step.
+fn remove_down_worker(
+  running: List(RunningWorker(context)),
+  down: Down,
+  kept_rev: List(RunningWorker(context)),
+  results: List(IndexedResult),
+) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+  case running {
+    [] -> #(list.reverse(kept_rev), results)
+    [worker, ..rest] if worker.monitor == down.monitor -> {
+      let #(next_kept_rev, next_results) =
+        after_step_end(
+          worker,
+          StepExited(sandbox.format_exit_reason(down.reason)),
+          kept_rev,
+          results,
+        )
+      remove_down_worker(rest, down, next_kept_rev, next_results)
+    }
+    [worker, ..rest] ->
+      remove_down_worker(rest, down, [worker, ..kept_rev], results)
+  }
+}
+
+/// Kill each process whose step is past its deadline.
+fn expire_workers(
+  running: List(RunningWorker(context)),
+  now: Int,
+  kept_rev: List(RunningWorker(context)),
+  results: List(IndexedResult),
+) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+  case running {
+    [] -> #(list.reverse(kept_rev), results)
+    [worker, ..rest] if worker.deadline_ms <= now -> {
+      kill(worker.pid)
+      demonitor_process(worker.monitor)
+      let #(next_kept_rev, next_results) =
+        after_step_end(worker, StepTimedOut, kept_rev, results)
+      expire_workers(rest, now, next_kept_rev, next_results)
+    }
+    [worker, ..rest] -> expire_workers(rest, now, [worker, ..kept_rev], results)
+  }
+}
+
+/// After a step did not finish: record the failure of the step, then run
+/// the tear-down steps that did not run yet in a new process, with the
+/// context that they would get after the body. With no such step, the
+/// test has its outcome.
+fn after_step_end(
+  worker: RunningWorker(context),
+  end: StepEnd,
+  kept_rev: List(RunningWorker(context)),
+  results: List(IndexedResult),
+) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+  let state = fail_step(worker.job, worker.step, worker.state, end)
+  case list.filter(worker.later_steps, is_teardown_step) {
+    [] -> #(kept_rev, [
+      IndexedResult(
+        index: worker.job.index,
+        outcome: test_outcome(worker.job, state),
+      ),
+      ..results
+    ])
+    [first, ..rest] -> {
+      let job =
+        TestJob(
+          ..worker.job,
+          first_step: first,
+          later_steps: rest,
+          state: state,
+        )
+      #([spawn_test_process(job, timing.now_ms()), ..kept_rev], results)
+    }
+  }
+}
+
+/// Emit progress for new results and keep them until their turn.
+fn add_results(
+  group: GroupRun(context),
+  state: LoopState(context),
+  results: List(IndexedResult),
+) -> LoopState(context) {
+  LoopState(
+    ..state,
+    pending_emit: list.append(results, state.pending_emit),
+    completed: emit_test_finished_progress_results(
+      group.progress_output,
+      state.completed,
+      group.total,
+      list.map(results, indexed_result_value),
+    ),
+  )
+}
+
+fn indexed_result_value(indexed_result: IndexedResult) -> TestResult {
+  indexed_result.outcome.result
+}
+
+fn emit_test_finished_progress(
+  progress_output: Option(ProgressOutput),
+  completed: Int,
+  total: Int,
+  result: TestResult,
+) -> Int {
+  let next_completed = completed + 1
+  case progress_output {
+    None -> next_completed
+    Some(ProgressOutput(reporter: reporter, write: write)) -> {
+      write(progress.line(
+        reporter,
+        progress.TestFinishedProgress(
+          completed: next_completed,
+          total: total,
+          result: result,
+        ),
+      ))
+      next_completed
+    }
+  }
+}
+
+fn emit_test_finished_progress_results(
+  progress_output: Option(ProgressOutput),
+  completed: Int,
+  total: Int,
+  results: List(TestResult),
+) -> Int {
+  case results {
+    [] -> completed
+    [result, ..rest] -> {
+      let next_completed =
+        emit_test_finished_progress(progress_output, completed, total, result)
+      emit_test_finished_progress_results(
+        progress_output,
+        next_completed,
+        total,
+        rest,
+      )
+    }
+  }
+}
+
+// =============================================================================
+// The test process
+// =============================================================================
+
+/// The body of a test process: run the steps of the job, then send the
+/// outcome. Before each step that runs, the process tells the loop the
+/// step and the state, so the loop can end the test if the process stops.
+fn run_test_process(job: TestJob(context)) -> Nil {
+  let state = run_steps(job, [job.first_step, ..job.later_steps], job.state)
+  send(
+    job.subject,
+    WorkerFinished(worker: process.self(), outcome: test_outcome(job, state)),
+  )
+}
+
+fn run_steps(
+  job: TestJob(context),
+  steps: List(TestStep(context)),
+  state: TestState(context),
+) -> TestState(context) {
+  case steps {
+    [] -> state
+    [step, ..later_steps] ->
+      run_steps(
+        job,
+        later_steps,
+        run_step_when_due(job, step, later_steps, state),
+      )
+  }
+}
+
+/// Run a step when it is due: a tear-down step always, a set-up step and
+/// the body only while nothing failed.
+fn run_step_when_due(
+  job: TestJob(context),
+  step: TestStep(context),
+  later_steps: List(TestStep(context)),
+  state: TestState(context),
+) -> TestState(context) {
+  case is_teardown_step(step) || state.status == Passed {
+    False -> state
+    True -> {
+      send(
+        job.subject,
+        StepStarted(
+          worker: process.self(),
+          step: step,
+          later_steps: later_steps,
+          state: state,
+          started_ms: timing.now_ms(),
+        ),
+      )
+      run_step(job, step, state)
+    }
+  }
+}
+
+fn is_teardown_step(step: TestStep(context)) -> Bool {
+  case step {
+    AfterEachStep(_) | RunnerAfterEachStep(_) -> True
+    RunnerBeforeEachStep(_) | BeforeEachStep(_) | BodyStep -> False
+  }
+}
+
+/// Run one step in the test process. A crash of the step is caught.
+fn run_step(
+  job: TestJob(context),
+  step: TestStep(context),
+  state: TestState(context),
+) -> TestState(context) {
+  case step {
+    RunnerBeforeEachStep(hook: hook) ->
+      set_up_step_result(
+        job,
+        state,
+        "before_each_test",
+        sandbox.run_catching(
+          call_runner_hook,
+          RunnerHookCall(hook: hook, info: job.info, context: state.context),
+        ),
+      )
+    BeforeEachStep(hook: hook) ->
+      set_up_step_result(
+        job,
+        state,
+        "before_each",
+        sandbox.run_catching(
+          call_hook,
+          HookCall(hook: hook, input: state.context),
+        ),
+      )
+    BodyStep ->
+      body_result(
+        state,
+        sandbox.run_catching(
+          run_test_body,
+          TestBody(run: job.test_case.run, context: state.context),
+        ),
+      )
+    AfterEachStep(hook: hook) ->
+      tear_down_step_result(
+        job,
+        state,
+        AfterEachHook,
+        sandbox.run_catching(
+          call_hook,
+          HookCall(hook: hook, input: state.context),
+        ),
+      )
+    RunnerAfterEachStep(hook: hook) ->
+      tear_down_step_result(
+        job,
+        state,
+        AfterEachTestHook,
+        sandbox.run_catching(
+          call_runner_hook,
+          RunnerHookCall(hook: hook, info: job.info, context: state.context),
+        ),
+      )
+  }
+}
+
+fn set_up_step_result(
+  job: TestJob(context),
+  state: TestState(context),
+  operator: String,
+  caught: Result(Result(context, String), String),
+) -> TestState(context) {
+  case caught {
+    Ok(Ok(next)) -> TestState(..state, context: next)
+    Ok(Error(message)) -> set_up_failed(state, operator, message)
+    Error(reason) ->
+      set_up_failed(state, operator, hook_crash_message(job.scope, reason))
+  }
+}
+
+fn body_result(
+  state: TestState(context),
+  caught: Result(AssertionResult, String),
+) -> TestState(context) {
+  case caught {
+    Ok(AssertionOk) -> state
+    Ok(AssertionFailed(failure)) -> body_ended(state, Failed, failure)
+    Ok(AssertionSkipped) -> TestState(..state, status: Skipped)
+    Error(reason) -> body_ended(state, Failed, hook_failure("crash", reason))
+  }
+}
+
+fn tear_down_step_result(
+  job: TestJob(context),
+  state: TestState(context),
+  hook: TeardownHook,
+  caught: Result(Result(Nil, String), String),
+) -> TestState(context) {
+  case caught {
+    Ok(Ok(Nil)) -> state
+    Ok(Error(message)) -> tear_down_failed(job, state, hook, message)
+    Error(reason) ->
+      tear_down_failed(job, state, hook, hook_crash_message(job.scope, reason))
+  }
+}
+
+/// The state after a step that did not finish in its process: it ran past
+/// its deadline, or the process stopped.
+fn fail_step(
+  job: TestJob(context),
+  step: TestStep(context),
+  state: TestState(context),
+  end: StepEnd,
+) -> TestState(context) {
+  case step, end {
+    RunnerBeforeEachStep(_), _ ->
+      set_up_failed(state, "before_each_test", step_end_message(job, end))
+    BeforeEachStep(_), _ ->
+      set_up_failed(state, "before_each", step_end_message(job, end))
+    BodyStep, StepTimedOut ->
+      body_ended(state, TimedOut, hook_failure("timeout", "test timed out"))
+    BodyStep, StepExited(reason: reason) ->
+      body_ended(
+        state,
+        Failed,
+        hook_failure(
+          "crash",
+          "worker crashed in "
+            <> string.join(job.scope, " > ")
+            <> ": "
+            <> reason,
+        ),
+      )
+    AfterEachStep(_), _ ->
+      tear_down_failed(job, state, AfterEachHook, step_end_message(job, end))
+    RunnerAfterEachStep(_), _ ->
+      tear_down_failed(
+        job,
+        state,
+        AfterEachTestHook,
+        step_end_message(job, end),
+      )
+  }
+}
+
+/// The message for a hook step that did not finish, in the same words as
+/// for a hook that timed out or crashed before.
+fn step_end_message(job: TestJob(context), end: StepEnd) -> String {
+  case end {
+    StepTimedOut -> hook_timeout_message(job.scope)
+    StepExited(reason: reason) -> hook_crash_message(job.scope, reason)
+  }
+}
+
+fn set_up_failed(
+  state: TestState(context),
+  operator: String,
+  message: String,
+) -> TestState(context) {
+  TestState(..state, status: SetupFailed, failures_rev: [
+    hook_failure(operator, message),
+    ..state.failures_rev
+  ])
+}
+
+fn body_ended(
+  state: TestState(context),
+  status: Status,
+  failure: AssertionFailure,
+) -> TestState(context) {
+  TestState(..state, status: status, failures_rev: [
+    failure,
+    ..state.failures_rev
+  ])
+}
+
+fn tear_down_failed(
+  job: TestJob(context),
+  state: TestState(context),
+  hook: TeardownHook,
+  message: String,
+) -> TestState(context) {
+  TestState(
+    ..state,
+    teardown_failures_rev: add_teardown_failure(
+      hook,
+      types.full_name(job.scope, job.test_case.name),
+      message,
+      state.teardown_failures_rev,
+    ),
+  )
+}
+
+/// The outcome of a test from its state after its last step.
+fn test_outcome(
+  job: TestJob(context),
+  state: TestState(context),
+) -> TestOutcome {
+  TestOutcome(
+    result: TestResult(
+      name: job.test_case.name,
+      groups: job.scope,
+      status: state.status,
+      duration_ms: timing.now_ms() - state.started_ms,
+      tags: job.info.tags,
+      failures: list.reverse(state.failures_rev),
+      kind: job.test_case.kind,
+    ),
+    teardown_failures: list.reverse(state.teardown_failures_rev),
+  )
 }
 
 // =============================================================================
 // Hook helpers
 // =============================================================================
 
-/// A runner hook with the two arguments it gets, so that it can run in a
-/// sandbox as a function of one input.
+/// A runner hook with the two arguments it gets, so that it can run as a
+/// function of one input.
 type RunnerHookCall(context, output) {
   RunnerHookCall(
     hook: fn(TestInfo, context) -> output,
@@ -1628,8 +1915,8 @@ fn call_runner_hook(call: RunnerHookCall(context, output)) -> output {
   call.hook(call.info, call.context)
 }
 
-/// A group hook with its input, so that it can run in a sandbox as a
-/// function of one input.
+/// A group hook with its input, so that it can run as a function of one
+/// input.
 type HookCall(input, output) {
   HookCall(hook: Callback(input, output), input: input)
 }
@@ -1638,210 +1925,16 @@ fn call_hook(call: HookCall(input, output)) -> output {
   types.call(call.hook, call.input)
 }
 
-/// Run one hook with its input in a sandbox. A timeout or a crash becomes
-/// an `Error` that names the scope.
-fn run_hook(
-  config: ParallelConfig,
-  scope: List(String),
-  hook: fn(input) -> Result(output, String),
-  input: input,
-) -> Result(output, String) {
-  let sandbox_config =
-    sandbox.SandboxConfig(
-      timeout_ms: config.default_timeout_ms,
-      show_crash_reports: False,
-    )
-  case sandbox.run_isolated(sandbox_config, hook, input) {
-    sandbox.SandboxCompleted(result) -> result
-    sandbox.SandboxTimedOut ->
-      Error("hook timed out in " <> string.join(scope, " > "))
-    sandbox.SandboxCrashed(reason) -> Error(hook_crash_message(scope, reason))
-  }
-}
-
-/// Run a group-level hook (`before_all` or `after_all`) in the process that
-/// runs the group. A crash becomes an `Error` that names the scope.
-///
-/// The hook does not run in a sandbox: a resource that it starts, such as a
-/// pool that links to the caller or an ETS table, must live for all the
-/// tests of the group, and a sandbox process stops when the hook returns.
-/// So no timeout applies to these hooks.
-fn run_hook_in_process(
-  scope: List(String),
-  hook: Callback(input, Result(output, String)),
-  input: input,
-) -> Result(output, String) {
-  case sandbox.run_catching(call_hook, HookCall(hook: hook, input: input)) {
-    Ok(result) -> result
-    Error(reason) -> Error(hook_crash_message(scope, reason))
-  }
-}
-
 fn hook_crash_message(scope: List(String), reason: String) -> String {
   "hook crashed in " <> string.join(scope, " > ") <> ": " <> reason
 }
 
-fn run_before_each_list(
-  config: ParallelConfig,
-  scope: List(String),
-  context: context,
-  hooks: List(Callback(context, Result(context, String))),
-  failures_rev: List(AssertionFailure),
-) -> #(context, Status, List(AssertionFailure)) {
-  case hooks {
-    [] -> #(context, Passed, failures_rev)
-    [hook, ..rest] ->
-      case
-        run_hook(config, scope, call_hook, HookCall(hook: hook, input: context))
-      {
-        Ok(next) ->
-          run_before_each_list(config, scope, next, rest, failures_rev)
-        Error(message) -> #(context, SetupFailed, [
-          hook_failure("before_each", message),
-          ..failures_rev
-        ])
-      }
-  }
-}
-
-/// Run every `after_each` hook of a test, also after one fails, and give
-/// the failures newest first, in front of `failures_rev`. A failure does
-/// not change the status of the test.
-fn run_after_each_list(
-  config: ParallelConfig,
-  scope: List(String),
-  test_name: List(String),
-  context: context,
-  hooks: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
-  case hooks {
-    [] -> failures_rev
-    [hook, ..rest] ->
-      run_after_each_list(
-        config,
-        scope,
-        test_name,
-        context,
-        rest,
-        add_teardown_failure(
-          run_hook(
-            config,
-            scope,
-            call_hook,
-            HookCall(hook: hook, input: context),
-          ),
-          AfterEachHook,
-          test_name,
-          failures_rev,
-        ),
-      )
-  }
-}
-
-fn run_runner_before_each_list(
-  config: ParallelConfig,
-  scope: List(String),
-  info: TestInfo,
-  context: context,
-  hooks: List(fn(TestInfo, context) -> Result(context, String)),
-  failures_rev: List(AssertionFailure),
-) -> #(context, Status, List(AssertionFailure)) {
-  case hooks {
-    [] -> #(context, Passed, failures_rev)
-    [hook, ..rest] ->
-      case
-        run_hook(
-          config,
-          scope,
-          call_runner_hook,
-          RunnerHookCall(hook: hook, info: info, context: context),
-        )
-      {
-        Ok(next) ->
-          run_runner_before_each_list(
-            config,
-            scope,
-            info,
-            next,
-            rest,
-            failures_rev,
-          )
-        Error(message) -> #(context, SetupFailed, [
-          hook_failure("before_each_test", message),
-          ..failures_rev
-        ])
-      }
-  }
-}
-
-/// Run every runner `after_each_test` hook of a test, also after one
-/// fails, and give the failures newest first, in front of `failures_rev`.
-/// A failure does not change the status of the test.
-fn run_runner_after_each_list(
-  config: ParallelConfig,
-  scope: List(String),
-  test_name: List(String),
-  info: TestInfo,
-  context: context,
-  hooks: List(fn(TestInfo, context) -> Result(Nil, String)),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
-  case hooks {
-    [] -> failures_rev
-    [hook, ..rest] ->
-      run_runner_after_each_list(
-        config,
-        scope,
-        test_name,
-        info,
-        context,
-        rest,
-        add_teardown_failure(
-          run_hook(
-            config,
-            scope,
-            call_runner_hook,
-            RunnerHookCall(hook: hook, info: info, context: context),
-          ),
-          AfterEachTestHook,
-          test_name,
-          failures_rev,
-        ),
-      )
-  }
+fn hook_timeout_message(scope: List(String)) -> String {
+  "hook timed out in " <> string.join(scope, " > ")
 }
 
 fn hook_failure(operator: String, message: String) -> AssertionFailure {
   AssertionFailure(operator: operator, message: message, payload: None)
-}
-
-fn assertion_to_status_and_failures(
-  result: AssertionResult,
-  inherited_failures_rev: List(AssertionFailure),
-  setup_failures_rev: List(AssertionFailure),
-) -> #(Status, List(AssertionFailure)) {
-  case result {
-    AssertionOk -> #(
-      Passed,
-      list.append(setup_failures_rev, inherited_failures_rev),
-    )
-    AssertionFailed(failure) -> #(Failed, [
-      failure,
-      ..list.append(setup_failures_rev, inherited_failures_rev)
-    ])
-    AssertionSkipped -> #(
-      Skipped,
-      list.append(setup_failures_rev, inherited_failures_rev),
-    )
-  }
-}
-
-fn setup_failed_status_and_failures(
-  inherited_failures_rev: List(AssertionFailure),
-  setup_failures_rev: List(AssertionFailure),
-) -> #(Status, List(AssertionFailure)) {
-  #(SetupFailed, list.append(setup_failures_rev, inherited_failures_rev))
 }
 
 /// A test body with the context that it gets.
@@ -1858,50 +1951,5 @@ fn run_test_body(body: TestBody(context)) -> AssertionResult {
   case types.call(body.run, body.context) {
     Ok(result) -> result
     Error(message) -> AssertionFailed(hook_failure("error", message))
-  }
-}
-
-/// Run a test body in a sandbox. The sandbox timeout is the only deadline
-/// of a test, in parallel and in sequential runs.
-fn run_in_sandbox(
-  config: ParallelConfig,
-  timeout_override: Option(Int),
-  body: TestBody(context),
-) -> sandbox.SandboxResult(AssertionResult) {
-  let ParallelConfig(default_timeout_ms: default_timeout_ms, max_concurrency: _) =
-    config
-  let timeout = case timeout_override {
-    Some(ms) -> ms
-    None -> default_timeout_ms
-  }
-  let sandbox_config =
-    sandbox.SandboxConfig(timeout_ms: timeout, show_crash_reports: False)
-  sandbox.run_isolated(sandbox_config, run_test_body, body)
-}
-
-/// The status and failures of a test body from its sandbox result. A body
-/// that ran past its timeout is `TimedOut`.
-fn sandbox_status_and_failures(
-  sandbox_result: sandbox.SandboxResult(AssertionResult),
-  inherited_failures_rev: List(AssertionFailure),
-  setup_failures_rev: List(AssertionFailure),
-) -> #(Status, List(AssertionFailure)) {
-  let earlier_failures_rev =
-    list.append(setup_failures_rev, inherited_failures_rev)
-  case sandbox_result {
-    sandbox.SandboxCompleted(assertion) ->
-      assertion_to_status_and_failures(
-        assertion,
-        inherited_failures_rev,
-        setup_failures_rev,
-      )
-    sandbox.SandboxTimedOut -> #(TimedOut, [
-      hook_failure("timeout", "test timed out"),
-      ..earlier_failures_rev
-    ])
-    sandbox.SandboxCrashed(reason) -> #(Failed, [
-      hook_failure("crash", reason),
-      ..earlier_failures_rev
-    ])
   }
 }

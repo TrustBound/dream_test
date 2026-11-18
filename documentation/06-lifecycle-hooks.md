@@ -343,18 +343,21 @@ The BDD and Gherkin reporters show the failure in a `Tear-down failures:` sectio
 
 ### Where hooks run
 
-A hook can start a resource that its tests use, for example a pool or an ETS table. On the BEAM, such a resource often stops when the process that started it stops. So each hook runs in a process that lives as long as the tests that it serves:
+A hook can start a resource that its tests use, for example a pool or an ETS table. On the BEAM, such a resource often stops when the process that started it stops. So each scope has one process that runs its hooks and lives as long as the tests that it serves:
 
 | Hooks | Process | Timeout |
 |---|---|---|
-| `before_all`, `after_all` | the runner process | none |
-| `before_all_suites`, `before_each_suite`, `after_each_suite`, `after_all_suites` | the runner process | none |
-| `before_each`, `after_each`, `before_each_test`, `after_each_test` | a new process for each hook | the test timeout |
+| `before_all_suites`, `after_all_suites` | one owner process for the whole run | the default timeout, for each hook |
+| `before_each_suite`, `after_each_suite` | one owner process for each suite | the default timeout of the suite, for each hook |
+| `before_all`, `after_all` | one owner process for each group | the default timeout, for each hook |
+| `before_each_test`, `before_each`, the body, `after_each`, `after_each_test` | one process for each test | the default timeout for each hook, the test timeout for the body |
 
-- A pool that `before_all` starts lives until `after_all` stops it.
-- A crash in a hook does not stop the run. The runner records it as a failure of that hook.
-- A hook that runs in the runner process has no timeout. If it never returns, the run never ends.
-- A resource that `before_each` starts stops when the hook returns. Start a per-test resource in the test body.
+- A pool that `before_all` starts lives until `after_all` stops it. A pool that `before_each` starts lives for the body and the `after_each` hooks of that test.
+- The runner waits for each hook with its timeout. A set-up hook that never returns gives `SetupFailed` with `hook timed out in <scope>`. A tear-down hook that never returns is a tear-down failure with the same message. The run goes on.
+- A crash in a hook, or a crash of the process that runs it, does not stop the run. The runner records it as a failure of that hook.
+- After a timeout or a crash of its owner, the next hook of the scope runs in a new owner process. If the owner of a group stops while the tests run, the run report gets a tear-down failure `before_all process exited in <scope>: <reason>`, and the `after_all` hooks run in a new owner.
+- If the body of a test times out, or the test process stops, the `after_each` and `after_each_test` hooks that did not run yet still run, in a new process with their own timeouts. They get the context after the last `before_each` hook that returned. The test keeps its status, for example `TimedOut`.
+- When a scope ends, its owner process exits with reason `normal`. An ETS table that the owner made is deleted, and a linked process that traps exits, such as a supervisor, stops.
 
 ### Hooks and parallelism (the source of most flaky tests)
 

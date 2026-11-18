@@ -2,16 +2,18 @@
 ////
 //// A hook that starts a resource the way a user does, for example a pool
 //// that links to the caller or an ETS table that the caller owns, must find
-//// that resource alive in the tests that it serves. Suite-level hooks and
-//// group `before_all`/`after_all` hooks run in the process that runs the
-//// suite, so a resource lives until the hook that stops it.
+//// that resource alive in the tests that it serves. Each scope has one
+//// owner process for its hooks, and each test has one process for its
+//// hooks and its body. The runner waits for each hook with a timeout, so a
+//// hook that never returns or kills its process does not stop the run.
 
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
+import dream_test/sandbox.{type SandboxResult, SandboxCompleted, SandboxConfig}
 import dream_test/types.{
-  type AssertionResult, type Status, type TestResult, AfterAllSuitesHook,
-  AfterEachSuiteHook, AssertionFailure, AssertionOk, Passed, SetupFailed,
-  TeardownFailure,
+  type AssertionResult, type Status, type TestResult, AfterAllHook,
+  AfterAllSuitesHook, AfterEachHook, AfterEachSuiteHook, AssertionFailure,
+  AssertionOk, Failed, Passed, SetupFailed, TeardownFailure, TimedOut,
 }
 import dream_test/unit.{describe, it}
 import dream_test/unit_context
@@ -123,6 +125,436 @@ pub fn tests() {
       ])
       |> or_fail_with(
         "a crash in after_each_suite should be a tear-down failure",
+      )
+    }),
+
+    it("a pool that before_each starts lives for the test body", fn() {
+      unit_context.describe("pool test", NoPool, [
+        unit_context.before_each(start_pool_in_context),
+        unit_context.it("uses the pool", pool_in_context_is_alive),
+        unit_context.after_each(stop_pool_in_context),
+      ])
+      |> run_suite
+      |> statuses
+      |> should
+      |> be_equal([#("uses the pool", Passed)])
+      |> or_fail_with("the pool from before_each should live for the body")
+    }),
+
+    it("an ETS table that before_each makes lives for the test body", fn() {
+      unit_context.describe(
+        "table test",
+        atom.create("dream_test_before_each_table"),
+        [
+          unit_context.before_each(make_table),
+          unit_context.it("uses the table", table_in_context_exists),
+          unit_context.after_each(remove_table),
+        ],
+      )
+      |> run_suite
+      |> statuses
+      |> should
+      |> be_equal([#("uses the table", Passed)])
+      |> or_fail_with("the ETS table from before_each should live for the body")
+    }),
+
+    it("a before_all that never returns gives SetupFailed", fn() {
+      describe("root", [
+        unit.before_all(hang),
+        it("a", passing_test),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", SetupFailed, [#("before_all", "hook timed out in root")]),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+      )
+      |> or_fail_with("a hanging before_all should time out")
+    }),
+
+    it("an after_all that never returns is a tear-down failure", fn() {
+      describe("root", [
+        it("a", passing_test),
+        unit.after_all(hang),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterAllHook,
+              scope: ["root"],
+              message: "hook timed out in root",
+            ),
+          ]),
+        ),
+      )
+      |> or_fail_with("a hanging after_all should be a tear-down failure")
+    }),
+
+    it("a before_all_suites hook that never returns gives SetupFailed", fn() {
+      runner.new([describe("suite", [it("a", passing_test)])])
+      |> runner.before_all_suites(fn(_suites) { hang() })
+      |> run_builder_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", SetupFailed, [#("before_all_suites", "hook timed out")]),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+      )
+      |> or_fail_with("a hanging before_all_suites should time out")
+    }),
+
+    it(
+      "an after_all_suites hook that never returns is a tear-down failure",
+      fn() {
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.after_all_suites(fn(_suites) { hang() })
+        |> run_builder_bounded
+        |> should
+        |> be_equal(
+          SandboxCompleted(
+            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+              TeardownFailure(
+                hook: AfterAllSuitesHook,
+                scope: [],
+                message: "hook timed out",
+              ),
+            ]),
+          ),
+        )
+        |> or_fail_with(
+          "a hanging after_all_suites should be a tear-down failure",
+        )
+      },
+    ),
+
+    it("a before_each_suite hook that never returns gives SetupFailed", fn() {
+      runner.new([describe("suite", [it("a", passing_test)])])
+      |> runner.before_each_suite(fn(_suite) { hang() })
+      |> run_builder_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", SetupFailed, [
+                #("before_each_suite", "hook timed out in suite"),
+              ]),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+      )
+      |> or_fail_with("a hanging before_each_suite should time out")
+    }),
+
+    it(
+      "an after_each_suite hook that never returns is a tear-down failure",
+      fn() {
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.after_each_suite(fn(_suite) { hang() })
+        |> run_builder_bounded
+        |> should
+        |> be_equal(
+          SandboxCompleted(
+            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+              TeardownFailure(
+                hook: AfterEachSuiteHook,
+                scope: ["suite"],
+                message: "hook timed out in suite",
+              ),
+            ]),
+          ),
+        )
+        |> or_fail_with(
+          "a hanging after_each_suite should be a tear-down failure",
+        )
+      },
+    ),
+
+    it("a body that times out still runs after_each with its context", fn() {
+      let reports = process.new_subject()
+      unit_context.describe("root", "start", [
+        unit_context.before_each(fn(_context) { Ok("set up") }),
+        unit_context.it("hangs", fn(_context) { hang() }),
+        unit_context.after_each(fn(context) {
+          process.send(reports, context)
+          Ok(Nil)
+        }),
+      ])
+      |> run_bounded
+      |> result_and_report(reports)
+      |> should
+      |> be_equal(#(
+        SandboxCompleted(
+          RunSummary(
+            tests: [#("hangs", TimedOut, [#("timeout", "test timed out")])],
+            teardown_failures: [],
+          ),
+        ),
+        Ok("set up"),
+      ))
+      |> or_fail_with("after_each should run after a body that timed out")
+    }),
+
+    it("a test process that is killed still runs after_each", fn() {
+      let reports = process.new_subject()
+      unit_context.describe("root", "start", [
+        unit_context.before_each(fn(_context) { Ok("set up") }),
+        unit_context.it("kills itself", fn(_context) { kill_self() }),
+        unit_context.after_each(fn(context) {
+          process.send(reports, context)
+          Ok(Nil)
+        }),
+      ])
+      |> run_bounded
+      |> result_and_report(reports)
+      |> should
+      |> be_equal(#(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("kills itself", Failed, [
+                #("crash", "worker crashed in root: killed"),
+              ]),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+        Ok("set up"),
+      ))
+      |> or_fail_with("after_each should run after the test process died")
+    }),
+
+    it("a before_all that kills its process fails its group only", fn() {
+      runner.new([
+        describe("first", [
+          unit.before_all(fn() { kill_self() }),
+          it("a", passing_test),
+        ]),
+        describe("second", [it("b", passing_test)]),
+      ])
+      |> run_builder_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", SetupFailed, [
+                #("before_all", "hook crashed in first: killed"),
+              ]),
+              #("b", Passed, []),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+      )
+      |> or_fail_with("a killed before_all process should fail its group")
+    }),
+
+    it("a before_all process that dies during the tests is reported", fn() {
+      let reports = process.new_subject()
+      describe("root", [
+        unit.before_all(fn() {
+          start_linked_crash()
+          Ok(Nil)
+        }),
+        it("a", fn() {
+          process.sleep(30)
+          Ok(AssertionOk)
+        }),
+        unit.after_all(fn() {
+          process.send(reports, "after_all ran")
+          Ok(Nil)
+        }),
+      ])
+      |> run_bounded
+      |> result_and_report(reports)
+      |> should
+      |> be_equal(#(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterAllHook,
+              scope: ["root"],
+              message: "before_all process exited in root: Boom",
+            ),
+          ]),
+        ),
+        Ok("after_all ran"),
+      ))
+      |> or_fail_with("the death of the before_all process should be reported")
+    }),
+
+    it("a before_each that never returns gives SetupFailed", fn() {
+      describe("root", [
+        unit.before_each(hang),
+        it("a", passing_test),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(
+            tests: [
+              #("a", SetupFailed, [#("before_each", "hook timed out in root")]),
+            ],
+            teardown_failures: [],
+          ),
+        ),
+      )
+      |> or_fail_with("a hanging before_each should time out")
+    }),
+
+    it("an after_each that kills its process is a tear-down failure", fn() {
+      describe("root", [
+        it("a", passing_test),
+        unit.after_each(fn() { kill_self() }),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterEachHook,
+              scope: ["root", "a"],
+              message: "hook crashed in root: killed",
+            ),
+          ]),
+        ),
+      )
+      |> or_fail_with("a killed after_each process should be reported")
+    }),
+
+    it("an after_all that crashes is a tear-down failure", fn() {
+      describe("root", [
+        it("a", passing_test),
+        unit.after_all(fn() { erlang_error(boom()) }),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterAllHook,
+              scope: ["root"],
+              message: "hook crashed in root: error:boom",
+            ),
+          ]),
+        ),
+      )
+      |> or_fail_with("a crashing after_all should be a tear-down failure")
+    }),
+
+    it("an after_all that kills its process is a tear-down failure", fn() {
+      describe("root", [
+        it("a", passing_test),
+        unit.after_all(fn() { kill_self() }),
+      ])
+      |> run_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterAllHook,
+              scope: ["root"],
+              message: "hook crashed in root: killed",
+            ),
+          ]),
+        ),
+      )
+      |> or_fail_with("a killed after_all process should be reported")
+    }),
+
+    it(
+      "a before_all_suites hook that kills its process gives SetupFailed",
+      fn() {
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.before_all_suites(fn(_suites) { kill_self() })
+        |> run_builder_bounded
+        |> should
+        |> be_equal(
+          SandboxCompleted(
+            RunSummary(
+              tests: [
+                #("a", SetupFailed, [
+                  #("before_all_suites", "hook crashed: killed"),
+                ]),
+              ],
+              teardown_failures: [],
+            ),
+          ),
+        )
+        |> or_fail_with("a killed before_all_suites process should be reported")
+      },
+    ),
+
+    it(
+      "an after_each_suite hook that kills its process is a tear-down failure",
+      fn() {
+        runner.new([describe("suite", [it("a", passing_test)])])
+        |> runner.after_each_suite(fn(_suite) { kill_self() })
+        |> run_builder_bounded
+        |> should
+        |> be_equal(
+          SandboxCompleted(
+            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+              TeardownFailure(
+                hook: AfterEachSuiteHook,
+                scope: ["suite"],
+                message: "hook crashed in suite: killed",
+              ),
+            ]),
+          ),
+        )
+        |> or_fail_with("a killed after_each_suite process should be reported")
+      },
+    ),
+
+    it("a before_all_suites process that dies during the run is reported", fn() {
+      runner.new([
+        describe("suite", [
+          it("a", fn() {
+            process.sleep(30)
+            Ok(AssertionOk)
+          }),
+        ]),
+      ])
+      |> runner.before_all_suites(fn(_suites) {
+        start_linked_crash()
+        Ok(Nil)
+      })
+      |> run_builder_bounded
+      |> should
+      |> be_equal(
+        SandboxCompleted(
+          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+            TeardownFailure(
+              hook: AfterAllSuitesHook,
+              scope: [],
+              message: "before_all_suites process exited: Boom",
+            ),
+          ]),
+        ),
+      )
+      |> or_fail_with(
+        "the death of the before_all_suites process should be reported",
       )
     }),
 
@@ -264,6 +696,65 @@ fn table_in_context_exists(name: Atom) -> Result(AssertionResult, String) {
   |> should
   |> be_equal(True)
   |> or_fail_with("the ETS table should exist")
+}
+
+/// The tests and tear-down failures of a run, in a form that a sandbox
+/// can return.
+type RunSummary {
+  RunSummary(
+    tests: List(#(String, Status, List(#(String, String)))),
+    teardown_failures: List(types.TeardownFailure),
+  )
+}
+
+fn hang() -> a {
+  process.sleep_forever()
+  hang()
+}
+
+fn kill_self() -> a {
+  process.kill(process.self())
+  hang()
+}
+
+@external(erlang, "dream_test_hook_resource_test_ffi", "start_linked_crash")
+fn start_linked_crash() -> Nil
+
+/// Run a builder with a 50ms default timeout in a sandbox of 2 seconds, so
+/// a hook that never returns fails the test instead of the whole run.
+fn run_builder_bounded(
+  builder: runner.RunBuilder(context),
+) -> SandboxResult(RunSummary) {
+  sandbox.run_isolated(
+    SandboxConfig(timeout_ms: 2000, show_crash_reports: False),
+    run_with_short_timeout,
+    builder,
+  )
+}
+
+fn run_bounded(suite: types.TestSuite(context)) -> SandboxResult(RunSummary) {
+  run_builder_bounded(runner.new([suite]))
+}
+
+fn run_with_short_timeout(builder: runner.RunBuilder(context)) -> RunSummary {
+  let report =
+    builder
+    |> runner.default_timeout_ms(50)
+    |> runner.silent()
+    |> runner.run()
+  RunSummary(
+    tests: failures(types.report_tests(report)),
+    teardown_failures: types.report_teardown_failures(report),
+  )
+}
+
+/// The result of a run and the first report that a hook sent, or
+/// `Error(Nil)` when no hook sent one.
+fn result_and_report(
+  result: SandboxResult(RunSummary),
+  reports: process.Subject(report),
+) -> #(SandboxResult(RunSummary), Result(report, Nil)) {
+  #(result, process.receive(reports, 0))
 }
 
 fn passing_test() -> Result(AssertionResult, String) {
