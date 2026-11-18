@@ -255,6 +255,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - Merges LCOV files that match a pattern into the report, for example the
     file that a separately run application server writes with
     `coverage.start` and `coverage.finish`
+  - `SF:` paths lose their `.` parts and empty parts, as measured paths
+    do, so `coverage.exclude` also matches a merged file that is written
+    another way. An absolute `SF:` path is a `MalformedLcov` error
 
 - **Coverage without the runner** (`coverage.start`, `coverage.finish`,
   `coverage.check_minimum`, `coverage.check_minimum_per_file`,

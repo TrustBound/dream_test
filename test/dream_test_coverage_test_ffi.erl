@@ -18,7 +18,8 @@
     compile_source/1,
     compile_like_old_gleam/2,
     compile_like_new_gleam/3,
-    format/1
+    format/1,
+    working_directory/0
 ]).
 %% Called inside the child node only.
 -export([prepare_child/1]).
@@ -266,6 +267,11 @@ is_build_path(Path) ->
 
 format(Term) ->
     unicode:characters_to_binary(io_lib:format("~tp", [Term])).
+
+%% The absolute path of the working directory.
+working_directory() ->
+    {ok, Directory} = file:get_cwd(),
+    unicode:characters_to_binary(Directory).
 
 %% A name that no other call gives, in this run or an earlier run that left
 %% files in `build`: the time in nanoseconds and a counter of this BEAM.

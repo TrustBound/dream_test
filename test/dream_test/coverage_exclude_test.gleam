@@ -208,6 +208,29 @@ pub fn tests() {
         )
         |> or_fail_with("expected the merged deep.gleam record to be dropped")
       }),
+      it(
+        "drops merged line counts for an excluded file spelled another way",
+        fn() {
+          let directory = test_directory()
+          let _ =
+            write(
+              directory <> "/part.info",
+              "SF:./test/coverage_fixtures//nested/deep.gleam\nDA:4,3\nend_of_record\n",
+            )
+          fixture_config()
+          |> coverage.merge_lcov(directory <> "/*.info")
+          |> coverage.exclude(nested_pattern())
+          |> measured_paths()
+          |> should
+          |> be_equal(
+            Ok([
+              "test/coverage_fixtures/coverage_fixture_ffi.erl",
+              "test/coverage_fixtures/sample.gleam",
+            ]),
+          )
+          |> or_fail_with("expected the merged deep.gleam record to be dropped")
+        },
+      ),
     ]),
 
     group("errors", [

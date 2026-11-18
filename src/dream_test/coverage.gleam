@@ -1031,7 +1031,10 @@ pub fn minimum_percent_per_file(
 /// match at least one file, so a run that silently produced no coverage is
 /// reported instead of hidden. Paths in the LCOV files (`SF:` lines) are read
 /// from the directory the tests run in, and each must be a file in the
-/// project.
+/// project. An absolute `SF:` path is an error. `.` parts and empty parts
+/// are removed, as they are from measured and excluded paths, so
+/// `./src//app.gleam` and `src/app.gleam` are one file, and
+/// `coverage.exclude` matches both.
 ///
 /// ## Parameters
 ///
@@ -3161,15 +3164,11 @@ fn parse_lcov_line(
   case line, open_record {
     "", _ -> parse_lcov_lines(rest, next, open_record, records_reversed)
     "SF:" <> source_path, None if source_path != "" ->
-      parse_lcov_lines(
+      parse_source_file_line(
+        source_path,
+        line,
         rest,
-        next,
-        Some(LcovRecord(
-          source_path: source_path,
-          lines: [],
-          start: position,
-          start_line: line,
-        )),
+        position,
         records_reversed,
       )
     "SF:" <> _, None ->
@@ -3283,6 +3282,49 @@ fn da_numbers(
     Ok(line_number), Ok(calls) if line_number >= 1 && calls >= 0 ->
       Ok(#(line_number, calls))
     _, _ -> Error(Nil)
+  }
+}
+
+/// How the BEAM reads a path: `filename:pathtype/1`.
+type PathType {
+  Absolute
+  Relative
+  Volumerelative
+}
+
+@external(erlang, "filename", "pathtype")
+fn path_type(path: String) -> PathType
+
+/// Start a record at an `SF` line. The path is normalised the way measured
+/// and excluded paths are, so the same file always has one key. An
+/// absolute path is an error: it cannot match a measured or an excluded
+/// path, which are relative, so its counts would escape `coverage.exclude`.
+fn parse_source_file_line(
+  source_path: String,
+  line: String,
+  rest: List(String),
+  position: LcovPosition,
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  case path_type(source_path) {
+    Relative ->
+      parse_lcov_lines(
+        rest,
+        LcovPosition(..position, line_number: position.line_number + 1),
+        Some(LcovRecord(
+          source_path: normalise_path(source_path),
+          lines: [],
+          start: position,
+          start_line: line,
+        )),
+        records_reversed,
+      )
+    Absolute | Volumerelative ->
+      malformed(
+        position,
+        line,
+        "the SF path is absolute. Write it relative to the project folder, as coverage writes it, so that it matches the measured and excluded files.",
+      )
   }
 }
 

@@ -19,6 +19,9 @@ fn merge_directory() -> String {
 @external(erlang, "dream_test_coverage_test_ffi", "unique_name")
 fn unique_name() -> String
 
+@external(erlang, "dream_test_coverage_test_ffi", "working_directory")
+fn working_directory() -> String
+
 /// Measure `classify(1)` on the fixtures, merging `<directory>/*.info`.
 fn measure_with_merge(
   directory: String,
@@ -212,6 +215,21 @@ pub fn tests() {
           "a new SF record starts before the previous one ends with end_of_record.",
         ))
         |> or_fail_with("expected MalformedLcov for a nested SF")
+      }),
+      it("returns MalformedLcov for an absolute SF path", fn() {
+        let line =
+          "SF:" <> working_directory() <> "/test/coverage_fixtures/sample.gleam"
+        let #(directory, result) =
+          merge_error(line <> "\nDA:9,1\nend_of_record\n")
+        result
+        |> should
+        |> be_equal(malformed(
+          directory,
+          1,
+          line,
+          "the SF path is absolute. Write it relative to the project folder, as coverage writes it, so that it matches the measured and excluded files.",
+        ))
+        |> or_fail_with("expected MalformedLcov for an absolute SF path")
       }),
       it("returns MalformedLcov for SF without a path", fn() {
         let #(directory, result) = merge_error("SF:\n")
