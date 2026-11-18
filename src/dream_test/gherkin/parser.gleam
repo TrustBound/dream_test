@@ -158,6 +158,9 @@ pub type FeatureFileError {
   UnreadableFeatureFile(error: FileError)
   /// The file was read, but its content is not valid Gherkin.
   InvalidFeatureFile(path: String, error: ParseError)
+  /// No file matches the glob pattern of a feature discovery.
+  /// `discover.load` and `discover.to_suite` give this error.
+  NoMatchingFeatureFiles(pattern: String)
 }
 
 // ============================================================================
@@ -333,7 +336,8 @@ pub fn parse_error_to_string(error error: ParseError) -> String {
 /// Render a `FeatureFileError` as a human-readable message.
 ///
 /// An invalid file gives `<path>: line N: <problem>`. An unreadable file
-/// gives `Failed to read feature file: <reason>`.
+/// gives `Failed to read feature file: <reason>`. A pattern without files
+/// gives `No feature files match the pattern "<pattern>"`.
 ///
 /// ## Example
 ///
@@ -353,6 +357,8 @@ pub fn feature_file_error_to_string(error error: FeatureFileError) -> String {
       "Failed to read feature file: " <> file.error_to_string(error)
     InvalidFeatureFile(path, error) ->
       path <> ": " <> parse_error_to_string(error)
+    NoMatchingFeatureFiles(pattern) ->
+      "No feature files match the pattern \"" <> pattern <> "\""
   }
 }
 

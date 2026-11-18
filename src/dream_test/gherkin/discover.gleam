@@ -193,7 +193,9 @@ pub fn with_registry(
 /// Build a TestSuite from discovered features.
 ///
 /// Parse errors are converted into failing unit tests tagged with
-/// `"parse-error"`.
+/// `"parse-error"`. A pattern that matches no files gives one failing test
+/// tagged `"no-feature-files"`, named
+/// `No feature files match the pattern "<pattern>"`.
 ///
 /// ## What does this produce?
 ///
@@ -217,7 +219,8 @@ pub fn with_registry(
 /// ## Returns
 ///
 /// A `TestSuite(Nil)` containing one test per discovered scenario, plus failing
-/// tests for any parse errors (tagged `"parse-error"`).
+/// tests for any parse errors (tagged `"parse-error"`), or one failing test
+/// when no file matches (tagged `"no-feature-files"`).
 pub fn to_suite(
   discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
@@ -227,11 +230,13 @@ pub fn to_suite(
 
   let children = features_to_groups(parsed.features, discovery.registry, [])
   let error_nodes = errors_to_nodes(parsed.failures, [])
+  let missing_nodes =
+    list.map(missing_files_errors(discovery.pattern, files), missing_files_node)
   Root(
     seed: Nil,
     name: suite_name,
     tags: [],
-    children: list.append(children, error_nodes),
+    children: list.flatten([children, error_nodes, missing_nodes]),
   )
 }
 
@@ -258,12 +263,18 @@ pub fn to_suite(
 ///
 /// ## Returns
 ///
-/// A `LoadResult` containing parsed features and any parse errors.
+/// A `LoadResult` containing parsed features and any parse errors. A pattern
+/// that matches no files gives the error
+/// `parser.NoMatchingFeatureFiles(pattern)`.
 pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
-  let parsed = parse_all_features(discover_files(discovery.pattern))
+  let files = discover_files(discovery.pattern)
+  let parsed = parse_all_features(files)
   LoadResult(
     features: parsed.features,
-    errors: list.map(parsed.failures, failure_error),
+    errors: list.append(
+      missing_files_errors(discovery.pattern, files),
+      list.map(parsed.failures, failure_error),
+    ),
   )
 }
 
@@ -298,6 +309,39 @@ pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
 
 fn discover_files(pattern: String) -> List(String) {
   wildcard(pattern)
+}
+
+/// A pattern that matches no files is an error, so a wrong pattern cannot
+/// give a run that passes with no tests.
+fn missing_files_errors(
+  pattern: String,
+  files: List(String),
+) -> List(FeatureFileError) {
+  case files {
+    [] -> [parser.NoMatchingFeatureFiles(pattern: pattern)]
+    _ -> []
+  }
+}
+
+fn missing_files_node(error: FeatureFileError) -> Node(Nil) {
+  Test(
+    name: parser.feature_file_error_to_string(error),
+    tags: ["no-feature-files"],
+    kind: Unit,
+    run: types.NoInput(missing_files_test_run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn missing_files_test_run() -> Result(AssertionResult, String) {
+  Ok(
+    AssertionFailed(AssertionFailure(
+      operator: "discover",
+      message: "No feature files match the pattern (see test name for the pattern)",
+      payload: None,
+    )),
+  )
 }
 
 /// A feature file that did not parse: its path and the parser message.

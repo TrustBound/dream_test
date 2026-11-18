@@ -174,6 +174,47 @@ pub fn tests() {
       |> or_fail_with("the source should be the whole path")
     }),
 
+    it("load gives an error for a pattern that matches no files", fn() {
+      let result =
+        discover.features("./test/tmp/features/no_such_*.feature")
+        |> discover.load()
+
+      #(
+        result.features,
+        list.map(result.errors, parser.feature_file_error_to_string),
+      )
+      |> should
+      |> be_equal(
+        #([], [
+          "No feature files match the pattern \"./test/tmp/features/no_such_*.feature\"",
+        ]),
+      )
+      |> or_fail_with("a pattern without files should be an error")
+    }),
+
+    it("to_suite fails a run for a pattern that matches no files", fn() {
+      let results =
+        discover.features("./test/tmp/features/no_such_*.feature")
+        |> discover.with_registry(steps.new(initial: Nil))
+        |> discover.to_suite("Features")
+        |> list.wrap
+        |> runner.new
+        |> runner.run()
+        |> test_types.report_tests
+
+      #(list.map(results, result_name), list.map(results, result_status))
+      |> should
+      |> be_equal(
+        #(
+          [
+            "No feature files match the pattern \"./test/tmp/features/no_such_*.feature\"",
+          ],
+          [test_types.Failed],
+        ),
+      )
+      |> or_fail_with("a pattern without files should fail the run")
+    }),
+
     it("to_suite runs the scenarios with the attached registry", fn() {
       let _ =
         file.write(
@@ -226,4 +267,8 @@ fn result_status(result: test_types.TestResult) -> test_types.Status {
 
 fn step_ok(_state: Nil, _context: steps.StepContext) -> Result(Nil, String) {
   Ok(Nil)
+}
+
+fn result_name(result: test_types.TestResult) -> String {
+  result.name
 }

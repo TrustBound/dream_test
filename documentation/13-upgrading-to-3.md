@@ -419,6 +419,7 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 | `let d: FeatureDiscovery = discover.with_registry(found, steps)` | `let d: RunnableDiscovery(Int) = discover.with_registry(found, steps)` |
 | `discover.to_suite` on a `FeatureDiscovery` | Call `discover.with_registry` first. `to_suite` takes only a `RunnableDiscovery`. |
 | `FeatureConfig` | `FeatureConfig(state)` |
+| A `discover.features` pattern that matched no files gave an empty suite, and the run passed. | `to_suite` gives one failing test, `No feature files match the pattern "<pattern>"`, tagged `no-feature-files`. `load` gives the error `parser.NoMatchingFeatureFiles(pattern)`. Fix the pattern. |
 
 The usual chain `discover.features(...) |> discover.with_registry(steps) |> discover.to_suite(...)` does not change.
 

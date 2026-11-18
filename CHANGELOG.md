@@ -114,6 +114,12 @@ store. This release has breaking changes. Read
   `step_trie.tokenize_step_text` splits only at spaces outside quotes.
 - `discover.with_registry` gives the opaque type `RunnableDiscovery`, and
   `discover.to_suite` takes only that type.
+- A `discover.features` pattern that matches no files is an error.
+  `discover.to_suite` gives one failing test,
+  `No feature files match the pattern "<pattern>"`, tagged
+  `no-feature-files`. `discover.load` gives the new error
+  `parser.NoMatchingFeatureFiles(pattern)`. Before, both gave no features
+  and no errors, so a wrong pattern gave a run that passed.
 
 #### Gherkin parser and syntax tree
 
@@ -166,6 +172,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - A pattern registered two times in one phase is an error.
 - `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
 - Step text and patterns split into words only at spaces.
+- A `discover.features` pattern that matches no files fails the run.
 - `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `exit_on_failure` stops with `init:stop(1)`: code after `runner.run` can run.
