@@ -5,8 +5,9 @@
 ////
 //// - Tests are written as `it("does something", fn() { ... })`
 //// - Hooks are also **0‑argument** functions (`before_each(fn() { ... })`)
-//// - All hooks/tests return `Result(AssertionResult, String)` so you can abort
-////   early with `Error("message")` when prerequisites fail.
+//// - Test bodies return `Result(AssertionResult, String)`, and hooks return
+////   `Result(Nil, String)`, so you can abort early with `Error("message")`
+////   when prerequisites fail.
 ////
 //// This module builds a `dream_test/types.TestSuite(Nil)` under the hood.
 ////
@@ -623,7 +624,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// so it can stop a resource that `before_all` started. Every `after_all` hook runs, also
 /// after one fails. If it returns `Error("message")` or crashes, the run
 /// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
-/// group path as scope, and the run fails. No test result is added.
+/// group path in `groups`, and the run fails. No test result is added.
 ///
 /// ## Example
 ///

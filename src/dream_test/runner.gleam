@@ -473,8 +473,9 @@ pub fn progress_reporter(
 
 /// Attach results reporters (printed at the end, in the order provided).
 ///
-/// Results reporters receive the full traversal-ordered results list from the
-/// `RunFinished` event, so their output is deterministic under parallel execution.
+/// Each results reporter gets the run report once, after the run ends. Its
+/// tests are in traversal order, so the output is the same under parallel
+/// execution.
 pub fn results_reporters(
   builder builder: RunBuilder(ctx),
   reporters reporters: List(reporter_types.ResultsReporter),
@@ -750,7 +751,7 @@ pub fn before_each_suite(
 /// suite. Every `after_each_suite` hook runs, also after one fails. If it
 /// returns `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailure` with hook `AfterEachSuiteHook`
-/// and the suite name as scope, and the run fails.
+/// and the suite name in `groups`, and the run fails.
 pub fn after_each_suite(
   builder builder: RunBuilder(ctx),
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -788,7 +789,7 @@ pub fn before_all_suites(
 /// `after_all_suites` hook runs, also after one fails. If it returns
 /// `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailure` with hook `AfterAllSuitesHook`
-/// and scope `[]`, and the run fails.
+/// and `groups: []`, and the run fails.
 pub fn after_all_suites(
   builder builder: RunBuilder(ctx),
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),

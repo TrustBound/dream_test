@@ -65,10 +65,6 @@
 import gleam/list
 import gleam/option.{type Option}
 
-/// Error type for test execution.
-///
-/// Lifecycle hooks and test bodies can short-circuit by returning
-/// `Error("message")` where the message is human-readable.
 /// The outcome of a test.
 ///
 /// After a test runs, it has one of these statuses:
