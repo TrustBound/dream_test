@@ -454,6 +454,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Given`. After: `resolve_phase(keyword: And, previous: Some(GivenPhase))`
   gives `Ok(GivenPhase)`.
 
+### Removed
+
+- BREAKING: `types.ModuleCoverage` and `types.CoverageSummary` are
+  removed. They were placeholders from 0.0.1, and nothing used them. Use
+  `dream_test/coverage` instead.
+
 ### Fixed
 
 - The capture helpers of `dream_test/gherkin/steps` (`get_int`,

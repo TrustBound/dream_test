@@ -271,27 +271,6 @@ pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
   }
 }
 
-/// Coverage data for a single module.
-///
-/// *Note: Coverage reporting is planned but not yet implemented.*
-///
-pub type ModuleCoverage {
-  ModuleCoverage(
-    module_: String,
-    percent: Float,
-    covered_lines: Int,
-    total_lines: Int,
-  )
-}
-
-/// Summary of code coverage across all modules.
-///
-/// *Note: Coverage reporting is planned but not yet implemented.*
-///
-pub type CoverageSummary {
-  CoverageSummary(by_module: List(ModuleCoverage))
-}
-
 /// Complete result of running a test.
 ///
 /// Contains everything needed to report on a test's outcome.
