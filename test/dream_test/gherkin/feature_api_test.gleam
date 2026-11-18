@@ -8,6 +8,7 @@ import dream_test/types as test_types
 import dream_test/unit.{describe, it}
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 import gleam/string
 
 pub fn tests() {
@@ -386,6 +387,24 @@ pub fn tests() {
       |> or_fail_with("a handler Error should fail the scenario")
     }),
 
+    it("a scenario fails with the message of a capture error", fn() {
+      let registry =
+        steps.new()
+        |> steps.given("I add {word}", add_an_int_capture)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.given("I add apples")]),
+        ])
+
+      runner.new([suite])
+      |> runner.run()
+      |> test_types.report_tests
+      |> list.map(result_failure_messages)
+      |> should
+      |> be_equal([["Capture 0 is the word \"apples\", not an integer"]])
+      |> or_fail_with("a capture error should fail the scenario")
+    }),
+
     it("feature_with_background runs background and When/And/But steps", fn() {
       let registry =
         steps.new()
@@ -722,6 +741,13 @@ fn result_failure_messages(result: test_types.TestResult) -> List(String) {
 
 fn failure_message(failure: test_types.AssertionFailure) -> String {
   failure.message
+}
+
+fn add_an_int_capture(
+  context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  use _count <- result.try(steps.get_int(context.captures, 0))
+  Ok(test_types.AssertionOk)
 }
 
 fn gherkin_step_error(

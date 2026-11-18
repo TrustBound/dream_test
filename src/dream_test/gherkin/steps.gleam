@@ -50,6 +50,8 @@ import dream_test/gherkin/types.{
 }
 import dream_test/gherkin/world.{type World}
 import dream_test/types as dream_types
+import gleam/float
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
@@ -391,8 +393,8 @@ pub fn get_int(
 ) -> Result(Int, String) {
   case list_at(captures, index) {
     Some(CapturedInt(value)) -> Ok(value)
-    Some(_) -> Error("Capture at index is not an integer")
-    None -> Error("No capture at index")
+    Some(other) -> Error(wrong_capture_message(index, other, "an integer"))
+    None -> Error(missing_capture_message(captures, index))
   }
 }
 
@@ -422,8 +424,8 @@ pub fn get_float(
 ) -> Result(Float, String) {
   case list_at(captures, index) {
     Some(CapturedFloat(value)) -> Ok(value)
-    Some(_) -> Error("Capture at index is not a float")
-    None -> Error("No capture at index")
+    Some(other) -> Error(wrong_capture_message(index, other, "a float"))
+    None -> Error(missing_capture_message(captures, index))
   }
 }
 
@@ -454,8 +456,8 @@ pub fn get_string(
   case list_at(captures, index) {
     Some(CapturedString(value)) -> Ok(value)
     Some(CapturedWord(value)) -> Ok(value)
-    Some(_) -> Error("Capture at index is not a string")
-    None -> Error("No capture at index")
+    Some(other) -> Error(wrong_capture_message(index, other, "a string"))
+    None -> Error(missing_capture_message(captures, index))
   }
 }
 
@@ -486,8 +488,8 @@ pub fn get_word(
   case list_at(captures, index) {
     Some(CapturedWord(value)) -> Ok(value)
     Some(CapturedString(value)) -> Ok(value)
-    Some(_) -> Error("Capture at index is not a word")
-    None -> Error("No capture at index")
+    Some(other) -> Error(wrong_capture_message(index, other, "a word"))
+    None -> Error(missing_capture_message(captures, index))
   }
 }
 
@@ -515,6 +517,46 @@ pub fn capture_count(captures captures: List(CapturedValue)) -> Int {
 // ============================================================================
 // Internal Helpers
 // ============================================================================
+
+fn wrong_capture_message(
+  index: Int,
+  captured: CapturedValue,
+  expected: String,
+) -> String {
+  "Capture "
+  <> int.to_string(index)
+  <> " is "
+  <> describe_capture(captured)
+  <> ", not "
+  <> expected
+}
+
+fn describe_capture(captured: CapturedValue) -> String {
+  case captured {
+    CapturedInt(value) -> "the integer " <> int.to_string(value)
+    CapturedFloat(value) -> "the float " <> float.to_string(value)
+    CapturedString(value) -> "the string " <> string.inspect(value)
+    CapturedWord(value) -> "the word " <> string.inspect(value)
+  }
+}
+
+fn missing_capture_message(
+  captures: List(CapturedValue),
+  index: Int,
+) -> String {
+  "No capture at index "
+  <> int.to_string(index)
+  <> ": the step has "
+  <> capture_count_text(list.length(captures))
+}
+
+fn capture_count_text(count: Int) -> String {
+  case count {
+    0 -> "no captures"
+    1 -> "1 capture"
+    _ -> int.to_string(count) <> " captures"
+  }
+}
 
 fn list_at(items: List(a), index: Int) -> Option(a) {
   list_at_loop(items, index, 0)

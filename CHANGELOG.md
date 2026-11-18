@@ -371,6 +371,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The capture helpers of `dream_test/gherkin/steps` (`get_int`,
+  `get_float`, `get_string`, `get_word`) give an error that names the
+  capture. Before: `Capture at index is not an integer` and
+  `No capture at index`. After:
+  `Capture 0 is the word "apples", not an integer` and
+  `No capture at index 2: the step has 1 capture`.
 - A resource that a group `before_all` hook starts now lives for the tests
   of the group. Before, the hook ran in a short-lived process, so a pool
   that links to its caller (for example a supervisor) and an ETS table

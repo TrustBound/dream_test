@@ -101,11 +101,38 @@ pub fn tests() {
     }),
 
     it("get_int returns Error when capture index is out of bounds", fn() {
-      let result = steps.get_int([], 0)
-      case result {
-        Ok(_) -> Ok(fail_with("expected Error for missing capture"))
-        Error(_msg) -> Ok(test_types.AssertionOk)
-      }
+      steps.get_int([], 0)
+      |> should
+      |> be_equal(Error("No capture at index 0: the step has no captures"))
+      |> or_fail_with("an empty list has no capture")
+    }),
+
+    it("get_int names the one capture a step has", fn() {
+      steps.get_int([step_trie.CapturedInt(1)], 1)
+      |> should
+      |> be_equal(Error("No capture at index 1: the step has 1 capture"))
+      |> or_fail_with("the error should give the capture count")
+    }),
+
+    it("get_int names the number of captures a step has", fn() {
+      steps.get_int([step_trie.CapturedInt(1), step_trie.CapturedInt(2)], 2)
+      |> should
+      |> be_equal(Error("No capture at index 2: the step has 2 captures"))
+      |> or_fail_with("the error should give the capture count")
+    }),
+
+    it("get_int names a captured float in its Error", fn() {
+      steps.get_int([step_trie.CapturedFloat(2.5)], 0)
+      |> should
+      |> be_equal(Error("Capture 0 is the float 2.5, not an integer"))
+      |> or_fail_with("the error should show the float")
+    }),
+
+    it("get_int names a captured string in its Error", fn() {
+      steps.get_int([step_trie.CapturedString("s")], 0)
+      |> should
+      |> be_equal(Error("Capture 0 is the string \"s\", not an integer"))
+      |> or_fail_with("the error should show the string")
     }),
 
     it("find_step names a Then step in the undefined step error", fn() {
@@ -173,7 +200,7 @@ pub fn tests() {
     it("get_int returns Error for a capture that is not an int", fn() {
       steps.get_int([step_trie.CapturedWord("a")], 0)
       |> should
-      |> be_equal(Error("Capture at index is not an integer"))
+      |> be_equal(Error("Capture 0 is the word \"a\", not an integer"))
       |> or_fail_with("a word is not an int")
     }),
 
@@ -187,14 +214,14 @@ pub fn tests() {
     it("get_float returns Error for a capture that is not a float", fn() {
       steps.get_float([step_trie.CapturedInt(1)], 0)
       |> should
-      |> be_equal(Error("Capture at index is not a float"))
+      |> be_equal(Error("Capture 0 is the integer 1, not a float"))
       |> or_fail_with("an int is not a float")
     }),
 
     it("get_float returns Error when capture index is out of bounds", fn() {
       steps.get_float([], 0)
       |> should
-      |> be_equal(Error("No capture at index"))
+      |> be_equal(Error("No capture at index 0: the step has no captures"))
       |> or_fail_with("an empty list has no capture")
     }),
 
@@ -208,14 +235,14 @@ pub fn tests() {
     it("get_string returns Error for a capture that is not a string", fn() {
       steps.get_string([step_trie.CapturedInt(1)], 0)
       |> should
-      |> be_equal(Error("Capture at index is not a string"))
+      |> be_equal(Error("Capture 0 is the integer 1, not a string"))
       |> or_fail_with("an int is not a string")
     }),
 
     it("get_string returns Error when capture index is out of bounds", fn() {
       steps.get_string([], 0)
       |> should
-      |> be_equal(Error("No capture at index"))
+      |> be_equal(Error("No capture at index 0: the step has no captures"))
       |> or_fail_with("an empty list has no capture")
     }),
 
@@ -229,14 +256,14 @@ pub fn tests() {
     it("get_word returns Error for a capture that is not a word", fn() {
       steps.get_word([step_trie.CapturedInt(1)], 0)
       |> should
-      |> be_equal(Error("Capture at index is not a word"))
+      |> be_equal(Error("Capture 0 is the integer 1, not a word"))
       |> or_fail_with("an int is not a word")
     }),
 
     it("get_word returns Error when capture index is out of bounds", fn() {
       steps.get_word([], 0)
       |> should
-      |> be_equal(Error("No capture at index"))
+      |> be_equal(Error("No capture at index 0: the step has no captures"))
       |> or_fail_with("an empty list has no capture")
     }),
   ])
