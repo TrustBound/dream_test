@@ -8,14 +8,15 @@
 %%   - ? matches a single character
 %%   - [abc] matches a, b, or c
 %%   - {a,b} matches a or b
+%%
+%% Returns: {ok, [Path, ...]}, or {error, <<"<class>:<reason>">>} for a
+%% pattern that cannot be searched, for example "{a" with no closing brace.
 wildcard(Pattern) ->
-    PatternStr = unicode:characters_to_list(Pattern),
-    Files = filelib:wildcard(PatternStr),
-    [unicode:characters_to_binary(F) || F <- Files].
-
-
-
-
-
-
-
+    try
+        Files = filelib:wildcard(unicode:characters_to_list(Pattern)),
+        {ok, [unicode:characters_to_binary(F) || F <- Files]}
+    catch
+        Class:Reason ->
+            {error, unicode:characters_to_binary(
+                      io_lib:format("~0tp:~0tp", [Class, Reason]))}
+    end.

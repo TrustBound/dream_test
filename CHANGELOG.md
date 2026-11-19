@@ -163,6 +163,14 @@ store. This release has breaking changes. Read
   `no-feature-files`. `discover.load` gives the new error
   `parser.NoMatchingFeatureFiles(pattern)`. Before, both gave no features
   and no errors, so a wrong pattern gave a run that passed.
+- A `discover.features` pattern that cannot be searched, for example
+  `features/{a.feature`, is an error, not a crash while the suite is
+  built. `discover.load` gives the new error
+  `parser.InvalidFeatureFilePattern(pattern, reason)`, and
+  `discover.to_suite` gives one failing test,
+  `Cannot search for feature files with the pattern "<pattern>": <reason>`,
+  tagged `no-feature-files`. A `case` on a `parser.FeatureFileError` needs
+  a branch for the new variant.
 
 #### Gherkin parser and syntax tree
 

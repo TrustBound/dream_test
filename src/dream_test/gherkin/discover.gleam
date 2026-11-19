@@ -66,6 +66,7 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 
 // ============================================================================
 // Types
@@ -198,7 +199,9 @@ pub fn with_registry(
 /// Parse errors are converted into failing unit tests tagged with
 /// `"parse-error"`. A pattern that matches no files gives one failing test
 /// tagged `"no-feature-files"`, named
-/// `No feature files match the pattern "<pattern>"`.
+/// `No feature files match the pattern "<pattern>"`. A pattern that cannot
+/// be searched gives one failing test with the same tag, named
+/// `Cannot search for feature files with the pattern "<pattern>": <reason>`.
 ///
 /// ## What does this produce?
 ///
@@ -223,18 +226,19 @@ pub fn with_registry(
 ///
 /// A `TestSuite` containing one test per discovered scenario, plus failing
 /// tests for any parse errors (tagged `"parse-error"`), or one failing test
-/// when no file matches (tagged `"no-feature-files"`).
+/// when no file matches or the pattern cannot be searched (tagged
+/// `"no-feature-files"`).
 pub fn to_suite(
   discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
 ) -> TestSuite {
-  let files = discover_files(discovery.pattern)
-  let parsed = parse_all_features(files)
+  let found = discover_files(discovery.pattern)
+  let parsed = parse_all_features(result.unwrap(found, []))
 
   let children = features_to_groups(parsed.features, discovery.registry, [])
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes =
-    list.map(missing_files_errors(discovery.pattern, files), missing_files_node)
+    list.map(missing_files_errors(discovery.pattern, found), missing_files_node)
   suite.join(name: suite_name, suites: [
     suite.from_root(Root(
       seed: Nil,
@@ -276,14 +280,15 @@ pub fn to_suite(
 ///
 /// A `LoadResult` containing parsed features and any parse errors. A pattern
 /// that matches no files gives the error
-/// `parser.NoMatchingFeatureFiles(pattern)`.
+/// `parser.NoMatchingFeatureFiles(pattern)`, and a pattern that cannot be
+/// searched gives `parser.InvalidFeatureFilePattern(pattern, reason)`.
 pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
-  let files = discover_files(discovery.pattern)
-  let parsed = parse_all_features(files)
+  let found = discover_files(discovery.pattern)
+  let parsed = parse_all_features(result.unwrap(found, []))
   LoadResult(
     features: parsed.features,
     errors: list.append(
-      missing_files_errors(discovery.pattern, files),
+      missing_files_errors(discovery.pattern, found),
       list.map(parsed.failures, failure_error),
     ),
   )
@@ -309,28 +314,34 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 ///
 /// ## Returns
 ///
-/// A list of file paths matching the glob pattern.
+/// A list of file paths matching the glob pattern. A pattern that cannot be
+/// searched gives `[]`; `load` gives the error for it.
 pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
-  discover_files(discovery.pattern)
+  result.unwrap(discover_files(discovery.pattern), [])
 }
 
 // ============================================================================
 // Internal Helpers
 // ============================================================================
 
-fn discover_files(pattern: String) -> List(String) {
-  wildcard(pattern)
+fn discover_files(pattern: String) -> Result(List(String), FeatureFileError) {
+  case wildcard(pattern) {
+    Ok(files) -> Ok(files)
+    Error(reason) ->
+      Error(parser.InvalidFeatureFilePattern(pattern: pattern, reason: reason))
+  }
 }
 
-/// A pattern that matches no files is an error, so a wrong pattern cannot
-/// give a run that passes with no tests.
+/// A pattern that matches no files, or that cannot be searched, is an
+/// error, so a wrong pattern cannot give a run that passes with no tests.
 fn missing_files_errors(
   pattern: String,
-  files: List(String),
+  found: Result(List(String), FeatureFileError),
 ) -> List(FeatureFileError) {
-  case files {
-    [] -> [parser.NoMatchingFeatureFiles(pattern: pattern)]
-    _ -> []
+  case found {
+    Error(error) -> [error]
+    Ok([]) -> [parser.NoMatchingFeatureFiles(pattern: pattern)]
+    Ok(_) -> []
   }
 }
 
@@ -349,7 +360,7 @@ fn missing_files_test_run() -> Result(AssertionResult, String) {
   Ok(
     AssertionFailed(AssertionFailure(
       operator: "discover",
-      message: "No feature files match the pattern (see test name for the pattern)",
+      message: "No feature files found for the pattern (see test name for the cause)",
       payload: None,
     )),
   )
@@ -461,4 +472,4 @@ fn errors_to_nodes(
 
 /// Find files matching a glob pattern using Erlang's filelib:wildcard/1.
 @external(erlang, "dream_test_gherkin_discover_ffi", "wildcard")
-fn wildcard(pattern: String) -> List(String)
+fn wildcard(pattern: String) -> Result(List(String), String)

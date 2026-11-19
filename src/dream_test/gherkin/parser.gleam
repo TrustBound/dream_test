@@ -166,6 +166,11 @@ pub type FeatureFileError {
   /// No file matches the glob pattern of a feature discovery.
   /// `discover.load` and `discover.to_suite` give this error.
   NoMatchingFeatureFiles(pattern: String)
+  /// The glob pattern of a feature discovery cannot be searched, for
+  /// example `features/{a.feature` with no closing brace. `reason` is
+  /// `<class>:<reason>` from the search. `discover.load` and
+  /// `discover.to_suite` give this error.
+  InvalidFeatureFilePattern(pattern: String, reason: String)
 }
 
 // ============================================================================
@@ -342,7 +347,9 @@ pub fn parse_error_to_string(error error: ParseError) -> String {
 ///
 /// An invalid file gives `<path>: line N: <problem>`. An unreadable file
 /// gives `Failed to read feature file: <reason>`. A pattern without files
-/// gives `No feature files match the pattern "<pattern>"`.
+/// gives `No feature files match the pattern "<pattern>"`. A pattern that
+/// cannot be searched gives
+/// `Cannot search for feature files with the pattern "<pattern>": <reason>`.
 ///
 /// ## Example
 ///
@@ -364,6 +371,11 @@ pub fn feature_file_error_to_string(error error: FeatureFileError) -> String {
       path <> ": " <> parse_error_to_string(error)
     NoMatchingFeatureFiles(pattern) ->
       "No feature files match the pattern \"" <> pattern <> "\""
+    InvalidFeatureFilePattern(pattern, reason) ->
+      "Cannot search for feature files with the pattern \""
+      <> pattern
+      <> "\": "
+      <> reason
   }
 }
 

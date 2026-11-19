@@ -216,6 +216,48 @@ pub fn tests() {
       |> or_fail_with("a pattern without files should fail the run")
     }),
 
+    it("load gives an error for a pattern that cannot be searched", fn() {
+      let result =
+        discover.features("./test/tmp/features/{a.feature")
+        |> discover.load()
+
+      #(
+        result.features,
+        list.map(result.errors, parser.feature_file_error_to_string),
+      )
+      |> should
+      |> be_equal(
+        #([], [
+          "Cannot search for feature files with the pattern \"./test/tmp/features/{a.feature\": error:{badpattern,missing_delimiter}",
+        ]),
+      )
+      |> or_fail_with("a malformed pattern should be an error")
+    }),
+
+    it("to_suite fails a run for a pattern that cannot be searched", fn() {
+      let results =
+        discover.features("./test/tmp/features/{a.feature")
+        |> discover.with_registry(steps.new(initial: Nil))
+        |> discover.to_suite("Features")
+        |> list.wrap
+        |> runner.new
+        |> runner.silent
+        |> runner.run()
+        |> test_types.report_tests
+
+      #(list.map(results, result_name), list.map(results, result_status))
+      |> should
+      |> be_equal(
+        #(
+          [
+            "Cannot search for feature files with the pattern \"./test/tmp/features/{a.feature\": error:{badpattern,missing_delimiter}",
+          ],
+          [test_types.Failed],
+        ),
+      )
+      |> or_fail_with("a malformed pattern should fail the run")
+    }),
+
     it("to_suite runs the scenarios with the attached registry", fn() {
       let _ =
         file.write(
