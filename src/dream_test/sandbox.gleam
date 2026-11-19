@@ -841,7 +841,10 @@ fn start_setup_process(first: SetupProcessRequest(input, output)) -> Nil {
 }
 
 /// Run each request in the setup process until a `StopRequest`. A crash of
-/// a function is caught, so the setup process stays alive.
+/// a function is caught, so the setup process stays alive. On a
+/// `StopRequest` the setup process exits with reason `shutdown`, so a
+/// process that links to it stops with it, also when it does not trap
+/// exits. A normal exit would not stop it.
 fn serve_setup_process(
   requests: Subject(SetupProcessRequest(input, output)),
   request: SetupProcessRequest(input, output),
@@ -852,9 +855,13 @@ fn serve_setup_process(
       send(reply, run_catching(run, input))
       serve_setup_process(requests, receive_forever(requests))
     }
-    StopRequest -> Nil
+    StopRequest -> exit(atom.create("shutdown"))
   }
 }
+
+/// Exit the calling process with `reason`.
+@external(erlang, "erlang", "exit")
+fn exit(reason: atom.Atom) -> Nil
 
 /// Check that a setup process is still alive before the caller gives it more
 /// work.
@@ -946,8 +953,8 @@ fn format_down_reason(down: process.Down) -> String {
 
 /// Stop a setup process and wait until it has exited.
 ///
-/// The setup process exits with reason `normal`. An ETS table that it made is
-/// deleted, and a process that links to it and traps exits, such as a
+/// The setup process exits with reason `shutdown`. An ETS table that it made
+/// is deleted, and a process that links to it, such as an actor or a
 /// supervisor, gets the exit signal and stops. When `stop_setup_process` returns,
 /// the setup process has exited, so a later set-up can make a table with the same
 /// name. A setup process that stopped already is not an error, and any process can

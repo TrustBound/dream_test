@@ -5,8 +5,9 @@
 //// start there and *link* to that test process stops when the test ends
 //// (pass, fail, timeout, crash): the test process exits with reason
 //// `shutdown`, or is killed on a timeout. A process that a `before_all`
-//// hook starts links to the process of its group instead; stop it in
-//// `after_all`.
+//// hook starts links to the setup process of its group instead, and
+//// stops when that setup process exits with reason `shutdown` after the
+//// last test of the group.
 ////
 //// This module gives you a few “batteries included” patterns:
 ////

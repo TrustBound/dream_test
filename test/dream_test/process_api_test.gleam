@@ -3,6 +3,7 @@ import dream_test/process as dt_process
 import dream_test/runner
 import dream_test/types
 import dream_test/unit.{describe, it}
+import dream_test/unit_context
 import gleam/erlang/process as beam_process
 import gleam/int
 import gleam/option.{None}
@@ -51,6 +52,43 @@ pub fn tests() {
       |> should
       |> be_equal([Ok(Nil), Ok(Nil), Ok(Nil)])
       |> or_fail_with("each linked counter should stop with its test")
+    }),
+
+    it("a linked counter that a suite set-up starts stops after the run", fn() {
+      // The set-up starts a counter that links to the setup process and
+      // does not trap exits. The tear-down leaves it alone. When the run
+      // returns, the counter must stop with the setup process.
+      let counters = beam_process.new_subject()
+      runner.new([
+        unit_context.describe_with_set_up(
+          "set-up",
+          set_up: fn() { start_counter_in_set_up(counters) },
+          tear_down: leave_counter,
+          children: [unit_context.it("passes", counter_context_passes)],
+        ),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) { receive_down(counters) }
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("the counter of the set-up should stop after the run")
+    }),
+
+    it("a linked counter that before_all starts stops after the run", fn() {
+      let counters = beam_process.new_subject()
+      runner.new([
+        describe("before_all", [
+          unit.before_all(fn() { start_counter_in_before_all(counters) }),
+          it("passes", passes),
+        ]),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) { receive_down(counters) }
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("the counter of before_all should stop after the run")
     }),
 
     it("counter helpers work", fn() {
@@ -253,4 +291,34 @@ fn wait_for_down(pid: beam_process.Pid) -> Result(Nil, String) {
 
 fn ignore_down(_down: beam_process.Down) -> Nil {
   Nil
+}
+
+fn start_counter_in_set_up(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(beam_process.Pid, String) {
+  let counter = dt_process.start_counter()
+  let assert Ok(pid) = beam_process.subject_owner(counter)
+  beam_process.send(counters, pid)
+  Ok(pid)
+}
+
+fn leave_counter(_counter: beam_process.Pid) -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn counter_context_passes(
+  _counter: beam_process.Pid,
+) -> Result(types.AssertionResult, String) {
+  Ok(types.AssertionOk)
+}
+
+fn start_counter_in_before_all(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(Nil, String) {
+  start_counter_in_set_up(counters)
+  |> result.replace(Nil)
+}
+
+fn passes() -> Result(types.AssertionResult, String) {
+  Ok(types.AssertionOk)
 }

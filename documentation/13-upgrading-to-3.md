@@ -1043,7 +1043,7 @@ pub fn suite() {
 
 A test process that stops during the body gives `Failed` with `crash: worker crashed in <group>: <reason>`. In 2.x, the failure was `crash: killed`.
 
-When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook.
+When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook. A process that a `before_all` hook or a suite set-up starts and links stops after the last test that the hook serves: its setup process exits with reason `shutdown`.
 
 ### Reporters
 

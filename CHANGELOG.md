@@ -584,6 +584,11 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   when the test ends, as the `dream_test/process` docs say. The test
   process exits with reason `shutdown`. Before, a linked process that did
   not trap exits stayed alive after a test that passed, failed or crashed.
+- A process that a suite set-up or a `before_all` hook starts and links
+  to its setup process stops when the setup process stops. The setup
+  process exits with reason `shutdown`. Before, it exited with reason
+  `normal`, and a linked process that did not trap exits stayed alive
+  after the run.
 - `process.await_ready` and `process.await_some` measure the timeout on
   the monotonic clock. `interval_ms: 0` no longer waits forever, and the
   time in the check counts toward the timeout.
