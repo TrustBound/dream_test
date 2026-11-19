@@ -3,7 +3,7 @@ import dream_test/gherkin/discover
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps
 import dream_test/matchers.{
-  be_empty, be_equal, contain, have_length, or_fail_with, should,
+  be_empty, be_equal, be_ok, contain, have_length, or_fail_with, should,
 }
 import dream_test/runner
 import dream_test/suite
@@ -29,6 +29,7 @@ pub fn tests() {
       // Assert
       files
       |> should
+      |> be_ok()
       |> contain(a)
       |> or_fail_with("expected discover_a.feature to be listed")
     }),
@@ -48,6 +49,7 @@ pub fn tests() {
       // Assert
       files
       |> should
+      |> be_ok()
       |> contain(b)
       |> or_fail_with("expected discover_b.feature to be listed")
     }),
@@ -214,6 +216,27 @@ pub fn tests() {
         ),
       )
       |> or_fail_with("a pattern without files should fail the run")
+    }),
+
+    it("list_files gives an empty list for a pattern without files", fn() {
+      discover.features("./test/tmp/features/no_such_*.feature")
+      |> discover.list_files()
+      |> should
+      |> be_equal(Ok([]))
+      |> or_fail_with("a pattern without files should list no files")
+    }),
+
+    it("list_files gives an error for a pattern that cannot be searched", fn() {
+      discover.features("./test/tmp/features/{a.feature")
+      |> discover.list_files()
+      |> should
+      |> be_equal(
+        Error(parser.InvalidFeatureFilePattern(
+          pattern: "./test/tmp/features/{a.feature",
+          reason: "error:{badpattern,missing_delimiter}",
+        )),
+      )
+      |> or_fail_with("a malformed pattern should be an error")
     }),
 
     it("load gives an error for a pattern that cannot be searched", fn() {

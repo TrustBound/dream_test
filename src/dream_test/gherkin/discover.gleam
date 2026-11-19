@@ -303,6 +303,7 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 /// discover.features("test/*.feature")
 /// |> discover.list_files()
 /// |> should
+/// |> be_ok()
 /// |> contain("test/cart.feature")
 /// |> or_fail_with("expected list_files to include test/cart.feature")
 /// ```
@@ -313,10 +314,13 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 ///
 /// ## Returns
 ///
-/// A list of file paths matching the glob pattern. A pattern that cannot be
-/// searched gives `[]`; `load` gives the error for it.
-pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
-  result.unwrap(discover_files(discovery.pattern), [])
+/// `Ok` with the file paths that match the glob pattern. A pattern that
+/// matches no files gives `Ok([])`. A pattern that cannot be searched gives
+/// `Error(parser.InvalidFeatureFilePattern(pattern, reason))`.
+pub fn list_files(
+  discovery discovery: FeatureDiscovery,
+) -> Result(List(String), FeatureFileError) {
+  discover_files(discovery.pattern)
 }
 
 // ============================================================================

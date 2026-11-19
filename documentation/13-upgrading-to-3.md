@@ -425,6 +425,35 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 
 The usual chain `discover.features(...) |> discover.with_registry(steps) |> discover.to_suite(...)` does not change.
 
+#### `discover.list_files` returns a `Result`
+
+`discover.list_files` returns `Result(List(String), parser.FeatureFileError)`. A pattern that cannot be searched, for example `features/{a.feature`, gives `Error(parser.InvalidFeatureFilePattern(pattern, reason))`. A pattern that matches no files gives `Ok([])`. In 2.x, it returned `List(String)`, and a pattern that cannot be searched stopped the test run with a crash.
+
+##### 2.x: `list_files` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/discover_loading.gleam#L7-L13"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+    it("list_files returns matching .feature file paths", fn() {
+      discover.features("test/*.feature")
+      |> discover.list_files()
+      |> should
+      |> contain("test/cart.feature")
+      |> or_fail_with("expected list_files to include test/cart.feature")
+    }),
+```
+
+##### 3.0.0: `list_files` returns a `Result` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/discover_loading.gleam#L7-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+    it("list_files returns matching .feature file paths", fn() {
+      discover.features("test/*.feature")
+      |> discover.list_files()
+      |> should
+      |> be_ok()
+      |> contain("test/cart.feature")
+      |> or_fail_with("expected list_files to include test/cart.feature")
+    }),
+```
+
 #### How step text matches a pattern
 
 In 3.0.0, step text and step patterns are split into words in the same way: at spaces, with a double-quoted run kept in one word. A quoted run starts at a double quote at the start of a word, also after `(` or `[`. It ends at a double quote before a space, the end of the text, or one of `,` `.` `)` `]` `;` `:` `!` `?`. So `"apple", "banana"` is two words, and the quote in `O"Brien` or `5"` is an ordinary character. A pattern without placeholders always matches its own text. In 2.x, the step text was also split where digits meet other characters, but the pattern was not.

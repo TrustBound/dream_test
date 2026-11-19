@@ -186,6 +186,11 @@ store. This release has breaking changes. Read
   `Cannot search for feature files with the pattern "<pattern>": <reason>`,
   tagged `no-feature-files`. A `case` on a `parser.FeatureFileError` needs
   a branch for the new variant.
+- `discover.list_files` returns
+  `Result(List(String), parser.FeatureFileError)`, not `List(String)`. A
+  pattern that cannot be searched gives
+  `Error(parser.InvalidFeatureFilePattern(pattern, reason))`. A pattern
+  that matches no files gives `Ok([])`.
 
 #### Gherkin parser and syntax tree
 
