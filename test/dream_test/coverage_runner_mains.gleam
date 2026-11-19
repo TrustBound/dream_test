@@ -18,6 +18,7 @@ import dream_test/types
 import dream_test/unit.{before_all, describe, it}
 import gleam/int
 import gleam/io
+import gleam/list
 import gleam/result
 
 fn fixture_tests() {
@@ -196,16 +197,43 @@ fn wait_for_server_exit(server: ServerPort) -> Int
 
 /// Start the fixture server, send it two requests, stop it, and return the
 /// replies and its exit status. The server writes its LCOV file when it
-/// stops.
-fn exercise_fixture_server() -> #(List(Result(String, String)), Int) {
+/// stops. The first request that fails stops the exchange, and its error
+/// is the result: after a failed request the port of the server is closed,
+/// so a later request cannot be sent.
+fn exercise_fixture_server() -> Result(#(List(String), Int), String) {
   let server =
     start_server_in_new_vm("dream_test@coverage_fixture_server", "main")
-  let replies = [
-    send_server_request(server, "classify"),
-    send_server_request(server, "answer"),
-    send_server_request(server, "stop"),
-  ]
-  #(replies, wait_for_server_exit(server))
+  case send_server_requests(server, ["classify", "answer", "stop"], []) {
+    Ok(replies) -> Ok(#(replies, wait_for_server_exit(server)))
+    Error(error) -> Error(error)
+  }
+}
+
+/// Send each request in order, and return the replies, or the error of the
+/// first request that fails.
+fn send_server_requests(
+  server: ServerPort,
+  requests: List(String),
+  replies_in_reverse: List(String),
+) -> Result(List(String), String) {
+  case requests {
+    [] -> Ok(list.reverse(replies_in_reverse))
+    [request, ..rest] ->
+      send_server_request_then_rest(server, request, rest, replies_in_reverse)
+  }
+}
+
+fn send_server_request_then_rest(
+  server: ServerPort,
+  request: String,
+  rest: List(String),
+  replies_in_reverse: List(String),
+) -> Result(List(String), String) {
+  case send_server_request(server, request) {
+    Ok(reply) ->
+      send_server_requests(server, rest, [reply, ..replies_in_reverse])
+    Error(error) -> Error(error)
+  }
 }
 
 fn server_tests() {
@@ -217,7 +245,7 @@ fn server_tests() {
     it("serves requests and writes its coverage when it stops", fn() {
       exercise_fixture_server()
       |> should
-      |> be_equal(#([Ok("positive"), Ok("42"), Ok("stopped")], 0))
+      |> be_equal(Ok(#(["positive", "42", "stopped"], 0)))
       |> or_fail_with("expected the replies and exit status 0")
     }),
   ])
