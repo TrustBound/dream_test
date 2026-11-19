@@ -14,7 +14,10 @@
 ////   number of tear-down hooks that failed, and `setup_stopped`, the number
 ////   of set-ups whose process stopped
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags,
-////   kind, failures). `kind` is `"unit"` or `"gherkin:<scenario id>"`. Only a Gherkin test has `rule`, after
+////   kind, failures). `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
+////   scenario id ends with a number that is unique in the run and changes
+////   from run to run, so do not compare `kind` of a Gherkin test between
+////   runs: use `full_name`. Only a Gherkin test has `rule`, after
 ////   `kind`: the name of its Rule group, for example `"Rule: Stock"`, or
 ////   `null` for a scenario outside a Rule.
 //// - `teardown_failures`: one object for each tear-down hook that failed
