@@ -811,7 +811,7 @@ fn error_message(error: CoverageError) -> ErrorMessage {
       ErrorMessage(
         what: "Could not find the source directory \"" <> path <> "\".",
         reason: "coverage measures the .gleam and .erl files in this directory, and no directory with this name exists where the tests run.",
-        fix: "run `gleam test` from the project root, or set the path with coverage.source_directory(...).",
+        fix: "run `gleam test` from the project folder, or set the path with coverage.source_directory(...).",
       )
     SourceDirectoryOutsideSourceRoot(path) ->
       ErrorMessage(
@@ -970,7 +970,7 @@ fn error_message(error: CoverageError) -> ErrorMessage {
           <> source_path
           <> "\", which does not exist.",
         reason: "merged coverage must be for files in this project, and SF paths are read from the directory the tests run in.",
-        fix: "write SF paths relative to the project root, or delete LCOV files left from an older version of the code.",
+        fix: "write SF paths relative to the project folder, or delete LCOV files left from an older version of the code.",
       )
     ExcludeMatchedNothing(pattern, source_directory) ->
       ErrorMessage(

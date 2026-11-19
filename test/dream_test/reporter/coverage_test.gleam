@@ -594,7 +594,7 @@ pub fn tests() {
         |> be_equal(failure_block(
           "Could not find the source directory \"lib\".",
           "coverage measures the .gleam and .erl files in this directory, and no directory with this name exists where the tests run.",
-          "run `gleam test` from the project root, or set the path with coverage.source_directory(...).",
+          "run `gleam test` from the project folder, or set the path with coverage.source_directory(...).",
         ))
         |> or_fail_with("expected the SourceDirectoryNotFound message")
       }),
@@ -761,7 +761,7 @@ pub fn tests() {
         |> be_equal(failure_block(
           "The LCOV file \"parts/a.info\" covers \"src/gone.gleam\", which does not exist.",
           "merged coverage must be for files in this project, and SF paths are read from the directory the tests run in.",
-          "write SF paths relative to the project root, or delete LCOV files left from an older version of the code.",
+          "write SF paths relative to the project folder, or delete LCOV files left from an older version of the code.",
         ))
         |> or_fail_with("expected the LcovSourceNotFound message")
       }),

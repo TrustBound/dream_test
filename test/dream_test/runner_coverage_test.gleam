@@ -213,7 +213,7 @@ pub fn tests() {
         "\nCoverage failed\n"
           <> "  Could not find the source directory \"test/no_such_coverage_directory\".\n"
           <> "  Reason: coverage measures the .gleam and .erl files in this directory, and no directory with this name exists where the tests run.\n"
-          <> "  Fix: run `gleam test` from the project root, or set the path with coverage.source_directory(...).\n"
+          <> "  Fix: run `gleam test` from the project folder, or set the path with coverage.source_directory(...).\n"
           <> "\n"
           <> "Tests: 1 passed. Exit status 1, because coverage was requested and did not complete.\n",
       ))

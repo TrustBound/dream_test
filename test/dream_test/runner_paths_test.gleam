@@ -300,7 +300,7 @@ pub fn tests() {
       |> should
       |> be_equal(
         #([Passed], [
-          "\nCoverage failed\n  Could not find the source directory \"test/no_such_coverage_directory\".\n  Reason: coverage measures the .gleam and .erl files in this directory, and no directory with this name exists where the tests run.\n  Fix: run `gleam test` from the project root, or set the path with coverage.source_directory(...).\n\nTests: 1 passed. The exit status is not changed, because exit_on_failure is off.\n",
+          "\nCoverage failed\n  Could not find the source directory \"test/no_such_coverage_directory\".\n  Reason: coverage measures the .gleam and .erl files in this directory, and no directory with this name exists where the tests run.\n  Fix: run `gleam test` from the project folder, or set the path with coverage.source_directory(...).\n\nTests: 1 passed. The exit status is not changed, because exit_on_failure is off.\n",
         ]),
       )
       |> or_fail_with("the start failure should be written")
