@@ -396,6 +396,29 @@ pub fn tests() {
       |> or_fail_with("the timed-out test process should be gone")
     }),
 
+    it("a body that times out runs its after_each once", fn() {
+      // The body never returns and times out after 20ms. The hooks get the
+      // default timeout of 60s, so after_each always finishes. The test is
+      // TimedOut, and after_each runs exactly once: the loop reads every
+      // message of the killed process before it starts the tear-down.
+      let calls = process.new_subject()
+      runner.new([
+        describe("root", [
+          after_each(fn() { record_call(calls) }),
+          timed_test("hangs", Some(20), block_forever),
+        ]),
+      ])
+      |> runner.default_timeout_ms(60_000)
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(test_status)
+      |> fn(statuses) { #(statuses, count_calls(calls, 0)) }
+      |> should
+      |> be_equal(#([TimedOut], 1))
+      |> or_fail_with("after_each should run once after a timeout")
+    }),
+
     it("a test with its own timeout times out while another runs on", fn() {
       // The runner hook holds each worker for 30ms before the bodies start.
       // The 20ms deadline of "short" counts from the start of its body.
@@ -703,4 +726,20 @@ fn statuses(results: List(TestResult)) -> List(#(List(String), Status)) {
   list.map(results, fn(result) {
     #(types.full_name(result.groups, result.name), result.status)
   })
+}
+
+fn record_call(calls: Subject(Nil)) -> Result(Nil, String) {
+  process.send(calls, Nil)
+  Ok(Nil)
+}
+
+fn count_calls(calls: Subject(Nil), count: Int) -> Int {
+  case process.receive(calls, 0) {
+    Ok(Nil) -> count_calls(calls, count + 1)
+    Error(Nil) -> count
+  }
+}
+
+fn test_status(result: TestResult) -> Status {
+  result.status
 }

@@ -352,7 +352,10 @@ type TestJob(context) {
 /// A test process that the loop started and that has not finished. The
 /// loop knows its current step, the state when that step started, and the
 /// deadline of the step. The loop monitors the process, so a process that
-/// stops before it finishes still gives a result.
+/// stops before it finishes still gives a result. `timed_out` is `True`
+/// after the loop killed the process at a deadline: the loop still reads
+/// its messages until its down message, so a step or an outcome that the
+/// process sent before the kill is not lost.
 type RunningWorker(context) {
   RunningWorker(
     job: TestJob(context),
@@ -362,6 +365,7 @@ type RunningWorker(context) {
     later_steps: List(TestStep(context)),
     state: TestState(context),
     deadline_ms: Int,
+    timed_out: Bool,
   )
 }
 
@@ -2349,6 +2353,7 @@ fn spawn_test_process(
     later_steps: job.later_steps,
     state: job.state,
     deadline_ms: now + step_timeout(job, job.first_step),
+    timed_out: False,
   )
 }
 
@@ -2405,11 +2410,11 @@ fn wait_for_event(
       let #(running, results) = remove_down_worker(state.running, down, [], [])
       add_results(group, LoopState(..state, running: running), results)
     }
-    Error(Nil) -> {
-      let #(running, results) =
-        expire_workers(state.running, timing.now_ms(), [], [])
-      add_results(group, LoopState(..state, running: running), results)
-    }
+    Error(Nil) ->
+      LoopState(
+        ..state,
+        running: expire_workers(state.running, timing.now_ms(), []),
+      )
   }
 }
 
@@ -2503,12 +2508,7 @@ fn remove_down_worker(
     [] -> #(list.reverse(kept_rev), results)
     [worker, ..rest] if worker.monitor == down.monitor -> {
       let #(next_kept_rev, next_results) =
-        after_step_end(
-          worker,
-          StepExited(sandbox.format_exit_reason(down.reason)),
-          kept_rev,
-          results,
-        )
+        after_step_end(worker, step_end(worker, down), kept_rev, results)
       remove_down_worker(rest, down, next_kept_rev, next_results)
     }
     [worker, ..rest] ->
@@ -2516,24 +2516,42 @@ fn remove_down_worker(
   }
 }
 
-/// Kill each process whose step is past its deadline, and wait until it has
-/// exited, so its tear-down steps start only when what it held is free.
+/// Why a process stopped in its current step: a timeout when the loop
+/// killed it at a deadline, else its exit reason.
+fn step_end(worker: RunningWorker(context), down: Down) -> StepEnd {
+  case worker.timed_out {
+    True -> StepTimedOut
+    False -> StepExited(sandbox.format_exit_reason(down.reason))
+  }
+}
+
+/// Kill each process whose step is past its deadline, and mark it as timed
+/// out. The process stays in the list until the loop reads its down
+/// message. The messages that it sent before the kill come before that
+/// down message, so the loop reads each of them first: a process that
+/// sent its outcome just before the kill keeps that outcome, and a step
+/// that it started is the step that timed out. Its tear-down steps start
+/// after the down message, when what it held is free. A process that does
+/// not stop by its new deadline is killed again.
 fn expire_workers(
   running: List(RunningWorker(context)),
   now: Int,
   kept_rev: List(RunningWorker(context)),
-  results: List(IndexedResult),
-) -> #(List(RunningWorker(context)), List(IndexedResult)) {
+) -> List(RunningWorker(context)) {
   case running {
-    [] -> #(list.reverse(kept_rev), results)
+    [] -> list.reverse(kept_rev)
     [worker, ..rest] if worker.deadline_ms <= now -> {
-      sandbox.kill_and_wait(worker.pid)
-      demonitor_process(worker.monitor)
-      let #(next_kept_rev, next_results) =
-        after_step_end(worker, StepTimedOut, kept_rev, results)
-      expire_workers(rest, now, next_kept_rev, next_results)
+      process.kill(worker.pid)
+      expire_workers(rest, now, [
+        RunningWorker(
+          ..worker,
+          timed_out: True,
+          deadline_ms: now + worker.job.default_timeout_ms,
+        ),
+        ..kept_rev
+      ])
     }
-    [worker, ..rest] -> expire_workers(rest, now, [worker, ..kept_rev], results)
+    [worker, ..rest] -> expire_workers(rest, now, [worker, ..kept_rev])
   }
 }
 
