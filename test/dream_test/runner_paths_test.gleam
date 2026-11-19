@@ -189,11 +189,12 @@ pub fn tests() {
       |> or_fail_with("both after_all_suites hooks should run in order")
     }),
 
-    it("gives no suite source for a suite without tests", fn() {
+    it("runs no before_each_suite for a suite without tests", fn() {
+      // The hook records nothing, so the helper gives the empty list.
       suite_source([])
       |> should
-      |> be_equal("None")
-      |> or_fail_with("a suite without tests has no source")
+      |> be_equal("[]")
+      |> or_fail_with("a suite without tests runs no suite hook")
     }),
 
     it("gives the suite source when every test has the same source", fn() {

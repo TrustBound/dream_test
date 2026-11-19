@@ -331,6 +331,26 @@ pub fn tests() {
       |> or_fail_with("a crashing before_each_test should give SetupFailed")
     }),
 
+    it("a before_each hook that crashes gives SetupFailed", fn() {
+      runner.new([
+        describe("root", [
+          before_each(fn() { erlang_error(atom.create("boom")) }),
+          it("a", fn() { Ok(AssertionOk) }),
+        ]),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> summaries
+      |> should
+      |> be_equal([
+        #(["root", "a"], SetupFailed, [
+          failure("before_each", "hook crashed in root: error:boom"),
+        ]),
+      ])
+      |> or_fail_with("a crashing before_each should give SetupFailed")
+    }),
+
     it(
       "a runner after_each_test that runs too long is a tear-down failure",
       fn() {
