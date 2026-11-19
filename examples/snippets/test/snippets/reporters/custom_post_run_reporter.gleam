@@ -30,7 +30,20 @@ pub fn render_my_report(report: RunReport) -> String {
 pub fn main() {
   let report = runner.new([tests()]) |> runner.run()
   io.print(render_my_report(report))
+  halt(exit_status(report))
 }
+
+/// 1 when a test or a hook failed, else 0.
+fn exit_status(report: RunReport) -> Int {
+  case types.failed(report) {
+    True -> 1
+    False -> 0
+  }
+}
+
+/// End the program with an exit status. It never returns.
+@external(erlang, "erlang", "halt")
+fn halt(status: Int) -> Nil
 
 fn example_suite() {
   describe("Example Suite", [

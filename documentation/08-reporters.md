@@ -13,7 +13,7 @@ Dream Test reporting is split into two phases:
 
 This keeps output readable under parallel execution:
 
-- Progress stays responsive and keeps CI logs alive.
+- Progress redraws one line in an interactive terminal while tests finish.
 - Final reports are deterministic and easy to scan/tail.
 
 ### Recommended default: progress + BDD
@@ -83,15 +83,15 @@ pub fn main() {
 The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `duration_ms`, `system`, `summary`, `tests` and `teardown_failures`:
 
 - `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), `teardown_failed` counts the tear-down hooks that failed, and `setup_stopped` counts the set-ups whose process stopped.
-- `tests` has one object for each test, with `name`, `full_name`, `status`, `duration_ms`, `tags`, `kind` and `failures`. `kind` is `"unit"` or `"gherkin:<scenario id>"`. Only a Gherkin test has `rule`, after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
+- `tests` has one object for each test, with `name`, `full_name`, `status`, `duration_ms`, `tags`, `kind` and `failures`. `kind` is `"unit"` or `"gherkin:<scenario id>"`. The scenario id ends with a number that changes on each run, so do not compare `kind` of a Gherkin test between runs. Compare `full_name`. Only a Gherkin test has `rule`, after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
 - `teardown_failures` has one object for each tear-down hook that failed and each set-up that stopped, in the order that they happened. Each object has `kind`, `hook`, `groups` and `message`:
-  - `"kind": "hook_failed"`: a tear-down hook failed. `hook` is the hook (for example `"after_all"`, or `"suite tear-down"` for the tear-down of a suite with a set-up), `groups` is the full test name, the group path, the suite name, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
+  - `"kind": "hook_failed"`: a tear-down hook failed. `hook` is the hook (for example `"after_all"`, or `"suite tear-down"` for the tear-down of a suite with a set-up), `groups` is the full test name for an `after_each` or `after_each_test` hook, the group path for an `after_all` hook or a `suite tear-down`, the suite name for `after_each_suite`, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
   - `"kind": "setup_stopped"`: the process that keeps a set-up alive exited while its tests ran. `hook` is the set-up hook (`"before_all"`, `"before_each_suite"`, `"before_all_suites"` or `"suite set-up"`), `groups` is the group path, the suite name, or `[]` for the whole run, `message` is the exit reason of the process, and `not_run` is the tests that had not started and were not run, each one as its `full_name` list, for example `[["root", "b"], ["root", "c"]]`.
 - Version `1.0` put a failed tear-down hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
 
 ### Progress reporter (during the run)
 
-Use progress output when you want compact logs, especially for large suites.
+Use progress output in an interactive terminal. It redraws one line with a carriage return (`\r`), so a CI log that keeps every write shows many partial lines. For CI logs, use the BDD or JSON results reporter.
 
 #### Progress output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -290,16 +290,33 @@ pub fn render_my_report(report: RunReport) -> String {
 }
 ```
 
-Then call it from your runner `main()`:
+Then call it from your runner `main()`.
 
-##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L30-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+A custom report cannot be added to `runner.results_reporters`, which takes only the built-in reporters. Thus `main` runs the tests, prints the report, then ends the program itself. Do not add `runner.exit_on_failure` here. It ends the program inside `runner.run` when the run fails, so the custom report would never print. Without an exit of its own, `main` ends with exit status 0, also when tests fail. The `halt` below gives exit status 1 when `types.failed` is `True`: a test failed, timed out or had a failed set-up, or a hook failed.
+
+##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L30-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn main() {
   let report = runner.new([tests()]) |> runner.run()
   io.print(render_my_report(report))
+  halt(exit_status(report))
 }
+
+/// 1 when a test or a hook failed, else 0.
+fn exit_status(report: RunReport) -> Int {
+  case types.failed(report) {
+    True -> 1
+    False -> 0
+  }
+}
+
+/// End the program with an exit status. It never returns.
+@external(erlang, "erlang", "halt")
+fn halt(status: Int) -> Nil
 ```
+
+For a run with one passing and one failing test, this `main` prints `MyReport: 2 total; 1 passed; 1 failed; 0 tear-down failed; 0 set-up stopped`, then ends with exit status 1.
 
 #### Driving the progress reporter manually (advanced)
 
@@ -315,7 +332,7 @@ This is intentionally **not** the common path; most users should attach progress
 
 ### Gherkin reporter (post-run, Cucumber-style)
 
-If you’re using `dream_test/gherkin`, you can render results in Gherkin-friendly formatting.
+If your suites come from the Gherkin modules (`dream_test/gherkin/feature`, `dream_test/gherkin/discover`), `dream_test/reporters/gherkin` renders the results in a Cucumber-like format.
 
 #### Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -325,6 +342,7 @@ import dream_test/gherkin/steps
 import dream_test/matchers.{succeed}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
+import dream_test/types.{type RunReport}
 import gleam/io
 
 fn step_ok(state: Nil, _context: steps.StepContext) {
@@ -350,17 +368,33 @@ pub fn tests() {
 }
 
 pub fn main() {
-  let results = runner.new([tests()]) |> runner.run()
-  gherkin_reporter.report(results, io.print)
+  let report = runner.new([tests()]) |> runner.run()
+  gherkin_reporter.report(report, io.print)
+  halt(exit_status(report))
 }
+
+/// 1 when a test or a hook failed, else 0.
+fn exit_status(report: RunReport) -> Int {
+  case types.failed(report) {
+    True -> 1
+    False -> 0
+  }
+}
+
+/// End the program with an exit status. It never returns.
+@external(erlang, "erlang", "halt")
+fn halt(status: Int) -> Nil
 ```
+
+The Gherkin report is not a results reporter either, so this `main` ends the program itself, as in [the custom report](#custom-post-run-reporter-format-a-runreport) above.
 
 ### Choosing a reporter (a quick heuristic)
 
 - **Local dev**: start with BDD output.
-- **Big suites / noisy logs**: progress output.
+- **Big suites in an interactive terminal**: progress output, with a results reporter for the end.
+- **CI logs**: BDD output without progress, or with `bdd.failures_only`.
 - **Tooling / CI integration**: JSON output (and/or post-run formatting to write files).
-- **Behavior specs**: use the Gherkin reporter when your suites are authored via `dream_test/gherkin`.
+- **Behavior specs**: use `dream_test/reporters/gherkin` when your suites come from `dream_test/gherkin/feature` or `dream_test/gherkin/discover`.
 
 ### What's Next?
 

@@ -3,6 +3,7 @@ import dream_test/gherkin/steps
 import dream_test/matchers.{succeed}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
+import dream_test/types.{type RunReport}
 import gleam/io
 
 fn step_ok(state: Nil, _context: steps.StepContext) {
@@ -28,6 +29,19 @@ pub fn tests() {
 }
 
 pub fn main() {
-  let results = runner.new([tests()]) |> runner.run()
-  gherkin_reporter.report(results, io.print)
+  let report = runner.new([tests()]) |> runner.run()
+  gherkin_reporter.report(report, io.print)
+  halt(exit_status(report))
 }
+
+/// 1 when a test or a hook failed, else 0.
+fn exit_status(report: RunReport) -> Int {
+  case types.failed(report) {
+    True -> 1
+    False -> 0
+  }
+}
+
+/// End the program with an exit status. It never returns.
+@external(erlang, "erlang", "halt")
+fn halt(status: Int) -> Nil
