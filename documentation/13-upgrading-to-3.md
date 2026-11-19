@@ -1323,6 +1323,8 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 - A failed tear-down hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
 - A set-up that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
 - A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
+- The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
+- The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.
 
 ##### 2.x: JSON from a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/json_api_format.gleam#L6-L15"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 

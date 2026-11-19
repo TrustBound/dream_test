@@ -5,6 +5,7 @@ import dream_test/reporters/types as reporter_types
 import dream_test/types
 import dream_test/unit.{describe, group, it}
 import fixtures/test_results.{report_of, report_with_cleanup_failure}
+import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
 
@@ -187,7 +188,7 @@ pub fn tests() {
         |> after("\"summary\":")
         |> should
         |> be_equal(
-          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
+          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}\n",
         )
         |> or_fail_with("compact JSON should have no spaces or new lines")
       }),
@@ -228,7 +229,7 @@ pub fn tests() {
           <> "    }\n"
           <> "  ],\n"
           <> "  \"teardown_failures\": []\n"
-          <> "}",
+          <> "}\n",
         )
         |> or_fail_with("pretty JSON should have one field on each line")
       }),
@@ -276,7 +277,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
         )
         |> or_fail_with(
           "each tear-down failure should have its kind, hook, scope and message",
@@ -296,7 +297,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}",
+          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
         )
         |> or_fail_with("a stopped set-up should have its own kind")
       }),
@@ -328,7 +329,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"teardown_failures\":[]}",
+          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"teardown_failures\":[]}\n",
         )
         |> or_fail_with("a Gherkin scenario should have its Rule")
       }),
@@ -338,7 +339,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}",
+          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}\n",
         )
         |> or_fail_with("each test should have its status and kind")
       }),
@@ -352,7 +353,7 @@ pub fn tests() {
         |> after("\"failures\":")
         |> should
         |> be_equal(
-          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}],\"teardown_failures\":[]}",
+          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}],\"teardown_failures\":[]}\n",
         )
         |> or_fail_with("each payload should have its own fields")
       }),
@@ -385,15 +386,64 @@ pub fn tests() {
       ),
 
       it(
-        "writes unknown as the Gleam version without the gleam_stdlib application",
+        "writes unknown as the gleam_stdlib version without the gleam_stdlib application",
         fn() {
           without_gleam_stdlib_application(fn() { json.format(report_of([])) })
-          |> between("\"gleam_version\":", "}")
+          |> between("\"gleam_stdlib_version\":", "}")
           |> should
           |> be_equal("\"unknown\"")
-          |> or_fail_with("the Gleam version should be unknown")
+          |> or_fail_with("the gleam_stdlib version should be unknown")
         },
       ),
+
+      it("names the system fields for what they report", fn() {
+        json.format(report_of([]))
+        |> between("\"system\":{", "}")
+        |> remove_values
+        |> should
+        |> be_equal("\"os\",\"otp_version\",\"gleam_stdlib_version\"")
+        |> or_fail_with("expected os, otp_version and gleam_stdlib_version")
+      }),
+
+      it("ends the compact report with a newline", fn() {
+        json.format(report_of([]))
+        |> string.ends_with("}\n")
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("the compact report should end with a newline")
+      }),
+
+      it("ends the pretty report with a newline", fn() {
+        json.format_pretty(report_of([]))
+        |> string.ends_with("\n}\n")
+        |> should
+        |> be_equal(True)
+        |> or_fail_with("the pretty report should end with a newline")
+      }),
+
+      it("has one newline only, at the end of the compact report", fn() {
+        json.format(report_of(sample_results()))
+        |> string.split("\n")
+        |> list.length
+        |> should
+        |> be_equal(2)
+        |> or_fail_with("the compact report should be one line")
+      }),
     ]),
   ])
+}
+
+/// The field names of a flat JSON object body, without their values.
+fn remove_values(object_body: String) -> String {
+  object_body
+  |> string.split(",")
+  |> list.map(field_name)
+  |> string.join(",")
+}
+
+fn field_name(field: String) -> String {
+  case string.split_once(field, ":") {
+    Ok(#(name, _value)) -> name
+    Error(Nil) -> field
+  }
 }

@@ -23,18 +23,18 @@ fn normalize_timestamp_ms(json: String) -> String {
   before <> "\"timestamp_ms\":0," <> rest
 }
 
-// The reported gleam_version tracks the installed gleam_stdlib, so it must be
+// The reported gleam_stdlib_version is the installed gleam_stdlib, so it must be
 // normalized or the snapshot breaks on every dependency update.
-fn normalize_gleam_version(json: String) -> String {
+fn normalize_gleam_stdlib_version(json: String) -> String {
   let #(before, after) =
-    string.split_once(json, "\"gleam_version\": \"")
-    |> result.unwrap(#("MISSING_GLEAM_VERSION", ""))
+    string.split_once(json, "\"gleam_stdlib_version\": \"")
+    |> result.unwrap(#("MISSING_GLEAM_STDLIB_VERSION", ""))
 
   let #(_version, rest) =
     string.split_once(after, "\"")
-    |> result.unwrap(#("MISSING_GLEAM_VERSION_VALUE", after))
+    |> result.unwrap(#("MISSING_GLEAM_STDLIB_VERSION_VALUE", after))
 
-  before <> "\"gleam_version\": \"0.0.0\"" <> rest
+  before <> "\"gleam_stdlib_version\": \"0.0.0\"" <> rest
 }
 
 // The reported otp_version tracks the local Erlang install, so it must be
@@ -76,7 +76,7 @@ pub fn tests() {
       let normalized =
         normalize_timestamp_ms(text)
         |> normalize_duration_ms
-        |> normalize_gleam_version
+        |> normalize_gleam_stdlib_version
         |> normalize_otp_version
 
       normalized

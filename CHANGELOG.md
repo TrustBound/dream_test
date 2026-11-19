@@ -113,6 +113,13 @@ store. This release has breaking changes. Read
 - The JSON schema version is `2.0`. Its `summary` adds the counts
   `teardown_failed` (tear-down hooks that failed) and `setup_stopped`
   (set-ups whose process stopped).
+- The `system` object of the JSON report has `gleam_stdlib_version` in
+  place of `gleam_version`. The value did not change: it is the version of
+  the `gleam_stdlib` package. The compiled code does not record the version
+  of the Gleam compiler, so the report cannot give it.
+- The JSON report (`json.format`, `json.format_pretty` and the JSON results
+  reporter) ends with a newline. Before, text that a reporter wrote after
+  it joined its last line.
 - The summary line of the BDD and Gherkin reporters lists the extra counts
   in the order skipped, pending, timed out, setup failed.
 - The progress event API is removed: `reporters/types.ReporterEvent`,

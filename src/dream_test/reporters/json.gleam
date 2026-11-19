@@ -8,7 +8,11 @@
 //// - `version`: schema version
 //// - `timestamp_ms`: when the report was created
 //// - `duration_ms`: total duration (sum of test durations)
-//// - `system`: `os`, `otp_version`, `gleam_version`
+//// - `system`: `os`, `otp_version`, and `gleam_stdlib_version`, the
+////   version of the `gleam_stdlib` package that the tests run with, or
+////   `"unknown"` when the `gleam_stdlib` application is not loaded. The
+////   report does not give the version of the Gleam compiler, because the
+////   compiled code does not record it.
 //// - `summary`: counts by status (`total`, `passed`, `failed`, `skipped`,
 ////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
 ////   number of tear-down hooks that failed, and `setup_stopped`, the number
@@ -125,7 +129,7 @@ pub fn render(
 
 /// Format test results as a compact JSON string.
 ///
-/// Returns a single-line JSON string suitable for machine parsing.
+/// Returns the JSON on one line, with a newline at the end.
 ///
 /// ## Parameters
 ///
@@ -133,7 +137,7 @@ pub fn render(
 ///
 /// ## Returns
 ///
-/// A compact (single-line) JSON string.
+/// A compact JSON string: one line, with a newline at the end.
 ///
 /// ## Example
 ///
@@ -158,6 +162,7 @@ pub fn render(
 pub fn format(report report: RunReport) -> String {
   build_report_json(report)
   |> json.to_string
+  <> "\n"
 }
 
 /// Format test results as pretty-printed JSON.
@@ -170,7 +175,8 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Returns
 ///
-/// A pretty-printed JSON string with 2-space indentation.
+/// A pretty-printed JSON string with 2-space indentation and a newline at
+/// the end.
 ///
 /// ## Example
 ///
@@ -196,6 +202,7 @@ pub fn format_pretty(report report: RunReport) -> String {
   build_report_json(report)
   |> json.to_string
   |> prettify_json
+  <> "\n"
 }
 
 /// Print test results as JSON using a provided writer function.
@@ -310,7 +317,7 @@ fn build_system_json() -> Json {
   json.object([
     #("os", json.string(get_os())),
     #("otp_version", json.string(get_otp_version())),
-    #("gleam_version", json.string(get_gleam_version())),
+    #("gleam_stdlib_version", json.string(get_gleam_stdlib_version())),
   ])
 }
 
@@ -577,8 +584,8 @@ fn get_os() -> String
 @external(erlang, "dream_test_reporter_json_ffi", "get_otp_version")
 fn get_otp_version() -> String
 
-@external(erlang, "dream_test_reporter_json_ffi", "get_gleam_version")
-fn get_gleam_version() -> String
+@external(erlang, "dream_test_reporter_json_ffi", "get_gleam_stdlib_version")
+fn get_gleam_stdlib_version() -> String
 
 @external(erlang, "dream_test_reporter_json_ffi", "get_timestamp_ms")
 fn get_timestamp_ms() -> Int
