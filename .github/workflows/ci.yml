@@ -66,8 +66,9 @@ jobs:
       - name: Read coverage for the badge
         # Runs on every event, so a pull request also shows that the JSON
         # summary is readable. Only the badge job below publishes. It also
-        # runs when an earlier step failed: a total below the minimum fails
-        # `gleam test`, and the badge must still show that total in red.
+        # runs when an earlier step failed: the badge shows the coverage
+        # that the run measured, also when tests failed or the total is
+        # below the minimum (then in red).
         id: coverage_badge
         if: ${{ !cancelled() }}
         env:
@@ -107,9 +108,10 @@ jobs:
   coverage-badge:
     name: Publish coverage badge
     # Only a push to main in this repository publishes. Pull requests and
-    # forks never do. The job also runs when the test job failed, so a
-    # total below the minimum still publishes, in red. It needs a badge
-    # text: a test run that wrote no coverage JSON publishes nothing.
+    # forks never do. The job publishes whenever the test run measured
+    # coverage and wrote the JSON, also when tests failed or the total is
+    # below the minimum. A test run that wrote no coverage JSON publishes
+    # nothing.
     if: ${{ !cancelled() && needs.test.outputs.coverage_message != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'TrustBound/dream_test' }}
     needs: test
     runs-on: ubuntu-latest
