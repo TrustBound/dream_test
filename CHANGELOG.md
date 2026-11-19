@@ -43,6 +43,12 @@ store. This release has breaking changes. Read
   code that builds `types.Node` values directly.
 - `types.ModuleCoverage` and `types.CoverageSummary` are removed. Use
   `dream_test/coverage`.
+- `types.TestKind.Integration` is removed. No test ever had this kind. Tag
+  integration tests with `unit.with_tags` and select them with
+  `runner.filter_tests`.
+- The alias `types.TestSuiteItem` is removed. Use `types.Node`.
+- The module `dream_test/context` (`TestContext`, `new`, `failures`,
+  `add_failure`) is removed. Nothing in Dream Test used it.
 - `TestSuite` has no type parameter and moves to the new module
   `dream_test/suite`. `types.TestSuite(context)` is removed. A suite keeps
   its context inside it, so one `runner.new` takes a `unit` suite, a
@@ -253,6 +259,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - Parse errors are typed, and the parser follows the official grammar.
 - `sandbox.run_isolated` takes the function and its input.
 - `types.ModuleCoverage` and `types.CoverageSummary` are removed.
+- `types.TestKind.Integration`, `types.TestSuiteItem` and the module
+  `dream_test/context` are removed.
 
 ### Added
 
@@ -267,7 +275,15 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - `suite.group` puts suites in one group, and `suite.join` puts them one
     after the other in one suite. Each suite keeps its own context
   - `suite.name`, `suite.tests` and `suite.run` read and run a suite.
-    `parallel.run_suite` runs a typed tree inside groups
+    `suite.run` takes a `suite.RunInput`: the concurrency and default
+    timeout, the test filter, the progress output, the runner hooks
+    around each test and the outer set-ups
+  - `suite.with_source` gives each test of a suite a source, for example
+    the module name. Module discovery uses it
+  - `parallel.run_suite` runs a typed tree inside groups, with the new
+    config type `parallel.RunSuiteConfig`: the fields of
+    `RunRootParallelWithReporterConfig`, the tree as `name`, `tags`,
+    `children` and `context`, and the groups around it
   - Module discovery loads suites with a context, and `discover.to_suite`
     keeps the context of each module suite
 
@@ -435,7 +451,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - **Sandbox** (`dream_test/sandbox`)
 
   - `sandbox.run_in_setup_process`, `sandbox.check_setup_process` and `sandbox.stop_setup_process`
-    with the types `sandbox.SetupProcess` and `sandbox.SetupProcessResult`. A setup process
+    with the types `sandbox.SetupProcess` and `sandbox.SetupProcessResult`. A setup
     process runs functions one after another with a timeout for each, and
     stays alive between them, so a pool or an ETS table that one function
     starts lives for the next function. `sandbox.SetupProcessLost(reason)` says
@@ -473,8 +489,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 - **Typed Gherkin scenario state** (`dream_test/gherkin/steps`)
 
-  - `steps.new(initial:)` takes the state that each scenario starts from,
-    and `steps.initial_state(registry)` gives it
+  - `steps.new(initial:)` takes the state that each scenario starts from
   - `StepContext.scenario_id` gives the id of the scenario, unique in
     the run
   - `steps.validate` returns the duplicate step definitions of a registry,
@@ -708,8 +723,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - The values of an `Examples` row replace the `<header>` placeholders in
   the scenario name, the DocStrings (content and media type) and the
   DataTable cells, as in the official Gherkin compiler. Before, only the
-  step text changed, so a test was named `the <one> (Example 1)` in place
-  of `the un (Example 1)`. The headers replace in column order, so with two
+  step text changed, so a test was named `the <one>` in place of
+  `the un (Example 1)`. The headers replace in column order, so with two
   columns of the same name the first column wins.
 - A scenario with no steps runs no Background steps, as in the official
   Gherkin compiler. Before, a failing Background step failed a scenario
