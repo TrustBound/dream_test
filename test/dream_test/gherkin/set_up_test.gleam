@@ -10,10 +10,10 @@ import dream_test/runner
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionFailure, type Status, type TestInfo, type TestResult,
-  AssertionFailure, ContextFromSetUp, Failed, FixedContext, GherkinScenario,
-  Passed, SetupFailed,
+  AssertionFailure, Failed, GherkinScenario, Passed, SetupFailed,
 }
 import dream_test/unit.{describe, it}
+import dream_test/unit_context
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/list
@@ -73,25 +73,38 @@ pub fn tests() {
       |> or_fail_with("no scenario should run and no tear-down")
     }),
 
-    it("suite_context gives the value of new", fn() {
-      case steps.suite_context(steps.new(initial: 7)) {
-        FixedContext(value: value) -> value
-        ContextFromSetUp(..) -> 0
-      }
+    it("to_suite gives each test the state of a registry from new", fn() {
+      run([
+        steps.to_suite(
+          registry: steps.new(initial: 7),
+          name: "start",
+          tags: [],
+          children: [unit_context.it("gets 7", is_7)],
+        ),
+      ])
+      |> statuses
       |> should
-      |> be_equal(7)
-      |> or_fail_with("new should give a fixed context")
+      |> be_equal([#(["start", "gets 7"], Passed)])
+      |> or_fail_with("the test should start from 7")
     }),
 
-    it("suite_context gives the set-up of new_with_set_up", fn() {
+    it("to_suite gives each test the value of the set-up", fn() {
       let events = process.new_subject()
-      case steps.suite_context(counter_steps(events, Ok(10))) {
-        FixedContext(..) -> Error("no set-up")
-        ContextFromSetUp(set_up: set_up, ..) -> set_up()
-      }
+      let report =
+        run([
+          steps.to_suite(
+            registry: counter_steps(events, Ok(7)),
+            name: "start",
+            tags: [],
+            children: [unit_context.it("gets 7", is_7)],
+          ),
+        ])
+      #(statuses(report), receive_all(events, []))
       |> should
-      |> be_equal(Ok(10))
-      |> or_fail_with("new_with_set_up should give its set-up")
+      |> be_equal(
+        #([#(["start", "gets 7"], Passed)], ["set_up", "tear_down got 7"]),
+      )
+      |> or_fail_with("the test should start from the set-up value")
     }),
 
     it("discover.to_suite runs the set-up once for all files", fn() {
@@ -177,6 +190,13 @@ fn write_counter_file(name: String) -> Nil {
         <> "\nScenario: adds one\n  Given the counter starts\n  When I add 1\n  Then the counter is 11\n",
     )
   Nil
+}
+
+fn is_7(value: Int) {
+  value
+  |> should
+  |> be_equal(7)
+  |> or_fail_with("the state should be 7")
 }
 
 fn keep(value: Int, _context: StepContext) -> Result(Int, String) {

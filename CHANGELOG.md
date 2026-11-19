@@ -261,7 +261,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - `steps.new_with_set_up(set_up:, tear_down:)` makes a step registry whose
     scenarios start from the value of `set_up`. `gherkin/discover.to_suite`
     runs the set-up one time for the scenarios of all its files.
-    `steps.suite_context` gives where the scenarios of a registry start
+    `steps.to_suite` makes a suite of typed children that start as the
+    registry says
   - The set-up runs one time, before the first test, and only when at
     least one test of the suite runs. The tear-down gets its value after
     the last test. Both run in one process that lives while the tests run

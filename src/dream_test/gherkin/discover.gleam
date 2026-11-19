@@ -242,11 +242,11 @@ pub fn to_suite(
       tags: [],
       children: list.append(error_nodes, missing_nodes),
     )),
-    suite.new(
+    steps.to_suite(
+      registry: discovery.registry,
       name: suite_name,
       tags: [],
       children: children,
-      context: steps.suite_context(discovery.registry),
     ),
   ])
 }

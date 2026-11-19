@@ -96,6 +96,7 @@ import dream_test/gherkin/step_trie.{
 import dream_test/gherkin/types.{
   type StepPhase, GivenPhase, ThenPhase, WhenPhase,
 }
+import dream_test/suite.{type TestSuite}
 import dream_test/types as dream_types
 import gleam/float
 import gleam/int
@@ -280,24 +281,38 @@ pub fn new_with_set_up(
   )
 }
 
-/// Where each scenario of the registry gets its starting state.
+/// Make a suite from typed children whose tests start as the registry
+/// says: from the state of `new`, or from the value of the set-up of
+/// `new_with_set_up`.
 ///
-/// `FixedContext(value)` for a registry from `new`, and
-/// `ContextFromSetUp(set_up, tear_down)` for a registry from
-/// `new_with_set_up`. `gherkin/feature` uses it to make the suite of a
-/// feature (see `suite.new`).
+/// `gherkin/feature` and `gherkin/discover.to_suite` use it to make the
+/// suite of their scenarios. Use it to run the scenario groups of
+/// `feature.to_group` in one suite with one start, for example one server
+/// for several Features.
+///
+/// ## Parameters
+///
+/// - `registry`: the steps, and where each scenario starts
+/// - `name`: the name of the top-level group
+/// - `tags`: the tags of the top-level group
+/// - `children`: the tests and groups, for example from `feature.to_group`
 ///
 /// ## Example
 ///
 /// ```gleam
-/// steps.suite_context(new(initial: 7))
-/// // -> types.FixedContext(7)
+/// to_suite(registry: steps, name: "Shop", tags: [], children: [
+///   feature.to_group(FeatureConfig(feature: cart, step_registry: steps)),
+///   feature.to_group(FeatureConfig(feature: stock, step_registry: steps)),
+/// ])
 /// ```
 ///
-pub fn suite_context(
+pub fn to_suite(
   registry registry: StepRegistry(state),
-) -> dream_types.SuiteContext(state) {
-  registry.start
+  name name: String,
+  tags tags: List(String),
+  children children: List(dream_types.Node(state)),
+) -> TestSuite {
+  suite.new(name: name, tags: tags, children: children, context: registry.start)
 }
 
 /// Register a Given step definition.

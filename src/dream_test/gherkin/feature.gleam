@@ -170,11 +170,11 @@ pub type InlineStep {
 /// ```
 pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
   let feature = config.feature
-  suite.new(
+  steps.to_suite(
+    registry: config.step_registry,
     name: feature.name,
     tags: feature.tags,
     children: feature_children(config),
-    context: steps.suite_context(config.step_registry),
   )
 }
 
@@ -190,15 +190,10 @@ pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
 /// ## Example
 ///
 /// ```gleam
-/// suite.new(
-///   name: "all features",
-///   tags: [],
-///   children: [
-///     to_group(FeatureConfig(feature: cart_feature, step_registry: steps)),
-///     to_group(FeatureConfig(feature: stock_feature, step_registry: steps)),
-///   ],
-///   context: steps.suite_context(steps),
-/// )
+/// steps.to_suite(registry: steps, name: "all features", tags: [], children: [
+///   to_group(FeatureConfig(feature: cart_feature, step_registry: steps)),
+///   to_group(FeatureConfig(feature: stock_feature, step_registry: steps)),
+/// ])
 /// ```
 pub fn to_group(config config: FeatureConfig(state)) -> Node(state) {
   Group(
