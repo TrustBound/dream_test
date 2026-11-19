@@ -159,9 +159,9 @@ pub type Output {
 
 /// Create a new runner builder for a list of suites.
 ///
-/// The type parameter `ctx` is the suite context type. For `dream_test/unit`
-/// suites this is `Nil`. For `dream_test/unit_context` suites it is your custom
-/// context type.
+/// Every suite has the type `TestSuite`, whatever the context of its tests,
+/// so suites from `dream_test/unit`, `dream_test/unit_context` and Gherkin
+/// go in one list.
 ///
 /// ## Example
 ///
@@ -622,8 +622,9 @@ pub fn silent(builder builder: RunBuilder) -> RunBuilder {
 
 /// Filter which tests are executed.
 ///
-/// The predicate receives `TestInfo` (name, full name, effective tags, kind).
-/// Tags include inherited group tags.
+/// The predicate receives `TestInfo`: the test `name`, the names of its
+/// `groups` from the outermost group, its `tags`, its `kind` and its
+/// `source`. Tags include inherited group tags.
 ///
 /// Groups with no selected tests in their entire subtree are skipped entirely,
 /// including hooks.
@@ -684,23 +685,30 @@ pub fn filter_tests(
 
 /// Register a runner-level hook that runs before each test.
 ///
-/// The hook receives `types.TestInfo` and the current context value.
-/// If it returns `Error("...")`, the test is marked `SetupFailed`
-/// and the test body does not run.
+/// The hook receives `types.TestInfo`. It runs in the process of the test,
+/// before the `before_each` hooks, with the default timeout.
+/// If it returns `Error("...")`, times out or crashes, the test is marked
+/// `SetupFailed` and the test body does not run.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/runner
 /// import dream_test/types.{type TestInfo}
+/// import gleam/io
+/// import gleam/string
 ///
-/// fn log_test(info: TestInfo, ctx: Nil) {
-///   io.println("starting " <> string.join(types.full_name(info.groups, info.name), " > "))
-///   Ok(ctx)
+/// fn log_test(info: TestInfo) -> Result(Nil, String) {
+///   let name = string.join(types.full_name(info.groups, info.name), " > ")
+///   io.println("starting " <> name)
+///   Ok(Nil)
 /// }
 ///
-/// runner.new([suite])
-/// |> runner.before_each_test(log_test)
+/// pub fn main() {
+///   runner.new([tests()])
+///   |> runner.before_each_test(log_test)
+///   |> runner.run()
+/// }
 /// ```
 pub fn before_each_test(
   builder builder: RunBuilder,
@@ -714,8 +722,8 @@ pub fn before_each_test(
 
 /// Register a runner-level hook that runs after each test.
 ///
-/// The hook receives `types.TestInfo` and the current context value. It runs
-/// in the process of the test, after the body, with the default timeout. If
+/// The hook receives `types.TestInfo`. It runs in the process of the test,
+/// after the body and the `after_each` hooks, with the default timeout. If
 /// the body timed out or the test process stopped, it runs in a new process.
 /// Every `after_each_test` hook
 /// runs, also after one fails. If it returns `Error("...")` or crashes, the
