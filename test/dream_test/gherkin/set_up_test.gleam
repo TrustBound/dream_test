@@ -3,11 +3,10 @@
 
 import dream_test/file
 import dream_test/gherkin/discover
-import dream_test/gherkin/feature.{
-  FeatureConfig, feature, given, scenario, then, when,
-}
+import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
+import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
 import dream_test/suite.{type TestSuite}
@@ -82,7 +81,7 @@ pub fn tests() {
           registry: steps.new(initial: 7),
           name: "start",
           tags: [],
-          children: [unit_context.it("gets 7", is_7)],
+          children: [steps.Node(unit_context.it("gets 7", is_7))],
         ),
       ])
       |> statuses
@@ -99,7 +98,7 @@ pub fn tests() {
             registry: counter_steps(events, Ok(7)),
             name: "start",
             tags: [],
-            children: [unit_context.it("gets 7", is_7)],
+            children: [steps.Node(unit_context.it("gets 7", is_7))],
           ),
         ])
       #(statuses(report), receive_all(events, []))
@@ -110,29 +109,124 @@ pub fn tests() {
       |> or_fail_with("the test should start from the set-up value")
     }),
 
-    it("to_group puts two Features in one suite with one set-up", fn() {
+    it("to_suite runs every kind of child under one set-up", fn() {
+      // Feature, Scenarios, a Group with a tag that holds a Feature, and
+      // Node with a unit_context.it and a before_each. The set-up runs one
+      // time; before_each runs before each of the four tests. The tests
+      // directly in the suite run before the tests of its groups.
       let events = process.new_subject()
       let registry = counter_steps(events, Ok(10))
       let report =
         run([
           steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
-            counter_group(registry, "Cart"),
-            counter_group(registry, "Stock"),
+            steps.Node(
+              unit_context.before_each(fn(value) {
+                record_before_each(events, value)
+              }),
+            ),
+            steps.Feature(counter_parsed("Cart")),
+            steps.Scenarios(counter_parsed("Stock")),
+            steps.Group(name: "Billing", tags: ["billing"], children: [
+              steps.Feature(counter_parsed("Invoice")),
+            ]),
+            steps.Node(unit_context.it("gets 10", is_10)),
           ]),
         ])
-      #(statuses(report), receive_all(events, []))
+      #(
+        list.map(types.report_tests(report), full_name_status_and_tags),
+        receive_all(events, []),
+      )
       |> should
       |> be_equal(
         #(
           [
-            #(["Shop", "Cart", "adds one"], Passed),
-            #(["Shop", "Stock", "adds one"], Passed),
+            #(["Shop", "adds one"], Passed, []),
+            #(["Shop", "gets 10"], Passed, []),
+            #(["Shop", "Cart", "adds one"], Passed, []),
+            #(["Shop", "Billing", "Invoice", "adds one"], Passed, ["billing"]),
           ],
+          [
+            "set_up",
+            "before_each",
+            "before_each",
+            "before_each",
+            "before_each",
+            "tear_down got 10",
+          ],
+        ),
+      )
+      |> or_fail_with("one set-up should serve every child")
+    }),
+
+    it("two registries in two joined suites each set up their own", fn() {
+      let cart_events = process.new_subject()
+      let stock_events = process.new_subject()
+      let report =
+        run([
+          suite.join(name: "all", suites: [
+            steps.to_suite(
+              registry: counter_steps(cart_events, Ok(10)),
+              name: "Cart suite",
+              tags: [],
+              children: [steps.Feature(counter_parsed("Cart"))],
+            ),
+            steps.to_suite(
+              registry: counter_steps(stock_events, Ok(10)),
+              name: "Stock suite",
+              tags: [],
+              children: [steps.Feature(counter_parsed("Stock"))],
+            ),
+          ]),
+        ])
+      #(
+        statuses(report),
+        receive_all(cart_events, []),
+        receive_all(stock_events, []),
+      )
+      |> should
+      |> be_equal(
+        #(
+          [
+            #(["Cart suite", "Cart", "adds one"], Passed),
+            #(["Stock suite", "Stock", "adds one"], Passed),
+          ],
+          ["set_up", "tear_down got 10"],
           ["set_up", "tear_down got 10"],
         ),
       )
-      |> or_fail_with("one set-up should serve both Features")
+      |> or_fail_with("each registry should set up once for its features")
     }),
+
+    it(
+      "a Feature whose steps are in another registry has undefined steps",
+      fn() {
+        // The nearest misuse that compiles: both Features under the registry
+        // of the counter. The Feature of the shop uses steps that only another
+        // registry has, so its scenario fails; it does not run silently.
+        let events = process.new_subject()
+        let report =
+          run([
+            steps.to_suite(
+              registry: counter_steps(events, Ok(10)),
+              name: "Shop",
+              tags: [],
+              children: [
+                steps.Feature(counter_parsed("Cart")),
+                steps.Feature(shop_parsed()),
+              ],
+            ),
+          ])
+        list.map(types.report_tests(report), full_name_status_and_messages)
+        |> should
+        |> be_equal([
+          #(["Shop", "Cart", "adds one"], Passed, []),
+          #(["Shop", "Shelf", "opens"], Failed, [
+            "Undefined step: Given the shop opens",
+          ]),
+        ])
+        |> or_fail_with("a step of another registry should be undefined")
+      },
+    ),
 
     it("discover.to_suite runs the set-up once for all files", fn() {
       let events = process.new_subject()
@@ -208,17 +302,54 @@ fn counter_feature(registry: StepRegistry(Int)) -> TestSuite {
   ])
 }
 
-/// A Feature named `name` with one scenario, as one group.
-fn counter_group(registry: StepRegistry(Int), name: String) {
-  case parser.parse_string(counter_text(name)) {
-    Ok(parsed) ->
-      feature.to_group(FeatureConfig(feature: parsed, step_registry: registry))
-    Error(_) -> unit_context.it(name <> " does not parse", fails)
-  }
+/// The parsed Feature named `name` with one scenario.
+fn counter_parsed(name: String) -> gherkin_types.Feature {
+  let assert Ok(parsed) = parser.parse_string(counter_text(name))
+  parsed
 }
 
-fn fails(_value: Int) {
-  Error("the feature text should parse")
+/// A Feature whose step only another registry has.
+fn shop_parsed() -> gherkin_types.Feature {
+  let assert Ok(parsed) =
+    parser.parse_string(
+      "Feature: Shelf\nScenario: opens\n  Given the shop opens\n",
+    )
+  parsed
+}
+
+fn record_before_each(
+  events: Subject(String),
+  value: Int,
+) -> Result(Int, String) {
+  process.send(events, "before_each")
+  Ok(value)
+}
+
+fn is_10(value: Int) {
+  value
+  |> should
+  |> be_equal(10)
+  |> or_fail_with("the state should be 10")
+}
+
+fn full_name_status_and_tags(
+  result: TestResult,
+) -> #(List(String), Status, List(String)) {
+  #(types.full_name(result.groups, result.name), result.status, result.tags)
+}
+
+fn full_name_status_and_messages(
+  result: TestResult,
+) -> #(List(String), Status, List(String)) {
+  #(
+    types.full_name(result.groups, result.name),
+    result.status,
+    list.map(result.failures, failure_message),
+  )
+}
+
+fn failure_message(failure: AssertionFailure) -> String {
+  failure.message
 }
 
 fn counter_text(name: String) -> String {

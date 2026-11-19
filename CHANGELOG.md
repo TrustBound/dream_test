@@ -301,8 +301,13 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - `steps.new_with_set_up(set_up:, tear_down:)` makes a step registry whose
     scenarios start from the value of `set_up`. `gherkin/discover.to_suite`
     runs the set-up one time for the scenarios of all its files.
-    `steps.to_suite` makes a suite of typed children that start as the
-    registry says
+    `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
+    that starts as the registry says. Its children are
+    `steps.SuiteChild` values: `Feature(feature)`, `Scenarios(feature)`,
+    `Group(name:, tags:, children:)` and `Node(node)`. The scenarios of
+    every Feature run with the steps of that registry, so a suite of
+    Features cannot mix the steps of one registry with the set-up of
+    another
   - The set-up runs one time, before the first test, and only when at
     least one test of the suite runs. The tear-down gets its value after
     the last test. Both run in one process that lives while the tests run
@@ -315,8 +320,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     stops is a `SetupStopped` with the new hook `types.SuiteSetUpHook`,
     named `suite set-up`, and each test that did not start gets
     `not run: the suite set-up of "<suite>" stopped (<reason>)`
-  - `feature.to_group` gives a Feature as one group node, to put several
-    Features in one suite
+  - `steps.SuiteChild` puts several Features in one suite with one
+    set-up: `Feature(feature)` is a group with the tests of a Feature
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 

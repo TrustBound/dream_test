@@ -55,7 +55,6 @@
 //// }
 //// ```
 
-import dream_test/gherkin/feature.{FeatureConfig}
 import dream_test/gherkin/parser.{type FeatureFileError}
 import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
@@ -235,7 +234,7 @@ pub fn to_suite(
   let found = discover_files(discovery.pattern)
   let parsed = parse_all_features(result.unwrap(found, []))
 
-  let children = features_to_groups(parsed.features, discovery.registry, [])
+  let children = list.map(parsed.features, steps.Feature)
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes =
     list.map(missing_files_errors(discovery.pattern, found), missing_files_node)
@@ -432,27 +431,6 @@ fn parse_error_assertion() -> AssertionResult {
     message: "Failed to parse feature file (see test name for details)",
     payload: None,
   ))
-}
-
-fn features_to_groups(
-  features: List(gherkin_types.Feature),
-  registry: StepRegistry(state),
-  acc_rev: List(Node(state)),
-) -> List(Node(state)) {
-  case features {
-    [] -> list.reverse(acc_rev)
-    [feature, ..rest] -> {
-      let group = feature_to_group(feature, registry)
-      features_to_groups(rest, registry, [group, ..acc_rev])
-    }
-  }
-}
-
-fn feature_to_group(
-  feature: gherkin_types.Feature,
-  registry: StepRegistry(state),
-) -> Node(state) {
-  feature.to_group(FeatureConfig(feature: feature, step_registry: registry))
 }
 
 fn errors_to_nodes(

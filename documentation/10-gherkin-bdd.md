@@ -811,9 +811,18 @@ Summary: 4 run, 0 failed, 4 passed
 
 #### Several Features with one set-up
 
-`discover.to_suite` runs one set-up for all its files. To do the same with Features that you parse yourself, turn each Feature into a group with `feature.to_group`, and put the groups in one suite with `steps.to_suite`. The suite starts as the registry says, so the set-up runs one time for the scenarios of both Features:
+`discover.to_suite` runs one set-up for all its files. To do the same with Features that you parse yourself, give each Feature to `steps.to_suite` as a `steps.Feature` child. The suite starts as the registry says, so the set-up runs one time for the scenarios of all its Features, and every scenario runs with the steps of that registry.
 
-##### Two Features, one set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_shared_set_up.gleam#L38-L50"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+`steps.to_suite` takes these children (`steps.SuiteChild`):
+
+- `Feature(feature)`: a group named after the Feature, with a test for each scenario.
+- `Scenarios(feature)`: the tests of the scenarios, with no group for the Feature.
+- `Group(name:, tags:, children:)`: a group of your own, for example with a tag, that holds more children.
+- `Node(node)`: a test, a hook or a group that you make, for example with `unit_context.it` or `unit_context.before_each`. It gets the same start as the scenarios.
+
+A Feature gets its tests only from the registry of its suite, so it cannot run with the steps of one registry and the set-up of another. To use two registries, make two suites, for example with `suite.join`: each set-up runs one time for its own Features.
+
+##### Two Features, one set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_shared_set_up.gleam#L39-L50"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn shop_steps() -> StepRegistry(Int) {
@@ -822,11 +831,10 @@ fn shop_steps() -> StepRegistry(Int) {
 }
 
 /// Two Features in one suite: the set-up runs one time for both.
-fn shop_suite(cart: Feature, stock: Feature) -> TestSuite {
-  let registry = shop_steps()
-  steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
-    feature.to_group(FeatureConfig(feature: cart, step_registry: registry)),
-    feature.to_group(FeatureConfig(feature: stock, step_registry: registry)),
+fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
+  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
+    Feature(cart),
+    Group(name: "Warehouse", tags: ["warehouse"], children: [Feature(stock)]),
   ])
 }
 ```

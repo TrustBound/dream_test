@@ -1,7 +1,8 @@
-import dream_test/gherkin/feature.{FeatureConfig}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
-import dream_test/gherkin/types.{type Feature}
+import dream_test/gherkin/steps.{
+  type StepContext, type StepRegistry, Feature, Group,
+}
+import dream_test/gherkin/types
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit
@@ -41,11 +42,10 @@ fn shop_steps() -> StepRegistry(Int) {
 }
 
 /// Two Features in one suite: the set-up runs one time for both.
-fn shop_suite(cart: Feature, stock: Feature) -> TestSuite {
-  let registry = shop_steps()
-  steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
-    feature.to_group(FeatureConfig(feature: cart, step_registry: registry)),
-    feature.to_group(FeatureConfig(feature: stock, step_registry: registry)),
+fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
+  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
+    Feature(cart),
+    Group(name: "Warehouse", tags: ["warehouse"], children: [Feature(stock)]),
   ])
 }
 

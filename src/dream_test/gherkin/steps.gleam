@@ -281,28 +281,51 @@ pub fn new_with_set_up(
   )
 }
 
-/// Make a suite from typed children whose tests start as the registry
-/// says: from the state of `new`, or from the value of the set-up of
-/// `new_with_set_up`.
+/// One child of the suite of `to_suite`.
 ///
-/// `gherkin/feature` and `gherkin/discover.to_suite` use it to make the
-/// suite of their scenarios. Use it to run the scenario groups of
-/// `feature.to_group` in one suite with one start, for example one server
-/// for several Features.
+/// - `Feature(feature)`: a group named after the Feature, with its tags and
+///   a test for each scenario, as in `feature.to_test_suite`. The scenarios
+///   run with the steps of the registry of `to_suite`. A Feature gets its
+///   tests only here, so it cannot run with the steps of one registry and
+///   the start of another.
+/// - `Scenarios(feature)`: the tests of the scenarios of a Feature, and a
+///   group for each Rule, with no group for the Feature.
+/// - `Group(name, tags, children)`: a group of your own, for example with a
+///   tag, that holds more children.
+/// - `Node(node)`: a test, a hook or a group that you make, for example
+///   with `unit_context.it` or `unit_context.before_each`. It gets the same
+///   start as the scenarios.
+pub type SuiteChild(state) {
+  Feature(feature: types.Feature)
+  Scenarios(feature: types.Feature)
+  Group(name: String, tags: List(String), children: List(SuiteChild(state)))
+  Node(node: dream_types.Node(state))
+}
+
+/// Make a suite whose tests start as the registry says: from the state of
+/// `new`, or from the value of the set-up of `new_with_set_up`. The set-up
+/// runs one time for all the children, and only when at least one of
+/// their tests runs.
+///
+/// `feature.to_test_suite` and `gherkin/discover.to_suite` use it. Use it
+/// to run several Features with one start, for example one server for all
+/// of them. The scenarios of every `Feature` and `Scenarios` child run with
+/// the steps of `registry`.
 ///
 /// ## Parameters
 ///
-/// - `registry`: the steps, and where each scenario starts
+/// - `registry`: the steps, and where each test starts
 /// - `name`: the name of the top-level group
 /// - `tags`: the tags of the top-level group
-/// - `children`: the tests and groups, for example from `feature.to_group`
+/// - `children`: the Features, groups, tests and hooks (see `SuiteChild`)
 ///
 /// ## Example
 ///
 /// ```gleam
 /// to_suite(registry: steps, name: "Shop", tags: [], children: [
-///   feature.to_group(FeatureConfig(feature: cart, step_registry: steps)),
-///   feature.to_group(FeatureConfig(feature: stock, step_registry: steps)),
+///   Feature(cart),
+///   Group(name: "Billing", tags: ["billing"], children: [Feature(invoice)]),
+///   Node(unit_context.it("the server answers", answers)),
 /// ])
 /// ```
 ///
@@ -310,9 +333,52 @@ pub fn to_suite(
   registry registry: StepRegistry(state),
   name name: String,
   tags tags: List(String),
-  children children: List(dream_types.Node(state)),
+  children children: List(SuiteChild(state)),
 ) -> TestSuite {
-  suite.new(name: name, tags: tags, children: children, context: registry.start)
+  suite.new(
+    name: name,
+    tags: tags,
+    children: children_to_nodes(children, registry),
+    context: registry.start,
+  )
+}
+
+fn children_to_nodes(
+  children: List(SuiteChild(state)),
+  registry: StepRegistry(state),
+) -> List(dream_types.Node(state)) {
+  case children {
+    [] -> []
+    [child, ..rest] ->
+      list.append(
+        child_to_nodes(child, registry),
+        children_to_nodes(rest, registry),
+      )
+  }
+}
+
+fn child_to_nodes(
+  child: SuiteChild(state),
+  registry: StepRegistry(state),
+) -> List(dream_types.Node(state)) {
+  case child {
+    Feature(feature) -> [
+      dream_types.Group(
+        name: feature.name,
+        tags: feature.tags,
+        children: feature_children(feature, registry),
+      ),
+    ]
+    Scenarios(feature) -> feature_children(feature, registry)
+    Group(name: name, tags: tags, children: children) -> [
+      dream_types.Group(
+        name: name,
+        tags: tags,
+        children: children_to_nodes(children, registry),
+      ),
+    ]
+    Node(node) -> [node]
+  }
 }
 
 /// Register a Given step definition.
@@ -774,5 +840,563 @@ fn list_at_loop(items: List(a), target: Int, current: Int) -> Option(a) {
         True -> Some(head)
         False -> list_at_loop(tail, target, current + 1)
       }
+  }
+}
+
+// ============================================================================
+// Scenario tests
+// ============================================================================
+
+/// The tests of the scenarios of `feature`, and a group for each Rule.
+fn feature_children(
+  feature: types.Feature,
+  registry: StepRegistry(state),
+) -> List(dream_types.Node(state)) {
+  let scope =
+    ScenarioScope(
+      feature_name: feature.name,
+      source: feature.source,
+      registry: registry,
+      rule_group: None,
+      background_steps: background_steps(feature.background),
+    )
+  let scenario_nodes = scenarios_to_nodes(scope, feature.scenarios, [])
+  let rule_nodes = rules_to_nodes(scope, feature.rules, [])
+  list.append(scenario_nodes, rule_nodes)
+}
+
+/// What the scenarios of a Feature or a Rule share.
+type ScenarioScope(state) {
+  ScenarioScope(
+    feature_name: String,
+    source: Option(String),
+    registry: StepRegistry(state),
+    /// The name of the Rule group (`Rule: <name>`) for the scenarios of a
+    /// Rule, or `None` for the scenarios outside a Rule.
+    rule_group: Option(String),
+    background_steps: List(types.Step),
+  )
+}
+
+fn background_steps(background: Option(types.Background)) -> List(types.Step) {
+  case background {
+    Some(background) -> background.steps
+    None -> []
+  }
+}
+
+fn rules_to_nodes(
+  scope: ScenarioScope(state),
+  rules: List(types.Rule),
+  nodes_newest_first: List(dream_types.Node(state)),
+) -> List(dream_types.Node(state)) {
+  case rules {
+    [] -> list.reverse(nodes_newest_first)
+    [rule, ..rest] ->
+      rules_to_nodes(scope, rest, [
+        rule_to_node(scope, rule),
+        ..nodes_newest_first
+      ])
+  }
+}
+
+fn rule_to_node(
+  scope: ScenarioScope(state),
+  rule: types.Rule,
+) -> dream_types.Node(state) {
+  let group_name = string.trim_end("Rule: " <> rule.name)
+  let rule_scope =
+    ScenarioScope(
+      ..scope,
+      rule_group: Some(group_name),
+      background_steps: list.append(
+        scope.background_steps,
+        background_steps(rule.background),
+      ),
+    )
+  dream_types.Group(
+    name: group_name,
+    tags: rule.tags,
+    children: scenarios_to_nodes(rule_scope, rule.scenarios, []),
+  )
+}
+
+fn scenarios_to_nodes(
+  scope: ScenarioScope(state),
+  scenarios: List(types.Scenario),
+  nodes_newest_first: List(dream_types.Node(state)),
+) -> List(dream_types.Node(state)) {
+  case scenarios {
+    [] -> list.reverse(nodes_newest_first)
+    [scenario, ..rest] ->
+      scenarios_to_nodes(
+        scope,
+        rest,
+        reverse_append(scenario_to_nodes(scope, scenario), nodes_newest_first),
+      )
+  }
+}
+
+fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
+  case items {
+    [] -> acc
+    [item, ..rest] -> reverse_append(rest, [item, ..acc])
+  }
+}
+
+fn scenario_to_nodes(
+  scope: ScenarioScope(state),
+  scenario: types.Scenario,
+) -> List(dream_types.Node(state)) {
+  case scenario.examples {
+    [] -> [
+      scenario_node(
+        scope,
+        ScenarioRun(
+          name: scenario.name,
+          tags: scenario.tags,
+          steps: scenario.steps,
+        ),
+      ),
+    ]
+    examples -> examples_to_nodes(scope, scenario, examples, 1, [])
+  }
+}
+
+/// A number that no other scenario in the BEAM instance gets: each call
+/// gives a new, larger number. It makes the scenario id unique in the run,
+/// also across separately built suites.
+fn scenario_number() -> String {
+  int.to_string(unique_integer([Positive, Monotonic]))
+}
+
+/// The options of `erlang:unique_integer/1`. Gleam gives them to Erlang as
+/// the atoms `positive` and `monotonic`.
+type UniqueIntegerOption {
+  Positive
+  Monotonic
+}
+
+@external(erlang, "erlang", "unique_integer")
+fn unique_integer(options: List(UniqueIntegerOption)) -> Int
+
+/// One test to build: its name, its own tags and its steps.
+type ScenarioRun {
+  ScenarioRun(name: String, tags: List(String), steps: List(types.Step))
+}
+
+fn scenario_node(
+  scope: ScenarioScope(state),
+  run: ScenarioRun,
+) -> dream_types.Node(state) {
+  let full_name =
+    list.flatten([
+      [scope.feature_name],
+      option.values([scope.rule_group]),
+      [run.name],
+    ])
+  let scenario_id = string.join(full_name, "::") <> "#" <> scenario_number()
+  let all_steps = with_background(scope.background_steps, run.steps)
+  let registry = scope.registry
+
+  dream_types.Test(
+    name: run.name,
+    tags: run.tags,
+    kind: dream_types.GherkinScenario(
+      scenario_id: scenario_id,
+      rule: scope.rule_group,
+    ),
+    run: dream_types.WithInput(fn(start) {
+      execute_scenario(scenario_id, all_steps, registry, start)
+    }),
+    timeout_ms: None,
+    source: scope.source,
+  )
+}
+
+/// The steps of a test: the Background steps, then the scenario steps. A
+/// scenario with no steps runs no Background steps, as in the official
+/// Gherkin compiler.
+fn with_background(
+  background_steps: List(types.Step),
+  scenario_steps: List(types.Step),
+) -> List(types.Step) {
+  case scenario_steps {
+    [] -> []
+    _ -> list.append(background_steps, scenario_steps)
+  }
+}
+
+/// Build the tests of every row of every Examples table. `index` counts the
+/// rows of all tables of the scenario, from 1.
+fn examples_to_nodes(
+  scope: ScenarioScope(state),
+  scenario: types.Scenario,
+  examples: List(types.Examples),
+  index: Int,
+  nodes_newest_first: List(dream_types.Node(state)),
+) -> List(dream_types.Node(state)) {
+  case examples {
+    [] -> list.reverse(nodes_newest_first)
+    [types.Examples(table: None, ..), ..rest] ->
+      examples_to_nodes(scope, scenario, rest, index, nodes_newest_first)
+    [types.Examples(table: Some(table), ..) as section, ..rest] -> {
+      let rows =
+        ExampleRows(
+          scenario: scenario,
+          section: section,
+          headers: table.headers,
+        )
+      let #(next_index, nodes) =
+        rows_to_nodes(scope, rows, table.rows, index, nodes_newest_first)
+      examples_to_nodes(scope, scenario, rest, next_index, nodes)
+    }
+  }
+}
+
+/// The rows of one Examples table, with the scenario they expand.
+type ExampleRows {
+  ExampleRows(
+    scenario: types.Scenario,
+    section: types.Examples,
+    headers: List(String),
+  )
+}
+
+fn rows_to_nodes(
+  scope: ScenarioScope(state),
+  rows: ExampleRows,
+  values: List(List(String)),
+  index: Int,
+  nodes_newest_first: List(dream_types.Node(state)),
+) -> #(Int, List(dream_types.Node(state))) {
+  case values {
+    [] -> #(index, nodes_newest_first)
+    [row, ..rest] -> {
+      let substitutions = list.zip(rows.headers, row)
+      let run =
+        ScenarioRun(
+          name: substitute_placeholders(rows.scenario.name, substitutions)
+            <> " ("
+            <> example_label(rows, index)
+            <> ")",
+          tags: list.append(rows.scenario.tags, rows.section.tags),
+          steps: substitute_steps(rows.scenario.steps, substitutions),
+        )
+      rows_to_nodes(scope, rows, rest, index + 1, [
+        scenario_node(scope, run),
+        ..nodes_newest_first
+      ])
+    }
+  }
+}
+
+fn example_label(rows: ExampleRows, index: Int) -> String {
+  case rows.section.name {
+    "" -> "Example " <> int.to_string(index)
+    name -> name <> ", Example " <> int.to_string(index)
+  }
+}
+
+// Example values replace `<header>` placeholders in the scenario name, the
+// step texts, the DocStrings and the DataTable cells. The headers replace in
+// column order, as in the official Gherkin compiler.
+
+fn substitute_steps(
+  steps: List(types.Step),
+  substitutions: List(#(String, String)),
+) -> List(types.Step) {
+  substitute_steps_loop(steps, substitutions, [])
+}
+
+fn substitute_steps_loop(
+  steps: List(types.Step),
+  substitutions: List(#(String, String)),
+  acc_rev: List(types.Step),
+) -> List(types.Step) {
+  case steps {
+    [] -> list.reverse(acc_rev)
+    [step, ..rest] ->
+      substitute_steps_loop(rest, substitutions, [
+        substitute_step(step, substitutions),
+        ..acc_rev
+      ])
+  }
+}
+
+fn substitute_step(
+  step: types.Step,
+  substitutions: List(#(String, String)),
+) -> types.Step {
+  types.Step(
+    keyword: step.keyword,
+    text: substitute_placeholders(step.text, substitutions),
+    doc_string: substitute_doc_string(step.doc_string, substitutions),
+    data_table: substitute_data_table(step.data_table, substitutions),
+  )
+}
+
+fn substitute_doc_string(
+  doc_string: Option(types.DocString),
+  substitutions: List(#(String, String)),
+) -> Option(types.DocString) {
+  case doc_string {
+    Some(types.DocString(content, content_type)) ->
+      Some(types.DocString(
+        content: substitute_placeholders(content, substitutions),
+        content_type: substitute_content_type(content_type, substitutions),
+      ))
+    None -> None
+  }
+}
+
+fn substitute_content_type(
+  content_type: Option(String),
+  substitutions: List(#(String, String)),
+) -> Option(String) {
+  case content_type {
+    Some(media_type) -> Some(substitute_placeholders(media_type, substitutions))
+    None -> None
+  }
+}
+
+fn substitute_data_table(
+  data_table: Option(types.DataTable),
+  substitutions: List(#(String, String)),
+) -> Option(types.DataTable) {
+  case data_table {
+    Some(types.DataTable(rows)) ->
+      Some(types.DataTable(rows: substitute_rows(rows, substitutions, [])))
+    None -> None
+  }
+}
+
+fn substitute_rows(
+  rows: List(List(String)),
+  substitutions: List(#(String, String)),
+  rows_newest_first: List(List(String)),
+) -> List(List(String)) {
+  case rows {
+    [] -> list.reverse(rows_newest_first)
+    [row, ..rest] ->
+      substitute_rows(rest, substitutions, [
+        substitute_cells(row, substitutions, []),
+        ..rows_newest_first
+      ])
+  }
+}
+
+fn substitute_cells(
+  cells: List(String),
+  substitutions: List(#(String, String)),
+  cells_newest_first: List(String),
+) -> List(String) {
+  case cells {
+    [] -> list.reverse(cells_newest_first)
+    [cell, ..rest] ->
+      substitute_cells(rest, substitutions, [
+        substitute_placeholders(cell, substitutions),
+        ..cells_newest_first
+      ])
+  }
+}
+
+fn substitute_placeholders(
+  text: String,
+  substitutions: List(#(String, String)),
+) -> String {
+  case substitutions {
+    [] -> text
+    [#(header, value), ..rest] ->
+      substitute_placeholders(
+        string.replace(text, "<" <> header <> ">", value),
+        rest,
+      )
+  }
+}
+
+// ============================================================================
+// Scenario Execution
+// ============================================================================
+
+fn execute_scenario(
+  scenario_id: String,
+  steps: List(types.Step),
+  registry: StepRegistry(state),
+  start: state,
+) -> Result(dream_types.AssertionResult, String) {
+  case validate(registry) {
+    Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry, start))
+    Error(message) -> Ok(step_failure(message))
+  }
+}
+
+fn resolve_and_execute(
+  scenario_id: String,
+  steps: List(types.Step),
+  registry: StepRegistry(state),
+  start: state,
+) -> dream_types.AssertionResult {
+  case resolve_phases(steps, None, []) {
+    Ok(phased_steps) ->
+      execute_steps(
+        ScenarioExecution(scenario_id: scenario_id, registry: registry),
+        phased_steps,
+        start,
+      )
+    Error(message) -> step_failure(message)
+  }
+}
+
+/// The data that stays the same for every step of one scenario.
+type ScenarioExecution(state) {
+  ScenarioExecution(scenario_id: String, registry: StepRegistry(state))
+}
+
+/// The result of one step: run the next step with this state, or stop the
+/// scenario with this result.
+type StepOutcome(state) {
+  Continue(state: state)
+  Stop(result: dream_types.AssertionResult)
+}
+
+fn resolve_phases(
+  steps: List(types.Step),
+  previous: Option(types.StepPhase),
+  phased_newest_first: List(#(types.Step, types.StepPhase)),
+) -> Result(List(#(types.Step, types.StepPhase)), String) {
+  case steps {
+    [] -> Ok(list.reverse(phased_newest_first))
+    [step, ..rest] ->
+      resolve_step_phase(step, rest, previous, phased_newest_first)
+  }
+}
+
+fn resolve_step_phase(
+  step: types.Step,
+  rest: List(types.Step),
+  previous: Option(types.StepPhase),
+  phased_newest_first: List(#(types.Step, types.StepPhase)),
+) -> Result(List(#(types.Step, types.StepPhase)), String) {
+  case types.resolve_phase(step.keyword, previous) {
+    Ok(phase) ->
+      resolve_phases(rest, Some(phase), [#(step, phase), ..phased_newest_first])
+    Error(Nil) -> Error(no_previous_step_message(step))
+  }
+}
+
+fn no_previous_step_message(step: types.Step) -> String {
+  "\""
+  <> types.keyword_to_string(step.keyword)
+  <> " "
+  <> step.text
+  <> "\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then."
+}
+
+fn execute_steps(
+  execution: ScenarioExecution(state),
+  phased_steps: List(#(types.Step, types.StepPhase)),
+  state: state,
+) -> dream_types.AssertionResult {
+  case phased_steps {
+    [] -> dream_types.AssertionOk
+    [#(step, phase), ..rest] ->
+      continue_after(
+        execution,
+        execute_step(execution, step, phase, state),
+        rest,
+      )
+  }
+}
+
+fn continue_after(
+  execution: ScenarioExecution(state),
+  outcome: StepOutcome(state),
+  rest: List(#(types.Step, types.StepPhase)),
+) -> dream_types.AssertionResult {
+  case outcome {
+    Continue(state) -> execute_steps(execution, rest, state)
+    Stop(result) -> result
+  }
+}
+
+fn execute_step(
+  execution: ScenarioExecution(state),
+  step: types.Step,
+  phase: types.StepPhase,
+  state: state,
+) -> StepOutcome(state) {
+  case find_step(execution.registry, phase, step.text) {
+    Ok(match) ->
+      run_definition(
+        match.handler,
+        build_step_context(execution, match, step),
+        state,
+      )
+    Error(message) -> Stop(step_failure(message))
+  }
+}
+
+fn run_definition(
+  definition: StepDefinition(state),
+  context: StepContext,
+  state: state,
+) -> StepOutcome(state) {
+  case definition {
+    Action(run) -> action_outcome(run(state, context))
+    Check(run) -> check_outcome(run(state, context), state)
+  }
+}
+
+fn action_outcome(result: Result(state, String)) -> StepOutcome(state) {
+  case result {
+    Ok(new_state) -> Continue(new_state)
+    Error(message) -> Stop(step_failure(message))
+  }
+}
+
+fn check_outcome(
+  result: Result(dream_types.AssertionResult, String),
+  state: state,
+) -> StepOutcome(state) {
+  case result {
+    Ok(dream_types.AssertionOk) -> Continue(state)
+    Ok(failure) -> Stop(failure)
+    Error(message) -> Stop(step_failure(message))
+  }
+}
+
+fn step_failure(message: String) -> dream_types.AssertionResult {
+  dream_types.AssertionFailed(dream_types.AssertionFailure(
+    operator: "step",
+    message: message,
+    payload: None,
+  ))
+}
+
+fn build_step_context(
+  execution: ScenarioExecution(state),
+  match: StepMatch(StepDefinition(state)),
+  step: types.Step,
+) -> StepContext {
+  StepContext(
+    captures: match.captures,
+    table: extract_table_from_step(step),
+    doc_string: extract_doc_string_from_step(step),
+    scenario_id: execution.scenario_id,
+  )
+}
+
+fn extract_table_from_step(step: types.Step) -> Option(List(List(String))) {
+  case step.data_table {
+    Some(types.DataTable(rows)) -> Some(rows)
+    None -> None
+  }
+}
+
+fn extract_doc_string_from_step(step: types.Step) -> Option(String) {
+  case step.doc_string {
+    Some(types.DocString(content, _)) -> Some(content)
+    None -> None
   }
 }
