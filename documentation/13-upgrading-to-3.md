@@ -1713,6 +1713,107 @@ pub fn tests() {
 
 ### Removed items
 
+#### Three items that did nothing
+
+`types.TestKind.Integration`, the alias `types.TestSuiteItem` and the module `dream_test/context` are removed. No part of Dream Test made or read them.
+
+No test ever had the kind `Integration`. To mark integration tests, give them a tag, and filter on the tag:
+
+##### 2.x: the `Integration` kind, never given to a test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L118-L130"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+/// The kind/category of a test.
+///
+/// Used to distinguish between different testing styles:
+///
+/// - `Unit` - Standard unit tests from `describe`/`it`
+/// - `Integration` - Integration tests (for future use)
+/// - `GherkinScenario(id)` - Tests from Gherkin features (inline DSL or `.feature` files)
+///
+pub type TestKind {
+  Unit
+  Integration
+  GherkinScenario(String)
+}
+```
+
+##### 3.0.0: tag the integration tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/tagging.gleam#L7-L20"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn tests() {
+  describe("Tagged tests", [
+    // Tag a whole group (all tests inside inherit these tags)
+    group("integration", [
+      it("slow path", fn() { Ok(succeed()) }),
+      it("another slow path", fn() { Ok(succeed()) }),
+    ])
+      |> with_tags(["integration", "slow"]),
+
+    // Or tag a single test
+    it("smoke", fn() { Ok(succeed()) })
+      |> with_tags(["smoke"]),
+  ])
+}
+```
+
+##### 3.0.0: run only the tests with a tag <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/filter_tests.gleam#L22-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn only_smoke(info: TestInfo) -> Bool {
+  list.contains(info.tags, "smoke")
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.filter_tests(only_smoke)
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+`types.TestSuiteItem(context)` was another name for `types.Node(context)`. Use `types.Node(context)`.
+
+`dream_test/context` held a list of failures (`TestContext`, `new`, `failures`, `add_failure`) that the runner never used. Keep such a list in your own code if you need it.
+
+##### 2.x: `dream_test/context` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/context_helpers.gleam#L1-L32"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/context
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/types.{AssertionFailure}
+import dream_test/unit.{describe, it}
+import gleam/option.{None}
+
+pub fn tests() {
+  describe("dream_test/context", [
+    it("new has no failures", fn() {
+      context.new()
+      |> context.failures()
+      |> should
+      |> be_equal([])
+      |> or_fail_with("expected new context to have no failures")
+    }),
+
+    it("add_failure stores failures newest-first", fn() {
+      let first_failure =
+        AssertionFailure(operator: "op1", message: "m1", payload: None)
+      let second_failure =
+        AssertionFailure(operator: "op2", message: "m2", payload: None)
+
+      context.new()
+      |> context.add_failure(first_failure)
+      |> context.add_failure(second_failure)
+      |> context.failures()
+      |> should
+      |> be_equal([second_failure, first_failure])
+      |> or_fail_with("expected newest-first failure ordering")
+    }),
+  ])
+}
+```
+
 | Removed in 3.0.0 | Use in its place |
 |---|---|
 | `dream_test/gherkin/world` (`put`, `get`, `get_or`, `has`, `delete`, `scenario_id`, `new_world`, `cleanup`) | The scenario state. See [Gherkin step definitions](#gherkin-step-definitions). |
@@ -1724,6 +1825,9 @@ pub fn tests() {
 | `gherkin/types.ScenarioOutline` | `Scenario` with `examples` |
 | `runner.has_failures` | `types.failed` |
 | `reporters/types.ReporterEvent`, `HookKind`, `HookOutcome`, `progress.handle_event` | `progress.ProgressEvent` and `progress.line` |
+| `types.TestKind.Integration` | A tag, for example `unit.with_tags(["integration"])`, and `runner.filter_tests` |
+| `types.TestSuiteItem` | `types.Node` |
+| `dream_test/context` (`TestContext`, `new`, `failures`, `add_failure`) | Nothing. The runner never used it. |
 | `types.ModuleCoverage`, `types.CoverageSummary` | `dream_test/coverage`. Nothing in 2.x filled these types. See the Coverage section of the [main README](../README.md#coverage). |
 
 ### What's Next?

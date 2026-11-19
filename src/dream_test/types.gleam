@@ -15,7 +15,7 @@
 //// | Type               | Purpose                                          |
 //// |--------------------|--------------------------------------------------|
 //// | `Status`           | Test outcome (Passed, Failed, etc.)              |
-//// | `TestKind`         | Type of test (Unit, Integration, Gherkin)        |
+//// | `TestKind`         | Type of test (Unit, Gherkin)                     |
 //// | `TestResult`       | Complete result of running a test                |
 //// | `AssertionResult`  | Pass/fail result of an assertion chain           |
 //// | `MatchResult(a)`   | Intermediate result during assertion chaining    |
@@ -118,13 +118,11 @@ pub type Status {
 /// Used to distinguish between different testing styles:
 ///
 /// - `Unit` - Standard unit tests from `describe`/`it`
-/// - `Integration` - Integration tests (for future use)
 /// - `GherkinScenario(scenario_id:, rule:)` - Tests from Gherkin features
 ///   (inline DSL or `.feature` files)
 ///
 pub type TestKind {
   Unit
-  Integration
   /// A Gherkin scenario. `scenario_id` is the id that the steps get in
   /// `StepContext.scenario_id`. `rule` is the name of the Rule group, for
   /// example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None`
@@ -291,7 +289,7 @@ pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
 /// - `duration_ms` - How long the test took in milliseconds
 /// - `tags` - Test tags for filtering
 /// - `failures` - List of assertion failures (empty if passed)
-/// - `kind` - Type of test (Unit, Integration, Gherkin)
+/// - `kind` - Type of test (Unit, Gherkin)
 ///
 /// ## Example
 ///
@@ -327,7 +325,7 @@ pub type TestResult {
 ///   group in. Use `full_name(groups, name)` for the group path and the
 ///   test name together (deterministic, good for identifiers).
 /// - `tags`: effective tags (includes inherited group tags)
-/// - `kind`: `TestKind` (Unit, Integration, or GherkinScenario(scenario_id:, rule:))
+/// - `kind`: `TestKind` (Unit or GherkinScenario(scenario_id:, rule:))
 /// - `source`: best-effort origin string (module name or `.feature` path)
 ///
 /// ### Source behavior
@@ -494,10 +492,6 @@ pub type SuiteContext(context) {
     tear_down: fn(context) -> Result(Nil, String),
   )
 }
-
-/// Compatibility alias: suite items are nodes in the unified model.
-pub type TestSuiteItem(context) =
-  Node(context)
 
 /// Construct a root suite with a single top-level group.
 ///

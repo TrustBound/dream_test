@@ -560,6 +560,12 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - `reporters/types.ReporterEvent`, `reporters/types.HookKind`,
   `reporters/types.HookOutcome` and `progress.handle_event`
 - `types.ModuleCoverage` and `types.CoverageSummary`
+- BREAKING: `types.TestKind.Integration`. No test ever had this kind. Tag
+  integration tests with `unit.with_tags` and select them with
+  `runner.filter_tests`
+- BREAKING: the alias `types.TestSuiteItem`. Use `types.Node`
+- BREAKING: the module `dream_test/context` (`TestContext`, `new`,
+  `failures`, `add_failure`). Nothing in Dream Test used it
 
 ### Fixed
 
