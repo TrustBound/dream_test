@@ -32,10 +32,10 @@ pub fn tests() {
       let results =
         runner.new([suite])
         |> runner.max_concurrency(1)
-        |> runner.before_each_test(fn(_info, ctx: Nil) {
-          log_and_keep_context(log_path, "runner_before\n", ctx)
+        |> runner.before_each_test(fn(_info) {
+          append_line(log_path, "runner_before\n")
         })
-        |> runner.after_each_test(fn(_info, _ctx: Nil) {
+        |> runner.after_each_test(fn(_info) {
           append_line(log_path, "runner_after\n")
         })
         |> runner.run()
@@ -61,7 +61,7 @@ pub fn tests() {
 
       let results =
         runner.new([suite])
-        |> runner.before_each_test(fn(info, ctx: Nil) {
+        |> runner.before_each_test(fn(info) {
           case
             info.name == "leaf"
             && types.full_name(info.groups, info.name)
@@ -69,7 +69,7 @@ pub fn tests() {
             && info.tags == ["group", "leaf"]
             && info.kind == Unit
           {
-            True -> Ok(ctx)
+            True -> Ok(Nil)
             False -> Error("metadata mismatch")
           }
         })
@@ -249,10 +249,10 @@ pub fn tests() {
         let results =
           runner.new([suite])
           |> runner.max_concurrency(2)
-          |> runner.before_each_test(fn(info, ctx: Nil) {
+          |> runner.before_each_test(fn(info) {
             case info.name == "fail" {
               True -> Error("nope")
-              False -> Ok(ctx)
+              False -> Ok(Nil)
             }
           })
           |> runner.run()
@@ -271,7 +271,7 @@ pub fn tests() {
 
     it("an after_each_test failure keeps the status of the test", fn() {
       runner.new([describe("suite", [it("after", fn() { Ok(AssertionOk) })])])
-      |> runner.after_each_test(fn(_info, _ctx: Nil) { Error("boom") })
+      |> runner.after_each_test(fn(_info) { Error("boom") })
       |> runner.run()
       |> types.report_tests
       |> status_and_operators
@@ -282,8 +282,8 @@ pub fn tests() {
 
     it("after_each_test runs after a failing after_each_test", fn() {
       runner.new([describe("suite", [it("after", fn() { Ok(AssertionOk) })])])
-      |> runner.after_each_test(fn(_info, _ctx: Nil) { Error("first") })
-      |> runner.after_each_test(fn(_info, _ctx: Nil) { Error("second") })
+      |> runner.after_each_test(fn(_info) { Error("first") })
+      |> runner.after_each_test(fn(_info) { Error("second") })
       |> runner.run()
       |> types.report_teardown_failures
       |> should
@@ -353,11 +353,11 @@ pub fn tests() {
 
       let _ =
         runner.new([suite])
-        |> runner.before_each_test(fn(info, ctx: Nil) {
+        |> runner.before_each_test(fn(info) {
           case info.source {
             Some(value) ->
               case write_string(log_path, value) {
-                Ok(_) -> Ok(ctx)
+                Ok(_) -> Ok(Nil)
                 Error(e) -> Error(e)
               }
             None -> Error("missing source")
@@ -385,17 +385,6 @@ fn write_string(path: String, content: String) -> Result(Nil, String) {
   case file.write(path, content) {
     Ok(_) -> Ok(Nil)
     Error(e) -> Error(file.error_to_string(e))
-  }
-}
-
-fn log_and_keep_context(
-  path: String,
-  line: String,
-  ctx: Nil,
-) -> Result(Nil, String) {
-  case append_line(path, line) {
-    Ok(_) -> Ok(ctx)
-    Error(e) -> Error(e)
   }
 }
 

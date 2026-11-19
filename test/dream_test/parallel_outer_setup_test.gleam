@@ -17,7 +17,7 @@ pub fn tests() {
   describe("dream_test/parallel outer set-ups", [
     it("a stopped outer set-up gives SetupFailed to each test", fn() {
       let reports = process.new_subject()
-      describe("suite", [
+      types.root("suite", Nil, [
         unit.before_all(fn() {
           process.send(reports, "before_all ran")
           Ok(Nil)
@@ -69,7 +69,7 @@ pub fn tests() {
     }),
 
     it("a set-up whose check gives an error is stopped", fn() {
-      describe("suite", [it("a", passing_test)])
+      types.root("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(
           set_up: BeforeEachSuiteHook,
@@ -96,7 +96,7 @@ pub fn tests() {
     }),
 
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
-      describe("suite", [it("a", passing_test)])
+      types.root("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(set_up: BeforeAllSuitesHook, groups: [], check_owner: fn() {
           Ok(Nil)
@@ -113,7 +113,7 @@ pub fn tests() {
     }),
 
     it("the outermost stopped set-up is the failure of a test", fn() {
-      describe("suite", [it("a", passing_test)])
+      types.root("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupStopped(
           set_up: BeforeAllSuitesHook,
@@ -154,7 +154,7 @@ pub fn tests() {
       fn() {
         let owner = process.spawn_unlinked(fn() { process.sleep_forever() })
         let monitor = process.monitor(owner)
-        describe("suite", [
+        types.root("suite", Nil, [
           it("a", fn() {
             kill_and_wait(owner)
             Ok(AssertionOk)
@@ -206,14 +206,14 @@ type SetupState {
 }
 
 fn run_in_setups(
-  suite: types.TestSuite(Nil),
+  suite: types.Root(Nil),
   setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {
   run_with_config(suite, parallel.default_config(), setups)
 }
 
 fn run_with_concurrency_one(
-  suite: types.TestSuite(Nil),
+  suite: types.Root(Nil),
   setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {
   run_with_config(
@@ -224,7 +224,7 @@ fn run_with_concurrency_one(
 }
 
 fn run_with_config(
-  suite: types.TestSuite(Nil),
+  suite: types.Root(Nil),
   config: parallel.ParallelConfig,
   setups: List(OuterSetup),
 ) -> RunRootParallelWithReporterResult {

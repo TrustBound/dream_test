@@ -62,12 +62,12 @@ import dream_test/sandbox.{
   type Owner, type OwnerResult, OwnerCaught, OwnerExited, OwnerLost,
   OwnerReturned, OwnerTimedOut,
 }
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionFailure, type Node, type RunReport, type SetUpHook,
-  type TeardownFailure, type TeardownHook, type TestResult, type TestSuite,
-  AfterAll, AfterAllSuitesHook, AfterEach, AfterEachSuiteHook, BeforeAll,
-  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, Group, Passed, Root,
-  SetupFailed, SetupStopped, TeardownFailure, Test,
+  type AssertionFailure, type RunReport, type SetUpHook, type TeardownFailure,
+  type TeardownHook, type TestResult, AfterAllSuitesHook, AfterEachSuiteHook,
+  BeforeAllSuitesHook, BeforeEachSuiteHook, Passed, SetupFailed, SetupStopped,
+  TeardownFailure,
 }
 import gleam/io
 import gleam/list
@@ -116,9 +116,9 @@ pub type TestInfo =
 ///   |> runner.run()
 /// }
 /// ```
-pub opaque type RunBuilder(ctx) {
+pub opaque type RunBuilder {
   RunBuilder(
-    suite_runs: List(SuiteRun(ctx)),
+    suite_runs: List(SuiteRun),
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
     should_exit_on_failure: Bool,
@@ -126,10 +126,8 @@ pub opaque type RunBuilder(ctx) {
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
     coverage: CoverageRequest,
-    runner_before_each_test: List(
-      fn(types.TestInfo, ctx) -> Result(ctx, String),
-    ),
-    runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
     runner_before_each_suite: List(fn(types.SuiteInfo) -> Result(Nil, String)),
     runner_after_each_suite: List(fn(types.SuiteInfo) -> Result(Nil, String)),
     runner_before_all_suites: List(
@@ -141,10 +139,12 @@ pub opaque type RunBuilder(ctx) {
   )
 }
 
-type SuiteRun(ctx) {
+/// A suite of the run, with its config and the tests of it that run.
+type SuiteRun {
   SuiteRun(
-    suite: TestSuite(ctx),
+    suite: TestSuite,
     config_override: Option(parallel.ParallelConfig),
+    tests: List(types.TestInfo),
   )
 }
 
@@ -198,9 +198,9 @@ pub type Output {
 ///
 /// ## Returns
 ///
-/// A `RunBuilder(ctx)` you can pipe through configuration helpers and finally
+/// A `RunBuilder` you can pipe through configuration helpers and finally
 /// `runner.run()`.
-pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
+pub fn new(suites suites: List(TestSuite)) -> RunBuilder {
   let config = parallel.default_config()
   RunBuilder(
     suite_runs: suites_to_suite_runs_default(suites, []),
@@ -237,9 +237,9 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 /// |> runner.run()
 /// ```
 pub fn add_suites(
-  builder builder: RunBuilder(ctx),
-  suites suites: List(TestSuite(ctx)),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  suites suites: List(TestSuite),
+) -> RunBuilder {
   let appended = append_suite_runs_default(builder.suite_runs, suites)
   RunBuilder(..builder, suite_runs: appended)
 }
@@ -269,10 +269,10 @@ pub fn add_suites(
 /// |> runner.run()
 /// ```
 pub fn add_suites_with_config(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   config config: parallel.ParallelConfig,
-  suites suites: List(TestSuite(ctx)),
-) -> RunBuilder(ctx) {
+  suites suites: List(TestSuite),
+) -> RunBuilder {
   let appended =
     append_suite_runs_with_override(builder.suite_runs, config, suites)
   RunBuilder(..builder, suite_runs: appended)
@@ -330,11 +330,11 @@ pub fn add_suites_with_config(
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn max_concurrency(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   max max: Int,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   let parallel.ParallelConfig(max_concurrency: _, default_timeout_ms: timeout) =
     builder.config
   RunBuilder(
@@ -391,11 +391,11 @@ pub fn max_concurrency(
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn default_timeout_ms(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   timeout_ms timeout_ms: Int,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   let parallel.ParallelConfig(max_concurrency: max, default_timeout_ms: _) =
     builder.config
   RunBuilder(
@@ -462,8 +462,8 @@ pub fn default_timeout_ms(
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
-pub fn exit_on_failure(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+/// The updated `RunBuilder`.
+pub fn exit_on_failure(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, should_exit_on_failure: True)
 }
 
@@ -472,9 +472,9 @@ pub fn exit_on_failure(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 /// This reporter is driven by `TestFinished` events in completion order.
 /// It is intended for a single in-place progress bar UI.
 pub fn progress_reporter(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   reporter reporter: progress.ProgressReporter,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, progress_reporter: Some(reporter))
 }
 
@@ -484,9 +484,9 @@ pub fn progress_reporter(
 /// tests are in traversal order, so the output is the same under parallel
 /// execution.
 pub fn results_reporters(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   reporters reporters: List(reporter_types.ResultsReporter),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, results_reporters: reporters)
 }
 
@@ -508,9 +508,9 @@ pub fn results_reporters(
 /// }
 /// ```
 pub fn output(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   output output: Output,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, output: Some(output))
 }
 
@@ -542,9 +542,9 @@ pub fn output(
 /// }
 /// ```
 pub fn coverage(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   config config: CoverageConfig,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, coverage: AlwaysCoverage(config))
 }
 
@@ -608,14 +608,14 @@ pub fn coverage(
 /// A local `gleam test` runs without coverage, and
 /// `DREAM_TEST_COVERAGE=1 gleam test` runs with it.
 pub fn coverage_from_environment(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   config config: CoverageConfig,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, coverage: CoverageFromEnvironment(config))
 }
 
 /// Disable all reporter output (still returns results from `runner.run()`).
-pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+pub fn silent(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, output: Some(silent_output()))
 }
 
@@ -673,11 +673,11 @@ pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn filter_tests(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   predicate predicate: fn(TestInfo) -> Bool,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, test_filter: Some(predicate))
 }
 
@@ -702,9 +702,9 @@ pub fn filter_tests(
 /// |> runner.before_each_test(log_test)
 /// ```
 pub fn before_each_test(
-  builder builder: RunBuilder(ctx),
-  hook hook: fn(types.TestInfo, ctx) -> Result(ctx, String),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  hook hook: fn(types.TestInfo) -> Result(Nil, String),
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_each_test: list.append(builder.runner_before_each_test, [hook]),
@@ -721,9 +721,9 @@ pub fn before_each_test(
 /// status of the test does not change: the run report gets a
 /// `types.TeardownFailure` with hook `AfterEachTestHook`, and the run fails.
 pub fn after_each_test(
-  builder builder: RunBuilder(ctx),
-  hook hook: fn(types.TestInfo, ctx) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  hook hook: fn(types.TestInfo) -> Result(Nil, String),
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_each_test: list.append(builder.runner_after_each_test, [hook]),
@@ -740,9 +740,9 @@ pub fn after_each_test(
 /// marked `SetupFailed`, the suite does not run, and `after_each_suite`
 /// still runs.
 pub fn before_each_suite(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_each_suite: list.append(builder.runner_before_each_suite, [
@@ -760,9 +760,9 @@ pub fn before_each_suite(
 /// run report gets a `types.TeardownFailure` with hook `AfterEachSuiteHook`
 /// and the suite name in `groups`, and the run fails.
 pub fn after_each_suite(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_each_suite: list.append(builder.runner_after_each_suite, [hook]),
@@ -778,9 +778,9 @@ pub fn after_each_suite(
 /// If it returns `Error("...")`, times out or crashes, all selected tests are marked
 /// `SetupFailed`, no suite runs, and `after_all_suites` still runs.
 pub fn before_all_suites(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_all_suites: list.append(builder.runner_before_all_suites, [
@@ -798,9 +798,9 @@ pub fn before_all_suites(
 /// run report gets a `types.TeardownFailure` with hook `AfterAllSuitesHook`
 /// and `groups: []`, and the run fails.
 pub fn after_all_suites(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_all_suites: list.append(builder.runner_after_all_suites, [hook]),
@@ -855,7 +855,7 @@ pub fn after_all_suites(
 /// `types.report_tests` and `types.report_teardown_failures`, and check it
 /// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
 /// when `types.failed(report)` is `True`.
-pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
+pub fn run(builder builder: RunBuilder) -> RunReport {
   let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
   let total = count_total_tests(selected_runs)
   let suite_runs_with_infos = suite_runs_with_infos(selected_runs, [])
@@ -909,6 +909,7 @@ pub fn run(builder builder: RunBuilder(ctx)) -> RunReport {
         builder.runner_after_each_suite,
         builder.runner_before_each_test,
         builder.runner_after_each_test,
+        builder.test_filter,
         Collected(tests: [], teardown_failures: []),
         all_suites_owner,
       )
@@ -1000,83 +1001,30 @@ type Collected {
 /// Each suite run with the `SuiteInfo` of its suite, so the hooks of a
 /// suite always get the info of the suite that runs.
 fn suite_runs_with_infos(
-  suite_runs: List(SuiteRun(ctx)),
-  acc_rev: List(#(SuiteRun(ctx), types.SuiteInfo)),
-) -> List(#(SuiteRun(ctx), types.SuiteInfo)) {
+  suite_runs: List(SuiteRun),
+  acc_rev: List(#(SuiteRun, types.SuiteInfo)),
+) -> List(#(SuiteRun, types.SuiteInfo)) {
   case suite_runs {
     [] -> list.reverse(acc_rev)
     [suite_run, ..rest] ->
       suite_runs_with_infos(rest, [
-        #(suite_run, suite_info_from_suite(suite_run.suite)),
+        #(suite_run, suite_info_from_suite_run(suite_run)),
         ..acc_rev
       ])
   }
 }
 
-fn suite_info_of_pair(
-  pair: #(SuiteRun(ctx), types.SuiteInfo),
-) -> types.SuiteInfo {
+fn suite_info_of_pair(pair: #(SuiteRun, types.SuiteInfo)) -> types.SuiteInfo {
   pair.1
 }
 
-fn suite_info_from_suite(suite: TestSuite(ctx)) -> types.SuiteInfo {
-  let tests_rev = collect_test_infos(root_group(suite), [], [], [])
-  let tests = list.reverse(tests_rev)
-  let source = suite_source_from_tests(tests)
-  types.SuiteInfo(name: suite.name, tests: tests, source: source)
-}
-
-fn collect_test_infos(
-  node: Node(ctx),
-  scope: List(String),
-  inherited_tags: List(String),
-  acc_rev: List(types.TestInfo),
-) -> List(types.TestInfo) {
-  case node {
-    Test(
-      name: name,
-      tags: tags,
-      kind: kind,
-      run: _run,
-      timeout_ms: _timeout_ms,
-      source: source,
-    ) -> {
-      let effective_tags = list.append(inherited_tags, tags)
-      let info =
-        types.TestInfo(
-          name: name,
-          groups: scope,
-          tags: effective_tags,
-          kind: kind,
-          source: source,
-        )
-      [info, ..acc_rev]
-    }
-    Group(name: name, tags: tags, children: children) -> {
-      let next_scope = list.append(scope, [name])
-      let next_tags = list.append(inherited_tags, tags)
-      collect_test_infos_children(children, next_scope, next_tags, acc_rev)
-    }
-    _ -> acc_rev
-  }
-}
-
-fn collect_test_infos_children(
-  children: List(Node(ctx)),
-  scope: List(String),
-  inherited_tags: List(String),
-  acc_rev: List(types.TestInfo),
-) -> List(types.TestInfo) {
-  case children {
-    [] -> acc_rev
-    [child, ..rest] ->
-      collect_test_infos_children(
-        rest,
-        scope,
-        inherited_tags,
-        collect_test_infos(child, scope, inherited_tags, acc_rev),
-      )
-  }
+fn suite_info_from_suite_run(suite_run: SuiteRun) -> types.SuiteInfo {
+  let source = suite_source_from_tests(suite_run.tests)
+  types.SuiteInfo(
+    name: suite.name(suite_run.suite),
+    tests: suite_run.tests,
+    source: source,
+  )
 }
 
 fn suite_source_from_tests(tests: List(types.TestInfo)) -> Option(String) {
@@ -1463,7 +1411,7 @@ fn suite_scope_message(text: String, scope: List(String)) -> String {
 }
 
 fn run_suites_with_hooks(
-  suite_runs: List(#(SuiteRun(ctx), types.SuiteInfo)),
+  suite_runs: List(#(SuiteRun, types.SuiteInfo)),
   default_config: parallel.ParallelConfig,
   progress_reporter: Option(progress.ProgressReporter),
   output: Output,
@@ -1471,15 +1419,19 @@ fn run_suites_with_hooks(
   completed: Int,
   before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
-  runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+  runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+  runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+  keep: Option(fn(TestInfo) -> Bool),
   collected: Collected,
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   let checked_owner = refresh_suite_owner(all_suites_owner)
   case suite_runs {
     [] -> #(collected, completed, checked_owner)
-    [#(SuiteRun(suite: suite, config_override: override), suite_info), ..rest] -> {
+    [
+      #(SuiteRun(suite: suite, config_override: override, ..), suite_info),
+      ..rest
+    ] -> {
       let suite_run =
         SuiteTests(
           suite: suite,
@@ -1491,6 +1443,7 @@ fn run_suites_with_hooks(
           completed: completed,
           runner_before_each_test: runner_before_each_test,
           runner_after_each_test: runner_after_each_test,
+          keep: keep,
         )
       let #(suite_collected, completed_after_suite, owner_after_suite) =
         run_suite_in_run(
@@ -1510,6 +1463,7 @@ fn run_suites_with_hooks(
         after_each_suite_hooks,
         runner_before_each_test,
         runner_after_each_test,
+        keep,
         Collected(
           tests: list.append(collected.tests, suite_collected.tests),
           teardown_failures: list.append(
@@ -1524,26 +1478,25 @@ fn run_suites_with_hooks(
 }
 
 /// What stays the same while the tests of one suite run.
-type SuiteTests(ctx) {
+type SuiteTests {
   SuiteTests(
-    suite: TestSuite(ctx),
+    suite: TestSuite,
     config: parallel.ParallelConfig,
     info: types.SuiteInfo,
     progress_reporter: Option(progress.ProgressReporter),
     output: Output,
     total: Int,
     completed: Int,
-    runner_before_each_test: List(
-      fn(types.TestInfo, ctx) -> Result(ctx, String),
-    ),
-    runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    keep: Option(fn(TestInfo) -> Bool),
   )
 }
 
 /// Run one suite in the scope of the whole run. After the owner of the
 /// run stopped, no suite-level hook runs.
 fn run_suite_in_run(
-  suite_run: SuiteTests(ctx),
+  suite_run: SuiteTests,
   before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
@@ -1564,7 +1517,7 @@ fn run_suite_in_run(
 /// Run a suite after the owner of the whole run stopped. No suite-level
 /// hook runs, and the executor gives `SetupFailed` to each test.
 fn run_suite_after_run_setup_stopped(
-  suite_run: SuiteTests(ctx),
+  suite_run: SuiteTests,
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
 ) -> #(Collected, Int, Option(SuiteScopeOwner(List(types.SuiteInfo)))) {
   let result =
@@ -1591,7 +1544,7 @@ fn run_suite_after_run_setup_stopped(
 /// `SetupFailed` to every test of the suite. The executor checks the owner
 /// of the whole run and the owner of the suite before each test starts.
 fn run_one_suite(
-  suite_run: SuiteTests(ctx),
+  suite_run: SuiteTests,
   before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   all_suites_owner: Option(SuiteScopeOwner(List(types.SuiteInfo))),
@@ -1685,19 +1638,20 @@ fn run_one_suite(
 
 /// Run the tests of one suite in the executor, inside `outer_setups`.
 fn run_suite_tests(
-  suite_run: SuiteTests(ctx),
+  suite_run: SuiteTests,
   outer_setups: List(parallel.OuterSetup),
 ) -> parallel.RunRootParallelWithReporterResult {
-  parallel.run_root_parallel_with_reporter(
-    parallel.RunRootParallelWithReporterConfig(
+  suite.run(
+    suite_run.suite,
+    suite.RunInput(
       config: suite_run.config,
-      suite: suite_run.suite,
+      keep: suite_run.keep,
       progress_reporter: suite_run.progress_reporter,
       write: output_out(suite_run.output),
       total: suite_run.total,
       completed: suite_run.completed,
-      runner_before_each_test: suite_run.runner_before_each_test,
-      runner_after_each_test: suite_run.runner_after_each_test,
+      before_each_test: suite_run.runner_before_each_test,
+      after_each_test: suite_run.runner_after_each_test,
       outer_setups: outer_setups,
     ),
   )
@@ -1953,156 +1907,24 @@ fn maybe_exit_on_failure(
 }
 
 fn apply_test_filter(
-  suite_runs: List(SuiteRun(ctx)),
+  suite_runs: List(SuiteRun),
   predicate: Option(fn(TestInfo) -> Bool),
-) -> List(SuiteRun(ctx)) {
+) -> List(SuiteRun) {
   case predicate {
     None -> suite_runs
-    Some(p) -> filter_suite_runs(suite_runs, p, [])
+    Some(keep) -> list.filter_map(suite_runs, filter_suite_run(_, keep))
   }
 }
 
-fn filter_suite_runs(
-  suite_runs: List(SuiteRun(ctx)),
-  predicate: fn(TestInfo) -> Bool,
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
-  case suite_runs {
-    [] -> list.reverse(acc_rev)
-    [SuiteRun(suite: suite, config_override: override), ..rest] -> {
-      let #(maybe, _has_tests) = filter_root(suite, predicate)
-      case maybe {
-        None -> filter_suite_runs(rest, predicate, acc_rev)
-        Some(filtered) ->
-          filter_suite_runs(rest, predicate, [
-            SuiteRun(suite: filtered, config_override: override),
-            ..acc_rev
-          ])
-      }
-    }
-  }
-}
-
-fn filter_root(
-  suite: TestSuite(ctx),
-  predicate: fn(TestInfo) -> Bool,
-) -> #(Option(TestSuite(ctx)), Bool) {
-  let #(children, has_tests) =
-    filter_children(
-      suite.children,
-      [suite.name],
-      suite.tags,
-      predicate,
-      [],
-      False,
-    )
-  case has_tests {
-    True -> #(Some(Root(..suite, children: children)), True)
-    False -> #(None, False)
-  }
-}
-
-/// The top-level group of a suite, as a node.
-fn root_group(suite: TestSuite(ctx)) -> Node(ctx) {
-  Group(name: suite.name, tags: suite.tags, children: suite.children)
-}
-
-fn filter_node(
-  node: Node(ctx),
-  scope: List(String),
-  inherited_tags: List(String),
-  predicate: fn(TestInfo) -> Bool,
-) -> #(Option(Node(ctx)), Bool) {
-  case node {
-    Test(
-      name: name,
-      tags: tags,
-      kind: kind,
-      run: run,
-      timeout_ms: timeout_ms,
-      source: source,
-    ) -> {
-      let effective_tags = list.append(inherited_tags, tags)
-      let info =
-        types.TestInfo(
-          name: name,
-          groups: scope,
-          tags: effective_tags,
-          kind: kind,
-          source: source,
-        )
-      case predicate(info) {
-        True -> #(
-          Some(Test(
-            name: name,
-            tags: tags,
-            kind: kind,
-            run: run,
-            timeout_ms: timeout_ms,
-            source: source,
-          )),
-          True,
-        )
-        False -> #(None, False)
-      }
-    }
-
-    Group(name: name, tags: tags, children: children) -> {
-      let next_scope = list.append(scope, [name])
-      let next_tags = list.append(inherited_tags, tags)
-      let #(filtered_children, has_tests) =
-        filter_children(children, next_scope, next_tags, predicate, [], False)
-      case has_tests {
-        True -> #(
-          Some(Group(name: name, tags: tags, children: filtered_children)),
-          True,
-        )
-        False -> #(None, False)
-      }
-    }
-
-    BeforeAll(..) -> #(Some(node), False)
-    BeforeEach(..) -> #(Some(node), False)
-    AfterEach(..) -> #(Some(node), False)
-    AfterAll(..) -> #(Some(node), False)
-  }
-}
-
-fn filter_children(
-  children: List(Node(ctx)),
-  scope: List(String),
-  inherited_tags: List(String),
-  predicate: fn(TestInfo) -> Bool,
-  acc_rev: List(Node(ctx)),
-  has_tests: Bool,
-) -> #(List(Node(ctx)), Bool) {
-  case children {
-    [] -> #(list.reverse(acc_rev), has_tests)
-    [child, ..rest] -> {
-      let #(maybe_child, child_has_tests) =
-        filter_node(child, scope, inherited_tags, predicate)
-      let next_has_tests = has_tests || child_has_tests
-      case maybe_child {
-        None ->
-          filter_children(
-            rest,
-            scope,
-            inherited_tags,
-            predicate,
-            acc_rev,
-            next_has_tests,
-          )
-        Some(kept) ->
-          filter_children(
-            rest,
-            scope,
-            inherited_tags,
-            predicate,
-            [kept, ..acc_rev],
-            next_has_tests,
-          )
-      }
-    }
+/// The suite run with only the tests that `keep` keeps, or `Error(Nil)`
+/// when it keeps no test.
+fn filter_suite_run(
+  suite_run: SuiteRun,
+  keep: fn(TestInfo) -> Bool,
+) -> Result(SuiteRun, Nil) {
+  case list.filter(suite_run.tests, keep) {
+    [] -> Error(Nil)
+    kept -> Ok(SuiteRun(..suite_run, tests: kept))
   }
 }
 
@@ -2312,38 +2134,12 @@ fn output_out(output: Output) -> fn(String) -> Nil {
   out
 }
 
-fn count_total_tests(suite_runs: List(SuiteRun(ctx))) -> Int {
-  count_total_tests_from_list(suite_runs, 0)
+fn count_total_tests(suite_runs: List(SuiteRun)) -> Int {
+  list.fold(suite_runs, 0, add_test_count)
 }
 
-fn count_total_tests_from_list(
-  suite_runs: List(SuiteRun(ctx)),
-  acc: Int,
-) -> Int {
-  case suite_runs {
-    [] -> acc
-    [SuiteRun(suite: suite, config_override: _), ..rest] ->
-      count_total_tests_from_list(
-        rest,
-        acc + count_tests_in_suite(root_group(suite)),
-      )
-  }
-}
-
-fn count_tests_in_suite(node: Node(ctx)) -> Int {
-  case node {
-    Test(..) -> 1
-    Group(_, _, children) -> count_tests_in_children(children, 0)
-    _ -> 0
-  }
-}
-
-fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
-  case children {
-    [] -> acc
-    [child, ..rest] ->
-      count_tests_in_children(rest, acc + count_tests_in_suite(child))
-  }
+fn add_test_count(count: Int, suite_run: SuiteRun) -> Int {
+  count + list.length(suite_run.tests)
 }
 
 // ============================================================================
@@ -2351,14 +2147,14 @@ fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
 // ============================================================================
 
 fn suites_to_suite_runs_default(
-  suites: List(TestSuite(ctx)),
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+  acc_rev: List(SuiteRun),
+) -> List(SuiteRun) {
   case suites {
     [] -> list.reverse(acc_rev)
     [suite, ..rest] ->
       suites_to_suite_runs_default(rest, [
-        SuiteRun(suite: suite, config_override: None),
+        SuiteRun(suite: suite, config_override: None, tests: suite.tests(suite)),
         ..acc_rev
       ])
   }
@@ -2366,31 +2162,35 @@ fn suites_to_suite_runs_default(
 
 fn suites_to_suite_runs_with_override(
   config: parallel.ParallelConfig,
-  suites: List(TestSuite(ctx)),
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+  acc_rev: List(SuiteRun),
+) -> List(SuiteRun) {
   case suites {
     [] -> list.reverse(acc_rev)
     [suite, ..rest] ->
       suites_to_suite_runs_with_override(config, rest, [
-        SuiteRun(suite: suite, config_override: Some(config)),
+        SuiteRun(
+          suite: suite,
+          config_override: Some(config),
+          tests: suite.tests(suite),
+        ),
         ..acc_rev
       ])
   }
 }
 
 fn append_suite_runs_default(
-  existing: List(SuiteRun(ctx)),
-  suites: List(TestSuite(ctx)),
-) -> List(SuiteRun(ctx)) {
+  existing: List(SuiteRun),
+  suites: List(TestSuite),
+) -> List(SuiteRun) {
   list.append(existing, suites_to_suite_runs_default(suites, []))
 }
 
 fn append_suite_runs_with_override(
-  existing: List(SuiteRun(ctx)),
+  existing: List(SuiteRun),
   config: parallel.ParallelConfig,
-  suites: List(TestSuite(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+) -> List(SuiteRun) {
   list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
 }
 

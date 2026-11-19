@@ -227,14 +227,14 @@ fn before_each_suite_hook(suite: SuiteInfo) -> Result(Nil, String) {
   Ok(Nil)
 }
 
-fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
+fn before_each_test_hook(info: TestInfo) -> Result(Nil, String) {
   io.println(
     "test: " <> string.join(types.full_name(info.groups, info.name), " > "),
   )
-  Ok(ctx)
+  Ok(Nil)
 }
 
-fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
+fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
   Ok(Nil)
 }
 ```
@@ -261,7 +261,7 @@ pub fn tests() {
   describe("Parallel executor", [
     it("can run a suite and return a report of the results", fn() {
       let suite =
-        describe("Suite", [
+        types.root("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])

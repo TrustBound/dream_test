@@ -63,9 +63,10 @@ import dream_test/gherkin/steps.{
   StepContext,
 }
 import dream_test/gherkin/types as gherkin_types
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, AssertionOk, GherkinScenario, Group, NoInput, Root, Test,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure,
+  AssertionOk, GherkinScenario, Group, NoInput, Root, Test,
 }
 import gleam/int
 import gleam/list
@@ -167,7 +168,41 @@ pub type InlineStep {
 /// let config = FeatureConfig(feature: feature, step_registry: steps)
 /// to_test_suite(config)
 /// ```
-pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite(Nil) {
+pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
+  let feature = config.feature
+  suite.from_root(Root(
+    seed: Nil,
+    name: feature.name,
+    tags: feature.tags,
+    children: feature_children(config),
+  ))
+}
+
+/// Convert a Feature to one group node, named after the Feature, with a
+/// test for each scenario.
+///
+/// Use it to put several Features in one tree, for example with
+/// `types.root` and `suite.from_root`. `gherkin/discover.to_suite` does this
+/// for the Features of all its files. The group holds the same tests, tags
+/// and Rule groups as the suite of `to_test_suite`.
+///
+/// ## Example
+///
+/// ```gleam
+/// suite.from_root(types.root("all features", Nil, [
+///   to_group(FeatureConfig(feature: cart_feature, step_registry: steps)),
+///   to_group(FeatureConfig(feature: stock_feature, step_registry: steps)),
+/// ]))
+/// ```
+pub fn to_group(config config: FeatureConfig(state)) -> Node(Nil) {
+  Group(
+    name: config.feature.name,
+    tags: config.feature.tags,
+    children: feature_children(config),
+  )
+}
+
+fn feature_children(config: FeatureConfig(state)) -> List(Node(Nil)) {
   let feature = config.feature
   let scope =
     ScenarioScope(
@@ -179,13 +214,7 @@ pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite(Nil) {
     )
   let scenario_nodes = scenarios_to_nodes(scope, feature.scenarios, [])
   let rule_nodes = rules_to_nodes(scope, feature.rules, [])
-
-  Root(
-    seed: Nil,
-    name: feature.name,
-    tags: feature.tags,
-    children: list.append(scenario_nodes, rule_nodes),
-  )
+  list.append(scenario_nodes, rule_nodes)
 }
 
 /// What the scenarios of a Feature or a Rule share.
@@ -761,7 +790,7 @@ pub fn feature(
   name name: String,
   registry registry: StepRegistry(state),
   scenarios scenarios: List(InlineScenario),
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -978,7 +1007,7 @@ pub fn feature_with_background(
   registry registry: StepRegistry(state),
   background_steps background_steps: List(gherkin_types.Step),
   scenarios scenarios: List(InlineScenario),
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(

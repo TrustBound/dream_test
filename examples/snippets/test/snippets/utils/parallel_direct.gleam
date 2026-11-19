@@ -7,7 +7,7 @@ pub fn tests() {
   describe("Parallel executor", [
     it("can run a suite and return a report of the results", fn() {
       let suite =
-        describe("Suite", [
+        types.root("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])

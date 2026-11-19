@@ -6,6 +6,7 @@ import dream_test/parallel
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/sandbox
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Node, type Status,
   type TeardownFailure, type TestResult, AfterAllHook, AfterEachHook,
@@ -26,7 +27,7 @@ pub fn tests() {
     it("run_root_parallel runs a suite", fn() {
       parallel.run_root_parallel(
         parallel.default_config(),
-        describe("root", [it("passes", fn() { Ok(AssertionOk) })]),
+        types.root("root", Nil, [it("passes", fn() { Ok(AssertionOk) })]),
       )
       |> types.report_tests
       |> summaries
@@ -121,9 +122,7 @@ pub fn tests() {
     it("a runner before_each_test failure gives SetupFailed in sequence", fn() {
       runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
       |> runner.max_concurrency(1)
-      |> runner.before_each_test(fn(_info, _context) {
-        Error("no runner setup")
-      })
+      |> runner.before_each_test(fn(_info) { Error("no runner setup") })
       |> runner.silent()
       |> runner.run()
       |> types.report_tests
@@ -225,7 +224,7 @@ pub fn tests() {
     it("run_root_parallel gives the tear-down failures", fn() {
       parallel.run_root_parallel(
         parallel.default_config(),
-        describe("root", [
+        types.root("root", Nil, [
           after_all(fn() { Error("no cleanup") }),
           it("a", fn() { Ok(AssertionOk) }),
         ]),
@@ -299,9 +298,9 @@ pub fn tests() {
       runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
       |> runner.max_concurrency(1)
       |> runner.default_timeout_ms(50)
-      |> runner.before_each_test(fn(_info, context) {
+      |> runner.before_each_test(fn(_info) {
         process.sleep_forever()
-        Ok(context)
+        Ok(Nil)
       })
       |> runner.silent()
       |> runner.run()
@@ -318,9 +317,7 @@ pub fn tests() {
 
     it("a runner before_each_test that crashes gives SetupFailed", fn() {
       runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
-      |> runner.before_each_test(fn(_info, _context) {
-        erlang_error(atom.create("boom"))
-      })
+      |> runner.before_each_test(fn(_info) { erlang_error(atom.create("boom")) })
       |> runner.silent()
       |> runner.run()
       |> types.report_tests
@@ -340,7 +337,7 @@ pub fn tests() {
         runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
         |> runner.max_concurrency(1)
         |> runner.default_timeout_ms(50)
-        |> runner.after_each_test(fn(_info, _context) {
+        |> runner.after_each_test(fn(_info) {
           process.sleep_forever()
           Ok(Nil)
         })
@@ -361,9 +358,7 @@ pub fn tests() {
 
     it("a runner after_each_test that crashes is a tear-down failure", fn() {
       runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
-      |> runner.after_each_test(fn(_info, _context) {
-        erlang_error(atom.create("boom"))
-      })
+      |> runner.after_each_test(fn(_info) { erlang_error(atom.create("boom")) })
       |> runner.silent()
       |> runner.run()
       |> types.report_teardown_failures
@@ -413,9 +408,9 @@ pub fn tests() {
           timed_test("long", None, fn() { pass_when_gone(watch) }),
         ]),
       ])
-      |> runner.before_each_test(fn(_info, context) {
+      |> runner.before_each_test(fn(_info) {
         process.sleep(30)
-        Ok(context)
+        Ok(Nil)
       })
       |> runner.silent()
       |> runner.run()
@@ -639,14 +634,14 @@ fn kill_worker_then_pass(
   Ok(AssertionOk)
 }
 
-fn run_default(suite: types.TestSuite(Nil)) -> List(TestResult) {
+fn run_default(suite: TestSuite) -> List(TestResult) {
   runner.new([suite])
   |> runner.silent()
   |> runner.run()
   |> types.report_tests
 }
 
-fn run_sequential(suite: types.TestSuite(Nil)) -> List(TestResult) {
+fn run_sequential(suite: TestSuite) -> List(TestResult) {
   runner.new([suite])
   |> runner.max_concurrency(1)
   |> runner.silent()
@@ -655,7 +650,7 @@ fn run_sequential(suite: types.TestSuite(Nil)) -> List(TestResult) {
 }
 
 fn run_sequential_with_timeout(
-  suite: types.TestSuite(Nil),
+  suite: TestSuite,
   timeout_ms: Int,
 ) -> List(TestResult) {
   runner.new([suite])
@@ -685,9 +680,7 @@ fn summaries(
 @external(erlang, "erlang", "error")
 fn erlang_error(reason: Atom) -> a
 
-fn teardown_failures_default(
-  suite: types.TestSuite(Nil),
-) -> List(TeardownFailure) {
+fn teardown_failures_default(suite: TestSuite) -> List(TeardownFailure) {
   runner.new([suite])
   |> runner.silent()
   |> runner.run()
@@ -695,7 +688,7 @@ fn teardown_failures_default(
 }
 
 fn teardown_failures_sequential_with_timeout(
-  suite: types.TestSuite(Nil),
+  suite: TestSuite,
   timeout_ms: Int,
 ) -> List(TeardownFailure) {
   runner.new([suite])

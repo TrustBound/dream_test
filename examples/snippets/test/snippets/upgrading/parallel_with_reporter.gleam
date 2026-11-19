@@ -2,12 +2,12 @@ import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
 import dream_test/reporters/summary
-import dream_test/types.{type TestSuite}
-import dream_test/unit.{describe, it}
+import dream_test/types.{type Root}
+import dream_test/unit.{it}
 import gleam/option.{Some}
 
-pub fn suite() -> TestSuite(Nil) {
-  describe("suite", [
+pub fn suite() -> Root(Nil) {
+  types.root("suite", Nil, [
     it("passes", fn() { Ok(succeed()) }),
   ])
 }

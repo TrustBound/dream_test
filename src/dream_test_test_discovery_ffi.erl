@@ -67,10 +67,13 @@ test_module_exports_tests(false, _ModuleStr) ->
 %% Dynamically call tests() on a discovered module name. Discovery keeps
 %% only modules that export tests/0.
 %%
-%% The value must have the shape of a `TestSuite(Nil)`: a root with the
-%% seed Nil, a name, a list of tags and a list of nodes, where each node is a group, a test or
-%% a hook. discover.gleam reads these fields outside any `try`, so a value
-%% of another shape is an error here and never crashes the run.
+%% The value must have the shape of a `dream_test/suite.TestSuite`: a name
+%% and a list of parts, where each part holds the `TestInfo` of its tests
+%% and the functions that run them. Every suite has this one type, whatever
+%% context its tests get, so a suite from unit_context or a Gherkin feature
+%% loads like any other suite. The runner reads these fields outside any
+%% `try`, so a value of another shape is an error here and never crashes
+%% the run.
 %%
 %% Returns: {ok, Suite} or {error, <<"message">>}
 call_tests(ModuleName) ->
@@ -82,74 +85,32 @@ call_tests(ModuleName) ->
             {error, crash_text(<<"tests() crashed: ">>, Class, Reason)}
     end.
 
-%% A suite with a context (a seed that is not Nil, for example from
-%% unit_context) is an error. Discovery types every suite as
-%% TestSuite(Nil), so the runner and to_suite would give its tests Nil, or
-%% a runner hook typed on Nil would get the real context.
-checked_suite({root, Seed, Name, _Tags, _Children})
-  when is_binary(Name), Seed =/= nil ->
-    {error,
-     <<"tests() returned a suite with a context (for example from unit_context). "
-       "Discovery gives every suite the context Nil, so its tests would not get "
-       "their context. Add this suite with runner.new or runner.add_suites in "
-       "place of discovery.">>};
-checked_suite({root, nil, Name, Tags, Children} = Suite)
-  when is_binary(Name) ->
-    suite_with_nodes(is_text_list(Tags), first_bad_node(Children), Suite);
+checked_suite({test_suite, Name, Parts} = Suite) when is_binary(Name) ->
+    checked(all_parts(Parts), Suite);
 checked_suite(Other) ->
-    {error, value_text(<<"tests() did not return a test suite: ">>, Other)}.
+    checked(false, Other).
 
-suite_with_nodes(false, _Bad, Suite) ->
-    {error, value_text(<<"tests() did not return a test suite: ">>, Suite)};
-suite_with_nodes(true, none, Suite) ->
+checked(true, Suite) ->
     {ok, Suite};
-suite_with_nodes(true, {bad, Node}, _Suite) ->
-    {error,
-     value_text(<<"tests() returned a node that is not a test, a group or a hook: ">>,
-                Node)}.
+checked(false, Value) ->
+    {error, value_text(<<"tests() did not return a test suite: ">>, Value)}.
 
-%% The first node of a list, at any depth, that is not a test, a group or a
-%% hook, as {bad, Node}, or none. The tail of a list that is not proper is
-%% bad too.
-first_bad_node([]) ->
-    none;
-first_bad_node([Node | Rest]) ->
-    first_bad_or_next(bad_in_node(Node), Rest);
-first_bad_node(Tail) ->
-    {bad, Tail}.
-
-first_bad_or_next(none, Rest) ->
-    first_bad_node(Rest);
-first_bad_or_next(Bad, _Rest) ->
-    Bad.
-
-bad_in_node({group, Name, Tags, Children} = Node) when is_binary(Name) ->
-    bad_in_group(is_text_list(Tags), Node, Children);
-bad_in_node({test, Name, Tags, _Kind, _Run, _Timeout, _Source} = Node)
-  when is_binary(Name) ->
-    bad_unless(is_text_list(Tags), Node);
-bad_in_node({Hook, _Run})
-  when Hook =:= before_all; Hook =:= before_each;
-       Hook =:= after_each; Hook =:= after_all ->
-    none;
-bad_in_node(Node) ->
-    {bad, Node}.
-
-bad_in_group(true, _Node, Children) ->
-    first_bad_node(Children);
-bad_in_group(false, Node, _Children) ->
-    {bad, Node}.
-
-bad_unless(true, _Node) ->
-    none;
-bad_unless(false, Node) ->
-    {bad, Node}.
-
-is_text_list([]) ->
+%% True when the value is a proper list of parts: a place, the `TestInfo`
+%% of each test, and the functions that give the tests and run them.
+all_parts([]) ->
     true;
-is_text_list([Text | Rest]) when is_binary(Text) ->
-    is_text_list(Rest);
-is_text_list(_Other) ->
+all_parts([{part, {place, _Groups, _Source}, Tests, TestsAt, Run} | Rest])
+  when is_function(TestsAt, 1), is_function(Run, 2) ->
+    all_test_infos(Tests) andalso all_parts(Rest);
+all_parts(_Other) ->
+    false.
+
+all_test_infos([]) ->
+    true;
+all_test_infos([{test_info, Name, _Groups, _Tags, _Kind, _Source} | Rest])
+  when is_binary(Name) ->
+    all_test_infos(Rest);
+all_test_infos(_Other) ->
     false.
 
 %% `<Prefix><Class>:<Reason>`, as `sandbox.run_catching` writes a crash,

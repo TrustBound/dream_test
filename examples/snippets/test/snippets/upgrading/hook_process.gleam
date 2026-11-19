@@ -1,5 +1,5 @@
 import dream_test/matchers.{be_equal, have_length, or_fail_with, should}
-import dream_test/parallel
+import dream_test/runner
 import dream_test/types
 import dream_test/unit
 import dream_test/unit_context.{before_each, describe, it}
@@ -29,7 +29,9 @@ pub fn suite() {
 pub fn tests() {
   unit.describe("Hooks and processes", [
     unit.it("a test and its before_each hook share a process", fn() {
-      parallel.run_root_parallel(parallel.default_config(), suite())
+      runner.new([suite()])
+      |> runner.silent()
+      |> runner.run()
       |> types.report_tests
       |> list.filter(fn(result) { result.status == types.Passed })
       |> should

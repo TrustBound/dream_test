@@ -6,7 +6,7 @@
 //// The tests that change DREAM_TEST_COVERAGE do it in a child node, because
 //// environment variables belong to the whole BEAM.
 
-import dream_test/child_timeout.{suite_with_child_timeout}
+import dream_test/child_timeout.{describe_with_child_timeout}
 import dream_test/coverage
 import dream_test/coverage_child_support.{run_in_child}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -132,7 +132,7 @@ fn below_minimum_exit_line() -> String {
 }
 
 pub fn tests() {
-  describe("runner.coverage", [
+  describe_with_child_timeout("runner.coverage", [
     it("prints the table with a Missing column and exits 0", fn() {
       run_main("passing_run_with_missing_lines")
       |> should
@@ -366,5 +366,4 @@ pub fn tests() {
       ),
     ]),
   ])
-  |> suite_with_child_timeout
 }

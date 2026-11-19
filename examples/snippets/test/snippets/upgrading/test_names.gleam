@@ -30,9 +30,9 @@ pub fn main() {
   |> runner.run()
 }
 
-fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
+fn before_each_test_hook(info: TestInfo) -> Result(Nil, String) {
   io.println("test: " <> test_label(info))
-  Ok(ctx)
+  Ok(Nil)
 }
 
 fn test_label(info: TestInfo) -> String {

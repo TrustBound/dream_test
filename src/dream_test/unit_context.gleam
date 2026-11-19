@@ -7,7 +7,9 @@
 //// - `before_all` / `before_each` can transform the context.
 //// - `it` receives the current context.
 ////
-//// This builds a `dream_test/types.TestSuite(context)` under the hood.
+//// This builds a `dream_test/suite.TestSuite` under the hood. The context
+//// stays inside the suite, so a context suite runs with other suites in
+//// one `runner.new`.
 ////
 //// ## When should I use this?
 ////
@@ -53,9 +55,10 @@
 //// }
 //// ```
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit, WithInput,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionSkipped,
+  BeforeAll, BeforeEach, Group, Root, Test, Unit, WithInput,
 }
 import gleam/option.{None}
 
@@ -73,7 +76,8 @@ pub type ContextNode(context) =
 ///
 /// ## Returns
 ///
-/// A `TestSuite(context)` you can run with `dream_test/runner`.
+/// A `TestSuite` you can run with `dream_test/runner`, also in one run with
+/// suites of other context types.
 ///
 /// ## Example
 ///
@@ -116,8 +120,8 @@ pub fn describe(
   name name: String,
   seed seed: context,
   children children: List(ContextNode(context)),
-) -> TestSuite(context) {
-  Root(seed: seed, name: name, tags: [], children: children)
+) -> TestSuite {
+  suite.from_root(Root(seed: seed, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a context-aware suite.

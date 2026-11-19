@@ -1,5 +1,4 @@
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/parallel
 import dream_test/reporters/summary
 import dream_test/runner
 import dream_test/types.{type RunReport}
@@ -43,7 +42,9 @@ fn example_suite() {
 pub fn tests() {
   describe("Custom post-run reporter", [
     it("renders the counts of a run", fn() {
-      parallel.run_root_parallel(parallel.default_config(), example_suite())
+      runner.new([example_suite()])
+      |> runner.silent()
+      |> runner.run()
       |> render_my_report
       |> should
       |> be_equal(

@@ -1,5 +1,5 @@
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/parallel
+import dream_test/runner
 import dream_test/types.{
   type RunReport, AfterAllHook, Failed, Passed, Pending, SetupFailed, Skipped,
   TeardownFailure, TimedOut,
@@ -53,7 +53,9 @@ pub fn tests() {
   describe("Hook failures", [
     it("a failed after_all hook is in the tear-down list", fn() {
       let report =
-        parallel.run_root_parallel(parallel.default_config(), database_suite())
+        runner.new([database_suite()])
+        |> runner.silent()
+        |> runner.run()
 
       #(after_all_failed(report), list.length(types.report_tests(report)))
       |> should
@@ -62,10 +64,9 @@ pub fn tests() {
     }),
     it("a failed before_all hook gives SetupFailed", fn() {
       let report =
-        parallel.run_root_parallel(
-          parallel.default_config(),
-          broken_database_suite(),
-        )
+        runner.new([broken_database_suite()])
+        |> runner.silent()
+        |> runner.run()
 
       count_broken(report)
       |> should

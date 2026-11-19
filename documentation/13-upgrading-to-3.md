@@ -532,9 +532,9 @@ fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
 ##### 3.0.0: a runner hook that reads `info.groups` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/test_names.gleam#L33-L41"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
+fn before_each_test_hook(info: TestInfo) -> Result(Nil, String) {
   io.println("test: " <> test_label(info))
-  Ok(ctx)
+  Ok(Nil)
 }
 
 fn test_label(info: TestInfo) -> String {
@@ -584,7 +584,7 @@ pub fn tests() {
   describe("Parallel executor", [
     it("can run a suite and return a list of results", fn() {
       let suite =
-        describe("Suite", [
+        types.root("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])
@@ -677,12 +677,12 @@ import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
 import dream_test/reporters/summary
-import dream_test/types.{type TestSuite}
-import dream_test/unit.{describe, it}
+import dream_test/types.{type Root}
+import dream_test/unit.{it}
 import gleam/option.{Some}
 
-pub fn suite() -> TestSuite(Nil) {
-  describe("suite", [
+pub fn suite() -> Root(Nil) {
+  types.root("suite", Nil, [
     it("passes", fn() { Ok(succeed()) }),
   ])
 }
@@ -792,12 +792,13 @@ pub fn tests() -> TestSuite(Nil) {
 }
 ```
 
-##### 3.0.0: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hand_built_suite.gleam#L1-L39"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hand_built_suite.gleam#L1-L42"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type Node, type TestSuite, BeforeAll, NoInput, Root, Test, Unit, WithInput,
+  type Node, BeforeAll, NoInput, Root, Test, Unit, WithInput,
 }
 import gleam/int
 import gleam/list
@@ -828,11 +829,13 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
   )
 }
 
-pub fn tests() -> TestSuite(Nil) {
-  Root(seed: Nil, name: "doubling", tags: [], children: [
-    BeforeAll(NoInput(check_tables)),
-    ..list.map(doubling_cases(), doubling_test)
-  ])
+pub fn tests() -> TestSuite {
+  suite.from_root(
+    Root(seed: Nil, name: "doubling", tags: [], children: [
+      BeforeAll(NoInput(check_tables)),
+      ..list.map(doubling_cases(), doubling_test)
+    ]),
+  )
 }
 ```
 
@@ -841,14 +844,12 @@ pub fn tests() -> TestSuite(Nil) {
 `discover.load` and `discover.to_suites` give a new error text for a test module that does not load. Code that compares the text must change:
 
 - A `tests()` function that crashes gives `tests() crashed: <class>:<reason>`, for example `tests() crashed: error:...`. In 2.x the text was `call_tests_failed`.
-- A `tests()` function whose value is not a test suite gives `tests() did not return a test suite: <value>`, or `tests() returned a node that is not a test, a group or a hook: <node>`. In 2.x the run crashed.
+- A `tests()` function whose value is not a test suite gives `tests() did not return a test suite: <value>`. In 2.x the run crashed.
 - A pattern that cannot be searched gives `cannot search for test modules: <class>:<reason>`. In 2.x the text was `discover_test_modules_failed`.
 
-#### Discovered suites with a context
+#### Discovered suites with a context are now supported
 
-Module discovery accepts only suites without a context, such as the suites of `unit.describe`. A test module whose `tests()` returns a suite with a context, for example from `unit_context.describe`, is now a discovery error. In 2.x, `discover.to_suite` gave its tests `Nil` in place of their context. With `discover.to_suites`, its tests got their context, but a runner hook typed on `Nil` also got that context and could replace it. The error starts with the module name, then `tests() returned a suite with a context (for example from unit_context).`
-
-Exclude the module from the discovery patterns, and give its suite to the runner with `runner.new` or `runner.add_suites`. The runner runs each suite with its own context. See [Context-aware tests](04-context-aware-tests.md).
+Module discovery loads a test module whose `tests()` returns a suite with a context, for example from `unit_context.describe`. The suite runs with its own context. `discover.to_suite` puts each module suite in one group, and each suite keeps its own context. In 2.x, `discover.to_suite` gave the tests of such a suite `Nil` in place of their context.
 
 ### Hooks
 

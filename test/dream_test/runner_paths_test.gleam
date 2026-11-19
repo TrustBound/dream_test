@@ -9,6 +9,7 @@ import dream_test/coverage_runner_mains
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
+import dream_test/suite
 import dream_test/types.{
   type Status, type TestResult, AssertionOk, Passed, Root, Test, Unit,
 }
@@ -390,7 +391,7 @@ fn suite_source(sources: List(Option(String))) -> String {
   let seen = process.new_subject()
   let _ =
     runner.new([
-      Root(seed: Nil, name: "s", tags: [], children: tests),
+      suite.from_root(Root(seed: Nil, name: "s", tags: [], children: tests)),
     ])
     |> runner.before_each_suite(fn(info) {
       record(seen, string.inspect(info.source))

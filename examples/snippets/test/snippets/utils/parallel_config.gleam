@@ -9,7 +9,7 @@ pub fn tests() {
   describe("ParallelConfig", [
     it("can be constructed to customize execution", fn() {
       let suite =
-        describe("Suite", [
+        types.root("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
         ])
 

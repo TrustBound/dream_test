@@ -1,6 +1,7 @@
 import dream_test/discover.{LoadResult, from_path, list_modules}
 import dream_test/matchers.{be_equal, contain, have_length, or_fail_with, should}
 import dream_test/runner
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionFailure, type Status, type TestResult, AssertionFailure, Failed,
   Passed,
@@ -19,36 +20,20 @@ fn load_errors(name: String) -> List(String) {
   errors
 }
 
-fn suite_test_sources(suite: types.TestSuite(Nil)) -> List(Option(String)) {
-  list.flat_map(suite.children, node_test_sources)
+fn suite_test_sources(suite: TestSuite) -> List(Option(String)) {
+  list.map(suite.tests(suite), test_source)
 }
 
-fn node_test_sources(node: types.Node(Nil)) -> List(Option(String)) {
-  case node {
-    types.Test(source: source, ..) -> [source]
-    types.Group(children: children, ..) ->
-      list.flat_map(children, node_test_sources)
-    _ -> []
+fn test_source(info: types.TestInfo) -> Option(String) {
+  info.source
+}
+
+/// Whether the fixture has one load error, and it starts with the text.
+fn has_one_load_error_starting_with(fixture: #(String, String)) -> Bool {
+  case load_errors(fixture.0) {
+    [error] -> string.starts_with(error, fixture.1)
+    _ -> False
   }
-}
-
-/// The load error for test/discovery_fixtures/context_suite.gleam.
-const context_suite_error =
-  "discovery_fixtures@context_suite: tests() returned a suite with a context (for example from unit_context). Discovery gives every suite the context Nil, so its tests would not get their context. Add this suite with runner.new or runner.add_suites in place of discovery."
-
-/// A runner hook for suites without a context: it gives each test `Nil`.
-fn give_nil_context(
-  _info: types.TestInfo,
-  _context: Nil,
-) -> Result(Nil, String) {
-  Ok(Nil)
-}
-
-/// The result that discovery gives for test/discovery_fixtures/context_suite.gleam.
-fn context_suite_result() -> #(String, Status, List(String)) {
-  #("Discovery Error: " <> context_suite_error, Failed, [
-    "Failed to discover/load test modules (see test name for details)",
-  ])
 }
 
 /// The name, the status and the failure messages of a result.
@@ -60,6 +45,10 @@ fn name_status_and_messages(
 
 fn failure_message(failure: AssertionFailure) -> String {
   failure.message
+}
+
+fn full_name_and_status(result: TestResult) -> #(List(String), Status) {
+  #(types.full_name(result.groups, result.name), result.status)
 }
 
 pub fn tests() {
@@ -121,42 +110,46 @@ pub fn tests() {
       |> or_fail_with("a bad pattern should give an error")
     }),
 
-    it("load rejects a module whose suite has a context", fn() {
+    it("load gives a module whose suite has a context", fn() {
       load_errors("context_suite")
       |> should
-      |> be_equal([context_suite_error])
-      |> or_fail_with("load should name the module and say how to add it")
+      |> be_equal([])
+      |> or_fail_with("load should accept a suite with a context")
     }),
 
-    it("to_suite does not run a context suite with no context", fn() {
-      runner.new([
-        discover.new()
-        |> from_path("discovery_fixtures/context_suite.gleam")
-        |> discover.to_suite("discovered"),
-      ])
-      |> runner.silent()
-      |> runner.run()
-      |> types.report_tests
-      |> list.map(name_status_and_messages)
-      |> should
-      |> be_equal([context_suite_result()])
-      |> or_fail_with("the context suite should be a discovery error")
-    }),
-
-    it("to_suites does not give a context suite to a Nil runner hook", fn() {
+    it("to_suites runs a context suite with its own context", fn() {
       runner.new(
         discover.new()
         |> from_path("discovery_fixtures/context_suite.gleam")
         |> discover.to_suites(),
       )
-      |> runner.before_each_test(give_nil_context)
       |> runner.silent()
       |> runner.run()
       |> types.report_tests
       |> list.map(name_status_and_messages)
       |> should
-      |> be_equal([context_suite_result()])
-      |> or_fail_with("the context suite should be a discovery error")
+      |> be_equal([#("gets the context", Passed, [])])
+      |> or_fail_with("the context suite should get the context 41")
+    }),
+
+    it("to_suite runs each suite with its own context", fn() {
+      runner.new([
+        discover.new()
+        |> from_path("discovery_fixtures/context_suite.gleam")
+        |> from_path("discovery_fixtures/hooked_suite.gleam")
+        |> discover.to_suite("all"),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(full_name_and_status)
+      |> should
+      |> be_equal([
+        #(["all", "context_suite", "gets the context"], Passed),
+        #(["all", "hooked_suite", "passes"], Passed),
+        #(["all", "hooked_suite", "nested", "passes too"], Passed),
+      ])
+      |> or_fail_with("each suite should keep its context under the group")
     }),
 
     it("accepts a module path without an extension", fn() {
@@ -206,27 +199,21 @@ pub fn tests() {
       |> or_fail_with("load should name the module and the value")
     }),
 
-    it("load reports a suite with a node that is not a node", fn() {
-      ["bad_node_suite", "bad_group_suite", "improper_children_suite"]
-      |> list.flat_map(load_errors)
+    it("load reports a suite value with a part that is not a part", fn() {
+      [
+        #(
+          "bad_part_suite",
+          "discovery_fixtures@bad_part_suite: tests() did not return a test suite: {test_suite,<<\"bad_part_suite\">>,[nil]}",
+        ),
+        #(
+          "bad_test_info_suite",
+          "discovery_fixtures@bad_test_info_suite: tests() did not return a test suite: {test_suite,<<\"bad_test_info_suite\">>,[{part,{place,[],none},[nil],",
+        ),
+      ]
+      |> list.map(has_one_load_error_starting_with)
       |> should
-      |> be_equal([
-        "discovery_fixtures@bad_node_suite: tests() returned a node that is not a test, a group or a hook: 42",
-        "discovery_fixtures@bad_group_suite: tests() returned a node that is not a test, a group or a hook: {group,<<\"bad\">>,[1],[]}",
-        "discovery_fixtures@improper_children_suite: tests() returned a node that is not a test, a group or a hook: 42",
-      ])
-      |> or_fail_with("load should name the module and the bad node")
-    }),
-
-    it("load reports a test with a tag that is not a string", fn() {
-      load_errors("bad_test_suite")
-      |> list.map(string.starts_with(
-        _,
-        "discovery_fixtures@bad_test_suite: tests() returned a node that is not a test, a group or a hook: {test,<<\"bad\">>,[1],",
-      ))
-      |> should
-      |> be_equal([True])
-      |> or_fail_with("load should name the module and the bad test")
+      |> be_equal([True, True])
+      |> or_fail_with("load should name the module and the value")
     }),
 
     it("to_suites adds a failing test for each load error", fn() {

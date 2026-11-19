@@ -55,13 +55,14 @@
 //// }
 //// ```
 
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig}
 import dream_test/gherkin/parser.{type FeatureFileError}
 import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure, Root, Test,
+  Unit,
 }
 import gleam/list
 import gleam/option.{None, Some}
@@ -220,13 +221,13 @@ pub fn with_registry(
 ///
 /// ## Returns
 ///
-/// A `TestSuite(Nil)` containing one test per discovered scenario, plus failing
+/// A `TestSuite` containing one test per discovered scenario, plus failing
 /// tests for any parse errors (tagged `"parse-error"`), or one failing test
 /// when no file matches (tagged `"no-feature-files"`).
 pub fn to_suite(
   discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let files = discover_files(discovery.pattern)
   let parsed = parse_all_features(files)
 
@@ -234,12 +235,12 @@ pub fn to_suite(
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes =
     list.map(missing_files_errors(discovery.pattern, files), missing_files_node)
-  Root(
+  suite.from_root(Root(
     seed: Nil,
     name: suite_name,
     tags: [],
     children: list.flatten([children, error_nodes, missing_nodes]),
-  )
+  ))
 }
 
 /// Load features and return detailed results.
@@ -432,9 +433,7 @@ fn feature_to_group(
   feature: gherkin_types.Feature,
   registry: StepRegistry(state),
 ) -> Node(Nil) {
-  let config = FeatureConfig(feature: feature, step_registry: registry)
-  let feature_suite = to_test_suite(config)
-  root_to_group(feature_suite)
+  feature.to_group(FeatureConfig(feature: feature, step_registry: registry))
 }
 
 fn errors_to_nodes(
@@ -446,10 +445,6 @@ fn errors_to_nodes(
     [failure, ..rest] ->
       errors_to_nodes(rest, [error_to_node(failure), ..acc_rev])
   }
-}
-
-fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  Group(name: suite.name, tags: suite.tags, children: suite.children)
 }
 
 // ============================================================================

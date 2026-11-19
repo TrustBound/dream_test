@@ -1,5 +1,5 @@
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/parallel
+import dream_test/runner
 import dream_test/types.{SetupFailed}
 import dream_test/unit.{before_each, describe, it}
 import gleam/io
@@ -19,10 +19,9 @@ pub fn setup_failure_tests() {
 pub fn tests() {
   describe("Setup failure example", [
     it("reports the test as SetupFailed without running its body", fn() {
-      parallel.run_root_parallel(
-        parallel.default_config(),
-        setup_failure_tests(),
-      )
+      runner.new([setup_failure_tests()])
+      |> runner.silent()
+      |> runner.run()
       |> types.report_tests
       |> list.map(fn(result) { result.status })
       |> should

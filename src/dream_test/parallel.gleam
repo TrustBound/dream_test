@@ -1,7 +1,8 @@
 //// Unified Root/Node execution engine (parallel tests, sequential groups).
 ////
-//// This module executes `types.TestSuite(context)` which is an alias of
-//// `types.Root(context)` in the unified tree model.
+//// This module executes a typed tree, a `types.Root(context)`. A
+//// `dream_test/suite.TestSuite` keeps such a tree inside it, and the runner
+//// runs it with this module.
 ////
 //// NOTE: This module is intentionally event-agnostic; `runner` composes it
 //// with reporters for live output.
@@ -22,7 +23,7 @@
 ////   describe("Parallel executor", [
 ////     it("can run a suite and return a report of the results", fn() {
 ////       let suite =
-////         describe("Suite", [
+////         types.root("Suite", Nil, [
 ////           it("a", fn() { Ok(succeed()) }),
 ////           it("b", fn() { Ok(succeed()) }),
 ////         ])
@@ -45,12 +46,12 @@ import dream_test/sandbox.{
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type RunReport, type SetUpHook, type Status, type TeardownFailure,
-  type TeardownHook, type TestInfo, type TestKind, type TestResult,
-  type TestSuite, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
-  AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
-  AssertionSkipped, BeforeAll, BeforeAllHook, BeforeEach, Failed, Group, Passed,
-  Root, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
+  type Root, type RunReport, type SetUpHook, type Status, type TeardownFailure,
+  type TeardownHook, type TestInfo, type TestKind, type TestResult, AfterAll,
+  AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed,
+  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeAllHook,
+  BeforeEach, Failed, Group, Passed, Root, SetupFailed, Skipped, TeardownFailure,
+  Test, TestResult, TimedOut,
 }
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
@@ -92,7 +93,7 @@ import gleam/string
 ///   describe("ParallelConfig", [
 ///     it("can be constructed to customize execution", fn() {
 ///       let suite =
-///         describe("Suite", [
+///         types.root("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///         ])
 ///
@@ -121,7 +122,38 @@ pub type ParallelConfig {
 pub type RunRootParallelWithReporterConfig(context) {
   RunRootParallelWithReporterConfig(
     config: ParallelConfig,
-    suite: TestSuite(context),
+    suite: Root(context),
+    progress_reporter: Option(progress.ProgressReporter),
+    write: fn(String) -> Nil,
+    total: Int,
+    completed: Int,
+    runner_before_each_test: List(
+      fn(TestInfo, context) -> Result(context, String),
+    ),
+    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    outer_setups: List(OuterSetup),
+  )
+}
+
+/// Configuration for `run_suite`.
+///
+/// It holds the same fields as `RunRootParallelWithReporterConfig`, with the
+/// tree in its own fields and one more field, `groups`:
+///
+/// - `groups`: the names of the groups around the tree, outermost first.
+///   Each test result, each `TestInfo` that a runner hook gets and each
+///   progress line has them in front of the names of the tree. Give `[]`
+///   for a tree that is not inside a group.
+/// - `name`, `tags`, `children`, `seed`: the fields of the `types.Root` of
+///   the tree.
+pub type RunSuiteConfig(context) {
+  RunSuiteConfig(
+    config: ParallelConfig,
+    groups: List(String),
+    name: String,
+    tags: List(String),
+    children: List(Node(context)),
+    seed: context,
     progress_reporter: Option(progress.ProgressReporter),
     write: fn(String) -> Nil,
     total: Int,
@@ -436,7 +468,7 @@ type Owners(context) {
 ///   describe("Parallel executor", [
 ///     it("can run a suite and return a report of the results", fn() {
 ///       let suite =
-///         describe("Suite", [
+///         types.root("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///           it("b", fn() { Ok(succeed()) }),
 ///         ])
@@ -478,7 +510,7 @@ pub fn default_config() -> ParallelConfig {
 ///   describe("Parallel executor", [
 ///     it("can run a suite and return a report of the results", fn() {
 ///       let suite =
-///         describe("Suite", [
+///         types.root("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///           it("b", fn() { Ok(succeed()) }),
 ///         ])
@@ -505,7 +537,7 @@ pub fn default_config() -> ParallelConfig {
 /// failed, in the order that they ran.
 pub fn run_root_parallel(
   config config: ParallelConfig,
-  suite suite: TestSuite(context),
+  suite suite: Root(context),
 ) -> RunReport {
   let Root(seed: seed, name: name, tags: tags, children: children) = suite
   let executor_input =
@@ -545,12 +577,12 @@ pub fn run_root_parallel(
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/parallel
-/// import dream_test/types.{type TestSuite}
-/// import dream_test/unit.{describe, it}
+/// import dream_test/types.{type Root}
+/// import dream_test/unit.{it}
 /// import gleam/option.{None}
 /// 
-/// pub fn suite() -> TestSuite(Nil) {
-///   describe("suite", [
+/// pub fn suite() -> Root(Nil) {
+///   types.root("suite", Nil, [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
@@ -614,34 +646,83 @@ pub fn run_root_parallel(
 pub fn run_root_parallel_with_reporter(
   config config: RunRootParallelWithReporterConfig(context),
 ) -> RunRootParallelWithReporterResult {
-  let RunRootParallelWithReporterConfig(
-    config: executor_config,
-    suite: suite,
-    progress_reporter: progress_reporter,
-    write: write,
-    total: total,
-    completed: completed,
-    runner_before_each_test: runner_before_each_test,
-    runner_after_each_test: runner_after_each_test,
-    outer_setups: outer_setups,
-  ) = config
+  let Root(seed: seed, name: name, tags: tags, children: children) =
+    config.suite
+  run_suite(RunSuiteConfig(
+    config: config.config,
+    groups: [],
+    name: name,
+    tags: tags,
+    children: children,
+    seed: seed,
+    progress_reporter: config.progress_reporter,
+    write: config.write,
+    total: config.total,
+    completed: config.completed,
+    runner_before_each_test: config.runner_before_each_test,
+    runner_after_each_test: config.runner_after_each_test,
+    outer_setups: config.outer_setups,
+  ))
+}
 
-  let Root(seed: seed, name: name, tags: tags, children: children) = suite
-  let owners = refresh_owners(Owners(outer: outer_setups, groups: []))
+/// Run a typed tree inside the groups `groups`, while driving a reporter.
+///
+/// This is what `run_root_parallel_with_reporter` does, for a tree that
+/// can be inside groups. `dream_test/suite` uses it to run each suite: a
+/// suite that `suite.group` put in a group runs with that group in
+/// `groups`.
+///
+/// ## Parameters
+///
+/// - `config`: the tree, where it is, and the run around it (see
+///   `RunSuiteConfig`)
+///
+/// ## Returns
+///
+/// A `RunRootParallelWithReporterResult`, as
+/// `run_root_parallel_with_reporter` gives it.
+///
+/// ## Example
+///
+/// ```gleam
+/// parallel.run_suite(parallel.RunSuiteConfig(
+///   config: parallel.default_config(),
+///   groups: ["all"],
+///   name: "suite",
+///   tags: [],
+///   children: [unit.it("passes", fn() { Ok(succeed()) })],
+///   seed: Nil,
+///   progress_reporter: None,
+///   write: ignore,
+///   total: 1,
+///   completed: 0,
+///   runner_before_each_test: [],
+///   runner_after_each_test: [],
+///   outer_setups: [],
+/// ))
+/// ```
+pub fn run_suite(
+  config config: RunSuiteConfig(context),
+) -> RunRootParallelWithReporterResult {
+  let owners = refresh_owners(Owners(outer: config.outer_setups, groups: []))
   let executor_input =
     ExecuteNodeConfig(
-      config: executor_config,
-      scope: [],
+      config: config.config,
+      scope: config.groups,
       inherited_tags: [],
-      context: seed,
+      context: config.seed,
       inherited_before_each: [],
       inherited_after_each: [],
-      runner_before_each_test: runner_before_each_test,
-      runner_after_each_test: runner_after_each_test,
-      node: Group(name: name, tags: tags, children: children),
-      progress_output: progress_output(progress_reporter, write),
-      total: total,
-      completed: completed,
+      runner_before_each_test: config.runner_before_each_test,
+      runner_after_each_test: config.runner_after_each_test,
+      node: Group(
+        name: config.name,
+        tags: config.tags,
+        children: config.children,
+      ),
+      progress_output: progress_output(config.progress_reporter, config.write),
+      total: config.total,
+      completed: config.completed,
       collected: empty_collected(),
       owners: owners,
     )
@@ -652,7 +733,7 @@ pub fn run_root_parallel_with_reporter(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
     completed: completed_after_suite,
-    progress_reporter: progress_reporter,
+    progress_reporter: config.progress_reporter,
     outer_setups: owners_after_suite.outer,
   )
 }

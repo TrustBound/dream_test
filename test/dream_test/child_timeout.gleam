@@ -3,7 +3,9 @@
 //// so the default timeout of 5 seconds is too near. The timeout is a
 //// safety limit only: a passing test never comes near it.
 
-import dream_test/types.{type Node, type Root, Group, Root, Test}
+import dream_test/suite.{type TestSuite}
+import dream_test/types.{type Node, Group, Test}
+import dream_test/unit
 import gleam/list
 import gleam/option.{Some}
 
@@ -20,7 +22,11 @@ pub fn with_child_timeout(node: Node(context)) -> Node(context) {
   }
 }
 
-/// Give every test in `suite` the timeout `child_timeout_ms`.
-pub fn suite_with_child_timeout(suite: Root(context)) -> Root(context) {
-  Root(..suite, children: list.map(suite.children, with_child_timeout))
+/// A `unit.describe` suite where every test has the timeout
+/// `child_timeout_ms`.
+pub fn describe_with_child_timeout(
+  name: String,
+  children: List(Node(Nil)),
+) -> TestSuite {
+  unit.describe(name, list.map(children, with_child_timeout))
 }

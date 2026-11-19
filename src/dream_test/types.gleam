@@ -467,10 +467,6 @@ pub fn call(
   }
 }
 
-/// Compatibility alias: suites are roots in the unified model.
-pub type TestSuite(context) =
-  Root(context)
-
 /// Compatibility alias: suite items are nodes in the unified model.
 pub type TestSuiteItem(context) =
   Node(context)

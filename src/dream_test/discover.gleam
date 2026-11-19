@@ -8,11 +8,10 @@
 ////
 //// - You provide one or more **module path globs** (e.g. `"unit/**_test.gleam"`).
 //// - Dream Test finds matching modules under `./test/` that export `tests/0`.
-//// - It calls `tests/0` to get `TestSuite(Nil)` values.
-//// - A module whose `tests/0` returns a suite with a context (for example
-////   from `unit_context`) is a load error that names the module. Give such
-////   a suite to the runner with `runner.new` or `runner.add_suites`, so
-////   its tests get their context.
+//// - It calls `tests/0` to get `TestSuite` values.
+//// - A module can return any suite: from `unit`, from `unit_context` with
+////   its own context, or a Gherkin feature. Each suite keeps its own
+////   context and set-up.
 ////
 //// ## Example
 ////
@@ -38,12 +37,13 @@
 ////
 //// <sub>Note: discovery requires compiled BEAM modules.</sub>
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, Group, NoInput, Root, Test, Unit,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure, NoInput,
+  Root, Test, Unit,
 }
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{None}
 import gleam/string
 
 // ============================================================================
@@ -86,7 +86,7 @@ pub opaque type TestDiscovery {
 ///   |> discover.load()
 /// ```
 pub type LoadResult {
-  LoadResult(suites: List(TestSuite(Nil)), errors: List(String))
+  LoadResult(suites: List(TestSuite), errors: List(String))
 }
 
 // ============================================================================
@@ -264,7 +264,7 @@ pub fn list_modules(
 /// ## Returns
 ///
 /// A `LoadResult` with:
-/// - `suites`: successfully loaded `TestSuite(Nil)` values
+/// - `suites`: successfully loaded `TestSuite` values
 /// - `errors`: discovery or load errors (as strings)
 ///
 /// ## Example
@@ -322,7 +322,7 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///   |> run()
 /// }
 /// ```
-pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
+pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite) {
   let LoadResult(suites: suites, errors: errors) = load(discovery)
 
   case list.is_empty(errors) {
@@ -343,8 +343,9 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 ///
 /// ## Returns
 ///
-/// A single `TestSuite(Nil)` containing:
-/// - all discovered suites, and
+/// A single `TestSuite` containing:
+/// - each discovered suite as a group inside it, with its own context and
+///   set-up, and
 /// - any errors as failing tests tagged `"discovery-error"`.
 ///
 /// ## Example
@@ -371,19 +372,30 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 pub fn to_suite(
   discovery discovery: TestDiscovery,
   suite_name suite_name: String,
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let LoadResult(suites: suites, errors: errors) = load(discovery)
-
-  let suite_nodes = suites_to_nodes(suites, [])
-
-  let error_nodes = errors_to_nodes(errors, [])
-
-  Root(
-    seed: Nil,
+  suite.join(
     name: suite_name,
-    tags: [],
-    children: list.append(suite_nodes, error_nodes),
+    suites: list.append(errors_at_top(suite_name, errors), [
+      suite.group(name: suite_name, suites: suites),
+    ]),
   )
+}
+
+/// The load errors as failing tests directly inside the suite `name`, or
+/// no suite when there is no error.
+fn errors_at_top(name: String, errors: List(String)) -> List(TestSuite) {
+  case errors {
+    [] -> []
+    _ -> [
+      suite.from_root(Root(
+        seed: Nil,
+        name: name,
+        tags: [],
+        children: errors_to_nodes(errors, []),
+      )),
+    ]
+  }
 }
 
 // ============================================================================
@@ -418,7 +430,7 @@ fn ensure_beam_extension(path: String) -> String {
 
 fn load_suites_from_modules(
   module_names: List(String),
-  suites_rev: List(TestSuite(Nil)),
+  suites_rev: List(TestSuite),
   errors_rev: List(String),
 ) -> LoadResult {
   case module_names {
@@ -436,14 +448,14 @@ fn load_suites_from_modules(
 fn load_suites_from_modules_next(
   module_name: String,
   rest: List(String),
-  suites_rev: List(TestSuite(Nil)),
+  suites_rev: List(TestSuite),
   errors_rev: List(String),
 ) -> LoadResult {
   case call_tests(module_name) {
     Ok(suite) ->
       load_suites_from_modules(
         rest,
-        [suite_with_source(suite, module_name), ..suites_rev],
+        [suite.with_source(suite: suite, source: module_name), ..suites_rev],
         errors_rev,
       )
     Error(message) ->
@@ -526,16 +538,6 @@ fn add_unique_modules_next(
   }
 }
 
-fn suites_to_nodes(
-  suites: List(TestSuite(Nil)),
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case suites {
-    [] -> list.reverse(acc_rev)
-    [suite, ..rest] -> suites_to_nodes(rest, [root_to_group(suite), ..acc_rev])
-  }
-}
-
 fn errors_to_nodes(
   errors: List(String),
   acc_rev: List(Node(Nil)),
@@ -546,57 +548,13 @@ fn errors_to_nodes(
   }
 }
 
-fn errors_suite(errors: List(String)) -> TestSuite(Nil) {
-  Root(
+fn errors_suite(errors: List(String)) -> TestSuite {
+  suite.from_root(Root(
     seed: Nil,
     name: "Discovery Errors",
     tags: ["discovery-error"],
     children: errors_to_nodes(errors, []),
-  )
-}
-
-fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  Group(name: suite.name, tags: suite.tags, children: suite.children)
-}
-
-fn suite_with_source(suite: TestSuite(Nil), source: String) -> TestSuite(Nil) {
-  Root(..suite, children: children_with_source(suite.children, source, []))
-}
-
-fn node_with_source(node: Node(Nil), source: String) -> Node(Nil) {
-  case node {
-    Group(name, tags, children) ->
-      Group(
-        name: name,
-        tags: tags,
-        children: children_with_source(children, source, []),
-      )
-    Test(name, tags, kind, run, timeout_ms, _source) ->
-      Test(
-        name: name,
-        tags: tags,
-        kind: kind,
-        run: run,
-        timeout_ms: timeout_ms,
-        source: Some(source),
-      )
-    other -> other
-  }
-}
-
-fn children_with_source(
-  children: List(Node(Nil)),
-  source: String,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case children {
-    [] -> list.reverse(acc_rev)
-    [child, ..rest] ->
-      children_with_source(rest, source, [
-        node_with_source(child, source),
-        ..acc_rev
-      ])
-  }
+  ))
 }
 
 fn error_to_node(error: String) -> Node(Nil) {
@@ -630,4 +588,4 @@ fn discovery_error_assertion() -> AssertionResult {
 fn discover_test_modules(beam_glob: String) -> Result(List(String), String)
 
 @external(erlang, "dream_test_test_discovery_ffi", "call_tests")
-fn call_tests(module_name: String) -> Result(TestSuite(Nil), String)
+fn call_tests(module_name: String) -> Result(TestSuite, String)

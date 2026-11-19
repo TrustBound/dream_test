@@ -11,6 +11,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/sandbox.{type SandboxResult, SandboxCompleted, SandboxConfig}
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Status, type TestResult, AfterAllHook,
   AfterAllSuitesHook, AfterEachHook, AfterEachSuiteHook, AssertionFailure,
@@ -1440,7 +1441,7 @@ fn crash_owner(name: Name(Crash)) -> Nil
 /// Run a builder with a 50ms default timeout in a sandbox of 2 seconds, so
 /// a hook that never returns fails the test instead of the whole run.
 fn run_builder_bounded(
-  builder: runner.RunBuilder(context),
+  builder: runner.RunBuilder,
 ) -> SandboxResult(RunSummary) {
   sandbox.run_isolated(
     SandboxConfig(timeout_ms: 2000, show_crash_reports: False),
@@ -1449,11 +1450,11 @@ fn run_builder_bounded(
   )
 }
 
-fn run_bounded(suite: types.TestSuite(context)) -> SandboxResult(RunSummary) {
+fn run_bounded(suite: TestSuite) -> SandboxResult(RunSummary) {
   run_builder_bounded(runner.new([suite]))
 }
 
-fn run_with_short_timeout(builder: runner.RunBuilder(context)) -> RunSummary {
+fn run_with_short_timeout(builder: runner.RunBuilder) -> RunSummary {
   let report =
     builder
     |> runner.default_timeout_ms(50)
@@ -1478,7 +1479,7 @@ fn passing_test() -> Result(AssertionResult, String) {
   Ok(AssertionOk)
 }
 
-fn run_suite(suite: types.TestSuite(context)) -> List(TestResult) {
+fn run_suite(suite: TestSuite) -> List(TestResult) {
   runner.new([suite])
   |> runner.run()
   |> types.report_tests

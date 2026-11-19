@@ -7,7 +7,7 @@
 //// a child node because the module names of `.gleam` files start at the
 //// `src` folder of the working directory, and each project needs its own.
 
-import dream_test/child_timeout.{suite_with_child_timeout}
+import dream_test/child_timeout.{describe_with_child_timeout}
 import dream_test/coverage
 import dream_test/coverage/report
 import dream_test/coverage_child_support.{
@@ -16,7 +16,7 @@ import dream_test/coverage_child_support.{
 }
 import dream_test/coverage_project_support.{measure}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/unit.{describe, it}
+import dream_test/unit.{it}
 import gleam/result
 
 fn gleam_source() -> String {
@@ -73,7 +73,7 @@ fn inexact_line_files_of_project() -> Result(List(String), String) {
 }
 
 pub fn tests() {
-  describe("coverage line accuracy", [
+  describe_with_child_timeout("coverage line accuracy", [
     it("marks a .gleam file built from generated Erlang source", fn() {
       run_in_child(fn() {
         let _ = child_project("old_gleam")
@@ -140,5 +140,4 @@ pub fn tests() {
       |> or_fail_with("expected no marked fixture files")
     }),
   ])
-  |> suite_with_child_timeout
 }

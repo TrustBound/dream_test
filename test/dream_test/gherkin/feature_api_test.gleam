@@ -5,6 +5,7 @@ import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
+import dream_test/suite.{type TestSuite}
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
 import gleam/int
@@ -908,9 +909,7 @@ pub fn tests() {
   ])
 }
 
-fn run_suites(
-  suites: List(test_types.TestSuite(Nil)),
-) -> List(test_types.TestResult) {
+fn run_suites(suites: List(TestSuite)) -> List(test_types.TestResult) {
   runner.new(suites)
   |> runner.silent
   |> runner.run()

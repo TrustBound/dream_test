@@ -6,6 +6,7 @@ import dream_test/matchers.{
   be_empty, be_equal, contain, have_length, or_fail_with, should,
 }
 import dream_test/runner
+import dream_test/suite
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
 import gleam/list
@@ -147,12 +148,12 @@ pub fn tests() {
     it("to_suite names a parse error test after the path and message", fn() {
       let _ = file.write("./test/tmp/features/discover_name.feature", "NOT\n")
 
-      let suite =
+      let discovered =
         discover.features("./test/tmp/features/discover_name.feature")
         |> discover.with_registry(steps.new(initial: Nil))
         |> discover.to_suite("Features")
 
-      test_names(suite.children)
+      test_names(suite.tests(discovered))
       |> should
       |> be_equal([
         "Parse Error: test/tmp/features/discover_name.feature: line 1: Found \"NOT\", but expected a tag line or a Feature line.",
@@ -163,12 +164,12 @@ pub fn tests() {
     it("to_suite gives the full path with ': ' as the parse error source", fn() {
       let _ = file.write("./test/tmp/features/discover: colon.feature", "NOT\n")
 
-      let suite =
+      let discovered =
         discover.features("./test/tmp/features/discover: colon.feature")
         |> discover.with_registry(steps.new(initial: Nil))
         |> discover.to_suite("Features")
 
-      test_sources(suite.children)
+      test_sources(suite.tests(discovered))
       |> should
       |> be_equal([Some("test/tmp/features/discover: colon.feature")])
       |> or_fail_with("the source should be the whole path")
@@ -239,26 +240,20 @@ pub fn tests() {
   ])
 }
 
-fn test_names(nodes: List(test_types.Node(Nil))) -> List(String) {
-  list.filter_map(nodes, test_name)
+fn test_names(tests: List(test_types.TestInfo)) -> List(String) {
+  list.map(tests, test_name)
 }
 
-fn test_name(node: test_types.Node(Nil)) -> Result(String, Nil) {
-  case node {
-    test_types.Test(name: name, ..) -> Ok(name)
-    _ -> Error(Nil)
-  }
+fn test_name(info: test_types.TestInfo) -> String {
+  info.name
 }
 
-fn test_sources(nodes: List(test_types.Node(Nil))) -> List(Option(String)) {
-  list.filter_map(nodes, test_source)
+fn test_sources(tests: List(test_types.TestInfo)) -> List(Option(String)) {
+  list.map(tests, test_source)
 }
 
-fn test_source(node: test_types.Node(Nil)) -> Result(Option(String), Nil) {
-  case node {
-    test_types.Test(source: source, ..) -> Ok(source)
-    _ -> Error(Nil)
-  }
+fn test_source(info: test_types.TestInfo) -> Option(String) {
+  info.source
 }
 
 fn result_status(result: test_types.TestResult) -> test_types.Status {

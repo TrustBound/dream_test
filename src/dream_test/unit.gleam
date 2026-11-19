@@ -9,7 +9,7 @@
 ////   `Result(Nil, String)`, so you can abort early with `Error("message")`
 ////   when prerequisites fail.
 ////
-//// This module builds a `dream_test/types.TestSuite(Nil)` under the hood.
+//// This module builds a `dream_test/suite.TestSuite` under the hood.
 ////
 //// ## When should I use this module?
 ////
@@ -55,9 +55,10 @@
 //// }
 //// ```
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionSkipped,
+  BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
 }
 import gleam/option.{None}
 
@@ -122,12 +123,12 @@ pub type UnitNode =
 ///
 /// ## Returns
 ///
-/// A `TestSuite(Nil)` you can pass to `runner.new([ ... ])`.
+/// A `TestSuite` you can pass to `runner.new([ ... ])`.
 pub fn describe(
   name name: String,
   children children: List(UnitNode),
-) -> TestSuite(Nil) {
-  Root(seed: Nil, name: name, tags: [], children: children)
+) -> TestSuite {
+  suite.from_root(Root(seed: Nil, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a suite.
