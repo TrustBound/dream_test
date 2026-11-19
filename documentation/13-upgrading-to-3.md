@@ -1038,7 +1038,7 @@ A failed `after_each` or `after_each_test` hook also keeps the status of its tes
 
 #### A failed set-up hook, and a timeout
 
-In 2.x, the tests of a failed `before_all`, `before_each_suite` or `before_all_suites` hook were `Failed`. In 3.0.0, they are `SetupFailed`. A test body that runs past its timeout is always `TimedOut`, with the failure `timeout: test timed out`. In 2.x, a sequential run gave `Failed` for a timeout. Code that counts or matches statuses must handle `SetupFailed` and `TimedOut`.
+In 2.x, the tests of a failed `before_all`, `before_each_suite` or `before_all_suites` hook were `Failed`. In 3.0.0, they are `SetupFailed`. A test body that runs past its timeout is `TimedOut`, with the failure `timeout: test timed out`. In 2.x, a sequential run gave `Failed` for a timeout. Code that counts or matches statuses must handle `SetupFailed` and `TimedOut`.
 
 ##### 2.x: count the broken tests by `Failed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L597-L631"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 

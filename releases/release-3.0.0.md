@@ -53,7 +53,7 @@ hook starts now lives for the tests of its group. A test runs its
   stopped set-up one time and names each test that it did not run.
 - A hook that crashes, never returns, or kills its own process does not stop
   the run.
-- A test body past its timeout is always `TimedOut`.
+- A test body past its timeout is `TimedOut`, not `Failed`.
 
 ### 🧺 One suite type, and set-ups for a whole suite
 
