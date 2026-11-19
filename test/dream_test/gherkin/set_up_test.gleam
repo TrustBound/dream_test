@@ -3,7 +3,10 @@
 
 import dream_test/file
 import dream_test/gherkin/discover
-import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/feature.{
+  FeatureConfig, feature, given, scenario, then, when,
+}
+import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
@@ -107,6 +110,30 @@ pub fn tests() {
       |> or_fail_with("the test should start from the set-up value")
     }),
 
+    it("to_group puts two Features in one suite with one set-up", fn() {
+      let events = process.new_subject()
+      let registry = counter_steps(events, Ok(10))
+      let report =
+        run([
+          steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
+            counter_group(registry, "Cart"),
+            counter_group(registry, "Stock"),
+          ]),
+        ])
+      #(statuses(report), receive_all(events, []))
+      |> should
+      |> be_equal(
+        #(
+          [
+            #(["Shop", "Cart", "adds one"], Passed),
+            #(["Shop", "Stock", "adds one"], Passed),
+          ],
+          ["set_up", "tear_down got 10"],
+        ),
+      )
+      |> or_fail_with("one set-up should serve both Features")
+    }),
+
     it("discover.to_suite runs the set-up once for all files", fn() {
       let events = process.new_subject()
       write_counter_file("set_up_a")
@@ -181,14 +208,28 @@ fn counter_feature(registry: StepRegistry(Int)) -> TestSuite {
   ])
 }
 
+/// A Feature named `name` with one scenario, as one group.
+fn counter_group(registry: StepRegistry(Int), name: String) {
+  case parser.parse_string(counter_text(name)) {
+    Ok(parsed) ->
+      feature.to_group(FeatureConfig(feature: parsed, step_registry: registry))
+    Error(_) -> unit_context.it(name <> " does not parse", fails)
+  }
+}
+
+fn fails(_value: Int) {
+  Error("the feature text should parse")
+}
+
+fn counter_text(name: String) -> String {
+  "Feature: "
+  <> name
+  <> "\nScenario: adds one\n  Given the counter starts\n  When I add 1\n  Then the counter is 11\n"
+}
+
 fn write_counter_file(name: String) -> Nil {
   let _ =
-    file.write(
-      "test/tmp/features/" <> name <> ".feature",
-      "Feature: "
-        <> name
-        <> "\nScenario: adds one\n  Given the counter starts\n  When I add 1\n  Then the counter is 11\n",
-    )
+    file.write("test/tmp/features/" <> name <> ".feature", counter_text(name))
   Nil
 }
 
