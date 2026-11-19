@@ -335,54 +335,88 @@ fn discover_files(pattern: String) -> Result(List(String), FeatureFileError) {
   }
 }
 
-/// A pattern that matches no files, or that cannot be searched, is an
-/// error, so a wrong pattern cannot give a run that passes with no tests.
-fn missing_files_errors(
-  pattern: String,
-  found: Result(List(String), FeatureFileError),
-) -> List(FeatureFileError) {
-  case found {
-    Error(error) -> [error]
-    Ok([]) -> [parser.NoMatchingFeatureFiles(pattern: pattern)]
-    Ok(_) -> []
-  }
+/// A pattern that matches no files, or that cannot be searched: the
+/// error, the tag of its failing test, and the run of that test.
+type MissingFiles {
+  MissingFiles(
+    error: FeatureFileError,
+    tag: String,
+    run: fn() -> Result(AssertionResult, String),
+  )
 }
 
+/// A pattern that matches no files, or that cannot be searched, is an
+/// error, so a wrong pattern cannot give a run that passes with no tests.
 /// The failing test for a pattern that matches no files is tagged
 /// `no-feature-files`. The failing test for a pattern that cannot be
 /// searched is tagged `invalid-feature-pattern`.
-fn missing_files_nodes(
+fn missing_files(
   pattern: String,
   found: Result(List(String), FeatureFileError),
-) -> List(Node(Nil)) {
+) -> List(MissingFiles) {
   case found {
-    Error(error) -> [missing_files_node(error, "invalid-feature-pattern")]
+    Error(error) -> [
+      MissingFiles(
+        error: error,
+        tag: "invalid-feature-pattern",
+        run: invalid_pattern_test_run,
+      ),
+    ]
     Ok([]) -> [
-      missing_files_node(
-        parser.NoMatchingFeatureFiles(pattern: pattern),
-        "no-feature-files",
+      MissingFiles(
+        error: parser.NoMatchingFeatureFiles(pattern: pattern),
+        tag: "no-feature-files",
+        run: no_feature_files_test_run,
       ),
     ]
     Ok(_) -> []
   }
 }
 
-fn missing_files_node(error: FeatureFileError, tag: String) -> Node(Nil) {
+fn missing_files_errors(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(FeatureFileError) {
+  list.map(missing_files(pattern, found), missing_files_error)
+}
+
+fn missing_files_error(missing: MissingFiles) -> FeatureFileError {
+  missing.error
+}
+
+fn missing_files_nodes(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(Node(Nil)) {
+  list.map(missing_files(pattern, found), missing_files_node)
+}
+
+fn missing_files_node(missing: MissingFiles) -> Node(Nil) {
   Test(
-    name: parser.feature_file_error_to_string(error),
-    tags: [tag],
+    name: parser.feature_file_error_to_string(missing.error),
+    tags: [missing.tag],
     kind: Unit,
-    run: types.NoInput(missing_files_test_run),
+    run: types.NoInput(missing.run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn missing_files_test_run() -> Result(AssertionResult, String) {
+fn no_feature_files_test_run() -> Result(AssertionResult, String) {
   Ok(
     AssertionFailed(AssertionFailure(
       operator: "discover",
       message: "No feature files found for the pattern (see test name for the cause)",
+      payload: None,
+    )),
+  )
+}
+
+fn invalid_pattern_test_run() -> Result(AssertionResult, String) {
+  Ok(
+    AssertionFailed(AssertionFailure(
+      operator: "discover",
+      message: "The feature file pattern cannot be searched (see test name for the cause)",
       payload: None,
     )),
   )

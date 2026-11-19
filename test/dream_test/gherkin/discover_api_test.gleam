@@ -209,6 +209,7 @@ pub fn tests() {
         list.map(results, result_name),
         list.map(results, result_status),
         list.map(results, result_tags),
+        list.map(results, result_messages),
       )
       |> should
       |> be_equal(
@@ -218,6 +219,11 @@ pub fn tests() {
           ],
           [test_types.Failed],
           [["no-feature-files"]],
+          [
+            [
+              "No feature files found for the pattern (see test name for the cause)",
+            ],
+          ],
         ),
       )
       |> or_fail_with("a pattern without files should fail the run")
@@ -277,6 +283,7 @@ pub fn tests() {
         list.map(results, result_name),
         list.map(results, result_status),
         list.map(results, result_tags),
+        list.map(results, result_messages),
       )
       |> should
       |> be_equal(
@@ -286,6 +293,11 @@ pub fn tests() {
           ],
           [test_types.Failed],
           [["invalid-feature-pattern"]],
+          [
+            [
+              "The feature file pattern cannot be searched (see test name for the cause)",
+            ],
+          ],
         ),
       )
       |> or_fail_with("a malformed pattern should fail the run")
@@ -341,6 +353,14 @@ fn step_ok(_state: Nil, _context: steps.StepContext) -> Result(Nil, String) {
 
 fn result_tags(result: test_types.TestResult) -> List(String) {
   result.tags
+}
+
+fn result_messages(result: test_types.TestResult) -> List(String) {
+  list.map(result.failures, failure_message)
+}
+
+fn failure_message(failure: test_types.AssertionFailure) -> String {
+  failure.message
 }
 
 fn result_name(result: test_types.TestResult) -> String {
