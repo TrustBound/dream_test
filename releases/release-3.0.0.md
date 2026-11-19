@@ -38,8 +38,8 @@ dream_test measures itself this way: its own tests cover 100% of the lines in
 
 ### 🧵 A new hook process model
 
-The hooks of each scope run in one owner process that lives while the tests
-of the scope run. A pool, a supervisor or an ETS table that a `before_all`
+The `before_all` and `after_all` hooks of a group run in one setup process
+that lives while the tests of the group run. A pool, a supervisor or an ETS table that a `before_all`
 hook starts now lives for the tests of its group. A test runs its
 `before_each` hooks, its body and its `after_each` hooks in one process.
 
@@ -54,6 +54,21 @@ hook starts now lives for the tests of its group. A test runs its
 - A hook that crashes, never returns, or kills its own process does not stop
   the run.
 - A test body past its timeout is always `TimedOut`.
+
+### 🧺 One suite type, and set-ups for a whole suite
+
+- Every suite has one type, `suite.TestSuite` in the new module
+  `dream_test/suite`, whatever context its tests get. One `runner.new`
+  takes `unit` suites, `unit_context` suites and Gherkin features together.
+  `suite.group` and `suite.join` put suites together, and each keeps its
+  own context.
+- A suite set-up gives the context of a whole suite and runs once, only
+  when at least one of its tests runs: `unit_context.describe_with_set_up`
+  for unit tests, and `steps.new_with_set_up` for Gherkin scenarios, for
+  example to start one server for all the scenarios of a feature.
+- Pending tests: `unit.pending(name)` and `unit_context.pending(name)` make
+  a test with a name and no body, for a test skeleton. The reporters show
+  it as pending, and the run still passes.
 
 ### 🥒 Gherkin conformance
 
@@ -80,7 +95,7 @@ is a `when` step for a scenario whose state is an `Int`.
 
 ## Breaking changes
 
-Each item has a 2.x and a 3.0.0 example in
+Each item that needs a code change has a 2.x and a 3.0.0 example in
 [Upgrading to 3.0.0](../documentation/13-upgrading-to-3.md).
 
 - `runner.run` and `parallel.run_root_parallel` return `types.RunReport`, and
@@ -100,6 +115,23 @@ Each item has a 2.x and a 3.0.0 example in
 - `sandbox.run_isolated` takes the function and its input as two parameters.
 - `types.Root`, `types.TestResult` and `types.TestInfo` changed shape, and
   `types.ModuleCoverage` and `types.CoverageSummary` are removed.
+- `TestSuite` has no type parameter and is in `dream_test/suite`, and
+  `runner.RunBuilder` has no type parameter.
+- `runner.before_each_test` and `runner.after_each_test` take
+  `fn(TestInfo) -> Result(Nil, String)`: the hooks get the `TestInfo` of the
+  test, not its context.
+- Module discovery keeps the context of a suite with a context; in 2.x its
+  tests got `Nil`.
+- `types.AssertionResult` has the new variant `AssertionPending`.
+- The progress event API changed: `progress.handle_event` and the reporter
+  event types are removed; use `progress.line` with a
+  `progress.ProgressEvent`.
+- `types.TestKind.Integration`, `types.TestSuiteItem` and the module
+  `dream_test/context` are removed.
+- Gherkin: `find_step` and `step_trie` take a `StepPhase` in place of a
+  keyword.
+- A `discover.features` pattern that matches no files is an error, and so
+  is a module discovery pattern that matches no test module.
 
 ## Requirements
 
