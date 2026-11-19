@@ -349,9 +349,9 @@ type TestJob(context) {
 /// A test process that the loop started and that has not finished. The
 /// loop knows its current step, the state when that step started, and the
 /// deadline of the step. The loop monitors the process, so a process that
-/// stops before it finishes still gives a result. `timed_out` is `True`
-/// after the loop killed the process at a deadline: the loop still reads
-/// its messages until its down message, so a step or an outcome that the
+/// stops before it finishes still gives a result. `killed` holds the step
+/// that ran when the loop killed the process at a deadline: the loop still
+/// reads its messages until its down message, so an outcome that the
 /// process sent before the kill is not lost.
 type RunningWorker(context) {
   RunningWorker(
@@ -362,7 +362,30 @@ type RunningWorker(context) {
     later_steps: List(TestStep(context)),
     state: TestState(context),
     deadline_ms: Int,
-    timed_out: Bool,
+    killed: Option(KilledStep(context)),
+  )
+}
+
+/// The step that ran when the loop killed a test process at its deadline,
+/// the steps after it, and the state when it started. This step is the
+/// step that timed out, also when the process started a later step before
+/// the kill reached it.
+type KilledStep(context) {
+  KilledStep(
+    step: TestStep(context),
+    later_steps: List(TestStep(context)),
+    state: TestState(context),
+  )
+}
+
+/// A step that did not finish in its test process: the step, the state
+/// when it started, the steps after it, and why it did not finish.
+type EndedStep(context) {
+  EndedStep(
+    step: TestStep(context),
+    state: TestState(context),
+    later_steps: List(TestStep(context)),
+    end: StepEnd,
   )
 }
 
@@ -2347,7 +2370,7 @@ fn spawn_test_process(
     later_steps: job.later_steps,
     state: job.state,
     deadline_ms: now + step_timeout(job, job.first_step),
-    timed_out: False,
+    killed: None,
   )
 }
 
@@ -2502,7 +2525,7 @@ fn remove_down_worker(
     [] -> #(list.reverse(kept_rev), results)
     [worker, ..rest] if worker.monitor == down.monitor -> {
       let #(next_kept_rev, next_results) =
-        after_step_end(worker, step_end(worker, down), kept_rev, results)
+        after_step_end(worker.job, ended_step(worker, down), kept_rev, results)
       remove_down_worker(rest, down, next_kept_rev, next_results)
     }
     [worker, ..rest] ->
@@ -2510,23 +2533,57 @@ fn remove_down_worker(
   }
 }
 
-/// Why a process stopped in its current step: a timeout when the loop
-/// killed it at a deadline, else its exit reason.
-fn step_end(worker: RunningWorker(context), down: Down) -> StepEnd {
-  case worker.timed_out {
-    True -> StepTimedOut
-    False -> StepExited(sandbox.format_exit_reason(down.reason))
+/// The step in which a process stopped. After a kill at a deadline, it is
+/// the step that ran at the kill, and it timed out. Else it is the current
+/// step, and the exit reason says why it stopped.
+fn ended_step(
+  worker: RunningWorker(context),
+  down: Down,
+) -> EndedStep(context) {
+  case worker.killed {
+    Some(killed) ->
+      EndedStep(
+        step: killed.step,
+        state: TestState(
+          ..killed.state,
+          teardown_failures_rev: worker.state.teardown_failures_rev,
+        ),
+        later_steps: steps_after_kill(killed, worker),
+        end: StepTimedOut,
+      )
+    None ->
+      EndedStep(
+        step: worker.step,
+        state: worker.state,
+        later_steps: worker.later_steps,
+        end: StepExited(sandbox.format_exit_reason(down.reason)),
+      )
   }
 }
 
-/// Kill each process whose step is past its deadline, and mark it as timed
-/// out. The process stays in the list until the loop reads its down
-/// message. The messages that it sent before the kill come before that
-/// down message, so the loop reads each of them first: a process that
-/// sent its outcome just before the kill keeps that outcome, and a step
-/// that it started is the step that timed out. Its tear-down steps start
-/// after the down message, when what it held is free. A process that does
-/// not stop by its new deadline is killed again.
+/// The steps that did not finish after a kill. With no step started after
+/// the kill, they are the steps after the killed step. When the process
+/// started a later step before the kill reached it, that step did not
+/// finish, so it is the first of them: a tear-down step that the killed
+/// process started runs again in a new process. The tear-down failures of
+/// the steps that finished stay in the state.
+fn steps_after_kill(
+  killed: KilledStep(context),
+  worker: RunningWorker(context),
+) -> List(TestStep(context)) {
+  let finished_after_kill =
+    list.length(killed.later_steps) - list.length(worker.later_steps)
+  list.drop([worker.step, ..worker.later_steps], 1 - finished_after_kill)
+}
+
+/// Kill each process whose step is past its deadline, and keep the step
+/// that ran at the kill as the step that timed out. The process stays in
+/// the list until the loop reads its down message. The messages that it
+/// sent before the kill come before that down message, so the loop reads
+/// each of them first: a process that sent its outcome just before the
+/// kill keeps that outcome. Its tear-down steps start after the down
+/// message, when what it held is free. A process that does not stop by
+/// its new deadline is killed again, and the first kill stays.
 fn expire_workers(
   running: List(RunningWorker(context)),
   now: Int,
@@ -2539,7 +2596,14 @@ fn expire_workers(
       expire_workers(rest, now, [
         RunningWorker(
           ..worker,
-          timed_out: True,
+          killed: option.or(
+            worker.killed,
+            Some(KilledStep(
+              step: worker.step,
+              later_steps: worker.later_steps,
+              state: worker.state,
+            )),
+          ),
           deadline_ms: now + worker.job.default_timeout_ms,
         ),
         ..kept_rev
@@ -2550,33 +2614,25 @@ fn expire_workers(
 }
 
 /// After a step did not finish: record the failure of the step, then run
-/// the tear-down steps that did not run yet in a new process, with the
+/// the tear-down steps that did not finish yet in a new process, with the
 /// context that they would get after the body. With no such step, the
 /// test has its outcome.
 fn after_step_end(
-  worker: RunningWorker(context),
-  end: StepEnd,
+  job: TestJob(context),
+  ended: EndedStep(context),
   kept_rev: List(RunningWorker(context)),
   results: List(IndexedResult),
 ) -> #(List(RunningWorker(context)), List(IndexedResult)) {
-  let state = fail_step(worker.job, worker.step, worker.state, end)
-  case list.filter(worker.later_steps, is_teardown_step) {
+  let state = fail_step(job, ended.step, ended.state, ended.end)
+  case list.filter(ended.later_steps, is_teardown_step) {
     [] -> #(kept_rev, [
-      IndexedResult(
-        index: worker.job.index,
-        outcome: test_outcome(worker.job, state),
-      ),
+      IndexedResult(index: job.index, outcome: test_outcome(job, state)),
       ..results
     ])
     [first, ..rest] -> {
-      let job =
-        TestJob(
-          ..worker.job,
-          first_step: first,
-          later_steps: rest,
-          state: state,
-        )
-      #([spawn_test_process(job, timing.now_ms()), ..kept_rev], results)
+      let next_job =
+        TestJob(..job, first_step: first, later_steps: rest, state: state)
+      #([spawn_test_process(next_job, timing.now_ms()), ..kept_rev], results)
     }
   }
 }

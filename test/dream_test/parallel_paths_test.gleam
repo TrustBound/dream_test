@@ -440,6 +440,34 @@ pub fn tests() {
       |> or_fail_with("after_each should run once after a timeout")
     }),
 
+    it("an after_each that times out runs once, and the next one runs", fn() {
+      // The first after_each never returns and times out. The loop keeps it
+      // as the step that timed out, so it does not run again, and runs the
+      // second after_each in a new process. The second after_each only
+      // sends a message, so it ends long before the 1s hook timeout.
+      let first_calls = process.new_subject()
+      let second_calls = process.new_subject()
+      let report =
+        runner.new([
+          describe("root", [
+            after_each(fn() { record_call_then_block(first_calls) }),
+            after_each(fn() { record_call(second_calls) }),
+            timed_test("passes", Some(60_000), pass),
+          ]),
+        ])
+        |> runner.default_timeout_ms(1000)
+        |> runner.silent()
+        |> runner.run()
+      #(
+        list.length(types.report_teardown_failures(report)),
+        count_calls(first_calls, 0),
+        count_calls(second_calls, 0),
+      )
+      |> should
+      |> be_equal(#(1, 1, 1))
+      |> or_fail_with("each after_each should run once after a hook timeout")
+    }),
+
     it("a test with its own timeout times out while another runs on", fn() {
       // The runner hook holds each worker for 30ms before the bodies start.
       // The 20ms deadline of "short" counts from the start of its body.
@@ -767,6 +795,12 @@ fn statuses(results: List(TestResult)) -> List(#(List(String), Status)) {
 
 fn record_call(calls: Subject(Nil)) -> Result(Nil, String) {
   process.send(calls, Nil)
+  Ok(Nil)
+}
+
+fn record_call_then_block(calls: Subject(Nil)) -> Result(Nil, String) {
+  process.send(calls, Nil)
+  process.sleep_forever()
   Ok(Nil)
 }
 
