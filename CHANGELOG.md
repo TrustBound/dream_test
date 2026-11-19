@@ -600,6 +600,10 @@ the guide labels them.
     `runner.results_reporters`. `render` is a `fn(RunReport) -> String`.
     The runner calls it one time at the end of the run and writes the text,
     in list order with the `bdd` and `json` reports
+  - The runner calls `render` in the process of the run, so `render` must
+    return. An abnormal exit signal sent to the process of the run, for
+    example from a linked process that `render` starts, is not caught and
+    ends the run
   - The reports print before the coverage check and before
     `runner.exit_on_failure()` ends the program. Thus a custom report or a
     Gherkin report (`reporter_types.Custom(gherkin.format)`) prints, and the

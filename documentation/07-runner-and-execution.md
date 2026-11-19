@@ -33,6 +33,7 @@ Use `max_concurrency` and `default_timeout_ms` to tune execution:
 
 - **Higher concurrency** speeds up independent tests.
 - **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
+- **`default_timeout_ms` must be at least 1.** With 0, the tests and hooks get no time, so they time out. A value below 0 stops the run with the Erlang error `timeout_value` when a set-up process waits for a hook, for example a `before_all` hook.
 
 #### Concurrency and timeouts <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

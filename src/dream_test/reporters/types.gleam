@@ -48,7 +48,9 @@ pub type ResultsReporter {
   /// `render` one time with the run report, and writes the text that it
   /// returns. The runner adds no newline, so end the text with `"\n"`.
   /// The runner calls `render` in the process of the run, so `render` must
-  /// return.
+  /// return. An abnormal exit signal sent to the process of the run, for
+  /// example from a linked process that `render` starts, is not caught and
+  /// ends the run.
   ///
   /// If `render` crashes, the runner writes a `Results reporter failed`
   /// error to the error output, also in a silent run. The error names the

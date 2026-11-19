@@ -282,7 +282,7 @@ pub fn render_my_report(report: RunReport) -> String {
 }
 ```
 
-Then give the formatter to the runner as `reporter_types.Custom(render_my_report)`. At the end of the run, the runner calls the formatter one time and writes the text that it returns. The runner adds no newline, so end the text with `"\n"`. The runner calls the formatter in the process of the run, so the formatter must return. The reports print in list order, with `bdd` and `json` reports in the same list.
+Then give the formatter to the runner as `reporter_types.Custom(render_my_report)`. At the end of the run, the runner calls the formatter one time and writes the text that it returns. The runner adds no newline, so end the text with `"\n"`. The runner calls the formatter in the process of the run, so the formatter must return. An abnormal exit signal sent to the process of the run, for example from a linked process that the formatter starts, is not caught and ends the run. The reports print in list order, with `bdd` and `json` reports in the same list.
 
 The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists when the run fails.
 
