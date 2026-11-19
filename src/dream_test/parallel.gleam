@@ -46,12 +46,14 @@ import dream_test/sandbox.{
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type Root, type RunReport, type SetUpHook, type Status, type TeardownFailure,
-  type TeardownHook, type TestInfo, type TestKind, type TestResult, AfterAll,
-  AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook, AssertionFailed,
-  AssertionFailure, AssertionOk, AssertionSkipped, BeforeAll, BeforeAllHook,
-  BeforeEach, Failed, Group, Passed, Root, SetupFailed, Skipped, TeardownFailure,
-  Test, TestResult, TimedOut,
+  type Root, type RunReport, type SetUpHook, type Status, type SuiteContext,
+  type TeardownFailure, type TeardownHook, type TestInfo, type TestKind,
+  type TestResult, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
+  AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
+  AssertionSkipped, BeforeAll, BeforeAllHook, BeforeAllSuitesHook, BeforeEach,
+  BeforeEachSuiteHook, ContextFromSetUp, Failed, FixedContext, Group, Passed,
+  Root, SetupFailed, Skipped, SuiteSetUpHook, SuiteTearDownHook, TeardownFailure,
+  Test, TestResult, TimedOut, WithInput,
 }
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
@@ -153,7 +155,7 @@ pub type RunSuiteConfig(context) {
     name: String,
     tags: List(String),
     children: List(Node(context)),
-    seed: context,
+    context: SuiteContext(context),
     progress_reporter: Option(progress.ProgressReporter),
     write: fn(String) -> Nil,
     total: Int,
@@ -424,6 +426,9 @@ type LoopState(context) {
 /// A group hook with the context that it gets, so that the owner process
 /// of the group can run it.
 type GroupHookCall(context) {
+  /// The set-up of a suite (see `types.ContextFromSetUp`). Its value is
+  /// the context of the suite.
+  StartCall(set_up: fn() -> Result(context, String))
   SetUpCall(hook: Callback(context, Result(context, String)), context: context)
   TearDownCall(hook: Callback(context, Result(Nil, String)), context: context)
 }
@@ -437,12 +442,51 @@ type GroupOwner(context) =
 /// as the tests of the scope see it.
 type ScopeOwner(context) {
   /// The owner was alive at the last check.
-  OwnerAlive(scope: List(String), owner: GroupOwner(context))
+  OwnerAlive(scope: List(String), owner: GroupOwner(context), set_up: SetUpHook)
   /// The owner stopped with `reason`. The tests of the scope that have not
   /// started do not run, and its `after_all` hooks run in a new owner.
   /// `not_run` is the full name of each test that it did not run, in the
   /// order of the run.
-  OwnerGone(scope: List(String), reason: String, not_run: List(List(String)))
+  OwnerGone(
+    scope: List(String),
+    reason: String,
+    not_run: List(List(String)),
+    set_up: SetUpHook,
+  )
+}
+
+/// The names that the reports give to the set-up and the tear-down of a
+/// group scope: the `before_all` and `after_all` hooks of a group, or the
+/// set-up and the tear-down of a suite (see `types.ContextFromSetUp`).
+/// `set_up_text` and `tear_down_text` start the text of a crash or a
+/// timeout, for example `hook crashed in <groups>: <reason>`.
+type ScopeHooks {
+  ScopeHooks(
+    set_up: SetUpHook,
+    tear_down: TeardownHook,
+    set_up_text: String,
+    tear_down_text: String,
+  )
+}
+
+/// The names for the scope whose set-up is `set_up`.
+fn scope_hooks(set_up: SetUpHook) -> ScopeHooks {
+  case set_up {
+    SuiteSetUpHook ->
+      ScopeHooks(
+        set_up: SuiteSetUpHook,
+        tear_down: SuiteTearDownHook,
+        set_up_text: "set-up",
+        tear_down_text: "tear-down",
+      )
+    BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
+      ScopeHooks(
+        set_up: BeforeAllHook,
+        tear_down: AfterAllHook,
+        set_up_text: "hook",
+        tear_down_text: "hook",
+      )
+  }
 }
 
 /// The owners of the scopes around a test: the outer set-ups of the
@@ -654,7 +698,7 @@ pub fn run_root_parallel_with_reporter(
     name: name,
     tags: tags,
     children: children,
-    seed: seed,
+    context: FixedContext(seed),
     progress_reporter: config.progress_reporter,
     write: config.write,
     total: config.total,
@@ -705,37 +749,217 @@ pub fn run_suite(
   config config: RunSuiteConfig(context),
 ) -> RunRootParallelWithReporterResult {
   let owners = refresh_owners(Owners(outer: config.outer_setups, groups: []))
-  let executor_input =
-    ExecuteNodeConfig(
-      config: config.config,
-      scope: config.groups,
-      inherited_tags: [],
-      context: config.seed,
-      inherited_before_each: [],
-      inherited_after_each: [],
-      runner_before_each_test: config.runner_before_each_test,
-      runner_after_each_test: config.runner_after_each_test,
-      node: Group(
-        name: config.name,
-        tags: config.tags,
-        children: config.children,
-      ),
-      progress_output: progress_output(config.progress_reporter, config.write),
-      total: config.total,
-      completed: config.completed,
-      collected: empty_collected(),
-      owners: owners,
-    )
+  case config.context, stopped_setup(owners) {
+    FixedContext(value: value), _ ->
+      suite_result(
+        config,
+        execute_or_fail_group(suite_input(config, value, owners)),
+      )
+    ContextFromSetUp(..), Some(stopped) ->
+      suite_result(
+        config,
+        fail_after_stop(
+          config.groups,
+          [],
+          suite_node(config),
+          stopped,
+          progress_output(config.progress_reporter, config.write),
+          config.completed,
+          config.total,
+          empty_collected(),
+        ),
+      )
+    ContextFromSetUp(set_up: set_up, tear_down: tear_down), None ->
+      start_set_up(config, owners, set_up, tear_down)
+  }
+}
 
-  let #(collected, completed_after_suite, owners_after_suite) =
-    execute_or_fail_group(executor_input)
+/// The top-level group of the tree of a suite.
+fn suite_node(config: RunSuiteConfig(context)) -> Node(context) {
+  Group(name: config.name, tags: config.tags, children: config.children)
+}
+
+/// The executor input for the tree of a suite with its context.
+fn suite_input(
+  config: RunSuiteConfig(context),
+  context: context,
+  owners: Owners(context),
+) -> ExecuteNodeConfig(context) {
+  ExecuteNodeConfig(
+    config: config.config,
+    scope: config.groups,
+    inherited_tags: [],
+    context: context,
+    inherited_before_each: [],
+    inherited_after_each: [],
+    runner_before_each_test: config.runner_before_each_test,
+    runner_after_each_test: config.runner_after_each_test,
+    node: suite_node(config),
+    progress_output: progress_output(config.progress_reporter, config.write),
+    total: config.total,
+    completed: config.completed,
+    collected: empty_collected(),
+    owners: owners,
+  )
+}
+
+fn suite_result(
+  config: RunSuiteConfig(context),
+  ran: #(Collected, Int, Owners(context)),
+) -> RunRootParallelWithReporterResult {
+  let #(collected, completed, owners) = ran
   RunRootParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
-    completed: completed_after_suite,
+    completed: completed,
     progress_reporter: config.progress_reporter,
-    outer_setups: owners_after_suite.outer,
+    outer_setups: owners.outer,
   )
+}
+
+/// Run the set-up of a suite in a new owner process, then the tests with
+/// its value, then the tear-down in the same owner.
+fn start_set_up(
+  config: RunSuiteConfig(context),
+  owners: Owners(context),
+  set_up: fn() -> Result(context, String),
+  tear_down: fn(context) -> Result(Nil, String),
+) -> RunRootParallelWithReporterResult {
+  let scope = list.append(config.groups, [config.name])
+  case
+    sandbox.run_in_owner(
+      None,
+      config.config.default_timeout_ms,
+      run_group_hook,
+      StartCall(set_up: set_up),
+    )
+  {
+    OwnerReturned(owner: owner, value: Ok(context)) ->
+      run_after_set_up(
+        config,
+        owners,
+        OwnerAlive(scope: scope, owner: owner, set_up: SuiteSetUpHook),
+        context,
+        tear_down,
+      )
+    OwnerReturned(owner: owner, value: Error(message)) -> {
+      sandbox.stop_owner(owner)
+      suite_set_up_failed(config, owners, failed_set_up(message))
+    }
+    OwnerCaught(owner: owner, reason: reason) -> {
+      sandbox.stop_owner(owner)
+      suite_set_up_failed(
+        config,
+        owners,
+        failed_set_up(scope_crash_message("set-up", scope, reason)),
+      )
+    }
+    OwnerTimedOut ->
+      suite_set_up_failed(
+        config,
+        owners,
+        failed_set_up(scope_timeout_message("set-up", scope)),
+      )
+    OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
+      suite_set_up_stopped(config, owners, scope, reason)
+  }
+}
+
+/// The failure of each test of a suite whose set-up failed.
+fn failed_set_up(message: String) -> AssertionFailure {
+  hook_failure(types.set_up_hook_name(SuiteSetUpHook), message)
+}
+
+fn run_after_set_up(
+  config: RunSuiteConfig(context),
+  owners: Owners(context),
+  own: ScopeOwner(context),
+  context: context,
+  tear_down: fn(context) -> Result(Nil, String),
+) -> RunRootParallelWithReporterResult {
+  let #(collected, completed, owners_after) =
+    execute_or_fail_group(suite_input(
+      config,
+      context,
+      Owners(..owners, groups: [own]),
+    ))
+  let teardown_failures_rev =
+    finish_group_scope(
+      config.config,
+      GroupScope(groups: own.scope, hooks: scope_hooks(SuiteSetUpHook)),
+      option.from_result(list.first(owners_after.groups)),
+      context,
+      [WithInput(tear_down)],
+    )
+  suite_result(config, #(
+    add_collected(
+      Collected(results_rev: [], teardown_failures_rev: teardown_failures_rev),
+      collected,
+    ),
+    completed,
+    owners_after,
+  ))
+}
+
+/// Each test of a suite whose set-up failed is `SetupFailed` with
+/// `failure`. The tear-down does not run.
+fn suite_set_up_failed(
+  config: RunSuiteConfig(context),
+  owners: Owners(context),
+  failure: AssertionFailure,
+) -> RunRootParallelWithReporterResult {
+  let results_rev =
+    fail_group_nodes(config.groups, [], [suite_node(config)], [failure], [])
+  suite_result(config, #(
+    Collected(results_rev: results_rev, teardown_failures_rev: []),
+    emit_test_finished_progress_results(
+      progress_output(config.progress_reporter, config.write),
+      config.completed,
+      config.total,
+      list.reverse(results_rev),
+    ),
+    owners,
+  ))
+}
+
+/// The process of the set-up of a suite stopped before the set-up
+/// returned. No test runs, the run report gets a `SetupStopped` with each
+/// test in `not_run`, and the tear-down does not run: there is no value
+/// to give it.
+fn suite_set_up_stopped(
+  config: RunSuiteConfig(context),
+  owners: Owners(context),
+  scope: List(String),
+  reason: String,
+) -> RunRootParallelWithReporterResult {
+  let stop =
+    Stop(set_up: SuiteSetUpHook, scope: scope, reason: reason, not_run: [])
+  let results_rev =
+    fail_group_nodes(
+      config.groups,
+      [],
+      [suite_node(config)],
+      [not_run_failure(stop)],
+      [],
+    )
+  let results = list.reverse(results_rev)
+  suite_result(config, #(
+    Collected(results_rev: results_rev, teardown_failures_rev: [
+      types.SetupStopped(
+        set_up: SuiteSetUpHook,
+        groups: scope,
+        reason: reason,
+        not_run: full_names(results),
+      ),
+    ]),
+    emit_test_finished_progress_results(
+      progress_output(config.progress_reporter, config.write),
+      config.completed,
+      config.total,
+      results,
+    ),
+    owners,
+  ))
 }
 
 // =============================================================================
@@ -811,7 +1035,7 @@ fn execute_node(
           let teardown_failures_rev =
             finish_group_scope(
               config,
-              group_scope,
+              before_all_scope(group_scope),
               alive_owner(group_scope, owner),
               ctx2,
               hooks.after_all,
@@ -885,7 +1109,7 @@ fn execute_node(
           let teardown_failures_rev =
             finish_group_scope(
               config,
-              group_scope,
+              before_all_scope(group_scope),
               list.first(own_owner) |> option.from_result,
               ctx2,
               hooks.after_all,
@@ -916,7 +1140,8 @@ fn alive_owner(
   owner: Option(GroupOwner(context)),
 ) -> Option(ScopeOwner(context)) {
   case owner {
-    Some(owner) -> Some(OwnerAlive(scope: scope, owner: owner))
+    Some(owner) ->
+      Some(OwnerAlive(scope: scope, owner: owner, set_up: BeforeAllHook))
     None -> None
   }
 }
@@ -954,8 +1179,8 @@ fn checked_outer_setup(
 
 fn refresh_owner(owner: ScopeOwner(context)) -> ScopeOwner(context) {
   case owner {
-    OwnerAlive(scope: scope, owner: alive) ->
-      checked_owner(scope, alive, sandbox.check_owner(alive))
+    OwnerAlive(scope: scope, owner: alive, set_up: set_up) ->
+      checked_owner(scope, alive, set_up, sandbox.check_owner(alive))
     OwnerGone(..) -> owner
   }
 }
@@ -963,11 +1188,13 @@ fn refresh_owner(owner: ScopeOwner(context)) -> ScopeOwner(context) {
 fn checked_owner(
   scope: List(String),
   owner: GroupOwner(context),
+  set_up: SetUpHook,
   checked: Result(GroupOwner(context), String),
 ) -> ScopeOwner(context) {
   case checked {
-    Ok(_alive) -> OwnerAlive(scope: scope, owner: owner)
-    Error(reason) -> OwnerGone(scope: scope, reason: reason, not_run: [])
+    Ok(_alive) -> OwnerAlive(scope: scope, owner: owner, set_up: set_up)
+    Error(reason) ->
+      OwnerGone(scope: scope, reason: reason, not_run: [], set_up: set_up)
   }
 }
 
@@ -1055,6 +1282,7 @@ fn record_not_run(
             scope: found.value.scope,
             reason: found.value.reason,
             not_run: list.append(found.value.not_run, names),
+            set_up: found.value.set_up,
           ),
         ),
       )
@@ -1106,13 +1334,8 @@ fn outer_stop(setup: OuterSetup) -> Result(Stop, Nil) {
 
 fn group_stop(owner: ScopeOwner(context)) -> Result(Stop, Nil) {
   case owner {
-    OwnerGone(scope: scope, reason: reason, not_run: not_run) ->
-      Ok(Stop(
-        set_up: BeforeAllHook,
-        scope: scope,
-        reason: reason,
-        not_run: not_run,
-      ))
+    OwnerGone(scope: scope, reason: reason, not_run: not_run, set_up: set_up) ->
+      Ok(Stop(set_up: set_up, scope: scope, reason: reason, not_run: not_run))
     OwnerAlive(..) -> Error(Nil)
   }
 }
@@ -1343,6 +1566,7 @@ fn collect_children(
 /// result type.
 fn run_group_hook(call: GroupHookCall(context)) -> Result(context, String) {
   case call {
+    StartCall(set_up: set_up) -> set_up()
     SetUpCall(hook: hook, context: context) -> types.call(hook, context)
     TearDownCall(hook: hook, context: context) ->
       types.call(hook, context)
@@ -1429,7 +1653,12 @@ fn before_all_result(
       )
     OwnerExited(reason: reason) | OwnerLost(reason: reason) ->
       BeforeAllRan(
-        owner: Some(OwnerGone(scope: scope, reason: reason, not_run: [])),
+        owner: Some(OwnerGone(
+          scope: scope,
+          reason: reason,
+          not_run: [],
+          set_up: BeforeAllHook,
+        )),
         context: context,
       )
   }
@@ -1441,28 +1670,38 @@ fn before_all_result(
 /// newest first.
 fn finish_group_scope(
   config: ParallelConfig,
-  scope: List(String),
+  scope: GroupScope,
   owner: Option(ScopeOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
 ) -> List(TeardownFailure) {
   case owner, hooks {
     None, _ -> run_after_all_hooks(config, scope, None, context, hooks, [])
-    Some(OwnerGone(scope: _, reason: reason, not_run: not_run)), _ ->
+    Some(OwnerGone(reason: reason, not_run: not_run, ..)), _ ->
       run_after_all_hooks(config, scope, None, context, hooks, [
         group_setup_stopped(scope, reason, not_run),
       ])
-    Some(OwnerAlive(scope: _, owner: alive)), [] ->
+    Some(OwnerAlive(owner: alive, ..)), [] ->
       stop_checked_owner(scope, sandbox.check_owner(alive))
-    Some(OwnerAlive(scope: _, owner: alive)), _ ->
+    Some(OwnerAlive(owner: alive, ..)), _ ->
       run_after_all_hooks(config, scope, Some(alive), context, hooks, [])
   }
+}
+
+/// A group scope at its end: its names and the names of its hooks.
+type GroupScope {
+  GroupScope(groups: List(String), hooks: ScopeHooks)
+}
+
+/// The scope of a group with `before_all` and `after_all` hooks.
+fn before_all_scope(groups: List(String)) -> GroupScope {
+  GroupScope(groups: groups, hooks: scope_hooks(BeforeAllHook))
 }
 
 /// Run the `after_all` hooks, then stop the last owner.
 fn run_after_all_hooks(
   config: ParallelConfig,
-  scope: List(String),
+  scope: GroupScope,
   owner: Option(GroupOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
@@ -1477,7 +1716,7 @@ fn run_after_all_hooks(
 /// Stop the owner of a scope with no `after_all` hook, or report that it
 /// stopped already.
 fn stop_checked_owner(
-  scope: List(String),
+  scope: GroupScope,
   checked: Result(GroupOwner(context), String),
 ) -> List(TeardownFailure) {
   case checked {
@@ -1490,13 +1729,13 @@ fn stop_checked_owner(
 }
 
 fn group_setup_stopped(
-  scope: List(String),
+  scope: GroupScope,
   reason: String,
   not_run: List(List(String)),
 ) -> TeardownFailure {
   types.SetupStopped(
-    set_up: BeforeAllHook,
-    groups: scope,
+    set_up: scope.hooks.set_up,
+    groups: scope.groups,
     reason: reason,
     not_run: not_run,
   )
@@ -1508,7 +1747,7 @@ fn group_setup_stopped(
 /// hook runs in a new owner.
 fn run_after_all_chain(
   config: ParallelConfig,
-  scope: List(String),
+  scope: GroupScope,
   owner: Option(GroupOwner(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
@@ -1540,7 +1779,7 @@ fn run_after_all_chain(
 type AfterAllStep(context) {
   AfterAllStep(
     config: ParallelConfig,
-    scope: List(String),
+    scope: GroupScope,
     context: context,
     hook: Callback(context, Result(Nil, String)),
     rest: List(Callback(context, Result(Nil, String))),
@@ -1579,7 +1818,7 @@ fn after_all_result(
         Some(owner),
         context,
         rest,
-        add_teardown_failure(AfterAllHook, scope, message, failures_rev),
+        add_teardown_failure(scope, message, failures_rev),
       )
     OwnerCaught(owner: owner, reason: reason) ->
       run_after_all_chain(
@@ -1589,9 +1828,8 @@ fn after_all_result(
         context,
         rest,
         add_teardown_failure(
-          AfterAllHook,
           scope,
-          hook_crash_message(scope, reason),
+          scope_crash_message(scope.hooks.tear_down_text, scope.groups, reason),
           failures_rev,
         ),
       )
@@ -1603,9 +1841,8 @@ fn after_all_result(
         context,
         rest,
         add_teardown_failure(
-          AfterAllHook,
           scope,
-          hook_timeout_message(scope),
+          scope_timeout_message(scope.hooks.tear_down_text, scope.groups),
           failures_rev,
         ),
       )
@@ -1617,9 +1854,8 @@ fn after_all_result(
         context,
         rest,
         add_teardown_failure(
-          AfterAllHook,
           scope,
-          hook_crash_message(scope, reason),
+          scope_crash_message(scope.hooks.tear_down_text, scope.groups, reason),
           failures_rev,
         ),
       )
@@ -1631,14 +1867,21 @@ fn after_all_result(
   }
 }
 
-/// Put a failure of a tear-down hook in front of `failures_rev`.
+/// Put a failure of the tear-down of a group scope in front of
+/// `failures_rev`.
 fn add_teardown_failure(
-  hook: TeardownHook,
-  scope: List(String),
+  scope: GroupScope,
   message: String,
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
-  [TeardownFailure(hook: hook, groups: scope, message: message), ..failures_rev]
+  [
+    TeardownFailure(
+      hook: scope.hooks.tear_down,
+      groups: scope.groups,
+      message: message,
+    ),
+    ..failures_rev
+  ]
 }
 
 fn run_child_groups_sequentially(
@@ -1710,30 +1953,49 @@ fn execute_or_fail_group(
 ) -> #(Collected, Int, Owners(context)) {
   case stopped_setup(node_config.owners) {
     None -> execute_node(node_config)
-    Some(stopped) -> {
-      let results_rev =
-        fail_group_nodes(
-          node_config.scope,
-          node_config.inherited_tags,
-          [node_config.node],
-          [stopped.failure],
-          [],
-        )
-      #(
-        add_collected(
-          Collected(results_rev: results_rev, teardown_failures_rev: []),
-          node_config.collected,
-        ),
-        emit_test_finished_progress_results(
-          node_config.progress_output,
-          node_config.completed,
-          node_config.total,
-          list.reverse(results_rev),
-        ),
-        record_not_run(stopped, full_names(list.reverse(results_rev))),
+    Some(stopped) ->
+      fail_after_stop(
+        node_config.scope,
+        node_config.inherited_tags,
+        node_config.node,
+        stopped,
+        node_config.progress_output,
+        node_config.completed,
+        node_config.total,
+        node_config.collected,
       )
-    }
   }
+}
+
+/// Each test of `node` is `SetupFailed` because the set-up `stopped`
+/// stopped, and that set-up records them as not run. No hook of `node`
+/// runs.
+fn fail_after_stop(
+  scope: List(String),
+  inherited_tags: List(String),
+  node: Node(context),
+  stopped: StoppedSetup(context),
+  progress_output: Option(ProgressOutput),
+  completed: Int,
+  total: Int,
+  collected: Collected,
+) -> #(Collected, Int, Owners(context)) {
+  let results_rev =
+    fail_group_nodes(scope, inherited_tags, [node], [stopped.failure], [])
+  let results = list.reverse(results_rev)
+  #(
+    add_collected(
+      Collected(results_rev: results_rev, teardown_failures_rev: []),
+      collected,
+    ),
+    emit_test_finished_progress_results(
+      progress_output,
+      completed,
+      total,
+      results,
+    ),
+    record_not_run(stopped, full_names(results)),
+  )
 }
 
 // =============================================================================
@@ -2511,15 +2773,14 @@ fn tear_down_failed(
   hook: TeardownHook,
   message: String,
 ) -> TestState(context) {
-  TestState(
-    ..state,
-    teardown_failures_rev: add_teardown_failure(
-      hook,
-      types.full_name(job.scope, job.test_case.name),
-      message,
-      state.teardown_failures_rev,
+  TestState(..state, teardown_failures_rev: [
+    TeardownFailure(
+      hook: hook,
+      groups: types.full_name(job.scope, job.test_case.name),
+      message: message,
     ),
-  )
+    ..state.teardown_failures_rev
+  ])
 }
 
 /// The outcome of a test from its state after its last step.
@@ -2570,11 +2831,26 @@ fn call_hook(call: HookCall(input, output)) -> output {
 }
 
 fn hook_crash_message(scope: List(String), reason: String) -> String {
-  "hook crashed in " <> string.join(scope, " > ") <> ": " <> reason
+  scope_crash_message("hook", scope, reason)
 }
 
 fn hook_timeout_message(scope: List(String)) -> String {
-  "hook timed out in " <> string.join(scope, " > ")
+  scope_timeout_message("hook", scope)
+}
+
+/// `<text> crashed in <groups>: <reason>`, for example
+/// `set-up crashed in server: error:boom`.
+fn scope_crash_message(
+  text: String,
+  scope: List(String),
+  reason: String,
+) -> String {
+  text <> " crashed in " <> string.join(scope, " > ") <> ": " <> reason
+}
+
+/// `<text> timed out in <groups>`.
+fn scope_timeout_message(text: String, scope: List(String)) -> String {
+  text <> " timed out in " <> string.join(scope, " > ")
 }
 
 fn hook_failure(operator: String, message: String) -> AssertionFailure {

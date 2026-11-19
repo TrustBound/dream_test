@@ -467,6 +467,30 @@ pub fn call(
   }
 }
 
+/// Where the tests of a suite get their context.
+///
+/// ## Variants
+///
+/// - `FixedContext(value)`: every test starts from `value`, as the `seed`
+///   of a `Root`.
+/// - `ContextFromSetUp(set_up, tear_down)`: `set_up` runs once, before the
+///   first test of the suite, and only when at least one test of the suite
+///   runs. Its value is the context of every hook and test. `tear_down`
+///   gets the same value after the last test. Both run in one process that
+///   lives while the tests run, so a process that the set-up starts and
+///   links stays alive. When the set-up returns `Error`, crashes or times
+///   out, each test is `SetupFailed` and the tear-down does not run.
+///
+/// `unit_context.describe_with_set_up` and `steps.new_with_set_up` make a
+/// `ContextFromSetUp`.
+pub type SuiteContext(context) {
+  FixedContext(value: context)
+  ContextFromSetUp(
+    set_up: fn() -> Result(context, String),
+    tear_down: fn(context) -> Result(Nil, String),
+  )
+}
+
 /// Compatibility alias: suite items are nodes in the unified model.
 pub type TestSuiteItem(context) =
   Node(context)
@@ -602,12 +626,16 @@ pub fn is_failure(status status: Status) -> Bool {
 /// - `AfterAllHook`: `unit.after_all` (and the same hook of the other DSLs)
 /// - `AfterEachSuiteHook`: `runner.after_each_suite`
 /// - `AfterAllSuitesHook`: `runner.after_all_suites`
+/// - `SuiteTearDownHook`: the tear-down of a suite whose context comes from
+///   a set-up (`unit_context.describe_with_set_up`,
+///   `steps.new_with_set_up`). Its name is `"tear_down"`.
 pub type TeardownHook {
   AfterEachTestHook
   AfterEachHook
   AfterAllHook
   AfterEachSuiteHook
   AfterAllSuitesHook
+  SuiteTearDownHook
 }
 
 /// The name of a tear-down hook, as reporters show it.
@@ -636,6 +664,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
     AfterAllHook -> "after_all"
     AfterEachSuiteHook -> "after_each_suite"
     AfterAllSuitesHook -> "after_all_suites"
+    SuiteTearDownHook -> "tear_down"
   }
 }
 
@@ -650,10 +679,14 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 ///   suite.
 /// - `BeforeAllSuitesHook`: `runner.before_all_suites`. Its scope is the
 ///   whole run.
+/// - `SuiteSetUpHook`: the set-up of a suite whose context comes from a
+///   set-up (`unit_context.describe_with_set_up`, `steps.new_with_set_up`).
+///   Its scope is the suite. Its name is `"set_up"`.
 pub type SetUpHook {
   BeforeAllHook
   BeforeEachSuiteHook
   BeforeAllSuitesHook
+  SuiteSetUpHook
 }
 
 /// The name of a set-up hook, as reporters show it.
@@ -680,6 +713,7 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
     BeforeAllHook -> "before_all"
     BeforeEachSuiteHook -> "before_each_suite"
     BeforeAllSuitesHook -> "before_all_suites"
+    SuiteSetUpHook -> "set_up"
   }
 }
 

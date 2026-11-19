@@ -58,7 +58,7 @@
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AfterAll, AfterEach, AssertionSkipped,
-  BeforeAll, BeforeEach, Group, Root, Test, Unit, WithInput,
+  BeforeAll, BeforeEach, ContextFromSetUp, Group, Root, Test, Unit, WithInput,
 }
 import gleam/option.{None}
 
@@ -439,4 +439,56 @@ pub fn with_tags(
 
 fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
+}
+
+/// Create a suite whose context comes from a set-up.
+///
+/// `set_up` runs once, before the first test of the suite, and only when
+/// at least one test of the suite runs. Its value is the context of every
+/// hook and test. `tear_down` gets the same value after the last test. The
+/// set-up and the tear-down run in one process that lives while the tests
+/// run, so a process that the set-up starts and links stays alive.
+///
+/// - When `set_up` returns `Error`, crashes or times out, each test is
+///   `SetupFailed` with the operator `set_up`, and `tear_down` does not run.
+/// - When the process of the set-up stops, the tests that did not start
+///   are `SetupFailed`, and the run report gets a `types.SetupStopped` with
+///   the set-up `types.SuiteSetUpHook`. `tear_down` still runs when the
+///   set-up returned.
+/// - When `tear_down` returns `Error`, crashes or times out, the run report
+///   gets a `types.TeardownFailure` with the hook `types.SuiteTearDownHook`.
+///
+/// ## Parameters
+///
+/// - `name`: the suite name (shown in reports)
+/// - `set_up`: gives the context, or `Error` with a message
+/// - `tear_down`: gets the context after the last test
+/// - `children`: tests, groups and hooks that get the context
+///
+/// ## Returns
+///
+/// A `TestSuite` you can run with other suites in one `runner.new`.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe_with_set_up(
+///   "Server",
+///   set_up: start_server,
+///   tear_down: stop_server,
+///   children: [it("answers a ping", answers_a_ping)],
+/// )
+/// ```
+pub fn describe_with_set_up(
+  name name: String,
+  set_up set_up: fn() -> Result(context, String),
+  tear_down tear_down: fn(context) -> Result(Nil, String),
+  children children: List(ContextNode(context)),
+) -> TestSuite {
+  suite.new(
+    name: name,
+    tags: [],
+    children: children,
+    context: ContextFromSetUp(set_up: set_up, tear_down: tear_down),
+  )
 }

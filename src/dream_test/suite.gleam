@@ -21,8 +21,8 @@ import dream_test/parallel.{
 }
 import dream_test/reporters/progress.{type ProgressReporter}
 import dream_test/types.{
-  type Node, type Root, type TestInfo, AfterAll, AfterEach, BeforeAll,
-  BeforeEach, Group, Test, TestInfo,
+  type Node, type Root, type SuiteContext, type TestInfo, AfterAll, AfterEach,
+  BeforeAll, BeforeEach, ContextFromSetUp, FixedContext, Group, Test, TestInfo,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -101,7 +101,50 @@ pub type RunInput {
 /// suite.from_root(types.root("numbers", 41, [unit_context.it("is 41", is_41)]))
 /// ```
 pub fn from_root(root root: Root(context)) -> TestSuite {
-  TestSuite(name: root.name, parts: [root_part(root)])
+  new(
+    name: root.name,
+    tags: root.tags,
+    children: root.children,
+    context: FixedContext(root.seed),
+  )
+}
+
+/// Make a suite from typed children and the place where its tests get
+/// their context.
+///
+/// With `types.FixedContext(value)`, each test starts from `value`, as
+/// with `from_root`. With `types.ContextFromSetUp(set_up, tear_down)`, the
+/// set-up runs once, before the first test, and only when at least one
+/// test of the suite runs. Its value is the context of every hook and test,
+/// and the tear-down gets it after the last test (see
+/// `types.SuiteContext`). `unit_context.describe_with_set_up` calls this.
+///
+/// ## Parameters
+///
+/// - `name`: the name of the top-level group
+/// - `tags`: the tags of the top-level group
+/// - `children`: the tests, groups and hooks
+/// - `context`: where the tests get their context
+///
+/// ## Example
+///
+/// ```gleam
+/// suite.new(
+///   name: "server",
+///   tags: [],
+///   children: [unit_context.it("answers", answers)],
+///   context: types.ContextFromSetUp(set_up: start_server, tear_down: stop_server),
+/// )
+/// ```
+pub fn new(
+  name name: String,
+  tags tags: List(String),
+  children children: List(Node(context)),
+  context context: SuiteContext(context),
+) -> TestSuite {
+  TestSuite(name: name, parts: [
+    tree_part(Tree(name: name, tags: tags, children: children, context: context)),
+  ])
 }
 
 /// The name of the suite: the name of its top-level group.
@@ -263,37 +306,47 @@ fn nothing_ran(input: RunInput) -> RunRootParallelWithReporterResult {
 // Typed trees
 // ============================================================================
 
-fn root_part(root: Root(context)) -> Part {
-  let place = Place(groups: [], source: None)
-  Part(
-    place: place,
-    tests: root_tests(root, place),
-    tests_at: fn(place) { root_tests(root, place) },
-    run: fn(place, input) { run_root(root, place, input) },
+/// A typed tree with its context.
+type Tree(context) {
+  Tree(
+    name: String,
+    tags: List(String),
+    children: List(Node(context)),
+    context: SuiteContext(context),
   )
 }
 
-fn root_tests(root: Root(context), place: Place) -> List(TestInfo) {
+fn tree_part(tree: Tree(context)) -> Part {
+  let place = Place(groups: [], source: None)
+  Part(
+    place: place,
+    tests: tree_tests(tree, place),
+    tests_at: fn(place) { tree_tests(tree, place) },
+    run: fn(place, input) { run_tree(tree, place, input) },
+  )
+}
+
+fn tree_tests(tree: Tree(context), place: Place) -> List(TestInfo) {
   collect_children(
-    placed_children(root.children, place.source),
-    list.append(place.groups, [root.name]),
-    root.tags,
+    placed_children(tree.children, place.source),
+    list.append(place.groups, [tree.name]),
+    tree.tags,
     [],
   )
   |> list.reverse
 }
 
-fn run_root(
-  root: Root(context),
+fn run_tree(
+  tree: Tree(context),
   place: Place,
   input: RunInput,
 ) -> RunRootParallelWithReporterResult {
   case
     selected_children(
-      placed_children(root.children, place.source),
-      list.append(place.groups, [root.name]),
-      root.tags,
-      input.keep,
+      placed_children(tree.children, place.source),
+      list.append(place.groups, [tree.name]),
+      tree.tags,
+      tree_keep(tree.context, input.keep),
     )
   {
     None -> nothing_ran(input)
@@ -301,10 +354,10 @@ fn run_root(
       parallel.run_suite(RunSuiteConfig(
         config: input.config,
         groups: place.groups,
-        name: root.name,
-        tags: root.tags,
+        name: tree.name,
+        tags: tree.tags,
         children: children,
-        seed: root.seed,
+        context: tree.context,
         progress_reporter: input.progress_reporter,
         write: input.write,
         total: input.total,
@@ -320,6 +373,22 @@ fn run_root(
         outer_setups: input.outer_setups,
       ))
   }
+}
+
+/// The filter of a tree. A tree with a set-up always gets one, so it does
+/// not start its set-up when it has no test.
+fn tree_keep(
+  context: SuiteContext(context),
+  keep: Option(fn(TestInfo) -> Bool),
+) -> Option(fn(TestInfo) -> Bool) {
+  case context, keep {
+    ContextFromSetUp(..), None -> Some(keep_every_test)
+    _, _ -> keep
+  }
+}
+
+fn keep_every_test(_info: TestInfo) -> Bool {
+  True
 }
 
 fn typed_before_each_test(
