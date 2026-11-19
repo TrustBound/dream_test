@@ -47,11 +47,8 @@ pub type ResultsReporter {
   /// Your own report format. At the end of the run, the runner calls
   /// `render` one time with the run report, and writes the text that it
   /// returns. The runner adds no newline, so end the text with `"\n"`.
-  ///
-  /// `render` runs in a new process. When it does not return in the
-  /// default timeout of the run (`runner.default_timeout_ms`), the runner
-  /// stops the process, and the reporter counts as crashed with the reason
-  /// `did not return in <N> ms`.
+  /// The runner calls `render` in the process of the run, so `render` must
+  /// return.
   ///
   /// If `render` crashes, the runner writes a `Results reporter failed`
   /// error to the error output, also in a silent run. The error names the

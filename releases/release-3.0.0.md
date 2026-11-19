@@ -46,8 +46,8 @@ hook starts now lives for the tests of its group. A test runs its
 - One rule for every hook failure: a failed set-up hook gives `SetupFailed`
   to each test that it serves. A failed tear-down hook keeps the test status,
   the other tear-down hooks still run, and the run fails.
-- `runner.run` returns a `types.RunReport` with the test results and the
-  tear-down failures. The BDD and Gherkin reporters show a
+- `runner.run` returns a `types.RunReport` with the test results, the
+  tear-down failures and the crashed `reporter_types.Custom` reporters. The BDD and Gherkin reporters show a
   `Set-up and tear-down failures:` section.
 - When the process that keeps a set-up alive stops, the runner reports the
   stopped set-up one time and names each test that it did not run.
@@ -132,8 +132,11 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - A crashed `reporter_types.Custom` reporter is in the run report, so
   `types.failed(report)` is `True`. `types.report_reporter_crashes` gives
   its position and the full reason.
-- `runner.silent()` drops normal output only. Errors still go to the
-  standard error stream.
+- `runner.silent()` drops the normal output only: progress, results
+  reports and the coverage report. It still writes two kinds of error to
+  the standard error stream: the `Results reporter failed` error of a
+  `reporter_types.Custom` reporter that crashed, and a coverage error, for
+  example a total below `coverage.minimum_percent`.
 - `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
   A `case` on a `ResultsReporter` needs a branch for it.
 - `sandbox.run_isolated` takes the function and its input as two parameters.

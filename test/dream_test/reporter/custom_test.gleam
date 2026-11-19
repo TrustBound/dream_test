@@ -167,40 +167,6 @@ pub fn tests() {
       |> or_fail_with("expected the reason on one line, cut at 200 characters")
     }),
 
-    it("stops a render that does not return and runs the next", fn() {
-      run_and_record_streams_with_timeout([passing_suite()], 100, [
-        reporter_types.Custom(render_forever),
-        reporter_types.Custom(coverage_runner_mains.custom_report),
-      ])
-      |> should
-      |> be_equal([
-        #(
-          "error",
-          "\nResults reporter failed\n"
-            <> "  The Custom results reporter at position 1 in runner.results_reporters did not return in 100 ms.\n"
-            <> "  Reason: the runner stops a render function that runs longer than runner.default_timeout_ms, so this reporter wrote no report.\n"
-            <> "  Fix: make the render function return a String in time, or give runner.default_timeout_ms a larger value.\n"
-            <> "\n",
-        ),
-        #("out", "Custom report: 1 passed, 0 failed\n"),
-      ])
-      |> or_fail_with("expected the time-out error, then the next report")
-    }),
-
-    it("keeps a render that does not return as a crash in the report", fn() {
-      runner.new([passing_suite()])
-      |> runner.default_timeout_ms(100)
-      |> runner.results_reporters([reporter_types.Custom(render_forever)])
-      |> runner.output(runner.Output(out: discard, error: discard))
-      |> runner.run()
-      |> types.report_reporter_crashes
-      |> should
-      |> be_equal([
-        types.ReporterCrash(position: 1, reason: "did not return in 100 ms"),
-      ])
-      |> or_fail_with("expected the time-out as the crash at position 1")
-    }),
-
     it("drops the normal output of a silent run and writes the crash", fn() {
       run_main_in_new_vm(
         "dream_test@coverage_runner_mains",
@@ -260,12 +226,6 @@ fn run_without_output(
 
 fn discard(_text: String) -> Nil {
   Nil
-}
-
-/// A render function that never returns.
-fn render_forever(_report: types.RunReport) -> String {
-  process.sleep_forever()
-  "not reached"
 }
 
 /// A custom report that gives the number of crashed reporters in the
@@ -340,19 +300,9 @@ fn run_and_record_streams(
   suites: List(suite.TestSuite),
   reporters: List(reporter_types.ResultsReporter),
 ) -> List(#(String, String)) {
-  run_and_record_streams_with_timeout(suites, 5000, reporters)
-}
-
-/// `run_and_record_streams` with the default timeout `timeout_ms`.
-fn run_and_record_streams_with_timeout(
-  suites: List(suite.TestSuite),
-  timeout_ms: Int,
-  reporters: List(reporter_types.ResultsReporter),
-) -> List(#(String, String)) {
   let subject = process.new_subject()
   let _report =
     runner.new(suites)
-    |> runner.default_timeout_ms(timeout_ms)
     |> runner.results_reporters(reporters)
     |> runner.output(
       runner.Output(out: fn(text) { send_out(subject, text) }, error: fn(text) {

@@ -207,12 +207,12 @@ The run fails when one of these is true:
 - a test is `Failed`, `TimedOut` or `SetupFailed`
 - a tear-down hook failed
 - the process of a set-up stopped while its tests ran (`SetupStopped`)
-- the `render` function of a `reporter_types.Custom` results reporter crashed, or did not return in the default timeout of the run (`runner.default_timeout_ms`)
+- the `render` function of a `reporter_types.Custom` results reporter crashed
 - coverage failed, for example a total below `coverage.minimum_percent`
 
 The first four make `types.failed` return `True` for the report that `runner.run` returns. `types.report_reporter_crashes` gives the position and the full reason of each crashed results reporter. Use it when your code picks its own exit status from the report.
 
-A silent run (`runner.silent`) writes nothing to the standard output: no progress, no results reports and no coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed or did not return in time, and a coverage error, for example a total below `coverage.minimum_percent`.
+A silent run (`runner.silent`) writes nothing to the standard output: no progress, no results reports and no coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed, and a coverage error, for example a total below `coverage.minimum_percent`.
 
 `exit_on_failure` does not stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1. `runner.run` does not return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
 

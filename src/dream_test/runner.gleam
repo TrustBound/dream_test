@@ -59,9 +59,8 @@ import dream_test/reporters/progress
 import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/sandbox.{
-  type SandboxResult, type SetupProcess, type SetupProcessResult,
-  SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
-  SetupProcessCaught, SetupProcessExited, SetupProcessLost, SetupProcessReturned,
+  type SetupProcess, type SetupProcessResult, SetupProcessCaught,
+  SetupProcessExited, SetupProcessLost, SetupProcessReturned,
   SetupProcessTimedOut,
 }
 import dream_test/suite.{type TestSuite}
@@ -155,8 +154,7 @@ type SuiteRun {
 ///
 /// Reporters write to `out`. The runner writes two kinds of error to
 /// `error`: the `Results reporter failed` error of a
-/// `reporter_types.Custom` reporter that crashed or did not return in time,
-/// and a coverage error. A test failure is not an error of the runner.
+/// `reporter_types.Custom` reporter that crashed, and a coverage error. A test failure is not an error of the runner.
 pub type Output {
   Output(out: fn(String) -> Nil, error: fn(String) -> Nil)
 }
@@ -355,9 +353,7 @@ pub fn max_concurrency(
 ///
 /// The timeout counts from the start of the test body. A body that runs
 /// longer is killed and reported as `TimedOut`, in parallel and in
-/// sequential runs. Each hook gets the same timeout on its own. The
-/// `render` function of each `reporter_types.Custom` results reporter also
-/// gets this timeout.
+/// sequential runs. Each hook gets the same timeout on its own.
 ///
 /// ## Example
 ///
@@ -639,7 +635,7 @@ pub fn coverage_from_environment(
 /// stream:
 ///
 /// - the `Results reporter failed` error of a `reporter_types.Custom`
-///   reporter that crashed or did not return in time
+///   reporter that crashed
 /// - a coverage error, for example a total below
 ///   `coverage.minimum_percent`, or coverage that did not complete
 pub fn silent(builder builder: RunBuilder) -> RunBuilder {
@@ -858,11 +854,6 @@ pub fn after_all_suites(
 /// With `exit_on_failure`, a failed run does not return: it writes all its
 /// output and then ends the program with exit status 1.
 ///
-/// The runner calls the `render` function of a `reporter_types.Custom`
-/// reporter in a new process. When it does not return in the default
-/// timeout of the run (`default_timeout_ms`), the runner stops it, and it
-/// counts as a crash.
-///
 /// If the `render` function of a `reporter_types.Custom` reporter crashes,
 /// the runner writes a `Results reporter failed` error to the error output
 /// and goes on with the next reporter and with coverage. The error names
@@ -1042,7 +1033,6 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         builder.results_reporters,
         report,
         output,
-        builder.config.default_timeout_ms,
       ),
     )
 
@@ -2253,23 +2243,19 @@ fn write_progress_event(
 /// Write the report of each results reporter in list order, and return
 /// the reporters that crashed. A crash does not stop the run: the runner
 /// writes a named error to the error output and goes on with the next
-/// reporter. A custom render function that does not return in
-/// `timeout_ms` is stopped, and counts as a crash. Positions start at 1
-/// and count every reporter in the list.
+/// reporter. Positions start at 1 and count every reporter in the list.
 fn write_results_reporters(
   reporters: List(reporter_types.ResultsReporter),
   report: RunReport,
   output: Output,
-  timeout_ms: Int,
 ) -> List(types.ReporterCrash) {
-  write_results_reporters_loop(reporters, report, output, timeout_ms, 1, [])
+  write_results_reporters_loop(reporters, report, output, 1, [])
 }
 
 fn write_results_reporters_loop(
   reporters: List(reporter_types.ResultsReporter),
   report: RunReport,
   output: Output,
-  timeout_ms: Int,
   position: Int,
   crashes_in_reverse: List(types.ReporterCrash),
 ) -> List(types.ReporterCrash) {
@@ -2280,10 +2266,9 @@ fn write_results_reporters_loop(
         rest,
         report,
         output,
-        timeout_ms,
         position + 1,
         list.append(
-          write_results_reporter(reporter, report, output, timeout_ms, position),
+          write_results_reporter(reporter, report, output, position),
           crashes_in_reverse,
         ),
       )
@@ -2291,13 +2276,11 @@ fn write_results_reporters_loop(
 }
 
 /// Write the report of one results reporter, and return its crash when
-/// its render function crashed or did not return in `timeout_ms`, else
-/// `[]`.
+/// its render function crashed, else `[]`.
 fn write_results_reporter(
   reporter: reporter_types.ResultsReporter,
   report: RunReport,
   output: Output,
-  timeout_ms: Int,
   position: Int,
 ) -> List(types.ReporterCrash) {
   let Output(out: write_out, error: write_error) = output
@@ -2312,57 +2295,30 @@ fn write_results_reporter(
     }
     reporter_types.Custom(render) ->
       write_custom_report(
-        sandbox.run_isolated(
-          SandboxConfig(timeout_ms: timeout_ms, show_crash_reports: False),
-          render,
-          report,
-        ),
+        sandbox.run_catching(render, report),
         write_out,
         write_error,
-        timeout_ms,
         position,
       )
   }
 }
 
 fn write_custom_report(
-  rendered: SandboxResult(String),
+  rendered: Result(String, String),
   write_out: fn(String) -> Nil,
   write_error: fn(String) -> Nil,
-  timeout_ms: Int,
   position: Int,
 ) -> List(types.ReporterCrash) {
   case rendered {
-    SandboxCompleted(text) -> {
+    Ok(text) -> {
       write_out(text)
       []
     }
-    SandboxCrashed(reason: crash) -> {
+    Error(crash) -> {
       write_error(custom_reporter_crash(position, crash))
       [types.ReporterCrash(position: position, reason: crash)]
     }
-    SandboxTimedOut -> {
-      write_error(custom_reporter_timeout(position, timeout_ms))
-      [
-        types.ReporterCrash(
-          position: position,
-          reason: "did not return in " <> int.to_string(timeout_ms) <> " ms",
-        ),
-      ]
-    }
   }
-}
-
-fn custom_reporter_timeout(position: Int, timeout_ms: Int) -> String {
-  "\nResults reporter failed\n"
-  <> "  The Custom results reporter at position "
-  <> int.to_string(position)
-  <> " in runner.results_reporters did not return in "
-  <> int.to_string(timeout_ms)
-  <> " ms.\n"
-  <> "  Reason: the runner stops a render function that runs longer than runner.default_timeout_ms, so this reporter wrote no report.\n"
-  <> "  Fix: make the render function return a String in time, or give runner.default_timeout_ms a larger value.\n"
-  <> "\n"
 }
 
 /// The most characters of a crash reason that the error output shows.

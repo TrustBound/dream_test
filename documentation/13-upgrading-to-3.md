@@ -613,14 +613,14 @@ In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it a
 
 - a tear-down hook failed
 - a set-up stopped (`SetupStopped`)
-- the `render` function of a `reporter_types.Custom` reporter crashed, or did not return in the default timeout of the run (`runner.default_timeout_ms`)
+- the `render` function of a `reporter_types.Custom` reporter crashed
 - coverage failed
 
 [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists every case.
 
 #### `runner.silent` still writes errors
 
-In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops the normal output only: progress, results reports and the coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed or did not return in time, and a coverage error, for example a total below `coverage.minimum_percent`.
+In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops the normal output only: progress, results reports and the coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed, and a coverage error, for example a total below `coverage.minimum_percent`.
 
 #### Runner test hooks: only the `TestInfo`, with `groups`
 
@@ -1334,7 +1334,7 @@ pub fn tests() {
 
 #### Custom reports
 
-In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. `render` runs in a new process, and gets the default timeout of the run. See [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
+In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. The runner calls `render` in the process of the run, so `render` must return. See [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
 
 #### `ResultsReporter` has the variant `Custom`
 

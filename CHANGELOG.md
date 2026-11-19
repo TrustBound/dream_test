@@ -25,9 +25,9 @@ store. This release has breaking changes. Read
 - `runner.silent()` drops the normal output only: progress, results
   reports and the coverage report. It still writes two kinds of error to
   the standard error stream: the `Results reporter failed` error of a
-  `reporter_types.Custom` reporter that crashed or did not return in time,
-  and a coverage error, for example a total below
-  `coverage.minimum_percent`. In 2.x, a silent run dropped all output.
+  `reporter_types.Custom` reporter that crashed, and a coverage error, for
+  example a total below `coverage.minimum_percent`. In 2.x, a silent run
+  dropped all output.
 - `parallel.run_root_parallel` returns `types.RunReport`, not
   `List(TestResult)`.
 - `parallel.RunRootParallelWithReporterConfig` has a new field
@@ -612,10 +612,6 @@ the guide labels them.
     shows the crash on one line. A crash longer than 200 characters is cut
     there, and the line ends with `... (cut at 200 characters, and
     types.report_reporter_crashes has the full reason)`
-  - `render` runs in a new process with the default timeout of the run
-    (`runner.default_timeout_ms`). A `render` function that does not
-    return in time is stopped, and counts as a crash with the reason
-    `did not return in <N> ms`
   - The report that `runner.run` returns has each crash, so
     `types.failed(report)` is `True`. `types.report_reporter_crashes`
     gives a `types.ReporterCrash(position:, reason:)` with the full reason
