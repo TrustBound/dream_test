@@ -126,6 +126,13 @@ pub fn main() {
 - **First run**: the snapshot file doesn’t exist → Dream Test creates it.
 - **Review**: treat the snapshot like code. Make sure it matches what you intend to guarantee.
 - **Future changes**: when it fails, decide whether the change is a regression (fix code) or an intentional update (update snapshot).
+- **Commit the `.snap` files**: a missing snapshot is not a failure. The test passes and writes a new file. If CI starts without the file, every snapshot test passes and checks nothing.
+
+### Update a snapshot
+
+1. Delete the `.snap` file, or remove it with `snapshot.clear_snapshot(path)`. `snapshot.clear_snapshots_in_directory(directory)` removes every `.snap` file in a directory, but not in its subdirectories.
+2. Run the tests again. The test writes the new value to the file and passes.
+3. Read the new file, then commit it.
 
 ### What's Next?
 
