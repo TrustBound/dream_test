@@ -6,6 +6,7 @@ import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, group, it}
+import gleam/erlang/charlist.{type Charlist}
 import gleam/int
 import gleam/result
 import gleam/string
@@ -53,16 +54,19 @@ pub fn tests() {
     ]),
     group("clearing snapshots", [
       it("can clear a single snapshot", fn() {
-        // Create a temporary snapshot
+        // Create a temporary snapshot. Its path has the operating system
+        // process ID of this BEAM, so two test runs at the same time do not
+        // share the file.
+        let path = "./test/snapshots/temp_" <> beam_process_id() <> ".snap"
         use _ <- result.try(
           "temp content"
           |> should
-          |> match_snapshot("./test/snapshots/temp.snap")
+          |> match_snapshot(path)
           |> or_fail_with("Should create temp snapshot"),
         )
 
         // Clear it
-        let result = snapshot.clear_snapshot("./test/snapshots/temp.snap")
+        let result = snapshot.clear_snapshot(path)
 
         result
         |> should
@@ -72,6 +76,14 @@ pub fn tests() {
     ]),
   ])
 }
+
+/// The operating system process ID of this BEAM, for example "48213".
+fn beam_process_id() -> String {
+  charlist.to_string(operating_system_process_id())
+}
+
+@external(erlang, "os", "getpid")
+fn operating_system_process_id() -> Charlist
 
 pub fn main() {
   runner.new([tests()])

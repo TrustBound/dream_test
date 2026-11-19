@@ -3,8 +3,8 @@
     wildcard/2,
     git_show/2,
     exports_tests/1,
-    run_main_in_new_vm/1,
-    run_main_in_new_vm_with_coverage_lock/1
+    run_main_in_new_vm/2,
+    run_main_in_new_vm_with_coverage_lock/2
 ]).
 
 %% The files under Root that match Pattern, as paths relative to Root, in
@@ -47,29 +47,81 @@ exports_tests(Name) ->
 %% test run, from the current folder (the snippets project). The process
 %% stops with `init:stop(0)` after `main` returns, the same way as the
 %% wrapper of a main in Gleam 1.14 and newer. Returns {ExitStatus, Output},
-%% with stdout and stderr together. A process that does not stop in 50
-%% seconds is closed, and the status is -1.
-run_main_in_new_vm(Module) ->
+%% with stdout and stderr together.
+%%
+%% The new process gets DeadlineMs milliseconds in all, from its start. A
+%% process that does not stop in time is killed, and the status is -1. A
+%% worker process starts the new process and waits for it. When the calling
+%% process stops first, for example because its test timed out, the worker
+%% kills the new process. A crash of the new process writes no
+%% erl_crash.dump file.
+run_main_in_new_vm(Module, DeadlineMs) ->
+    Caller = self(),
+    Ref = make_ref(),
+    {Worker, Monitor} = spawn_monitor(
+        fun() -> run_for(Caller, Ref, Module, DeadlineMs) end
+    ),
+    receive
+        {Ref, Result} ->
+            erlang:demonitor(Monitor, [flush]),
+            Result;
+        {'DOWN', Monitor, process, Worker, Reason} ->
+            erlang:error({main_worker_stopped, Reason})
+    end.
+
+%% `run_main_in_new_vm/2`, while this process holds the coverage lock. The
+%% deadline starts when this process has the lock.
+run_main_in_new_vm_with_coverage_lock(Module, DeadlineMs) ->
+    snippets_coverage_lock_ffi:with_lock(
+        fun() -> run_main_in_new_vm(Module, DeadlineMs) end
+    ).
+
+%% In the worker: start the new process, collect its output and send the
+%% result to Caller.
+run_for(Caller, Ref, Module, DeadlineMs) ->
+    CallerMonitor = erlang:monitor(process, Caller),
+    Deadline = erlang:monotonic_time(millisecond) + DeadlineMs,
     Eval = io_lib:format("'~ts':main(), init:stop(0).", [Module]),
     Port = open_port(
         {spawn_executable, os:find_executable("erl")},
         [exit_status, binary, stderr_to_stdout, use_stdio,
+         {env, [{"ERL_CRASH_DUMP_SECONDS", "0"}]},
          {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
     ),
-    collect_output(Port, <<>>).
+    {os_pid, OsPid} = erlang:port_info(Port, os_pid),
+    Result = collect_output(Port, OsPid, CallerMonitor, Deadline, DeadlineMs, <<>>),
+    Caller ! {Ref, Result}.
 
-%% `run_main_in_new_vm/1`, while this process holds the coverage lock.
-run_main_in_new_vm_with_coverage_lock(Module) ->
-    snippets_coverage_lock_ffi:with_lock(fun() -> run_main_in_new_vm(Module) end).
-
-collect_output(Port, Output) ->
+collect_output(Port, OsPid, CallerMonitor, Deadline, DeadlineMs, Output) ->
+    Remaining = max(0, Deadline - erlang:monotonic_time(millisecond)),
     receive
-        {Port, {data, Data}} -> collect_output(Port, <<Output/binary, Data/binary>>);
-        {Port, {exit_status, Status}} -> {Status, Output}
-    after 50000 ->
-        port_close(Port),
-        {-1, <<Output/binary, "\n[timed out after 50 seconds]">>}
+        {Port, {data, Data}} ->
+            collect_output(Port, OsPid, CallerMonitor, Deadline, DeadlineMs,
+                           <<Output/binary, Data/binary>>);
+        {Port, {exit_status, Status}} ->
+            {Status, Output};
+        {'DOWN', CallerMonitor, process, _Caller, _Reason} ->
+            kill_new_process(Port, OsPid),
+            exit(normal)
+    after Remaining ->
+        kill_new_process(Port, OsPid),
+        Seconds = integer_to_binary(DeadlineMs div 1000),
+        {-1, <<Output/binary, "\n[killed: the main did not stop in ",
+               Seconds/binary, " seconds]">>}
     end.
+
+%% Kill the operating system process of the new BEAM, and close its port.
+%% Closing the port alone does not stop it: the BEAM does not stop at the
+%% end of its standard input. The port is already closed when the process
+%% ended just before the kill.
+kill_new_process(Port, OsPid) ->
+    _ = os:cmd("kill -KILL " ++ integer_to_list(OsPid)),
+    try
+        port_close(Port)
+    catch
+        error:badarg -> ok
+    end,
+    ok.
 
 code_path_args() ->
     lists:append([["-pa", Path] || Path <- code:get_path(), is_build_path(Path)]).
