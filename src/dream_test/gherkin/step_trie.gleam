@@ -7,7 +7,10 @@
 ////
 //// Step text and step patterns are split into words by one function,
 //// `tokenize_step_text`. A space ends a word. A double-quoted run, such as
-//// `"Red Widget"`, stays in one word with its spaces. Because both sides use
+//// `"Red Widget"`, stays in one word with its spaces. A quoted run starts
+//// only at a double quote at the start of a word, and ends only at a double
+//// quote before a space or at the end of the text, so the quote in
+//// `O"Brien` or `5"` is an ordinary character. Because both sides use
 //// the same split, a pattern without placeholders always matches its own
 //// text.
 ////
@@ -564,6 +567,11 @@ pub fn lookup(
 /// 1. A space ends a word. Two or more spaces do not make an empty word.
 /// 2. A double-quoted run, such as `"Red Widget"`, stays in one word with its
 ///    spaces and quotes.
+/// 3. A quoted run starts only at a double quote at the start of a word,
+///    and ends only at a double quote before a space or at the end of the
+///    text. Any other double quote is an ordinary character: in
+///    `the input 5" is valid` and `O"Brien says "hi"`, the words are
+///    `5"` and `O"Brien`.
 ///
 /// ## Example
 ///
@@ -590,6 +598,9 @@ fn tokenize_preserving_quotes(
   }
 }
 
+/// A double quote starts a quoted run only at the start of a word, and
+/// ends it only before a space or at the end of the text. Any other double
+/// quote is an ordinary character of the word.
 fn process_char(
   char: String,
   rest: String,
@@ -597,16 +608,19 @@ fn process_char(
   current: String,
   in_quotes: Bool,
 ) -> List(String) {
-  case char, in_quotes {
-    "\"", False ->
+  let starts_word = current == ""
+  let ends_word = rest == "" || string.starts_with(rest, " ")
+  case char, in_quotes, starts_word, ends_word {
+    "\"", False, True, _ ->
       tokenize_preserving_quotes(rest, tokens, current <> char, True)
-    "\"", True ->
+    "\"", True, _, True ->
       tokenize_preserving_quotes(rest, tokens, current <> char, False)
-    " ", False -> {
+    " ", False, _, _ -> {
       let updated_tokens = add_token_if_non_empty(tokens, current)
       tokenize_preserving_quotes(rest, updated_tokens, "", False)
     }
-    _, _ -> tokenize_preserving_quotes(rest, tokens, current <> char, in_quotes)
+    _, _, _, _ ->
+      tokenize_preserving_quotes(rest, tokens, current <> char, in_quotes)
   }
 }
 

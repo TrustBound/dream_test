@@ -57,6 +57,52 @@ pub fn tests() {
       |> or_fail_with("quoted strings should be one token")
     }),
 
+    it("tokenize_step_text keeps a quote inside a word as a character", fn() {
+      [
+        step_trie.tokenize_step_text("the input 5\" is valid"),
+        step_trie.tokenize_step_text("O\"Brien says \"hi there\""),
+        step_trie.tokenize_step_text("a \"quoted\"run ends\" here"),
+      ]
+      |> should
+      |> be_equal([
+        ["the", "input", "5\"", "is", "valid"],
+        ["O\"Brien", "says", "\"hi there\""],
+        ["a", "\"quoted\"run ends\"", "here"],
+      ])
+      |> or_fail_with(
+        "a quoted run starts at the start of a word and ends before a space",
+      )
+    }),
+
+    it("lookup matches step text with a quote inside a word", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "the input {word} is valid", "valid")
+      |> result.try(step_trie.insert(
+        _,
+        GivenPhase,
+        "{word} says {string}",
+        "says",
+      ))
+      |> result.map(lookup_quotes_in_words)
+      |> should
+      |> be_equal(
+        Ok([
+          Some(
+            step_trie.StepMatch(handler: "valid", captures: [
+              step_trie.CapturedWord("5\""),
+            ]),
+          ),
+          Some(
+            step_trie.StepMatch(handler: "says", captures: [
+              step_trie.CapturedWord("O\"Brien"),
+              step_trie.CapturedString("hi"),
+            ]),
+          ),
+        ]),
+      )
+      |> or_fail_with("a quote inside a word should not join the next words")
+    }),
+
     it("tokenize_step_text does not split a word at digits", fn() {
       step_trie.tokenize_step_text("price is $99.99USD for user42")
       |> should
@@ -551,5 +597,14 @@ fn lookup_comma_numbers(
   [
     step_trie.lookup(trie, GivenPhase, "total 1,000"),
     step_trie.lookup(trie, GivenPhase, "total 1,5"),
+  ]
+}
+
+fn lookup_quotes_in_words(
+  trie: step_trie.StepTrie(String),
+) -> List(option.Option(step_trie.StepMatch(String))) {
+  [
+    step_trie.lookup(trie, GivenPhase, "the input 5\" is valid"),
+    step_trie.lookup(trie, GivenPhase, "O\"Brien says \"hi\""),
   ]
 }
