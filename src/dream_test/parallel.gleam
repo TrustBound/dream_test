@@ -482,8 +482,8 @@ fn scope_hooks(set_up: SetUpHook) -> ScopeHooks {
       ScopeHooks(
         set_up: SuiteSetUpHook,
         tear_down: SuiteTearDownHook,
-        set_up_text: "set-up",
-        tear_down_text: "tear-down",
+        set_up_text: "the suite set-up",
+        tear_down_text: "the suite tear-down",
       )
     BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
       ScopeHooks(
@@ -867,14 +867,21 @@ fn start_set_up(
       suite_set_up_failed(
         config,
         setup_processes,
-        failed_set_up(scope_crash_message("set-up", scope, reason)),
+        failed_set_up(scope_crash_message(
+          scope_hooks(SuiteSetUpHook).set_up_text,
+          scope,
+          reason,
+        )),
       )
     }
     SetupProcessTimedOut ->
       suite_set_up_failed(
         config,
         setup_processes,
-        failed_set_up(scope_timeout_message("set-up", scope)),
+        failed_set_up(scope_timeout_message(
+          scope_hooks(SuiteSetUpHook).set_up_text,
+          scope,
+        )),
       )
     SetupProcessExited(reason: reason) | SetupProcessLost(reason: reason) ->
       suite_set_up_stopped(config, setup_processes, scope, reason)
@@ -1409,20 +1416,33 @@ fn group_stop(setup_process: ScopeSetupProcess(context)) -> Result(Stop, Nil) {
 
 /// The failure of a test that was not run because `stop` stopped:
 /// `not run: the set-up from <set-up hook> in "<groups>" stopped (<reason>)`,
-/// without `in "<groups>"` for the whole run. The operator is the name of
-/// the set-up hook.
+/// without `in "<groups>"` for the whole run, or
+/// `not run: the suite set-up of "<suite>" stopped (<reason>)` for the
+/// set-up of a suite. The operator is the name of the set-up hook.
 fn not_run_failure(stop: Stop) -> AssertionFailure {
-  let name = types.set_up_hook_name(stop.set_up)
   AssertionFailure(
-    operator: name,
-    message: "not run: the set-up from "
-      <> name
-      <> quoted_scope(stop.scope)
-      <> " stopped ("
+    operator: types.set_up_hook_name(stop.set_up),
+    message: "not run: "
+      <> stopped_set_up_text(stop)
+      <> " ("
       <> stop.reason
       <> ")",
     payload: None,
   )
+}
+
+/// `the suite set-up of "<suite>" stopped` for the set-up of a suite, and
+/// `the set-up from <set-up hook> in "<groups>" stopped` for a hook.
+fn stopped_set_up_text(stop: Stop) -> String {
+  case stop.set_up {
+    SuiteSetUpHook ->
+      "the suite set-up of \"" <> string.join(stop.scope, " > ") <> "\" stopped"
+    BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
+      "the set-up from "
+      <> types.set_up_hook_name(stop.set_up)
+      <> quoted_scope(stop.scope)
+      <> " stopped"
+  }
 }
 
 /// ` in "<groups>"` for a scope, with its names joined by ` > `, or `""`
@@ -2930,7 +2950,7 @@ fn hook_timeout_message(scope: List(String)) -> String {
 }
 
 /// `<text> crashed in <groups>: <reason>`, for example
-/// `set-up crashed in server: error:boom`.
+/// `the suite set-up crashed in Server: error:boom`.
 fn scope_crash_message(
   text: String,
   scope: List(String),

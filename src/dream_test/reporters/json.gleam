@@ -22,16 +22,18 @@
 ////   has `kind`, `hook`, `groups` and `message`:
 ////   - `kind` `"hook_failed"`: a tear-down hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
-////     `"after_each_suite"` or `"after_all_suites"`. `groups` is a list of
+////     `"after_each_suite"`, `"after_all_suites"` or `"suite tear-down"`
+////     (the tear-down of a suite with a set-up). `groups` is a list of
 ////     names: the full test name for `after_each` and `after_each_test`,
 ////     the group path for `after_all`, the suite name for
-////     `after_each_suite`, `[]` for `after_all_suites`. `message` is the
-////     error message or the crash text.
+////     `after_each_suite` and `suite tear-down`, `[]` for
+////     `after_all_suites`. `message` is the error message or the crash text.
 ////   - `kind` `"setup_stopped"`: the process that keeps a set-up alive
 ////     exited while its tests ran. `hook` is the set-up hook:
-////     `"before_all"`, `"before_each_suite"` or `"before_all_suites"`.
-////     `groups` is the group path for `before_all`, the suite name for
-////     `before_each_suite`, `[]` for `before_all_suites`. `message` is the
+////     `"before_all"`, `"before_each_suite"`, `"before_all_suites"` or
+////     `"suite set-up"`. `groups` is the group path for `before_all`, the
+////     suite name for `before_each_suite` and `suite set-up`, `[]` for
+////     `before_all_suites`. `message` is the
 ////     exit reason of the process. Only this kind has `not_run`: the
 ////     tests that had not started when the set-up stopped, so they were
 ////     not run. Each one is its `full_name` list, as in `tests`.

@@ -146,7 +146,7 @@ pub fn tests() {
       |> should
       |> be_equal([
         "after_each_test", "after_each", "after_all", "after_each_suite",
-        "after_all_suites", "tear_down",
+        "after_all_suites", "suite tear-down",
       ])
       |> or_fail_with("each hook should have its builder name")
     }),
@@ -161,7 +161,7 @@ pub fn tests() {
       |> list.map(types.set_up_hook_name)
       |> should
       |> be_equal([
-        "before_all", "before_each_suite", "before_all_suites", "set_up",
+        "before_all", "before_each_suite", "before_all_suites", "suite set-up",
       ])
       |> or_fail_with("each set-up hook should have its builder name")
     }),

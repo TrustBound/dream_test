@@ -285,7 +285,7 @@ fn run(suites: List(TestSuite)) -> types.RunReport {
 }
 
 fn failure(message: String) -> AssertionFailure {
-  AssertionFailure(operator: "set_up", message: message, payload: None)
+  AssertionFailure(operator: "suite set-up", message: message, payload: None)
 }
 
 fn statuses(report: types.RunReport) -> List(#(List(String), Status)) {

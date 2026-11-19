@@ -2,6 +2,8 @@
 //// `unit_context.describe_with_set_up`.
 
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/reporters/json
+import dream_test/reporters/teardown
 import dream_test/runner
 import dream_test/suite
 import dream_test/types.{
@@ -93,10 +95,10 @@ pub fn tests() {
         #(
           [
             #(["broken", "first"], SetupFailed, [
-              failure("set_up", "port in use"),
+              failure("suite set-up", "port in use"),
             ]),
             #(["broken", "second"], SetupFailed, [
-              failure("set_up", "port in use"),
+              failure("suite set-up", "port in use"),
             ]),
           ],
           [],
@@ -120,8 +122,8 @@ pub fn tests() {
       |> be_equal(
         #(
           [
-            "set-up crashed in broken: error:#{",
-            "set-up crashed in broken: error:#{",
+            "the suite set-up crashed in broken: error:#{",
+            "the suite set-up crashed in broken: error:#{",
           ],
           [],
         ),
@@ -142,10 +144,10 @@ pub fn tests() {
         #(
           [
             #(["broken", "first"], SetupFailed, [
-              failure("set_up", "set-up timed out in broken"),
+              failure("suite set-up", "the suite set-up timed out in broken"),
             ]),
             #(["broken", "second"], SetupFailed, [
-              failure("set_up", "set-up timed out in broken"),
+              failure("suite set-up", "the suite set-up timed out in broken"),
             ]),
           ],
           [],
@@ -227,8 +229,60 @@ pub fn tests() {
       types.report_teardown_failures(report)
       |> list.map(teardown_message_start)
       |> should
-      |> be_equal(["tear-down crashed in server: error:#{"])
+      |> be_equal(["the suite tear-down crashed in server: error:#{"])
       |> or_fail_with("the tear-down failure should name the crash")
+    }),
+
+    it("the reports name a failed suite tear-down in plain words", fn() {
+      let failures =
+        runner.new([
+          unit_context.describe_with_set_up(
+            "Server",
+            set_up: fn() { Ok(7) },
+            tear_down: fn(_value: Int) { Error("port still open") },
+            children: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
+          ),
+        ])
+        |> runner.silent()
+        |> runner.run()
+        |> types.report_teardown_failures
+      #(
+        teardown.format(failures),
+        json.format(types.run_report(tests: [], teardown_failures: failures))
+          |> string.contains(
+            "{\"kind\":\"hook_failed\",\"hook\":\"suite tear-down\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
+          ),
+      )
+      |> should
+      |> be_equal(#(
+        "Set-up and tear-down failures:\n  suite tear-down in Server\n    port still open\n",
+        True,
+      ))
+      |> or_fail_with("the reports should say suite tear-down")
+    }),
+
+    it("the reports name a stopped suite set-up in plain words", fn() {
+      let failures = [
+        SetupStopped(
+          set_up: SuiteSetUpHook,
+          groups: ["Server"],
+          reason: "killed",
+          not_run: [["Server", "a"]],
+        ),
+      ]
+      #(
+        teardown.format(failures),
+        json.format(types.run_report(tests: [], teardown_failures: failures))
+          |> string.contains(
+            "{\"kind\":\"setup_stopped\",\"hook\":\"suite set-up\",\"groups\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
+          ),
+      )
+      |> should
+      |> be_equal(#(
+        "Set-up and tear-down failures:\n  suite set-up in \"Server\" stopped: the process that keeps its set-up alive exited with killed.\n    These tests had not started and were not run:\n      Server > a\n",
+        True,
+      ))
+      |> or_fail_with("the reports should say suite set-up")
     }),
 
     it("a set-up process that stops during the tests runs the tear-down", fn() {
@@ -434,8 +488,8 @@ fn is_named(info: TestInfo, name: String) -> Bool {
 
 fn stopped_failure() -> AssertionFailure {
   failure(
-    "set_up",
-    "not run: the set-up from set_up in \"broken\" stopped (killed)",
+    "suite set-up",
+    "not run: the suite set-up of \"broken\" stopped (killed)",
   )
 }
 
@@ -463,19 +517,19 @@ fn full_name_status_and_failures(
   #(types.full_name(result.groups, result.name), result.status, result.failures)
 }
 
-/// The first 34 characters of the first failure message of a result.
+/// The first 44 characters of the first failure message of a result.
 fn first_message_start(
   result: #(List(String), Status, List(AssertionFailure)),
 ) -> String {
   case result.2 {
-    [first, ..] -> string.slice(first.message, 0, 34)
+    [first, ..] -> string.slice(first.message, 0, 44)
     [] -> ""
   }
 }
 
 fn teardown_message_start(failure: TeardownFailure) -> String {
   case failure {
-    TeardownFailure(message: message, ..) -> string.slice(message, 0, 37)
+    TeardownFailure(message: message, ..) -> string.slice(message, 0, 47)
     SetupStopped(..) -> ""
   }
 }

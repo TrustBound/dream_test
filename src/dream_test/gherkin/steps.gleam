@@ -255,7 +255,7 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 /// The set-up and the tear-down run in one process that lives while the
 /// scenarios run, so a server that the set-up starts and links stays
 /// alive. When `set_up` returns `Error`, crashes or times out, each
-/// scenario is `SetupFailed` with the operator `set_up` and `tear_down`
+/// scenario is `SetupFailed` with the operator `suite set-up` and `tear_down`
 /// does not run. See `unit_context.describe_with_set_up` for the other
 /// cases.
 ///

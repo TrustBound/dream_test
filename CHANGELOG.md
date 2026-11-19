@@ -267,10 +267,14 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     least one test of the suite runs. The tear-down gets its value after
     the last test. Both run in one process that lives while the tests run
   - A failed set-up gives `SetupFailed` to each test, with the operator
-    `set_up`, and the tear-down does not run. A failed tear-down is a
-    tear-down failure with the new hook `types.SuiteTearDownHook`
-    (`tear_down`). A set-up whose process stops is a `SetupStopped` with
-    the new hook `types.SuiteSetUpHook` (`set_up`)
+    `suite set-up`, and the tear-down does not run. A crash reads
+    `the suite set-up crashed in <suite>: <reason>`, and a timeout reads
+    `the suite set-up timed out in <suite>`. A failed tear-down is a
+    tear-down failure with the new hook `types.SuiteTearDownHook`, named
+    `suite tear-down` in the reports and in JSON. A set-up whose process
+    stops is a `SetupStopped` with the new hook `types.SuiteSetUpHook`,
+    named `suite set-up`, and each test that did not start gets
+    `not run: the suite set-up of "<suite>" stopped (<reason>)`
   - `feature.to_group` gives a Feature as one group node, to put several
     Features in one suite
 

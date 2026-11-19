@@ -655,7 +655,7 @@ Some features need a resource that lives for all their scenarios, for example a 
 - Each scenario starts from the value of the set-up. A change that one scenario makes to its state does not reach the next scenario.
 - The tear-down gets the same value after the last scenario.
 - The set-up and the tear-down run in one process that lives while the scenarios run. A process that the set-up starts stays alive.
-- When the set-up returns `Error`, crashes or times out, each scenario is `SetupFailed`, and the tear-down does not run. When the tear-down fails, the run report gets a tear-down failure for the hook `tear_down`.
+- When the set-up returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `suite set-up`, and the tear-down does not run. A crash reads `the suite set-up crashed in Server: <reason>`. When the tear-down fails, the run report gets a tear-down failure for the hook `suite tear-down`, for example `suite tear-down in Server` then `the suite tear-down crashed in Server: <reason>`.
 
 With `discover.to_suite`, the set-up runs one time for the scenarios of all the files. A parse error test does not need the set-up, so it runs without it.
 

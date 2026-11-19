@@ -626,7 +626,7 @@ pub fn is_failure(status status: Status) -> Bool {
 /// - `AfterAllSuitesHook`: `runner.after_all_suites`
 /// - `SuiteTearDownHook`: the tear-down of a suite whose context comes from
 ///   a set-up (`unit_context.describe_with_set_up`,
-///   `steps.new_with_set_up`). Its name is `"tear_down"`.
+///   `steps.new_with_set_up`). Its name is `"suite tear-down"`.
 pub type TeardownHook {
   AfterEachTestHook
   AfterEachHook
@@ -662,7 +662,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
     AfterAllHook -> "after_all"
     AfterEachSuiteHook -> "after_each_suite"
     AfterAllSuitesHook -> "after_all_suites"
-    SuiteTearDownHook -> "tear_down"
+    SuiteTearDownHook -> "suite tear-down"
   }
 }
 
@@ -679,7 +679,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 ///   test of the run.
 /// - `SuiteSetUpHook`: the set-up of a suite whose context comes from a
 ///   set-up (`unit_context.describe_with_set_up`, `steps.new_with_set_up`).
-///   It serves the tests of that suite. Its name is `"set_up"`.
+///   It serves the tests of that suite. Its name is `"suite set-up"`.
 pub type SetUpHook {
   BeforeAllHook
   BeforeEachSuiteHook
@@ -711,7 +711,7 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
     BeforeAllHook -> "before_all"
     BeforeEachSuiteHook -> "before_each_suite"
     BeforeAllSuitesHook -> "before_all_suites"
-    SuiteSetUpHook -> "set_up"
+    SuiteSetUpHook -> "suite set-up"
   }
 }
 

@@ -66,7 +66,9 @@ Sometimes the context is a resource that must start before the first test and st
 - `set_up` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
 - `tear_down` gets the same value after the last test.
 - Both run in one process that lives while the tests run, so a process that the set-up starts stays alive.
-- When `set_up` returns `Error`, crashes or times out, each test is `SetupFailed` and `tear_down` does not run. When `tear_down` fails, the run report gets a tear-down failure for the hook `tear_down`.
+- When `set_up` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite set-up crashed in Store: <reason>`, and a timeout reads `the suite set-up timed out in Store`.
+- When `tear_down` returns `Error`, crashes or times out, the run report gets a tear-down failure for the hook `suite tear-down`. The report shows `suite tear-down in Store`, then the message, for example `the suite tear-down crashed in Store: <reason>`.
+- When the process of the set-up stops, each test that did not start is `SetupFailed` with `not run: the suite set-up of "Store" stopped (<reason>)`.
 
 #### A suite whose context comes from a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_set_up.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
