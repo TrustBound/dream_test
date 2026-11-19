@@ -608,7 +608,9 @@ the guide labels them.
     on with the next reporter and with coverage. The error names the
     position of the reporter: the first reporter in the list is at
     position 1, and every reporter counts, `bdd` and `json` included. It
-    shows the crash on one line, cut at 200 characters
+    shows the crash on one line. A crash longer than 200 characters is cut
+    there, and the line ends with `... (cut at 200 characters, and
+    types.report_reporter_crashes has the full reason)`
   - `render` runs in a new process with the default timeout of the run
     (`runner.default_timeout_ms`). A `render` function that does not
     return in time is stopped, and counts as a crash with the reason

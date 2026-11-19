@@ -784,9 +784,11 @@ pub type TeardownFailure {
 /// - `reason`: the crash, as `class:reason`, for example
 ///   `error:badarith`, or `did not return in <N> ms` for a render function
 ///   that did not return in the timeout of `<N>` milliseconds. This is the
-///   full text, which can be longer than one
-///   line. The error output shows it on one line, and cuts it at 200
-///   characters.
+///   full text, which can be longer than one line. The error output shows
+///   it on one line. When that line is longer than 200 characters, the
+///   error output shows the first 200 characters and then
+///   ` ... (cut at 200 characters, and types.report_reporter_crashes has
+///   the full reason)`.
 ///
 /// ## Example
 ///

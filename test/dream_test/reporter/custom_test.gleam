@@ -8,7 +8,6 @@ import dream_test/reporters/bdd
 import dream_test/reporters/json
 import dream_test/reporters/types as reporter_types
 import dream_test/runner
-import dream_test/sandbox
 import dream_test/suite
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
@@ -158,7 +157,7 @@ pub fn tests() {
           "error",
           "\nResults reporter failed\n"
             <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: "
-            <> string.slice(one_line(long_crash_reason()), 0, 200)
+            <> "error:{long_reason,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41, 42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60, 61,62,"
             <> " ... (cut at 200 characters, and types.report_reporter_crashes has the full reason)\n"
             <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
             <> "  Fix: make the render function return a String for every RunReport.\n"
@@ -233,26 +232,16 @@ pub fn tests() {
   ])
 }
 
-/// The full reason of `crash_render_with_long_reason`, as
-/// `sandbox.run_catching` gives it.
+/// The full reason of `crash_render_with_long_reason`: the class and the
+/// reason, as `io_lib:format("~p:~p", ...)` writes them, on seven lines.
 fn long_crash_reason() -> String {
-  case sandbox.run_catching(crash_render_with_long_reason, empty_report()) {
-    Error(reason) -> reason
-    Ok(text) -> "the render function did not crash: " <> text
-  }
-}
-
-fn empty_report() -> types.RunReport {
-  types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
-}
-
-/// The lines of `text`, each without the spaces at its start, joined with
-/// one space.
-fn one_line(text: String) -> String {
-  text
-  |> string.split("\n")
-  |> list.map(string.trim_start)
-  |> string.join(" ")
+  "error:{long_reason,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,\n"
+  <> "                    23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,\n"
+  <> "                    42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,\n"
+  <> "                    61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,\n"
+  <> "                    80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,\n"
+  <> "                    99,100,101,102,103,104,105,106,107,108,109,110,111,112,\n"
+  <> "                    113,114,115,116,117,118,119,120]}"
 }
 
 /// Run `suites` with `reporters` and an output that keeps nothing, and
