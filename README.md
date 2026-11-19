@@ -75,7 +75,7 @@ One line in your test `main` turns it on. [Read more](#coverage).
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | ⚡ **Parallel execution**              | Configurable concurrency for fast runs                                                                    |
 | 🛡️ **Isolation**                       | Crashes and timeouts don't break the run                                                                  |
-| ⏱️ **Timeouts**                        | Per-test timeout control                                                                                  |
+| ⏱️ **Timeouts**                        | A default timeout for each test and hook (`runner.default_timeout_ms`), and one for each group of suites (`runner.add_suites_with_config`) |
 | 🔍 **Test discovery**                  | Find tests from file paths                                                                                |
 | 🚨 **Exit-on-failure**                 | Exit status 1 for CI when the run fails, after every test ran and all output is written                   |
 | 🪝 **Runner hooks**                    | Runner-level hooks for per-test/per-suite/per-run setup and teardown                                       |
@@ -280,7 +280,7 @@ LCOV: build/coverage/lcov.info
 
 ### Turn coverage on from the environment
 
-Use `runner.coverage_from_environment` in place of `runner.coverage`. Coverage then runs only when `DREAM_TEST_COVERAGE` is `1` or `true`, for example in CI:
+Use `runner.coverage_from_environment` in place of `runner.coverage`. Coverage then runs only when `DREAM_TEST_COVERAGE` is `1` or `true`, for example in CI. When the variable is not set, or is `0` or `false`, coverage is off. Any other value is a coverage error (`coverage.InvalidEnvironmentValue`), and the run fails:
 
 #### Coverage from the environment <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_environment.gleam#L24-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

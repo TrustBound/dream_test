@@ -18,16 +18,16 @@ Why dev-dependency? Tests are a build-time concern. Keeping it in `[dev-dependen
 
 ### Run tests locally (what command you should use)
 
-This repo (and the examples) use a Makefile. If you’re in this repo:
-
-```sh
-make test
-```
-
-In your own project, you typically run:
+In your own project, run:
 
 ```sh
 gleam test
+```
+
+Dream Test itself and its examples also have a Makefile. In this repository, `make test` runs `gleam test`:
+
+```sh
+make test
 ```
 
 **Note:** `gleam test` runs the test runner module at `test/{project_name}_test.gleam` (where `project_name` matches the `name` in your `gleam.toml`). This file must define `pub fn main()`. See the `gleeunit` docs for the standard runner shape. ([hexdocs.pm/gleeunit](https://hexdocs.pm/gleeunit/index.html))
@@ -40,7 +40,7 @@ Dream Test requires an explicit runner module. This is a design choice:
 - **No surprising defaults**: your code chooses concurrency, timeouts, reporters, and CI behavior.
 - **Better “why did this fail?” debugging**: you can add logging or swap reporters without rewriting tests.
 
-Create a file under `test/` (for example, `test/{project_name}_test.gleam`) with a `pub fn main()`.
+Create the file `test/{project_name}_test.gleam` with a `pub fn main()`. `gleam test` runs the `main` of this file only, so it must have this name.
 
 You can use module discovery to avoid maintaining an import list.
 
@@ -72,7 +72,8 @@ pub fn suites() {
 
 ### What you just setup
 
-- `discover` turns files into suites (a convenience).
+- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it.
+- The pattern names files under `test/`. `snippets/unit/**.gleam` is the folder of this repository's examples. In your project, use your own folder, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
 - `runner` executes suites with isolation, timeouts, and configurable parallelism.
 - `reporters` decide how results are rendered (human output vs JSON vs more).
 

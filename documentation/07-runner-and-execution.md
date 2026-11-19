@@ -121,7 +121,15 @@ To make one suite from several suites, use `suite.group` or `suite.join`. Each s
 
 `discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
 
-A discovery pattern that matches no test module is a load error (`<pattern>: no test module matches the pattern`), and so is a test module that does not load (`<module>: cannot load the module: <reason>`). Each load error is a failing test, so a wrong pattern never gives a run that passes with no tests.
+Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. A pattern names files under `test/`, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
+
+Discovery has five load errors. Each one is a failing test, so a wrong pattern never gives a run that passes with no tests:
+
+- `<pattern>: cannot search for test modules: <class>:<reason>`: the pattern cannot be searched.
+- `<pattern>: no test module matches the pattern`
+- `<module>: cannot load the module: <reason>`: the beam file of the module does not load.
+- `<module>: tests() crashed: <class>:<reason>`
+- `<module>: tests() did not return a test suite: <value>`
 
 #### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -243,7 +251,7 @@ about what is running.
 - `name`: leaf test name (`it("...")`)
 - `groups`: the names of the groups around the test, outermost first (e.g. `["outer", "inner"]`). `types.full_name(info.groups, info.name)` gives the group path + test name (e.g. `["outer", "inner", "leaf"]`).
 - `tags`: effective tags (includes inherited group tags)
-- `kind`: `types.TestKind` (Unit, GherkinScenario(scenario_id:, rule:), etc.)
+- `kind`: `types.TestKind`: `Unit` or `GherkinScenario(scenario_id:, rule:)`
 - `source`: best-effort origin string (see below)
 
 **`types.SuiteInfo` fields**:
@@ -262,11 +270,11 @@ about what is running.
 
 - A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
 - A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining tear-down hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
-- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out`, and the run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
+- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
 
 `source` is best-effort:
 
-- Unit discovery suites use the **module name**.
+- Unit discovery suites use the **Erlang module name**, for example `unit@cart_test` for `test/unit/cart_test.gleam`.
 - Gherkin discovery suites use the **.feature path**.
 - Manually constructed suites use `None`.
 
@@ -322,7 +330,7 @@ fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
 
 ### Choosing a concurrency number (practical guidance)
 
-- Start with the default.
+- Start with the default: `max_concurrency` 4 and `default_timeout_ms` 5000 (`parallel.default_config()`).
 - If you see flakes involving ports/files/DB state, either isolate those resources per test or set `max_concurrency(1)` for that run.
 - If you have a large suite of pure unit tests (no external state), increasing concurrency often speeds up feedback noticeably.
 

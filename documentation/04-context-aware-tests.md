@@ -68,7 +68,7 @@ Sometimes the context is a resource that must start before the first test and st
 - Both run in one process that lives while the tests run, so a process that the set-up starts stays alive.
 - When `set_up` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite set-up crashed in Store: <reason>`, and a timeout reads `the suite set-up timed out in Store`.
 - When `tear_down` returns `Error`, crashes or times out, the run report gets a tear-down failure for the hook `suite tear-down`. The report shows `suite tear-down in Store`, then the message, for example `the suite tear-down crashed in Store: <reason>`.
-- When the process of the set-up stops, each test that did not start is `SetupFailed` with `not run: the suite set-up of "Store" stopped (<reason>)`.
+- When the process of the set-up stops, each test that did not start is `SetupFailed` with `not run: the suite set-up of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `suite set-up`, and `tear_down` still runs when `set_up` returned.
 
 #### A suite whose context comes from a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_set_up.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -250,10 +250,10 @@ pub fn main() {
 
 ### Important Gleam detail: when type inference needs help
 
-In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.captures`.
+In a context-aware test, you often read record fields, such as `context.counter`.
 Gleam can only allow record-field access when it knows the record type, so sometimes you need a minimal type hint:
 
-- `fn my_step(cart: Cart, context: StepContext) { ... context.captures ... }`
+- `it("reads the counter", fn(context: Context) { ... context.counter ... })`
 
 That’s not “extra ceremony” — it’s the smallest annotation needed for record field access.
 

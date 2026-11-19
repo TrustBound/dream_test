@@ -9,12 +9,9 @@ Rather than forcing every project to reinvent these helpers slightly differently
 These are small helper modules that make tests more reliable and less repetitive:
 
 - `file`: predictable IO + structured errors (great for temp files/snapshots)
-- `process`: small helpers for test isolation (counters, unique ports)
+- `process`: small helpers for tests (counters, random ports, actors, polling)
 - `timing`: monotonic time + formatting
 - `sandbox`: run code in an isolated process with timeout/crash reporting
-
-Dream Test ships a few small helper modules that support testing workflows.
-They’re public because they’re useful in real test suites, but they’re intentionally minimal.
 
 ### `dream_test/file` (safe filesystem helpers)
 
@@ -98,7 +95,7 @@ pub fn tests() {
 
 ### `dream_test/process` (small helpers for tests)
 
-These are practical testing helpers: a simple counter and a “unique port” generator for avoiding collisions.
+These are practical testing helpers: a simple counter and a random port. `unique_port` gives a random port from 10,000 to 59,999. It does not check that the port is free, and two calls can give the same port, so it makes a collision unlikely, not impossible.
 
 #### Counter and port helpers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/process_counter_and_port.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -129,6 +126,12 @@ pub fn tests() {
   ])
 }
 ```
+
+The module has more helpers. See [`dream_test/process` on HexDocs](https://hexdocs.pm/dream_test/dream_test/process.html):
+
+- `start_counter_with`, `decrement` and `set_count`: more counter control
+- `start_actor` and `call_actor`: start an actor that is linked to the test, and call it
+- `await_ready` and `await_some`: poll a check until it gives a value or a timeout, with `default_poll_config` or `quick_poll_config`
 
 ### `dream_test/timing` (durations + monotonic time)
 
@@ -260,6 +263,13 @@ pub fn tests() {
   ])
 }
 ```
+
+The module has more functions. See [`dream_test/sandbox` on HexDocs](https://hexdocs.pm/dream_test/dream_test/sandbox.html):
+
+- `run_catching`: run a function in the calling process, and give a crash as an `Error`
+- `default_config` and `with_crash_reports`: a `SandboxConfig` with the default timeout, and one that shows crash reports
+- `run_in_setup_process`, `check_setup_process` and `stop_setup_process`: run functions one after another in a process that stays alive, as the runner does for a set-up and its tear-down
+- `kill_and_wait` and `format_exit_reason`: stop a process and wait for its exit, and give an exit reason as text
 
 ### What's Next?
 

@@ -257,7 +257,7 @@ Tags are lightweight labels you can attach to tests and groups. Use them to slic
 
 What you can tag in unit tests:
 
-- A **test** (an `it(...)` or `skip(...)` node)
+- A **test** (an `it(...)`, `skip(...)` or `pending(...)` node)
 - A **group** (a `group(...)` node)
 
 Tags on a group apply to all tests inside that group (including nested groups).
