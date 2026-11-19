@@ -1,0 +1,8 @@
+feature "Foo"
+  tags "sometag"
+  scenario "Scenario Outline" "Bar"
+    step "Then" "Baz"
+    examples ""
+      header "name"
+      row "X"
+      row "Y"

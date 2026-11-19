@@ -6,23 +6,24 @@ A comprehensive example demonstrating all Dream Test features using AAA (Arrange
 
 Each test follows the AAA pattern:
 
+### An AAA test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/cache_app/test/cache_app_test.gleam#L36-L50"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-it("retrieves a stored value", fn() {
-  // Arrange
-  let cache = cache_app.start()
-  cache_app.set(cache, "name", "Alice")
+        it("retrieves a stored value", fn() {
+          // Arrange
+          let cache = cache_app.start()
+          cache_app.set(cache, "name", "Alice")
 
-  // Act
-  let result = cache_app.get(cache, "name")
+          // Act
+          let result = cache_app.get(cache, "name")
 
-  // Assert
-  cache_app.stop(cache)
-  result
-  |> should
-  |> be_some()
-  |> be_equal("Alice")
-  |> or_fail_with("get() should return the stored value")
-})
+          // Assert
+          result
+          |> should
+          |> be_some()
+          |> be_equal("Alice")
+          |> or_fail_with("get() should return the stored value")
+        }),
 ```
 
 Tests interact only with the public API — no internal state inspection.
@@ -65,7 +66,7 @@ It's intentionally simple — the focus is on testing patterns, not cache implem
 
 Copy this structure for your own projects:
 
-```
+```text
 your_app/
 ├── gleam.toml
 ├── src/

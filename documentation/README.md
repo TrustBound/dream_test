@@ -37,11 +37,14 @@ That’s why you’ll see the same patterns repeated:
 7. [Runner & execution model](07-runner-and-execution.md) — concurrency, timeouts, CI, reliability, and runner hooks.
 8. [Reporters](08-reporters.md) — humans vs machines, streaming vs post-run.
 9. [Snapshot testing](09-snapshot-testing.md) — when snapshots make tests clearer (and when they make them worse).
-10. [Gherkin / BDD](10-gherkin-bdd.md) — scenario testing with a world state and placeholder captures.
+10. [Gherkin / BDD](10-gherkin-bdd.md) — scenario testing with a typed scenario state and placeholder captures.
 11. [Utilities](11-utilities.md) — small helpers that make tests less repetitive and more reliable.
+12. [Coverage badge on GitHub](12-coverage-badge.md) — a live coverage badge from your own CI, with no outside service.
+13. [Upgrading to 3.0.0](13-upgrading-to-3.md) — what to change in a project that uses Dream Test 2.x, with real 2.x and 3.0.0 code.
 
 ### If you only need one thing…
 
 - **I want to get a test running**: start at [Quick Start](02-quick-start.md).
+- **I am upgrading from 2.x**: read [Upgrading to 3.0.0](13-upgrading-to-3.md).
 - **My tests are flaky**: read [Runner & execution model](07-runner-and-execution.md) and [Lifecycle hooks](06-lifecycle-hooks.md).
 - **I need better CI integration**: jump to [Reporters](08-reporters.md) (JSON) and [Runner & execution model](07-runner-and-execution.md) (exit codes).

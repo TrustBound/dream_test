@@ -35,7 +35,7 @@ pub fn tests() {
 
 **Output:**
 
-```
+```text
 Feature: Shopping Cart
   Scenario: Adding items to cart ✓ (3ms)
 
@@ -113,7 +113,7 @@ discover.features("test/**/*.feature")
 
 See exactly how long each test takes with human-readable duration formatting:
 
-```
+```text
 Calculator
   ✓ adds two numbers
   ✓ handles division (1ms)

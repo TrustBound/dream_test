@@ -23,16 +23,20 @@ There are two good starting points:
 
 ### Option A: the smallest useful setup (discovery)
 
+#### Discover test modules <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/discovery_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/discover.{from_path, to_suites}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
-import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
+import dream_test/runner.{
+  exit_on_failure, progress_reporter, results_reporters, run,
+}
 
 pub fn main() {
   let suites =
     discover.new()
-    |> from_path("unit/**_test.gleam")
+    |> from_path("snippets/unit/**.gleam")
     |> to_suites()
 
   runner.new(suites)
@@ -43,17 +47,17 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/discovery_runner.gleam)</sub>
-
 What’s happening here (in English):
 
-- `from_path("unit/**_test.gleam")` finds test modules on disk.
-- `to_suites()` turns them into suite values.
+- `from_path("snippets/unit/**.gleam")` finds test modules on disk, relative to `test/`.
+- `to_suites()` turns them into suite values. A module can return any suite: a `unit` suite, a `unit_context` suite with its own context, or a Gherkin feature.
 - The runner executes those suites and streams output via a reporter.
 
 ### Option B: explicit suites (simple and easy to reason about)
 
 This is the most “teachable” version because nothing is implicit: `tests()` returns a suite, and `main()` runs it.
+
+#### Explicit suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/quick_start.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -61,22 +65,20 @@ import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/string.{contains, trim}
+import gleam/string
 
 pub fn tests() {
   describe("String utilities", [
     it("trims whitespace", fn() {
-      let actual = "  hello  " |> trim()
-
-      actual
+      "  hello  "
+      |> string.trim()
       |> should
       |> be_equal("hello")
       |> or_fail_with("Should remove surrounding whitespace")
     }),
     it("finds substrings", fn() {
-      let has_world = "hello world" |> contains("world")
-
-      has_world
+      "hello world"
+      |> string.contains("world")
       |> should
       |> be_equal(True)
       |> or_fail_with("Should find 'world' in string")
@@ -92,8 +94,6 @@ pub fn main() {
   |> runner.run()
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/unit/quick_start.gleam)</sub>
 
 ### Why this shape?
 

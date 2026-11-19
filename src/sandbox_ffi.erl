@@ -4,16 +4,18 @@
 %% can suppress noisy crash reports while still reporting SandboxCrashed.
 -module(sandbox_ffi).
 
--export([run_catching/1]).
+-export([run_catching/2]).
 
-run_catching(Fun) ->
+run_catching(Fun, Input) ->
   try
-    {ok, Fun()}
+    {ok, Fun(Input)}
   catch
     Class:Reason:Stack ->
       %% Keep it simple and stable for tests: include class + reason.
-      Text0 = io_lib:format("~p:~p", [Class, Reason]),
-      Text = lists:flatten(Text0),
+      %% A Gleam String is a UTF-8 binary, not a charlist.
+      Text = unicode:characters_to_binary(
+        io_lib:format("~p:~p", [Class, Reason])
+      ),
       _ = Stack,
       {error, Text}
   end.

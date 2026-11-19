@@ -1,0 +1,6 @@
+feature "Example token used multiple times"
+  scenario "Scenario Outline" "Token used twice in a single step"
+    step "Given" "<what> <what>"
+    examples ""
+      header "what"
+      row "usage"

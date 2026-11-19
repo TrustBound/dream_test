@@ -1,0 +1,11 @@
+feature "Example tokens everywhere"
+  scenario "Scenario Outline" "the <one>"
+    step "Given" "the <two>:"
+      docstring none "<three>"
+    step "Given" "the <four>:"
+      table
+        row "<five>"
+    examples ""
+      header "one" "two" "three" "four" "five"
+      row "un" "deux" "trois" "quatre" "cinq"
+      row "uno" "dos" "tres" "quatro" "cinco"

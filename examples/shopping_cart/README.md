@@ -4,7 +4,7 @@ This example demonstrates **Cucumber/Gherkin-style BDD testing** with Dream Test
 
 ## Project Structure
 
-```
+```text
 shopping_cart/
 ├── src/shopping_cart/
 │   ├── types.gleam             # Core domain types
@@ -36,14 +36,20 @@ inline DSL suite.
 
 Write features in standard `.feature` files:
 
+#### The feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/features/shopping_cart.feature#L1-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gherkin
-# features/shopping_cart.feature
+@shopping @e2e
 Feature: Shopping Cart
+  As a customer
+  I want to manage items in my shopping cart
+  So that I can purchase products I need
 
   Background:
     Given I have an empty cart
 
-  Scenario: Adding items to cart
+  @happy-path
+  Scenario: Adding a single item to the cart
     When I add 2 apples to the cart
     Then the cart should contain 2 items
     And the subtotal should be $3.00
@@ -53,14 +59,16 @@ Feature: Shopping Cart
 
 Define features directly in Gleam:
 
+#### The inline feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/features/shopping_cart.gleam#L25-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-feature_with_background("Shopping Cart", registry, bg, [
-  scenario("Adding items to cart", [
-    when("I add 2 apples to the cart"),
-    then("the cart should contain 2 items"),
-    and("the subtotal should be $3.00"),
-  ]),
-])
+  feature_with_background("Shopping Cart (inline)", registry, bg, [
+    scenario("Adding a single item to the cart", [
+      when("I add 2 apples to the cart"),
+      then("the cart should contain 2 items"),
+      and("the subtotal should be $3.00"),
+    ])
+      |> with_tags(["happy-path"]),
 ```
 
 Both approaches share the same step definitions!
@@ -69,12 +77,41 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
+Each scenario starts from `cart_world.initial()` and passes one `CartWorld` value from step to step. A `given` or `when` step returns a new `CartWorld`. A `then` step reads it.
+
+### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-// test/steps/cart.gleam
-pub fn register(registry: StepRegistry) -> StepRegistry {
+pub type CartWorld {
+  CartWorld(
+    /// The cart that the steps change
+    cart: cart_types.Cart,
+    /// What happened at checkout
+    checkout: Checkout,
+    /// The error of the last cart operation that failed, if any
+    last_error: Option(String),
+  )
+}
+
+/// What happened at checkout.
+pub type Checkout {
+  NotCheckedOut
+  CheckedOut(result: cart_types.CheckoutResult)
+  CheckoutFailed(reason: String)
+}
+```
+
+### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart.gleam#L18-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
   registry
-  |> steps.step("I have an empty cart", step_empty_cart)
-  |> steps.step("I add {int} {word} to the cart", step_add_product)
+  |> steps.given("I have an empty cart", step_empty_cart)
+  |> steps.given("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.when("I remove {word} from the cart", step_remove_product)
 }
 ```
 
@@ -96,7 +133,7 @@ make test
 
 ## Output
 
-```
+```text
 Shopping Cart — Gherkin BDD Example
 ====================================
 

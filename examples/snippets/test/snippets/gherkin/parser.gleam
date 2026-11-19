@@ -13,7 +13,10 @@ pub fn tests() {
         <> "  Scenario: One\n"
         <> "    Given a thing\n"
 
-      use feature <- result.try(parser.parse_string(content))
+      use feature <- result.try(
+        parser.parse_string(content)
+        |> result.map_error(parser.parse_error_to_string),
+      )
 
       feature.name
       |> should

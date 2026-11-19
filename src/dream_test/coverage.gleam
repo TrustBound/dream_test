@@ -1,0 +1,3724 @@
+//// Line coverage for the code under test.
+////
+//// Coverage uses the native line counters of the BEAM. When a run starts,
+//// every module built from your source directory is loaded again with a
+//// counter on each line. When the run ends, the runner reads how many times
+//// each line ran, prints a table, and writes an LCOV file that editors and CI
+//// services can read.
+////
+//// Native line counters need Erlang/OTP 27 or later with the JIT (the
+//// default on x86-64 and ARM64). On another runtime, `start` fails with
+//// `NativeCoverageUnsupported`.
+////
+//// ## With the dream_test runner
+////
+//// Coverage is opt-in. Turn it on from your test `main`:
+////
+//// ```gleam
+//// import dream_test/coverage
+//// import dream_test/reporters/bdd
+//// import dream_test/runner
+////
+//// pub fn main() {
+////   runner.new([tests()])
+////   |> runner.results_reporters([bdd.new()])
+////   |> runner.coverage(
+////     coverage.new()
+////     |> coverage.show_missing()
+////     |> coverage.minimum_percent(80.0),
+////   )
+////   |> runner.exit_on_failure()
+////   |> runner.run()
+//// }
+//// ```
+////
+//// To measure coverage only in some runs (for example in CI), use
+//// `runner.coverage_from_environment` in place of `runner.coverage`. It turns
+//// coverage on only when the `DREAM_TEST_COVERAGE` environment variable is
+//// `1` or `true`:
+////
+//// ```sh
+//// DREAM_TEST_COVERAGE=1 gleam test
+//// ```
+////
+//// ## Without the dream_test runner
+////
+//// `start`, `finish` and `check_minimum` run coverage around any code, for
+//// example another test runner. Render the result with
+//// `dream_test/reporters/coverage`, or read it with
+//// `dream_test/coverage/report`.
+////
+//// ```gleam
+//// let config = coverage.new()
+//// let assert Ok(session) = coverage.start(config)
+//// run_my_tests()
+//// let assert Ok(coverage_report) = coverage.finish(session)
+//// io.print(coverage_reporter.render(report: coverage_report, config: config))
+//// ```
+////
+//// ## What is measured
+////
+//// Modules built from the `.gleam` and `.erl` files under the source
+//// directory. The source directory is `src` by default. It can be a folder
+//// inside `src`, `test` or `dev` (for example `src/app`), because module names
+//// start at those folders: `src/app/cart.gleam` is module `app@cart`.
+////
+//// `coverage.exclude` removes files from the run, for example generated
+//// code. An excluded module gets no line counters and is not in the table,
+//// the LCOV file or the minimum.
+////
+//// Only lines that can run are counted. When the compiler proves that code
+//// can never run, for example a private function that nothing calls, or the
+//// JavaScript-only body of a function that has an Erlang `@external`, that
+//// code has no counter and is not in the table.
+////
+//// The line of a function with an `@external(erlang, ...)` attribute is not
+//// counted either. Gleam compiles such a function to a wrapper that calls
+//// the Erlang function, but Gleam code never calls the wrapper: the
+//// compiler calls the Erlang function directly. Coverage finds these
+//// functions in two steps, so a line that can run is never left out:
+////
+//// 1. It reads the name and line of each function that the Gleam source
+////    declares with an `@external(erlang, ...)` attribute.
+//// 2. When it adds the line counters, it takes the function with that name
+////    and line from the `.beam` file. Only when that function has exactly
+////    the wrapper shape of Gleam 1.19 does it get no counter: one clause,
+////    and a body that is one call to another module with the same
+////    parameters in the same order, all on the function's line.
+////
+//// A function written on one line whose body only calls an external
+//// compiles to the same code as a wrapper, but it has no `@external`
+//// attribute, so its line is counted.
+////
+//// ## Ignoring lines
+////
+//// Comment markers leave lines of a source file out of coverage. Put each
+//// marker on its own line. `gleam format` moves a comment at the end of a
+//// code line to the next line, so a marker after code is not supported.
+////
+//// ```gleam
+//// pub fn log(message: String) -> Nil {
+////   // coverage:ignore
+////   io.println(message)
+//// }
+////
+//// // coverage:ignore-start debug helpers
+//// pub fn dump(value: a) -> a {
+////   echo value
+//// }
+//// // coverage:ignore-end
+////
+//// // coverage:ignore-function only old callers use this
+//// /// Converts the old record format.
+//// @deprecated("Use convert instead")
+//// pub fn convert_legacy(record: String) -> String {
+////   string.replace(record, ";", ",")
+//// }
+//// ```
+////
+//// - `// coverage:ignore` ignores the next line that holds code. Blank lines
+////   and comment lines between the marker and the code are skipped. Another
+////   marker before that line, or the end of the file, is an error.
+//// - `// coverage:ignore-start` and `// coverage:ignore-end` ignore every
+////   line from the start marker to the end marker.
+//// - `// coverage:ignore-function` ignores every line from the marker to the
+////   last line of the function after it. Blank lines, comments, doc comments
+////   and attributes such as `@external(...)` or `@deprecated(...)` can be
+////   between the marker and `fn`. In an `.erl` file, put the marker above the
+////   first clause; attributes such as `-spec` can be between them, and every
+////   clause up to the dot that ends the function is ignored.
+//// - In `.erl` files, write the markers after `%` or `%%`, for example
+////   `%% coverage:ignore`.
+//// - Text after a marker is its reason. `coverage.show_excluded` prints it,
+////   and `coverage.require_exclusion_reasons` makes it required.
+////
+//// An ignored line is not in the table, the Missing column, the LCOV file or
+//// the minimum. Line counts on it from `coverage.merge_lcov` are dropped too.
+//// Markers are read from each measured file, and from each file that a
+//// merged LCOV file covers.
+////
+//// An ignore-start marker without an ignore-end marker, an ignore-end marker
+//// without an ignore-start marker, an ignore-start marker inside an ignored
+//// block, an ignore-function marker that no complete function follows,
+//// and an ignore marker that another marker or the end of the file follows
+//// before a line of code are errors. The error gives the file and the line.
+////
+//// Markers match exact source lines only on Gleam 1.19 and later. See
+//// "Line accuracy".
+////
+//// ## Showing what is excluded
+////
+//// An exclusion is never silent. When a pattern excludes a file or a marker
+//// ignores a line, a count line follows the total:
+////
+//// ```text
+//// Excluded: 1 file, 6 lines in 1 file
+//// ```
+////
+//// `coverage.show_excluded` adds an `Excluded` column with the ignored lines
+//// and their reasons, and a row for each excluded file:
+////
+//// ```text
+//// File                        Lines  Cover  Excluded
+//// src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71
+//// src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)
+//// Total                       18/20  90.0%
+//// Excluded: 1 file, 6 lines in 1 file
+//// ```
+////
+//// Give a pattern a reason with `coverage.exclude_with_reason`. Give a
+//// marker a reason with text after it. `coverage.require_exclusion_reasons`
+//// fails the run when a pattern or a marker has no reason.
+////
+//// ## Table options
+////
+//// - `coverage.color()` prints the table in colour: the `Cover` cell is
+////   green at `100.0%`, red below the minimum and yellow in between (with no
+////   valid minimum: yellow from `50.0%`, red below it), and the
+////   `Missing` column is red. With a valid
+////   `coverage.minimum_percent_per_file`, the file rows use that minimum,
+////   and the total row keeps `coverage.minimum_percent`.
+//// - `coverage.sort_by_coverage()` lists the lowest coverage first.
+//// - `coverage.hide_complete()` leaves out files where every line ran. The
+////   total still counts them, and a line says how many were left out:
+////
+//// ```text
+//// File                Lines  Cover
+//// src/app/cart.gleam  18/20  90.0%
+//// Total               58/60  96.6%
+//// Hidden: 2 files at 100.0%
+//// ```
+////
+//// ## Other file formats
+////
+//// Coverage always writes LCOV unless `coverage.no_lcov()` is set. It can
+//// also write the same report in other formats when it finishes:
+////
+//// ```gleam
+//// coverage.new()
+//// |> coverage.json_path("build/coverage/coverage.json")
+//// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+//// |> coverage.markdown_path("build/coverage/coverage.md")
+//// |> coverage.html_path("build/coverage/html")
+//// |> coverage.html_file("build/coverage/all.html")
+//// ```
+////
+//// - JSON: a summary per file, with missing lines, ignored lines and
+////   excluded files (`dream_test/coverage/json_summary`).
+//// - Cobertura XML: for GitLab, Jenkins and Azure DevOps
+////   (`dream_test/coverage/cobertura`).
+//// - Markdown: a table for `$GITHUB_STEP_SUMMARY` or a pull request comment
+////   (`dream_test/coverage/markdown`).
+//// - HTML: an index page and a page per source file that shows each line
+////   with its hit count (`dream_test/coverage/html`).
+//// - Combined HTML: the same table and annotated source on one page
+////   (`dream_test/coverage/html`).
+////
+//// A file that cannot be written fails coverage with a `Coverage failed`
+//// message that names the format and the path.
+////
+//// ## Coverage from other BEAM instances
+////
+//// Code that runs in another BEAM instance is not measured by the test
+//// run, for example an application server that integration tests start as
+//// a separate OS process. That server can measure itself with `start` and
+//// `finish`, write an LCOV file when it stops, and the test run adds the
+//// file to its own report with `merge_lcov`.
+////
+//// In the server, start coverage before it serves requests, and call
+//// `finish` in its stop path, before the BEAM halts. `finish` writes the
+//// LCOV file:
+////
+//// ```gleam
+//// pub fn main() {
+////   let config =
+////     coverage.new()
+////     |> coverage.lcov_path("build/coverage/servers/app.info")
+////   let assert Ok(session) = coverage.start(config)
+////   serve_until_stop_requested()
+////   let assert Ok(_) = coverage.finish(session)
+//// }
+//// ```
+////
+//// In the test run, delete the old file before the server starts, stop the
+//// server before the tests end, and merge the file:
+////
+//// ```gleam
+//// describe("app", [
+////   before_all(fn() {
+////     file.delete("build/coverage/servers/app.info")
+////     |> result.map_error(file.error_to_string)
+////   }),
+////   before_all(start_server),
+////   after_all(stop_server_and_wait_for_exit),
+////   it("serves the home page", get_home_page),
+//// ])
+////
+//// runner.new([app_tests()])
+//// |> runner.coverage(
+////   coverage.new()
+////   |> coverage.merge_lcov("build/coverage/servers/*.info"),
+//// )
+//// |> runner.run()
+//// ```
+////
+//// - Start the server from the project root, the same directory the tests
+////   run in, so the paths in its LCOV file are the paths in the project.
+//// - A BEAM that is killed (for example with `SIGKILL`, or with `SIGTERM`
+////   and no handler) does not run `finish`, so the file is not written.
+////   Stop the server through its own stop path, for example a stop request
+////   or the end of its standard input.
+//// - Delete the old file before the server starts. Then a server that did
+////   not write its file fails the test run with `NoLcovFilesMatched`, and
+////   the counts of an earlier run are never merged.
+//// - Give each server its own file name, and stop each server before the
+////   test run finishes, because `merge_lcov` reads the files then.
+////
+//// ## Line accuracy
+////
+//// Line numbers come from the compiled `.beam` file. Gleam 1.19 and later map
+//// every line to its Gleam source line. Older Gleam versions map only the first
+//// line of each function, so lines inside a function can drift.
+////
+//// Coverage finds the files that an older Gleam version built: their
+//// `.beam` file was compiled from generated Erlang source, and a 1.19 build
+//// is not. `report.inexact_line_files` lists them, and the coverage table
+//// prints a warning that names them.
+////
+//// ## Limits
+////
+//// - More than one run can measure in one BEAM instance at the same time,
+////   but each module can be in only one run. A `start` that includes a
+////   module of a run that has not finished fails with
+////   `ModuleAlreadyMeasured`. After `finish`, a module can be measured again,
+////   and its counts start from zero.
+//// - A process that is already in a function of a module when `start` runs
+////   keeps running the version without counters. Its calls to other
+////   functions in the same module are not counted. A call made with the
+////   module name (`module.function` in Gleam, `module:function` in Erlang),
+////   by that process or any other, runs the version with counters.
+//// - `start` never stops a process. When a process still runs an older
+////   version of a module, from a code reload before the run, `start` fails
+////   with `OldCodeInUse`.
+//// - After `finish`, the modules keep their counters until they are loaded
+////   again. The counters cost a little time on each line, and nothing reads
+////   them.
+////
+//// ## Errors and versions
+////
+//// `CoverageError` and its cause types get new variants only in major
+//// versions, so a `case` that handles every variant keeps compiling across
+//// minor and patch releases.
+////
+//// ## Available Functions
+////
+//// | Category     | Functions                                                 |
+//// |--------------|-----------------------------------------------------------|
+//// | **Settings** | `new`, `source_directory`, `lcov_path`, `no_lcov`,        |
+//// |              | `json_path`, `cobertura_path`, `markdown_path`,           |
+//// |              | `html_path`, `html_file`,                                 |
+//// |              | `show_missing`, `minimum_percent`,                        |
+//// |              | `minimum_percent_per_file`, `merge_lcov`,                 |
+//// |              | `exclude`, `exclude_with_reason`, `show_excluded`,        |
+//// |              | `require_exclusion_reasons`                               |
+//// | **Table**    | `color`, `sort_by_coverage`, `hide_complete`              |
+//// | **Read**     | `shows_missing`, `shows_excluded`, `uses_color`,          |
+//// |              | `sorts_by_coverage`, `hides_complete`, `lcov_file`,       |
+//// |              | `minimum`, `minimum_per_file`                             |
+//// | **Run**      | `start`, `finish`, `check_minimum`,                       |
+//// |              | `check_minimum_per_file`                                  |
+////
+//// ## Import Style
+////
+//// ```gleam
+//// import dream_test/coverage
+//// ```
+
+import dream_test/coverage/cobertura
+import dream_test/coverage/html
+import dream_test/coverage/json_summary
+import dream_test/coverage/markdown
+import dream_test/coverage/report.{
+  type CoverageReport, type ExcludedFile, type FileCoverage, type IgnoredRange,
+  type LineCoverage, LineCoverage,
+}
+import dream_test/file.{type FileError}
+import gleam/dict.{type Dict}
+import gleam/int
+import gleam/list
+import gleam/option.{type Option, None, Some}
+import gleam/order.{type Order}
+import gleam/result
+import gleam/set.{type Set}
+import gleam/string
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/// Settings for a coverage run.
+///
+/// Create one with `coverage.new()` and pass it to `runner.coverage`, or to
+/// `coverage.start`.
+pub opaque type CoverageConfig {
+  CoverageConfig(
+    source_directory: String,
+    lcov_path: Option(String),
+    show_missing: Bool,
+    minimum_percent: Option(Float),
+    minimum_percent_per_file: Option(Float),
+    merge_lcov_patterns: List(String),
+    exclude_patterns: List(ExcludePattern),
+    show_excluded: Bool,
+    require_exclusion_reasons: Bool,
+    color: Bool,
+    sort_by_coverage: Bool,
+    hide_complete: Bool,
+    json_path: Option(String),
+    cobertura_path: Option(String),
+    markdown_path: Option(String),
+    html_path: Option(String),
+    html_file: Option(String),
+  )
+}
+
+/// A pattern given to `coverage.exclude` or `coverage.exclude_with_reason`.
+type ExcludePattern {
+  ExcludePattern(pattern: String, reason: Option(String))
+}
+
+/// A coverage run that has started.
+///
+/// Only `coverage.start` creates one. Pass it to `coverage.finish`.
+///
+/// The session measures its modules until `coverage.finish`, or until the
+/// process that called `coverage.start` ends. After that process ends,
+/// another run can measure the same modules.
+pub opaque type CoverageSession {
+  CoverageSession(
+    config: CoverageConfig,
+    measurement: Measurement,
+    modules: List(CoveredModule),
+    excluded_files: List(ExcludedFile),
+    source_marks: SourceMarks,
+    inexact_line_files: List(String),
+  )
+}
+
+type CoveredModule {
+  CoveredModule(module_name: String, source_path: String)
+}
+
+/// The settings and files of a run, before its modules get line counters.
+type PreparedRun {
+  PreparedRun(
+    config: CoverageConfig,
+    modules: List(CoveredModule),
+    excluded_files: List(ExcludedFile),
+    source_marks: SourceMarks,
+  )
+}
+
+/// The Erlang reference that names one measurement. The line counters of
+/// its modules belong to it until `coverage.finish`, or until the process
+/// that started it ends.
+type Measurement
+
+/// Everything that can go wrong during a coverage run.
+///
+/// `dream_test/reporters/coverage.render_failure` turns each one into a
+/// message that says what failed, why, and what to do. Variants that come
+/// from the BEAM keep the raw Erlang term in `raw`.
+///
+/// New variants are added only in major versions.
+pub type CoverageError {
+  /// The source directory does not exist.
+  SourceDirectoryNotFound(path: String)
+  /// The source directory is not `src`, `test` or `dev`, or a folder inside
+  /// one of them, so module names cannot be worked out.
+  SourceDirectoryOutsideSourceRoot(path: String)
+  /// The source directory holds no `.gleam` or `.erl` files.
+  NoSourceFiles(path: String)
+  /// This Erlang runtime cannot count lines natively. Native line counters
+  /// need Erlang/OTP 27 or later with the JIT.
+  NativeCoverageUnsupported(otp_release: String, emulator_flavor: String)
+  /// The Erlang compiler, which coverage uses to add line counters to each
+  /// module, could not be loaded.
+  CompilerNotLoaded(cause: LoadCause, raw: String)
+  /// Another coverage run in this BEAM already measures a module of the
+  /// source directory.
+  ModuleAlreadyMeasured(module_name: String, source_path: String)
+  /// A module built from the source directory could not be loaded.
+  ModuleNotLoaded(
+    module_name: String,
+    source_path: String,
+    cause: LoadCause,
+    raw: String,
+  )
+  /// A module could not be given line counters.
+  ModuleNotInstrumented(
+    module_name: String,
+    source_path: String,
+    cause: InstrumentCause,
+    raw: String,
+  )
+  /// The line counts of a module could not be read.
+  ModuleNotAnalysed(
+    module_name: String,
+    source_path: String,
+    cause: AnalysisCause,
+    raw: String,
+  )
+  /// `coverage.finish` already ran for this session, or the process that
+  /// called `coverage.start` ended and another run then measured one of its
+  /// modules.
+  SessionAlreadyFinished
+  /// The LCOV file could not be written.
+  LcovWriteFailed(path: String, error: FileError)
+  /// The JSON summary from `coverage.json_path` could not be written.
+  JsonWriteFailed(path: String, error: FileError)
+  /// The Cobertura XML file from `coverage.cobertura_path` could not be
+  /// written.
+  CoberturaWriteFailed(path: String, error: FileError)
+  /// The Markdown summary from `coverage.markdown_path` could not be written.
+  MarkdownWriteFailed(path: String, error: FileError)
+  /// A page of the HTML report from `coverage.html_path` could not be
+  /// written. `path` is the page, inside the HTML directory.
+  HtmlWriteFailed(path: String, error: FileError)
+  /// A source file could not be read to show it in the HTML report from
+  /// `coverage.html_path`.
+  HtmlSourceReadFailed(path: String, error: FileError)
+  /// The `files` folder of the HTML directory from `coverage.html_path`
+  /// could not be deleted before new pages were written. `path` is that
+  /// folder.
+  HtmlDeleteFailed(path: String, error: FileError)
+  /// The combined HTML page from `coverage.html_file` could not be written.
+  HtmlFileWriteFailed(path: String, error: FileError)
+  /// A source file could not be read to show it in the combined HTML page
+  /// from `coverage.html_file`.
+  HtmlFileSourceReadFailed(path: String, error: FileError)
+  /// The value given to `coverage.minimum_percent` is not from 0.0 to 100.0.
+  InvalidMinimumPercent(value: Float)
+  /// The value given to `coverage.minimum_percent_per_file` is not from 0.0
+  /// to 100.0.
+  InvalidMinimumPercentPerFile(value: Float)
+  /// The environment variable read by `runner.coverage_from_environment`
+  /// has a value that does not say if coverage is on or off. `name` is the
+  /// variable and `value` is its value.
+  InvalidEnvironmentValue(name: String, value: String)
+  /// Total coverage is below the value given to `coverage.minimum_percent`.
+  ///
+  /// - `hit`: executable lines that ran
+  /// - `total`: executable lines
+  /// - `minimum_percent`: the minimum, rounded to one decimal place
+  /// - `lines_needed`: how many lines must run to reach the minimum
+  BelowMinimumPercent(
+    hit: Int,
+    total: Int,
+    minimum_percent: Float,
+    lines_needed: Int,
+  )
+  /// One or more files are below the value given to
+  /// `coverage.minimum_percent_per_file`.
+  ///
+  /// - `minimum_percent`: the minimum, rounded to one decimal place
+  /// - `files`: every file below the minimum, sorted by path
+  FilesBelowMinimumPercent(
+    minimum_percent: Float,
+    files: List(FileBelowMinimum),
+  )
+  /// No file matches a pattern given to `coverage.merge_lcov`.
+  NoLcovFilesMatched(pattern: String)
+  /// A file given to `coverage.merge_lcov` could not be read.
+  LcovReadFailed(path: String, error: FileError)
+  /// A file given to `coverage.merge_lcov` is not valid LCOV.
+  ///
+  /// - `line_number`: the 1-based line in the LCOV file
+  /// - `line`: the text of that line
+  /// - `problem`: what is wrong with it
+  MalformedLcov(path: String, line_number: Int, line: String, problem: String)
+  /// A file given to `coverage.merge_lcov` covers a source file that does not
+  /// exist in this project.
+  LcovSourceNotFound(lcov_path: String, source_path: String)
+  /// A pattern given to `coverage.exclude` matches no `.gleam` or `.erl`
+  /// file in the source directory.
+  ExcludeMatchedNothing(pattern: String, source_directory: String)
+  /// The patterns given to `coverage.exclude` match every `.gleam` and
+  /// `.erl` file in the source directory, so nothing is left to measure.
+  EverySourceFileExcluded(source_directory: String)
+  /// A source file cannot be read to find its ignore markers.
+  SourceReadFailed(path: String, error: FileError)
+  /// A `coverage:ignore-start` marker has no `coverage:ignore-end` marker
+  /// after it.
+  ///
+  /// - `line_number`: the 1-based line of the start marker
+  IgnoreStartWithoutEnd(source_path: String, line_number: Int)
+  /// A `coverage:ignore-end` marker has no `coverage:ignore-start` marker
+  /// before it.
+  ///
+  /// - `line_number`: the 1-based line of the end marker
+  IgnoreEndWithoutStart(source_path: String, line_number: Int)
+  /// A `coverage:ignore-start` marker is inside a block that an earlier
+  /// start marker opened. Ignored blocks cannot be nested.
+  ///
+  /// - `line_number`: the 1-based line of the inner start marker
+  /// - `open_line_number`: the line of the start marker that opened the block
+  NestedIgnoreStart(
+    source_path: String,
+    line_number: Int,
+    open_line_number: Int,
+  )
+  /// A `coverage:ignore-function` marker is not followed by a complete
+  /// function: the code after it is a constant, a type or other code, or the
+  /// file ends first.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  IgnoreFunctionWithoutFunction(source_path: String, line_number: Int)
+  /// A `coverage:ignore` marker is not followed by a line that holds code:
+  /// another marker comes first, or the file ends first.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  IgnoreLineWithoutCode(source_path: String, line_number: Int)
+  /// `coverage.require_exclusion_reasons` is on, and a pattern was given to
+  /// `coverage.exclude`, which gives no reason.
+  ExcludeWithoutReason(pattern: String)
+  /// `coverage.require_exclusion_reasons` is on, and an ignore marker has no
+  /// text after it.
+  ///
+  /// - `line_number`: the 1-based line of the marker
+  /// - `marker`: the marker, for example `coverage:ignore-start`
+  IgnoreMarkerWithoutReason(
+    source_path: String,
+    line_number: Int,
+    marker: String,
+  )
+}
+
+/// A file below the minimum from `coverage.minimum_percent_per_file`, in
+/// `FilesBelowMinimumPercent`.
+///
+/// Build one with `coverage.file_below_minimum`. Read it with
+/// `below_minimum_source_path`, `below_minimum_hit`, `below_minimum_total`
+/// and `below_minimum_lines_needed`.
+pub opaque type FileBelowMinimum {
+  FileBelowMinimum(source_path: String, hit: Int, total: Int, lines_needed: Int)
+}
+
+/// Why a module could not be loaded.
+pub type LoadCause {
+  /// No `.beam` file for the module is on the code path.
+  ModuleNotBuilt
+  /// The module's `on_load` function failed.
+  OnLoadFailed
+  /// The `.beam` file is damaged or built for another Erlang version.
+  BadBeamFile
+  /// The code server runs in embedded mode, which only loads the modules
+  /// listed when the BEAM starts.
+  EmbeddedMode
+}
+
+/// Why a module could not be given line counters.
+pub type InstrumentCause {
+  /// The `.beam` file has no debug information.
+  NoDebugInfo
+  /// The debug information in the `.beam` file is encrypted.
+  EncryptedDebugInfo
+  /// The debug information in the `.beam` file could not be read, for
+  /// example because the file was deleted after the module was loaded.
+  DebugInfoUnreadable
+  /// Another tool, such as `cover`, already gave the module line counters.
+  AlreadyInstrumented
+  /// The Erlang compiler could not compile the module again with line
+  /// counters.
+  RecompileFailed
+  /// A process still runs an older version of the module. Loading the
+  /// module with line counters would kill that process, so coverage stops.
+  OldCodeInUse
+  /// The module with line counters could not be loaded.
+  InstrumentedLoadFailed
+}
+
+/// Why the line counts of a module could not be read.
+pub type AnalysisCause {
+  /// The module lost its line counters during the run, because it was
+  /// loaded again or deleted.
+  NotInstrumented
+}
+
+// =============================================================================
+// Settings
+// =============================================================================
+
+/// Create the default coverage settings.
+///
+/// - Source directory: `src`
+/// - LCOV file: `build/coverage/lcov.info`
+/// - JSON, Cobertura, Markdown and HTML files: not written
+/// - Missing lines: not shown
+/// - Excluded files and ignored lines: not listed, only counted
+/// - Exclusion reasons: not required
+/// - Minimum: none
+///
+/// ## Example
+///
+/// ```gleam
+/// runner.new([tests()])
+/// |> runner.coverage(coverage.new())
+/// |> runner.run()
+/// ```
+pub fn new() -> CoverageConfig {
+  CoverageConfig(
+    source_directory: "src",
+    lcov_path: Some("build/coverage/lcov.info"),
+    show_missing: False,
+    minimum_percent: None,
+    minimum_percent_per_file: None,
+    merge_lcov_patterns: [],
+    exclude_patterns: [],
+    show_excluded: False,
+    require_exclusion_reasons: False,
+    color: False,
+    sort_by_coverage: False,
+    hide_complete: False,
+    json_path: None,
+    cobertura_path: None,
+    markdown_path: None,
+    html_path: None,
+    html_file: None,
+  )
+}
+
+/// Measure the modules built from a different source directory.
+///
+/// The path is relative to the directory that `gleam test` runs in. It must
+/// be `src`, `test` or `dev`, or a folder inside one of them, for example
+/// `src/app`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the directory to measure
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.source_directory("src/app")
+/// ```
+pub fn source_directory(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, source_directory: path)
+}
+
+/// Write the LCOV file to a different path.
+///
+/// Parent directories are created when needed.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the LCOV file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.lcov_path("build/coverage/unit.lcov")
+/// ```
+pub fn lcov_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, lcov_path: Some(path))
+}
+
+/// Write a JSON summary to this path when coverage finishes.
+///
+/// See `dream_test/coverage/json_summary` for the schema. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.json_path("build/coverage/coverage.json")
+/// ```
+pub fn json_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, json_path: Some(path))
+}
+
+/// Write Cobertura XML to this path when coverage finishes.
+///
+/// GitLab, Jenkins and Azure DevOps read this format. See
+/// `dream_test/coverage/cobertura` for the shape. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+/// ```
+pub fn cobertura_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, cobertura_path: Some(path))
+}
+
+/// Write a Markdown table to this path when coverage finishes.
+///
+/// On GitHub Actions, give the path in `$GITHUB_STEP_SUMMARY` to show
+/// the table on the run page. See `dream_test/coverage/markdown`. The file holds the same files and lines as the LCOV
+/// file: excluded files and ignored lines are left out of the counts.
+/// Parent directories are created when needed. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.markdown_path("build/coverage/coverage.md")
+/// ```
+pub fn markdown_path(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, markdown_path: Some(path))
+}
+
+/// Write an HTML report to this directory when coverage finishes.
+///
+/// The directory gets an `index.html` with a row per file, and a page per
+/// source file that shows each line with its hit count. Open `index.html`
+/// in a browser. See `dream_test/coverage/html` for the pages and their
+/// paths. The pages hold the same files and lines as the LCOV file:
+/// excluded files and ignored lines are left out of the counts. Folders are
+/// created when needed. Off by default.
+///
+/// Before it writes the pages, coverage deletes the folder
+/// `<directory>/files` and everything in it, so a page of a source file that
+/// was removed or renamed does not stay. Coverage deletes only that one
+/// folder. It does not delete the directory itself or other files in it, so
+/// keep your own files out of `<directory>/files`. If the folder cannot be
+/// deleted, coverage fails with `HtmlDeleteFailed`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `directory`: the directory to write the pages to
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.html_path("build/coverage/html")
+/// ```
+pub fn html_path(
+  config config: CoverageConfig,
+  directory directory: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, html_path: Some(directory))
+}
+
+/// Write the HTML report as one combined page to this file when coverage
+/// finishes.
+///
+/// The page has the table of `coverage.html_path`'s `index.html`, then the
+/// annotated source of every file, in the order of the table. Each file
+/// name in the table links to the source of that file on the same page.
+/// The page is self-contained, so you can attach it to a CI run or send it
+/// as one file. See `dream_test/coverage/html` for the page. Folders are
+/// created when needed, and a file from an earlier run is written over. Off
+/// by default.
+///
+/// `coverage.html_path` and `coverage.html_file` can both be on. Coverage
+/// writes the HTML directory first, then this file.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `path`: the file to write the page to
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.html_file("build/coverage/all.html")
+/// ```
+pub fn html_file(
+  config config: CoverageConfig,
+  path path: String,
+) -> CoverageConfig {
+  CoverageConfig(..config, html_file: Some(path))
+}
+
+/// Do not write an LCOV file. The table is still printed.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.no_lcov()
+/// ```
+pub fn no_lcov(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, lcov_path: None)
+}
+
+/// Add a `Missing` column to the table that lists the lines that did not run.
+///
+/// Consecutive line numbers are merged into ranges (`258-260`). Long lists
+/// wrap onto more lines in the same column. Off by default.
+///
+/// The LCOV file always holds every line with its count, so this setting does
+/// not change it.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_missing()
+/// ```
+pub fn show_missing(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, show_missing: True)
+}
+
+/// Fail the run when total coverage is below a percent.
+///
+/// The value must be from `0.0` to `100.0` and is rounded to one decimal
+/// place. Coverage passes when it is equal to the minimum or above it. The
+/// check is exact: 1999 of 2500 lines (79.96%) fails a minimum of `80.0`.
+///
+/// With the runner, a failure prints a `Coverage failed` block after the
+/// table, and `runner.exit_on_failure` then exits with status 1.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `percent`: the minimum total coverage, from `0.0` to `100.0`
+///
+/// ## Returns
+///
+/// The updated settings. An out-of-range value is reported by
+/// `coverage.start` and `coverage.check_minimum` as `InvalidMinimumPercent`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(80.0)
+/// ```
+pub fn minimum_percent(
+  config config: CoverageConfig,
+  percent percent: Float,
+) -> CoverageConfig {
+  CoverageConfig(..config, minimum_percent: Some(percent))
+}
+
+/// Fail the run when any measured file is below a percent.
+///
+/// Use it when one file with few tests must not hide behind a high total.
+/// Every measured file must reach the minimum. Files that `coverage.exclude`
+/// left out and files with no executable lines pass. Lines that markers
+/// ignore do not count.
+///
+/// The value must be from `0.0` to `100.0` and is rounded to one decimal
+/// place. The check is exact and the same as `coverage.minimum_percent`: a
+/// file passes when it is equal to the minimum or above it. It works with
+/// `coverage.minimum_percent` or without it.
+///
+/// With the runner, a failure prints a `Coverage failed` block after the
+/// table that lists every file below the minimum, and
+/// `runner.exit_on_failure` then exits with status 1. When the total is
+/// below `coverage.minimum_percent` too, a separate block reports the total
+/// first.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `percent`: the minimum coverage of each file, from `0.0` to `100.0`
+///
+/// ## Returns
+///
+/// The updated settings. An out-of-range value is reported by
+/// `coverage.start` and `coverage.check_minimum_per_file` as
+/// `InvalidMinimumPercentPerFile`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(90.0)
+/// |> coverage.minimum_percent_per_file(70.0)
+/// ```
+pub fn minimum_percent_per_file(
+  config config: CoverageConfig,
+  percent percent: Float,
+) -> CoverageConfig {
+  CoverageConfig(..config, minimum_percent_per_file: Some(percent))
+}
+
+/// Add the coverage in other LCOV files to this run's report.
+///
+/// Use it when code runs in other BEAM instances, for example servers that
+/// integration tests start, or helper nodes. Each of those writes an LCOV
+/// file (with `coverage.finish`, or any tool that writes LCOV). When this run
+/// finishes, every file that matches `pattern` is read and its line counts
+/// are added, per file and line, to this run's counts. The table, the LCOV
+/// output and `coverage.minimum_percent` then use the combined totals. The
+/// module docs show how a server writes its file, in "Coverage from other
+/// BEAM instances".
+///
+/// Call it more than once to merge more than one pattern. Each pattern must
+/// match at least one file, so a run that silently produced no coverage is
+/// reported instead of hidden. Paths in the LCOV files (`SF:` lines) are read
+/// from the directory the tests run in, and each must be a file in the
+/// project. An absolute `SF:` path is an error. `.` parts and empty parts
+/// are removed, as they are from measured and excluded paths, so
+/// `./src//app.gleam` and `src/app.gleam` are one file, and
+/// `coverage.exclude` matches both.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `pattern`: a wildcard pattern for the LCOV files, for example
+///   `build/coverage/parts/*.info`
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.merge_lcov("build/coverage/servers/*.info")
+/// ```
+pub fn merge_lcov(
+  config config: CoverageConfig,
+  pattern pattern: String,
+) -> CoverageConfig {
+  CoverageConfig(
+    ..config,
+    merge_lcov_patterns: list.append(config.merge_lcov_patterns, [pattern]),
+  )
+}
+
+/// Leave the source files that match a pattern out of coverage.
+///
+/// Use it for code that tests do not need to cover, for example generated
+/// code. An excluded module gets no line counters, and it is not in the table,
+/// the LCOV file or `coverage.minimum_percent`. Line counts for it from
+/// `coverage.merge_lcov` are dropped too.
+///
+/// Patterns are wildcards relative to the directory the tests run in, the
+/// same as `coverage.merge_lcov`. They are matched against the paths of the
+/// `.gleam` and `.erl` files in the source directory, for example
+/// `src/app/cart.gleam`. `*` matches inside one folder, and `**` matches any
+/// number of folders.
+///
+/// To say why the files are left out, use `coverage.exclude_with_reason`.
+///
+/// Call it more than once to exclude more than one pattern. Each pattern must
+/// match at least one source file, and at least one source file must be left
+/// to measure. Otherwise `coverage.start` returns an error, so a pattern with
+/// a typo, or one left behind after the files moved, is reported instead of
+/// hidden.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `pattern`: a wildcard pattern for the source files, for example
+///   `src/app/generated/**` or `src/**/*_ffi.erl`
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude("src/app/generated/**")
+/// |> coverage.exclude("src/**/*_ffi.erl")
+/// ```
+pub fn exclude(
+  config config: CoverageConfig,
+  pattern pattern: String,
+) -> CoverageConfig {
+  add_exclude_pattern(config, ExcludePattern(pattern: pattern, reason: None))
+}
+
+/// Leave the source files that match a pattern out of coverage, and say why.
+///
+/// The same as `coverage.exclude`, with a reason. `coverage.show_excluded`
+/// prints the reason next to each excluded file, and
+/// `dream_test/coverage/report.excluded_files` gives it to your own reporter.
+/// With `coverage.require_exclusion_reasons`, every pattern must come from
+/// this function.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+/// - `pattern`: a wildcard pattern for the source files, the same as for
+///   `coverage.exclude`
+/// - `reason`: why the files are left out, for example `"generated code"`.
+///   Spaces at the start and the end are removed. A reason that is empty
+///   after that counts as no reason.
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude_with_reason(
+///   pattern: "src/app/generated/**",
+///   reason: "generated from the database schema",
+/// )
+/// ```
+pub fn exclude_with_reason(
+  config config: CoverageConfig,
+  pattern pattern: String,
+  reason reason: String,
+) -> CoverageConfig {
+  add_exclude_pattern(
+    config,
+    ExcludePattern(pattern: pattern, reason: non_empty_text(reason)),
+  )
+}
+
+fn add_exclude_pattern(
+  config: CoverageConfig,
+  exclude_pattern: ExcludePattern,
+) -> CoverageConfig {
+  CoverageConfig(
+    ..config,
+    exclude_patterns: list.append(config.exclude_patterns, [exclude_pattern]),
+  )
+}
+
+/// The trimmed text, or `None` when nothing is left.
+fn non_empty_text(text: String) -> Option(String) {
+  case string.trim(text) {
+    "" -> None
+    trimmed -> Some(trimmed)
+  }
+}
+
+/// List what coverage left out, and why, in the table.
+///
+/// Adds an `Excluded` column with the lines that ignore markers left out of
+/// each file, as ranges with the text after the marker in brackets, for
+/// example `40-44 (debug only), 71`. Adds a row for each file that an exclude
+/// pattern left out, for example
+/// `src/app/generated/db.gleam  excluded: matches src/app/generated/**`.
+/// Off by default.
+///
+/// The `Excluded:` count line under the total is printed whether this is on
+/// or off, so an exclusion is never silent.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_excluded()
+/// ```
+pub fn show_excluded(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, show_excluded: True)
+}
+
+/// Fail the run when an exclusion does not say why.
+///
+/// When this is on:
+///
+/// - every pattern must come from `coverage.exclude_with_reason`. A pattern
+///   from `coverage.exclude` makes `coverage.start` return
+///   `ExcludeWithoutReason`.
+/// - every `coverage:ignore`, `coverage:ignore-start` and
+///   `coverage:ignore-function` marker must have text after it, for example
+///   `// coverage:ignore-start debug only`. A marker without text gives
+///   `IgnoreMarkerWithoutReason` with the file and the line. A
+///   `coverage:ignore-end` marker needs no text, because the start marker
+///   holds the reason.
+///
+/// Markers of measured files are checked by `coverage.start`. Markers of
+/// files that only `coverage.merge_lcov` covers are checked by
+/// `coverage.finish`. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.exclude_with_reason(
+///   pattern: "src/app/generated/**",
+///   reason: "generated code",
+/// )
+/// |> coverage.require_exclusion_reasons()
+/// ```
+pub fn require_exclusion_reasons(
+  config config: CoverageConfig,
+) -> CoverageConfig {
+  CoverageConfig(..config, require_exclusion_reasons: True)
+}
+
+/// Print the coverage table in colour.
+///
+/// The `Cover` cell of each row is green at `100.0%`, red below
+/// `coverage.minimum_percent`, and yellow in between. With no minimum, or an
+/// invalid one, a fixed rule applies: yellow from `50.0%`, red below
+/// `50.0%`. A `-` cell (no executable lines) stays plain. The
+/// `Missing` column is red. Off by default, like `bdd.color()`, so output
+/// that goes to a file or a CI log has no escape codes.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_missing()
+/// |> coverage.color()
+/// ```
+pub fn color(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, color: True)
+}
+
+/// List the files with the lowest coverage first.
+///
+/// Files are sorted by the share of their lines that ran, lowest first.
+/// Files with the same share are sorted by path. A file with no executable
+/// lines counts as fully covered. Rows for excluded files stay after the
+/// measured files. Off by default: files keep the order of the report, which
+/// is by path for a report from `coverage.finish`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.sort_by_coverage()
+/// ```
+pub fn sort_by_coverage(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, sort_by_coverage: True)
+}
+
+/// Leave out the rows of files where every line ran.
+///
+/// A file is left out only when it has executable lines and all of them
+/// ran, so it would show `100.0%`. The total, the minimum and the LCOV file
+/// still count it. A line after the total says how many files were left
+/// out, for example `Hidden: 12 files at 100.0%`, so the table never hides
+/// them silently. Off by default.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to change
+///
+/// ## Returns
+///
+/// The updated settings.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.hide_complete()
+/// ```
+pub fn hide_complete(config config: CoverageConfig) -> CoverageConfig {
+  CoverageConfig(..config, hide_complete: True)
+}
+
+// =============================================================================
+// Read settings
+// =============================================================================
+
+/// Whether `coverage.show_missing` is on.
+///
+/// Reporters read this to decide whether to list the lines that did not run.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_missing()
+/// |> coverage.shows_missing()
+/// // -> True
+/// ```
+pub fn shows_missing(config config: CoverageConfig) -> Bool {
+  config.show_missing
+}
+
+/// Whether `coverage.show_excluded` is on.
+///
+/// Reporters read this to decide whether to list what coverage left out.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.show_excluded()
+/// |> coverage.shows_excluded()
+/// // -> True
+/// ```
+pub fn shows_excluded(config config: CoverageConfig) -> Bool {
+  config.show_excluded
+}
+
+/// Whether `coverage.color` is on.
+///
+/// Reporters read this to decide whether to print ANSI colour codes.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.color()
+/// |> coverage.uses_color()
+/// // -> True
+/// ```
+pub fn uses_color(config config: CoverageConfig) -> Bool {
+  config.color
+}
+
+/// Whether `coverage.sort_by_coverage` is on.
+///
+/// Reporters read this to decide whether to list the lowest coverage first.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.sort_by_coverage()
+/// |> coverage.sorts_by_coverage()
+/// // -> True
+/// ```
+pub fn sorts_by_coverage(config config: CoverageConfig) -> Bool {
+  config.sort_by_coverage
+}
+
+/// Whether `coverage.hide_complete` is on.
+///
+/// Reporters read this to decide whether to leave out files where every
+/// line ran.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.hide_complete()
+/// |> coverage.hides_complete()
+/// // -> True
+/// ```
+pub fn hides_complete(config config: CoverageConfig) -> Bool {
+  config.hide_complete
+}
+
+/// The minimum from `coverage.minimum_percent`, if any.
+///
+/// The value is returned as given, even when it is not from 0.0 to 100.0.
+/// `coverage.check_minimum` reports an invalid value.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to read
+///
+/// ## Returns
+///
+/// `Some(percent)` when a minimum is set, otherwise `None`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(80.0)
+/// |> coverage.minimum()
+/// // -> Some(80.0)
+/// ```
+pub fn minimum(config config: CoverageConfig) -> Option(Float) {
+  config.minimum_percent
+}
+
+/// The minimum coverage of each file, from
+/// `coverage.minimum_percent_per_file`.
+///
+/// The value is returned as given, even when it is not from 0.0 to 100.0.
+/// `coverage.check_minimum_per_file` reports an invalid value.
+///
+/// ## Parameters
+///
+/// - `config`: the settings to read
+///
+/// ## Returns
+///
+/// `Some(percent)` when a per-file minimum is set, otherwise `None`.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent_per_file(70.0)
+/// |> coverage.minimum_per_file()
+/// // -> Some(70.0)
+/// ```
+pub fn minimum_per_file(config config: CoverageConfig) -> Option(Float) {
+  config.minimum_percent_per_file
+}
+
+/// The LCOV file that `coverage.finish` writes, if any.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.lcov_file()
+/// // -> Some("build/coverage/lcov.info")
+/// ```
+pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
+  config.lcov_path
+}
+
+// =============================================================================
+// Run
+// =============================================================================
+
+/// Give every module built from the source directory line counters, except
+/// the files that `coverage.exclude` matches.
+///
+/// Call this before the code you want to measure runs. `runner.coverage`
+/// does this for you.
+///
+/// ## Parameters
+///
+/// - `config`: the coverage settings
+///
+/// ## Returns
+///
+/// - `Ok(CoverageSession)` when every module has line counters
+/// - `Error(CoverageError)` for the first step that failed. Exclude patterns
+///   and the ignore markers of the measured files are checked before any
+///   module changes. With `coverage.require_exclusion_reasons`, a pattern or
+///   a marker without a reason is an error too.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.source_directory("src/does_not_exist")
+/// |> coverage.start()
+/// // -> Error(SourceDirectoryNotFound("src/does_not_exist"))
+/// ```
+pub fn start(
+  config config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError) {
+  case
+    validate_minimum_percent(config.minimum_percent),
+    validate_minimum_percent_per_file(config.minimum_percent_per_file)
+  {
+    Ok(Nil), Ok(Nil) -> start_with_valid_minimum(config)
+    Error(error), _ | _, Error(error) -> Error(error)
+  }
+}
+
+fn validate_minimum_percent(
+  minimum: Option(Float),
+) -> Result(Nil, CoverageError) {
+  case minimum {
+    None -> Ok(Nil)
+    Some(value) if value <. 0.0 || value >. 100.0 ->
+      Error(InvalidMinimumPercent(value: value))
+    Some(_) -> Ok(Nil)
+  }
+}
+
+fn validate_minimum_percent_per_file(
+  minimum: Option(Float),
+) -> Result(Nil, CoverageError) {
+  case minimum {
+    None -> Ok(Nil)
+    Some(value) if value <. 0.0 || value >. 100.0 ->
+      Error(InvalidMinimumPercentPerFile(value: value))
+    Some(_) -> Ok(Nil)
+  }
+}
+
+fn start_with_valid_minimum(
+  config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError) {
+  case config.require_exclusion_reasons {
+    True -> start_if_every_pattern_has_reason(config, config.exclude_patterns)
+    False -> start_with_valid_settings(config)
+  }
+}
+
+fn start_if_every_pattern_has_reason(
+  config: CoverageConfig,
+  patterns: List(ExcludePattern),
+) -> Result(CoverageSession, CoverageError) {
+  case patterns {
+    [] -> start_with_valid_settings(config)
+    [ExcludePattern(pattern: pattern, reason: None), ..] ->
+      Error(ExcludeWithoutReason(pattern: pattern))
+    [_, ..rest] -> start_if_every_pattern_has_reason(config, rest)
+  }
+}
+
+fn start_with_valid_settings(
+  config: CoverageConfig,
+) -> Result(CoverageSession, CoverageError) {
+  case list_source_files(config.source_directory) {
+    Ok(source_files) -> start_with_source_files(config, source_files)
+    Error(error) -> Error(error)
+  }
+}
+
+fn start_with_source_files(
+  config: CoverageConfig,
+  source_files: List(String),
+) -> Result(CoverageSession, CoverageError) {
+  case source_files, module_prefix(config.source_directory) {
+    _, Error(error) -> Error(error)
+    [], _ -> Error(NoSourceFiles(path: config.source_directory))
+    _, Ok(prefix) ->
+      start_with_all_modules(
+        config,
+        covered_modules(config.source_directory, prefix, source_files, []),
+      )
+  }
+}
+
+fn start_with_all_modules(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+) -> Result(CoverageSession, CoverageError) {
+  let source_paths = set.from_list(list.map(modules, module_source_path))
+  case excluded_source_paths(config, source_paths, dict.new()) {
+    Ok(excluded) -> start_with_kept_modules(config, modules, excluded)
+    Error(error) -> Error(error)
+  }
+}
+
+/// Excluded source paths, each with the first pattern that matches it.
+type Excluded =
+  Dict(String, ExcludePattern)
+
+fn module_source_path(module: CoveredModule) -> String {
+  module.source_path
+}
+
+/// The source paths that the exclude patterns match. Fails on the first
+/// pattern that matches no source path.
+fn excluded_source_paths(
+  config: CoverageConfig,
+  source_paths: Set(String),
+  excluded: Excluded,
+) -> Result(Excluded, CoverageError) {
+  case config.exclude_patterns {
+    [] -> Ok(excluded)
+    [exclude_pattern, ..rest] ->
+      exclude_pattern_then_continue(
+        CoverageConfig(..config, exclude_patterns: rest),
+        exclude_pattern,
+        source_paths,
+        excluded,
+      )
+  }
+}
+
+fn exclude_pattern_then_continue(
+  config: CoverageConfig,
+  exclude_pattern: ExcludePattern,
+  source_paths: Set(String),
+  excluded: Excluded,
+) -> Result(Excluded, CoverageError) {
+  let matched =
+    match_files(exclude_pattern.pattern)
+    |> list.map(normalise_path)
+    |> set.from_list()
+    |> set.intersection(source_paths)
+  case set.is_empty(matched) {
+    True ->
+      Error(ExcludeMatchedNothing(
+        pattern: exclude_pattern.pattern,
+        source_directory: config.source_directory,
+      ))
+    False ->
+      excluded_source_paths(
+        config,
+        source_paths,
+        add_matched_paths(set.to_list(matched), exclude_pattern, excluded),
+      )
+  }
+}
+
+/// Record the pattern for each matched path that no earlier pattern matched.
+fn add_matched_paths(
+  paths: List(String),
+  exclude_pattern: ExcludePattern,
+  excluded: Excluded,
+) -> Excluded {
+  case paths {
+    [] -> excluded
+    [path, ..rest] ->
+      add_matched_paths(
+        rest,
+        exclude_pattern,
+        add_matched_path(excluded, path, exclude_pattern),
+      )
+  }
+}
+
+fn add_matched_path(
+  excluded: Excluded,
+  path: String,
+  exclude_pattern: ExcludePattern,
+) -> Excluded {
+  case dict.has_key(excluded, path) {
+    True -> excluded
+    False -> dict.insert(excluded, path, exclude_pattern)
+  }
+}
+
+/// A path in the form coverage builds source paths: no `.` or empty parts.
+fn normalise_path(path: String) -> String {
+  string.join(path_segments(path), "/")
+}
+
+fn start_with_kept_modules(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+  excluded: Excluded,
+) -> Result(CoverageSession, CoverageError) {
+  case kept_modules(modules, excluded, []) {
+    [] ->
+      Error(EverySourceFileExcluded(source_directory: config.source_directory))
+    kept ->
+      start_with_ignored_lines(
+        config,
+        kept,
+        excluded
+          |> dict.to_list()
+          |> list.sort(compare_excluded_paths)
+          |> list.map(excluded_file),
+      )
+  }
+}
+
+fn compare_excluded_paths(
+  left: #(String, ExcludePattern),
+  right: #(String, ExcludePattern),
+) -> Order {
+  string.compare(left.0, right.0)
+}
+
+fn excluded_file(entry: #(String, ExcludePattern)) -> ExcludedFile {
+  let #(source_path, exclude_pattern) = entry
+  report.excluded_file(
+    source_path: source_path,
+    pattern: exclude_pattern.pattern,
+    reason: exclude_pattern.reason,
+  )
+}
+
+/// Read the ignore markers of every kept module before any module gets line
+/// counters, so a bad marker fails the run before the tests run.
+fn start_with_ignored_lines(
+  config: CoverageConfig,
+  modules: List(CoveredModule),
+  excluded_files: List(ExcludedFile),
+) -> Result(CoverageSession, CoverageError) {
+  let source_paths = list.map(modules, module_source_path)
+  case
+    add_source_marks(dict.new(), source_paths, config.require_exclusion_reasons)
+  {
+    Ok(source_marks) ->
+      start_with_modules(PreparedRun(
+        config: config,
+        modules: modules,
+        excluded_files: excluded_files,
+        source_marks: source_marks,
+      ))
+    Error(error) -> Error(error)
+  }
+}
+
+fn kept_modules(
+  modules: List(CoveredModule),
+  excluded: Excluded,
+  accumulated_reversed: List(CoveredModule),
+) -> List(CoveredModule) {
+  case modules {
+    [] -> list.reverse(accumulated_reversed)
+    [module, ..rest] ->
+      kept_modules(
+        rest,
+        excluded,
+        keep_unless_excluded(module, excluded, accumulated_reversed),
+      )
+  }
+}
+
+fn keep_unless_excluded(
+  module: CoveredModule,
+  excluded: Excluded,
+  accumulated_reversed: List(CoveredModule),
+) -> List(CoveredModule) {
+  case dict.has_key(excluded, module.source_path) {
+    True -> accumulated_reversed
+    False -> [module, ..accumulated_reversed]
+  }
+}
+
+/// The module path segments that come before the files in the source
+/// directory: `src` gives `[]`, `src/app` gives `["app"]`.
+fn module_prefix(
+  source_directory: String,
+) -> Result(List(String), CoverageError) {
+  case path_segments(source_directory) {
+    [root, ..prefix] if root == "src" || root == "test" || root == "dev" ->
+      Ok(prefix)
+    _ -> Error(SourceDirectoryOutsideSourceRoot(path: source_directory))
+  }
+}
+
+fn path_segments(path: String) -> List(String) {
+  path
+  |> string.split("/")
+  |> list.filter(is_meaningful_segment)
+}
+
+fn is_meaningful_segment(segment: String) -> Bool {
+  segment != "" && segment != "."
+}
+
+fn start_with_modules(
+  run: PreparedRun,
+) -> Result(CoverageSession, CoverageError) {
+  case
+    start_measuring(
+      run.modules,
+      dict.map_values(run.source_marks, file_erlang_externals),
+    )
+  {
+    Ok(#(measurement, erlang_source_paths)) ->
+      Ok(CoverageSession(
+        config: run.config,
+        measurement: measurement,
+        modules: run.modules,
+        excluded_files: run.excluded_files,
+        source_marks: run.source_marks,
+        inexact_line_files: inexact_line_files(erlang_source_paths),
+      ))
+    Error(error) -> Error(error)
+  }
+}
+
+fn file_erlang_externals(
+  _source_path: String,
+  marks: FileMarks,
+) -> List(#(String, Int)) {
+  marks.erlang_externals
+}
+
+/// The `.gleam` files among the files built from Erlang source (Gleam before
+/// 1.19), whose line numbers may be off. An `.erl` file is always built from
+/// Erlang source, and its line numbers are exact.
+fn inexact_line_files(erlang_source_paths: List(String)) -> List(String) {
+  erlang_source_paths
+  |> list.filter(is_gleam_file)
+  |> list.sort(string.compare)
+}
+
+fn is_gleam_file(source_path: String) -> Bool {
+  string.ends_with(source_path, ".gleam")
+}
+
+fn covered_modules(
+  source_directory: String,
+  prefix: List(String),
+  source_files: List(String),
+  accumulated_reversed: List(CoveredModule),
+) -> List(CoveredModule) {
+  case source_files {
+    [] -> list.reverse(accumulated_reversed)
+    [relative_path, ..rest] -> {
+      let module =
+        CoveredModule(
+          module_name: module_name(prefix, relative_path),
+          source_path: string.join(
+            list.append(path_segments(source_directory), [relative_path]),
+            "/",
+          ),
+        )
+      covered_modules(source_directory, prefix, rest, [
+        module,
+        ..accumulated_reversed
+      ])
+    }
+  }
+}
+
+/// The BEAM module name of a file, from its path relative to the source
+/// directory. Gleam: `/` becomes `@` (`app/cart.gleam` is `app@cart`).
+/// Erlang: the file name without its extension.
+fn module_name(prefix: List(String), relative_path: String) -> String {
+  case string.ends_with(relative_path, ".erl") {
+    True -> erlang_module_name(relative_path)
+    False -> gleam_module_name(prefix, relative_path)
+  }
+}
+
+fn gleam_module_name(prefix: List(String), relative_path: String) -> String {
+  let module_path =
+    relative_path
+    |> string.drop_end(string.length(".gleam"))
+    |> string.split("/")
+  string.join(list.append(prefix, module_path), "@")
+}
+
+fn erlang_module_name(relative_path: String) -> String {
+  relative_path
+  |> base_name()
+  |> string.drop_end(string.length(".erl"))
+}
+
+/// Read the line counts, build the report, and write the LCOV file.
+///
+/// Call this after the code you want to measure has run. `runner.coverage`
+/// does this for you.
+///
+/// ## Parameters
+///
+/// - `session`: the session that `coverage.start` returned
+///
+/// ## Returns
+///
+/// - `Ok(CoverageReport)` with one file per measured module (plus any file
+///   from `coverage.merge_lcov` that is not excluded), sorted by path. Each
+///   file holds its ignored line ranges with their reasons, and the report
+///   holds the excluded files with their patterns and reasons
+///   (`report.ignored_ranges`, `report.excluded_files`).
+/// - `Error(CoverageError)` when `finish` already ran for this session (or
+///   the process that called `coverage.start` ended and another run took
+///   one of its modules), a
+///   module lost its line counters during the run, an LCOV file to
+///   merge cannot be read, a file that only merged LCOV covers has a bad
+///   ignore marker (or, with `coverage.require_exclusion_reasons`, a marker
+///   without a reason), the LCOV, JSON, Cobertura or Markdown file cannot
+///   be written, or a source file or a page of the HTML report cannot be
+///   read or written. The files are written in that order, and the first
+///   failure stops the run.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(session) = coverage.start(coverage.new())
+/// run_my_tests()
+/// let assert Ok(coverage_report) = coverage.finish(session)
+/// ```
+pub fn finish(
+  session session: CoverageSession,
+) -> Result(CoverageReport, CoverageError) {
+  case stop_measuring(session.measurement, session.modules) {
+    Ok(files) -> merge_then_write(list.map(files, file_coverage), session)
+    Error(error) -> Error(error)
+  }
+}
+
+fn merge_then_write(
+  files: List(FileCoverage),
+  session: CoverageSession,
+) -> Result(CoverageReport, CoverageError) {
+  let counts = list.fold(files, dict.new(), add_file_counts)
+  case merge_patterns(session.config.merge_lcov_patterns, counts) {
+    Ok(merged) ->
+      merged
+      |> dict.drop(list.map(session.excluded_files, excluded_file_path))
+      |> ignore_then_write(session)
+    Error(error) -> Error(error)
+  }
+}
+
+fn excluded_file_path(excluded: ExcludedFile) -> String {
+  report.excluded_source_path(excluded)
+}
+
+/// Drop the ignored lines, then build the report and write the LCOV file.
+/// Files that only merged LCOV covers have their markers read here.
+fn ignore_then_write(
+  counts: Counts,
+  session: CoverageSession,
+) -> Result(CoverageReport, CoverageError) {
+  case
+    add_source_marks(
+      session.source_marks,
+      dict.keys(counts),
+      session.config.require_exclusion_reasons,
+    )
+  {
+    Ok(source_marks) ->
+      counts
+      |> dict.to_list()
+      |> without_ignored_lines(source_marks, dict.new())
+      |> report_from_counts(source_marks)
+      |> report.add_excluded_files(session.excluded_files)
+      |> report.add_inexact_line_files(session.inexact_line_files)
+      |> write_report(session.config)
+    Error(error) -> Error(error)
+  }
+}
+
+fn without_ignored_lines(
+  entries: List(#(String, Dict(Int, Int))),
+  source_marks: SourceMarks,
+  accumulated: Counts,
+) -> Counts {
+  case entries {
+    [] -> accumulated
+    [#(source_path, file_counts), ..rest] -> {
+      let file_ignored_lines =
+        file_ignored_lines(dict.get(source_marks, source_path))
+      let kept_counts = dict.drop(file_counts, dict.keys(file_ignored_lines))
+      without_ignored_lines(
+        rest,
+        source_marks,
+        dict.insert(accumulated, source_path, kept_counts),
+      )
+    }
+  }
+}
+
+/// The ignored lines of one file. A file that the source reader did not
+/// read has none.
+fn file_ignored_lines(file_marks: Result(FileMarks, Nil)) -> Dict(Int, String) {
+  file_marks
+  |> result.map(marks_ignored_lines)
+  |> result.unwrap(dict.new())
+}
+
+fn marks_ignored_lines(marks: FileMarks) -> Dict(Int, String) {
+  marks.ignored_lines
+}
+
+fn file_coverage(file: #(String, List(LineCoverage))) -> FileCoverage {
+  report.file(file.0, file.1)
+}
+
+/// Write every file the settings ask for, in this order: LCOV, JSON,
+/// Cobertura, Markdown, the HTML directory, the combined HTML page. The
+/// first write that fails stops the run.
+fn write_report(
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> Result(CoverageReport, CoverageError) {
+  let outputs = [
+    #(config.lcov_path, LcovOutput),
+    #(config.json_path, JsonOutput),
+    #(config.cobertura_path, CoberturaOutput),
+    #(config.markdown_path, MarkdownOutput),
+  ]
+  case write_outputs(outputs, coverage_report, config) {
+    Ok(Nil) -> write_html_then_combined(config, coverage_report)
+    Error(error) -> Error(error)
+  }
+}
+
+fn write_html_then_combined(
+  config: CoverageConfig,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case write_html(config.html_path, coverage_report) {
+    Ok(_) -> write_combined_html(config.html_file, coverage_report)
+    Error(error) -> Error(error)
+  }
+}
+
+/// Read every source file, then write the combined page. A source file that
+/// cannot be read stops the run before the page is written.
+fn write_combined_html(
+  path: Option(String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case path {
+    None -> Ok(coverage_report)
+    Some(file_path) ->
+      read_sources_then_write_combined(
+        file_path,
+        report.files(coverage_report),
+        dict.new(),
+        coverage_report,
+      )
+  }
+}
+
+fn read_sources_then_write_combined(
+  path: String,
+  files: List(FileCoverage),
+  sources: Dict(String, String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case files {
+    [] -> write_combined_page(path, sources, coverage_report)
+    [file_coverage, ..rest] ->
+      read_source_then_continue(
+        CombinedRun(path: path, report: coverage_report),
+        report.source_path(file_coverage),
+        rest,
+        sources,
+      )
+  }
+}
+
+/// The combined page file and the report that it shows.
+type CombinedRun {
+  CombinedRun(path: String, report: CoverageReport)
+}
+
+fn read_source_then_continue(
+  run: CombinedRun,
+  source_path: String,
+  rest: List(FileCoverage),
+  sources: Dict(String, String),
+) -> Result(CoverageReport, CoverageError) {
+  case file.read(source_path) {
+    Ok(source) ->
+      read_sources_then_write_combined(
+        run.path,
+        rest,
+        dict.insert(sources, source_path, source),
+        run.report,
+      )
+    Error(error) ->
+      Error(HtmlFileSourceReadFailed(path: source_path, error: error))
+  }
+}
+
+fn write_combined_page(
+  path: String,
+  sources: Dict(String, String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  let page = html.combined(report: coverage_report, sources: sources)
+  case file.write(path, page) {
+    Ok(Nil) -> Ok(coverage_report)
+    Error(error) -> Error(HtmlFileWriteFailed(path: path, error: error))
+  }
+}
+
+/// Delete the pages of an earlier run, write a page per file, then the
+/// index. A source file that cannot be read stops the run before its page is
+/// written.
+fn write_html(
+  directory: Option(String),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case directory {
+    None -> Ok(coverage_report)
+    Some(path) -> delete_then_write_html_pages(path, coverage_report)
+  }
+}
+
+fn delete_then_write_html_pages(
+  directory: String,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case delete_html_pages(directory <> "/files") {
+    Ok(Nil) ->
+      write_html_pages(
+        directory,
+        report.files(coverage_report),
+        coverage_report,
+      )
+    Error(error) -> Error(error)
+  }
+}
+
+fn write_html_pages(
+  directory: String,
+  files: List(FileCoverage),
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  case files {
+    [] -> write_html_index(directory, coverage_report)
+    [file_coverage, ..rest] ->
+      write_source_page_then_continue(
+        HtmlRun(directory: directory, report: coverage_report),
+        file_coverage,
+        rest,
+      )
+  }
+}
+
+/// The HTML directory and the report that its pages show.
+type HtmlRun {
+  HtmlRun(directory: String, report: CoverageReport)
+}
+
+fn write_html_index(
+  directory: String,
+  coverage_report: CoverageReport,
+) -> Result(CoverageReport, CoverageError) {
+  let path = directory <> "/index.html"
+  case file.write(path, html.index(report: coverage_report)) {
+    Ok(Nil) -> Ok(coverage_report)
+    Error(error) -> Error(HtmlWriteFailed(path: path, error: error))
+  }
+}
+
+fn write_source_page_then_continue(
+  run: HtmlRun,
+  file_coverage: FileCoverage,
+  rest: List(FileCoverage),
+) -> Result(CoverageReport, CoverageError) {
+  let source_path = report.source_path(file_coverage)
+  case file.read(source_path) {
+    Ok(source) -> write_source_page(run, file_coverage, source, rest)
+    Error(error) -> Error(HtmlSourceReadFailed(path: source_path, error: error))
+  }
+}
+
+fn write_source_page(
+  run: HtmlRun,
+  file_coverage: FileCoverage,
+  source: String,
+  rest: List(FileCoverage),
+) -> Result(CoverageReport, CoverageError) {
+  let path =
+    run.directory <> "/" <> html.page_path(report.source_path(file_coverage))
+  let page = html.source_page(file: file_coverage, source: source)
+  case file.write(path, page) {
+    Ok(Nil) -> write_html_pages(run.directory, rest, run.report)
+    Error(error) -> Error(HtmlWriteFailed(path: path, error: error))
+  }
+}
+
+/// A file that `coverage.finish` can write.
+type Output {
+  LcovOutput
+  JsonOutput
+  CoberturaOutput
+  MarkdownOutput
+}
+
+fn write_outputs(
+  outputs: List(#(Option(String), Output)),
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> Result(Nil, CoverageError) {
+  case outputs {
+    [] -> Ok(Nil)
+    [#(None, _), ..rest] -> write_outputs(rest, coverage_report, config)
+    [#(Some(path), output), ..rest] ->
+      write_then_continue(output, path, rest, coverage_report, config)
+  }
+}
+
+fn write_then_continue(
+  output: Output,
+  path: String,
+  rest: List(#(Option(String), Output)),
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> Result(Nil, CoverageError) {
+  case file.write(path, render_output(output, coverage_report, config)) {
+    Ok(Nil) -> write_outputs(rest, coverage_report, config)
+    Error(error) -> Error(write_error(output, path, error))
+  }
+}
+
+fn render_output(
+  output: Output,
+  coverage_report: CoverageReport,
+  config: CoverageConfig,
+) -> String {
+  case output {
+    LcovOutput -> render_lcov(coverage_report)
+    JsonOutput ->
+      json_summary.render(
+        report: coverage_report,
+        options: json_summary_options(config),
+      )
+    CoberturaOutput ->
+      cobertura.render(report: coverage_report, timestamp: system_time_ms())
+    MarkdownOutput -> markdown.render(report: coverage_report)
+  }
+}
+
+fn json_summary_options(config: CoverageConfig) -> json_summary.Options {
+  json_summary.options()
+  |> set_when_given(config.minimum_percent, json_summary.minimum_percent)
+  |> set_when_given(
+    config.minimum_percent_per_file,
+    json_summary.minimum_percent_per_file,
+  )
+}
+
+fn set_when_given(
+  options: json_summary.Options,
+  value: Option(Float),
+  set: fn(json_summary.Options, Float) -> json_summary.Options,
+) -> json_summary.Options {
+  case value {
+    Some(percent) -> set(options, percent)
+    None -> options
+  }
+}
+
+fn write_error(
+  output: Output,
+  path: String,
+  error: FileError,
+) -> CoverageError {
+  case output {
+    LcovOutput -> LcovWriteFailed(path: path, error: error)
+    JsonOutput -> JsonWriteFailed(path: path, error: error)
+    CoberturaOutput -> CoberturaWriteFailed(path: path, error: error)
+    MarkdownOutput -> MarkdownWriteFailed(path: path, error: error)
+  }
+}
+
+// =============================================================================
+// Ignore markers
+// =============================================================================
+
+/// What the source reader finds in each source file, per source path.
+type SourceMarks =
+  Dict(String, FileMarks)
+
+/// What the source reader finds in one source file.
+///
+/// - `ignored_lines`: the lines that ignore markers leave out of coverage.
+///   Each line maps to the text written after its marker (empty when there
+///   is none).
+/// - `erlang_externals`: the name and line of each function that a Gleam
+///   file declares with an `@external(erlang, ...)` attribute. Always empty
+///   for an `.erl` file.
+type FileMarks {
+  FileMarks(
+    ignored_lines: Dict(Int, String),
+    erlang_externals: List(#(String, Int)),
+  )
+}
+
+/// How comments start in a source file.
+type CommentSyntax {
+  GleamComments
+  ErlangComments
+}
+
+/// What one line of a source file is, for the ignore markers.
+type SourceLine {
+  Marker(kind: MarkerKind, name: String, text: String)
+  CodeLine
+  OtherLine
+}
+
+type MarkerKind {
+  IgnoreLine
+  IgnoreStart
+  IgnoreEnd
+  IgnoreFunction
+}
+
+/// An ignore-start marker that has no ignore-end marker yet.
+type OpenBlock {
+  OpenBlock(line_number: Int, text: String)
+}
+
+/// A `coverage:ignore` marker that no line of code has followed yet.
+type PendingLine {
+  PendingLine(line_number: Int, text: String)
+}
+
+/// Where the marker reader is in one source file, and what it found.
+type MarkerScan {
+  MarkerScan(
+    source_path: String,
+    syntax: CommentSyntax,
+    line_number: Int,
+    ignored: Dict(Int, String),
+    open_block: Option(OpenBlock),
+    pending_line: Option(PendingLine),
+    require_reasons: Bool,
+  )
+}
+
+/// Read the markers of each path that `source_marks` does not hold yet.
+/// With `require_reasons`, a marker without text is an error.
+fn add_source_marks(
+  source_marks: SourceMarks,
+  source_paths: List(String),
+  require_reasons: Bool,
+) -> Result(SourceMarks, CoverageError) {
+  case source_paths {
+    [] -> Ok(source_marks)
+    [source_path, ..rest] ->
+      add_file_source_marks(
+        source_marks,
+        MarkerRead(source_path: source_path, require_reasons: require_reasons),
+        rest,
+      )
+  }
+}
+
+/// One source file whose markers are read.
+type MarkerRead {
+  MarkerRead(source_path: String, require_reasons: Bool)
+}
+
+fn add_file_source_marks(
+  source_marks: SourceMarks,
+  marker_read: MarkerRead,
+  rest: List(String),
+) -> Result(SourceMarks, CoverageError) {
+  case dict.has_key(source_marks, marker_read.source_path) {
+    True -> add_source_marks(source_marks, rest, marker_read.require_reasons)
+    False -> read_file_source_marks(source_marks, marker_read, rest)
+  }
+}
+
+fn read_file_source_marks(
+  source_marks: SourceMarks,
+  marker_read: MarkerRead,
+  rest: List(String),
+) -> Result(SourceMarks, CoverageError) {
+  case file.read(marker_read.source_path) {
+    Ok(text) -> scan_then_continue(source_marks, marker_read, text, rest)
+    Error(error) ->
+      Error(SourceReadFailed(path: marker_read.source_path, error: error))
+  }
+}
+
+fn scan_then_continue(
+  source_marks: SourceMarks,
+  marker_read: MarkerRead,
+  text: String,
+  rest: List(String),
+) -> Result(SourceMarks, CoverageError) {
+  let syntax = comment_syntax(marker_read.source_path)
+  let scan =
+    MarkerScan(
+      source_path: marker_read.source_path,
+      syntax: syntax,
+      line_number: 1,
+      ignored: dict.new(),
+      open_block: None,
+      pending_line: None,
+      require_reasons: marker_read.require_reasons,
+    )
+  case scan_lines(scan, string.split(text, "\n")) {
+    Ok(ignored) ->
+      add_source_marks(
+        dict.insert(
+          source_marks,
+          marker_read.source_path,
+          FileMarks(
+            ignored_lines: ignored,
+            erlang_externals: erlang_externals(syntax, text),
+          ),
+        ),
+        rest,
+        marker_read.require_reasons,
+      )
+    Error(error) -> Error(error)
+  }
+}
+
+/// `.erl` files use `%` comments. Every other file uses `//` comments.
+fn comment_syntax(source_path: String) -> CommentSyntax {
+  case string.ends_with(source_path, ".erl") {
+    True -> ErlangComments
+    False -> GleamComments
+  }
+}
+
+fn scan_lines(
+  scan: MarkerScan,
+  lines: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  case lines, scan.open_block, scan.pending_line {
+    [], None, None -> Ok(scan.ignored)
+    [], None, Some(pending) ->
+      Error(IgnoreLineWithoutCode(
+        source_path: scan.source_path,
+        line_number: pending.line_number,
+      ))
+    [], Some(open), _ ->
+      Error(IgnoreStartWithoutEnd(
+        source_path: scan.source_path,
+        line_number: open.line_number,
+      ))
+    [line, ..rest], _, _ -> scan_line_then_continue(scan, line, rest)
+  }
+}
+
+/// With `require_reasons`, every marker but an end marker needs text. An end
+/// marker uses the text of its start marker.
+fn scan_line_then_continue(
+  scan: MarkerScan,
+  line: String,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  let source_line = classify_line(scan.syntax, line)
+  case source_line, scan.require_reasons {
+    Marker(kind: IgnoreEnd, ..), _ -> scan_source_line(scan, source_line, rest)
+    Marker(name: name, text: "", ..), True ->
+      Error(IgnoreMarkerWithoutReason(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+        marker: name,
+      ))
+    _, _ -> scan_source_line(scan, source_line, rest)
+  }
+}
+
+fn scan_source_line(
+  scan: MarkerScan,
+  source_line: SourceLine,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  case source_line, scan.open_block, scan.pending_line {
+    Marker(IgnoreStart, _, _), Some(open), _ ->
+      Error(NestedIgnoreStart(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+        open_line_number: open.line_number,
+      ))
+    Marker(_, _, _), None, Some(pending) ->
+      Error(IgnoreLineWithoutCode(
+        source_path: scan.source_path,
+        line_number: pending.line_number,
+      ))
+    Marker(IgnoreStart, _, text), None, None ->
+      MarkerScan(
+        ..ignore_line(scan, text),
+        open_block: Some(OpenBlock(line_number: scan.line_number, text: text)),
+      )
+      |> next_line(rest)
+    Marker(IgnoreEnd, _, _), None, _ ->
+      Error(IgnoreEndWithoutStart(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+      ))
+    Marker(IgnoreEnd, _, _), Some(open), _ ->
+      MarkerScan(..ignore_line(scan, open.text), open_block: None)
+      |> next_line(rest)
+    _, Some(open), _ -> next_line(ignore_line(scan, open.text), rest)
+    Marker(IgnoreFunction, _, text), None, _ ->
+      ignore_function_then_continue(scan, text, rest)
+    Marker(IgnoreLine, _, text), None, _ ->
+      MarkerScan(
+        ..scan,
+        pending_line: Some(PendingLine(
+          line_number: scan.line_number,
+          text: text,
+        )),
+      )
+      |> next_line(rest)
+    CodeLine, None, Some(pending) ->
+      MarkerScan(..ignore_line(scan, pending.text), pending_line: None)
+      |> next_line(rest)
+    CodeLine, None, None -> next_line(scan, rest)
+    OtherLine, None, _ -> next_line(scan, rest)
+  }
+}
+
+fn next_line(
+  scan: MarkerScan,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  scan_lines(MarkerScan(..scan, line_number: scan.line_number + 1), rest)
+}
+
+fn ignore_line(scan: MarkerScan, text: String) -> MarkerScan {
+  MarkerScan(..scan, ignored: dict.insert(scan.ignored, scan.line_number, text))
+}
+
+fn classify_line(syntax: CommentSyntax, line: String) -> SourceLine {
+  case syntax, string.trim(line) {
+    _, "" -> OtherLine
+    GleamComments, "///" <> _ -> OtherLine
+    GleamComments, "//" <> body -> comment_line(body)
+    ErlangComments, "%" <> body -> comment_line(without_leading_percents(body))
+    _, _ -> CodeLine
+  }
+}
+
+fn without_leading_percents(text: String) -> String {
+  case text {
+    "%" <> rest -> without_leading_percents(rest)
+    _ -> text
+  }
+}
+
+/// A comment is a marker when its first word is a marker name. The rest of
+/// the comment is the marker's text.
+fn comment_line(body: String) -> SourceLine {
+  let words =
+    body
+    |> string.replace("\t", " ")
+    |> string.trim()
+    |> string.split_once(" ")
+  case words {
+    Ok(#(word, text)) -> marker_line(word, string.trim(text))
+    Error(Nil) -> marker_line(string.trim(body), "")
+  }
+}
+
+fn marker_line(word: String, text: String) -> SourceLine {
+  case word {
+    "coverage:ignore" -> Marker(kind: IgnoreLine, name: word, text: text)
+    "coverage:ignore-start" -> Marker(kind: IgnoreStart, name: word, text: text)
+    "coverage:ignore-end" -> Marker(kind: IgnoreEnd, name: word, text: text)
+    "coverage:ignore-function" ->
+      Marker(kind: IgnoreFunction, name: word, text: text)
+    _ -> OtherLine
+  }
+}
+
+// =============================================================================
+// Function markers
+// =============================================================================
+
+/// Where the function reader is: the source text that is left, and the line
+/// that this text starts on. Line 1 is the line after the marker.
+type Cursor {
+  Cursor(text: String, line: Int)
+}
+
+/// One token of Gleam source code. The reader skips white space, comments
+/// and strings, so a brace or a bracket in them is never a token.
+type Token {
+  Token(kind: TokenKind, line: Int)
+}
+
+type TokenKind {
+  Word(String)
+  Symbol(String)
+  EndOfText
+}
+
+/// Ignore the marker line and every line of the function after it, then go
+/// on from the line after the function.
+fn ignore_function_then_continue(
+  scan: MarkerScan,
+  text: String,
+  rest: List(String),
+) -> Result(Dict(Int, String), CoverageError) {
+  let source =
+    rest
+    |> string.join("\n")
+    |> string.replace("\r", "")
+  case function_last_line(scan.syntax, source) {
+    Ok(offset) ->
+      scan
+      |> ignore_range(scan.line_number + offset, text)
+      |> next_line(list.drop(rest, offset))
+    Error(Nil) ->
+      Error(IgnoreFunctionWithoutFunction(
+        source_path: scan.source_path,
+        line_number: scan.line_number,
+      ))
+  }
+}
+
+/// Ignore every line from the scan's line to `last_line`. The scan stays on
+/// `last_line`.
+fn ignore_range(scan: MarkerScan, last_line: Int, text: String) -> MarkerScan {
+  let ignored = ignore_line(scan, text)
+  case scan.line_number < last_line {
+    True ->
+      ignore_range(
+        MarkerScan(..ignored, line_number: scan.line_number + 1),
+        last_line,
+        text,
+      )
+    False -> ignored
+  }
+}
+
+/// The line, counted from 1 at the start of `source`, where the function
+/// after a `coverage:ignore-function` marker ends. `Error(Nil)` when the code
+/// after the marker is not a complete function.
+fn function_last_line(
+  syntax: CommentSyntax,
+  source: String,
+) -> Result(Int, Nil) {
+  case syntax {
+    GleamComments -> gleam_function_last_line(Cursor(text: source, line: 1))
+    ErlangComments -> erlang_function_last_line(source)
+  }
+}
+
+/// Skip attributes such as `@external(...)` and `@deprecated(...)`, then
+/// read a `fn` or `pub fn` up to its parameters.
+fn gleam_function_last_line(cursor: Cursor) -> Result(Int, Nil) {
+  let #(first, after_first) = next_token(cursor)
+  let #(second, after_second) = next_token(after_first)
+  case first.kind, second.kind {
+    Symbol("@"), Word(_) ->
+      gleam_function_last_line(after_attribute_arguments(after_second))
+    Word("pub"), Word("fn") ->
+      gleam_after_parameters(read_to_close(after_second, "(", ")", -1))
+    Word("fn"), _ ->
+      gleam_after_parameters(read_to_close(after_first, "(", ")", -1))
+    _, _ -> Error(Nil)
+  }
+}
+
+fn after_attribute_arguments(cursor: Cursor) -> Cursor {
+  let #(token, after) = next_token(cursor)
+  case token.kind {
+    Symbol("(") -> read_to_close(after, "(", ")", 0).1
+    _ -> cursor
+  }
+}
+
+/// Read tokens up to the bracket that closes at `depth` 0. Each `open`
+/// adds 1 to the depth and each `close` takes 1 away, so a start depth of
+/// -1 reads past the first `open` too. Returns the closing token, or the
+/// end-of-text token when the bracket never closes.
+fn read_to_close(
+  cursor: Cursor,
+  open: String,
+  close: String,
+  depth: Int,
+) -> #(Token, Cursor) {
+  let #(token, after) = next_token(cursor)
+  case token.kind {
+    EndOfText -> #(token, after)
+    Symbol(symbol) if symbol == close && depth == 0 -> #(token, after)
+    Symbol(symbol) if symbol == close ->
+      read_to_close(after, open, close, depth - 1)
+    Symbol(symbol) if symbol == open ->
+      read_to_close(after, open, close, depth + 1)
+    _ -> read_to_close(after, open, close, depth)
+  }
+}
+
+fn gleam_after_parameters(close: #(Token, Cursor)) -> Result(Int, Nil) {
+  case close.0.kind {
+    EndOfText -> Error(Nil)
+    _ -> gleam_return_type_last_line(close.1, close.0.line)
+  }
+}
+
+/// Read the return type, if there is one, then the body in braces. An
+/// external function has no body: it ends at the last token of its return
+/// type, or at its parameters.
+fn gleam_return_type_last_line(
+  cursor: Cursor,
+  last_line: Int,
+) -> Result(Int, Nil) {
+  let #(token, after) = next_token(cursor)
+  let #(following, _) = next_token(after)
+  case token.kind, following.kind {
+    Symbol("{"), _ -> closing_line(read_to_close(after, "{", "}", 0))
+    Word("fn"), Symbol("(") -> gleam_return_type_last_line(after, token.line)
+    Word("pub"), _
+    | Word("fn"), _
+    | Word("type"), _
+    | Word("const"), _
+    | Word("import"), _
+    -> Ok(last_line)
+    Word(_), _
+    | Symbol("->"), _
+    | Symbol("."), _
+    | Symbol(","), _
+    | Symbol("#"), _
+    | Symbol("("), _
+    | Symbol(")"), _
+    -> gleam_return_type_last_line(after, token.line)
+    _, _ -> Ok(last_line)
+  }
+}
+
+fn closing_line(close: #(Token, Cursor)) -> Result(Int, Nil) {
+  case close.0.kind {
+    EndOfText -> Error(Nil)
+    _ -> Ok(close.0.line)
+  }
+}
+
+/// Skip attributes such as `-spec` and `-doc`, then read the function to the
+/// dot that ends its last clause. The Erlang scanner (`erl_scan`) of the
+/// running OTP reads the source, so every string, sigil, triple-quoted
+/// string, quoted atom, character literal and comment is read by the same
+/// rules as the compiler uses.
+@external(erlang, "dream_test_coverage_ffi", "erlang_function_last_line")
+fn erlang_function_last_line(source: String) -> Result(Int, Nil)
+
+fn next_token(cursor: Cursor) -> #(Token, Cursor) {
+  case cursor.text {
+    "" -> #(Token(kind: EndOfText, line: cursor.line), cursor)
+    "\n" <> rest -> next_token(Cursor(text: rest, line: cursor.line + 1))
+    " " <> rest | "\t" <> rest -> next_token(Cursor(..cursor, text: rest))
+    "//" <> rest -> next_token(after_comment(Cursor(..cursor, text: rest)))
+    "\"" <> rest -> next_token(after_quoted(Cursor(..cursor, text: rest)))
+    "->" <> rest -> #(
+      Token(kind: Symbol("->"), line: cursor.line),
+      Cursor(..cursor, text: rest),
+    )
+    text -> word_or_symbol(cursor, take_word(text, ""))
+  }
+}
+
+fn after_comment(cursor: Cursor) -> Cursor {
+  case string.split_once(cursor.text, "\n") {
+    Ok(#(_, rest)) -> Cursor(text: rest, line: cursor.line + 1)
+    Error(Nil) -> Cursor(..cursor, text: "")
+  }
+}
+
+/// Skip to the character after the closing `"`. A backslash escapes the
+/// character after it.
+fn after_quoted(cursor: Cursor) -> Cursor {
+  case cursor.text {
+    "" -> cursor
+    "\"" <> rest -> Cursor(..cursor, text: rest)
+    "\\" <> rest -> after_quoted(after_character(Cursor(..cursor, text: rest)))
+    _ -> after_quoted(after_character(cursor))
+  }
+}
+
+/// Skip one character, and count it when it is a line break.
+fn after_character(cursor: Cursor) -> Cursor {
+  case cursor.text {
+    "\n" <> rest -> Cursor(text: rest, line: cursor.line + 1)
+    text -> Cursor(..cursor, text: string.drop_start(text, 1))
+  }
+}
+
+fn word_or_symbol(cursor: Cursor, word: #(String, String)) -> #(Token, Cursor) {
+  case word {
+    #("", text) -> #(
+      Token(kind: Symbol(string.slice(text, 0, 1)), line: cursor.line),
+      Cursor(..cursor, text: string.drop_start(text, 1)),
+    )
+    #(name, rest) -> #(
+      Token(kind: Word(name), line: cursor.line),
+      Cursor(..cursor, text: rest),
+    )
+  }
+}
+
+/// Split the text into the word at its start (letters, digits and `_`) and
+/// the text after the word.
+fn take_word(text: String, word: String) -> #(String, String) {
+  let first = string.slice(text, 0, 1)
+  case is_word_character(first) {
+    True -> take_word(string.drop_start(text, 1), word <> first)
+    False -> #(word, text)
+  }
+}
+
+fn is_word_character(character: String) -> Bool {
+  character == "_"
+  || string.lowercase(character) != string.uppercase(character)
+  || result.is_ok(int.parse(character))
+}
+
+// =============================================================================
+// Erlang externals
+// =============================================================================
+
+/// Where the reader of `@external(erlang, ...)` functions is in a Gleam
+/// file. `erlang_external` is True after an `@external(erlang, ...)`
+/// attribute, until the first token that is not part of an attribute.
+type ExternalScan {
+  ExternalScan(
+    cursor: Cursor,
+    erlang_external: Bool,
+    found_reversed: List(#(String, Int)),
+  )
+}
+
+/// The name and line of each function that a Gleam file declares with an
+/// `@external(erlang, ...)` attribute. The line is the line of the `pub` or
+/// `fn` keyword that starts the declaration, which is the line the compiler
+/// gives the function. An `.erl` file has none.
+fn erlang_externals(
+  syntax: CommentSyntax,
+  text: String,
+) -> List(#(String, Int)) {
+  case syntax {
+    GleamComments ->
+      scan_externals(
+        ExternalScan(
+          cursor: Cursor(text: string.replace(text, "\r", ""), line: 1),
+          erlang_external: False,
+          found_reversed: [],
+        ),
+      )
+    ErlangComments -> []
+  }
+}
+
+fn scan_externals(scan: ExternalScan) -> List(#(String, Int)) {
+  let #(first, after_first) = next_token(scan.cursor)
+  let #(second, after_second) = next_token(after_first)
+  let #(third, after_third) = next_token(after_second)
+  case first.kind, second.kind, third.kind {
+    EndOfText, _, _ -> list.reverse(scan.found_reversed)
+    Symbol("@"), Word("external"), Symbol("(") ->
+      scan_externals(after_external_attribute(scan, after_third))
+    Symbol("@"), Word(_), _ ->
+      scan_externals(
+        ExternalScan(..scan, cursor: after_attribute_arguments(after_second)),
+      )
+    Word("pub"), Word("fn"), Word(name) if scan.erlang_external ->
+      scan_externals(add_external(scan, #(name, first.line), after_third))
+    Word("fn"), Word(name), _ if scan.erlang_external ->
+      scan_externals(add_external(scan, #(name, first.line), after_second))
+    _, _, _ ->
+      scan_externals(
+        ExternalScan(..scan, cursor: after_first, erlang_external: False),
+      )
+  }
+}
+
+/// Read the arguments of an `@external` attribute. `cursor` is after its
+/// `(`. The first argument names the target.
+fn after_external_attribute(
+  scan: ExternalScan,
+  cursor: Cursor,
+) -> ExternalScan {
+  let #(target, _) = next_token(cursor)
+  let after_arguments = read_to_close(cursor, "(", ")", 0).1
+  case target.kind {
+    Word("erlang") ->
+      ExternalScan(..scan, cursor: after_arguments, erlang_external: True)
+    _ -> ExternalScan(..scan, cursor: after_arguments)
+  }
+}
+
+fn add_external(
+  scan: ExternalScan,
+  external: #(String, Int),
+  cursor: Cursor,
+) -> ExternalScan {
+  ExternalScan(cursor: cursor, erlang_external: False, found_reversed: [
+    external,
+    ..scan.found_reversed
+  ])
+}
+
+// =============================================================================
+// Merging LCOV
+// =============================================================================
+
+/// Call counts per source path, then per line.
+type Counts =
+  Dict(String, Dict(Int, Int))
+
+/// One `SF` record, with where it starts (for errors about a record that
+/// never ends).
+type LcovRecord {
+  LcovRecord(
+    source_path: String,
+    lines: List(#(Int, Int)),
+    start: LcovPosition,
+    start_line: String,
+  )
+}
+
+/// Where the LCOV reader is: the file and the 1-based line number.
+type LcovPosition {
+  LcovPosition(path: String, line_number: Int)
+}
+
+fn add_file_counts(counts: Counts, file: FileCoverage) -> Counts {
+  add_line_counts(
+    counts,
+    report.source_path(file),
+    list.map(report.lines(file), line_pair),
+  )
+}
+
+fn line_pair(line: LineCoverage) -> #(Int, Int) {
+  #(line.line, line.calls)
+}
+
+fn add_line_counts(
+  counts: Counts,
+  source_path: String,
+  lines: List(#(Int, Int)),
+) -> Counts {
+  let file_counts = case dict.get(counts, source_path) {
+    Ok(existing) -> existing
+    Error(Nil) -> dict.new()
+  }
+  dict.insert(
+    counts,
+    source_path,
+    list.fold(lines, file_counts, add_line_count),
+  )
+}
+
+fn add_line_count(file_counts: Dict(Int, Int), line: #(Int, Int)) {
+  let #(line_number, calls) = line
+  let existing = case dict.get(file_counts, line_number) {
+    Ok(existing) -> existing
+    Error(Nil) -> 0
+  }
+  dict.insert(file_counts, line_number, existing + calls)
+}
+
+fn report_from_counts(
+  counts: Counts,
+  source_marks: SourceMarks,
+) -> CoverageReport {
+  counts
+  |> dict.to_list()
+  |> list.sort(compare_paths)
+  |> files_from_counts(source_marks, [])
+  |> report.new()
+}
+
+fn files_from_counts(
+  entries: List(#(String, Dict(Int, Int))),
+  source_marks: SourceMarks,
+  accumulated_reversed: List(FileCoverage),
+) -> List(FileCoverage) {
+  case entries {
+    [] -> list.reverse(accumulated_reversed)
+    [entry, ..rest] ->
+      files_from_counts(rest, source_marks, [
+        file_from_counts(entry)
+          |> report.add_ignored_ranges(
+            ignored_ranges(file_ignored_lines(dict.get(source_marks, entry.0))),
+          ),
+        ..accumulated_reversed
+      ])
+  }
+}
+
+/// Consecutive ignored lines with the same marker text, as ranges.
+fn ignored_ranges(file_ignored_lines: Dict(Int, String)) -> List(IgnoredRange) {
+  file_ignored_lines
+  |> dict.to_list()
+  |> list.sort(compare_line_entries)
+  |> merge_ignored_lines(None, [])
+}
+
+fn compare_line_entries(left: #(Int, String), right: #(Int, String)) -> Order {
+  int.compare(left.0, right.0)
+}
+
+/// `open_range` is the first line, the last line and the text of the range
+/// that the next line can extend.
+fn merge_ignored_lines(
+  lines: List(#(Int, String)),
+  open_range: Option(#(Int, Int, String)),
+  ranges_reversed: List(IgnoredRange),
+) -> List(IgnoredRange) {
+  case lines, open_range {
+    [], None -> list.reverse(ranges_reversed)
+    [], Some(range) -> list.reverse([ignored_range(range), ..ranges_reversed])
+    [#(line, text), ..rest], None ->
+      merge_ignored_lines(rest, Some(#(line, line, text)), ranges_reversed)
+    [#(line, text), ..rest], Some(#(first, last, open_text))
+      if line == last + 1 && text == open_text
+    -> merge_ignored_lines(rest, Some(#(first, line, text)), ranges_reversed)
+    [#(line, text), ..rest], Some(range) ->
+      merge_ignored_lines(rest, Some(#(line, line, text)), [
+        ignored_range(range),
+        ..ranges_reversed
+      ])
+  }
+}
+
+fn ignored_range(range: #(Int, Int, String)) -> IgnoredRange {
+  let #(first, last, text) = range
+  report.ignored_range(
+    first_line: first,
+    last_line: last,
+    reason: non_empty_text(text),
+  )
+}
+
+fn compare_paths(
+  left: #(String, Dict(Int, Int)),
+  right: #(String, Dict(Int, Int)),
+) -> Order {
+  string.compare(left.0, right.0)
+}
+
+fn file_from_counts(entry: #(String, Dict(Int, Int))) -> FileCoverage {
+  let #(source_path, file_counts) = entry
+  report.file(source_path, list.map(dict.to_list(file_counts), line_from_pair))
+}
+
+fn line_from_pair(pair: #(Int, Int)) -> LineCoverage {
+  LineCoverage(line: pair.0, calls: pair.1)
+}
+
+fn merge_patterns(
+  patterns: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case patterns {
+    [] -> Ok(counts)
+    [pattern, ..rest] -> merge_pattern_then_continue(pattern, rest, counts)
+  }
+}
+
+fn merge_pattern_then_continue(
+  pattern: String,
+  rest: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case match_files(pattern) {
+    [] -> Error(NoLcovFilesMatched(pattern: pattern))
+    paths -> merge_files_then_patterns(paths, rest, counts)
+  }
+}
+
+fn merge_files_then_patterns(
+  paths: List(String),
+  patterns: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case merge_lcov_files(paths, counts) {
+    Ok(merged) -> merge_patterns(patterns, merged)
+    Error(error) -> Error(error)
+  }
+}
+
+fn merge_lcov_files(
+  paths: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case paths {
+    [] -> Ok(counts)
+    [path, ..rest] -> merge_lcov_file_then_continue(path, rest, counts)
+  }
+}
+
+fn merge_lcov_file_then_continue(
+  path: String,
+  rest: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case read_lcov_records(path) {
+    Ok(records) -> merge_records_then_files(records, path, rest, counts)
+    Error(error) -> Error(error)
+  }
+}
+
+fn merge_records_then_files(
+  records: List(LcovRecord),
+  path: String,
+  rest: List(String),
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case add_records(records, path, counts) {
+    Ok(merged) -> merge_lcov_files(rest, merged)
+    Error(error) -> Error(error)
+  }
+}
+
+fn add_records(
+  records: List(LcovRecord),
+  path: String,
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case records {
+    [] -> Ok(counts)
+    [record, ..rest] -> add_record_then_continue(record, rest, path, counts)
+  }
+}
+
+fn add_record_then_continue(
+  record: LcovRecord,
+  rest: List(LcovRecord),
+  path: String,
+  counts: Counts,
+) -> Result(Counts, CoverageError) {
+  case is_regular_file(record.source_path) {
+    True ->
+      add_records(
+        rest,
+        path,
+        add_line_counts(counts, record.source_path, record.lines),
+      )
+    False ->
+      Error(LcovSourceNotFound(lcov_path: path, source_path: record.source_path))
+  }
+}
+
+fn read_lcov_records(path: String) -> Result(List(LcovRecord), CoverageError) {
+  case file.read(path) {
+    Ok(text) ->
+      parse_lcov_lines(
+        string.split(text, "\n"),
+        LcovPosition(path: path, line_number: 1),
+        None,
+        [],
+      )
+    Error(error) -> Error(LcovReadFailed(path: path, error: error))
+  }
+}
+
+fn parse_lcov_lines(
+  lines: List(String),
+  position: LcovPosition,
+  open_record: Option(LcovRecord),
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  case lines, open_record {
+    [], None -> Ok(list.reverse(records_reversed))
+    [], Some(record) ->
+      malformed(
+        record.start,
+        record.start_line,
+        "this record never ends; every SF record must end with end_of_record.",
+      )
+    [line, ..rest], _ ->
+      parse_lcov_line(
+        string.trim_end(line),
+        rest,
+        position,
+        open_record,
+        records_reversed,
+      )
+  }
+}
+
+fn parse_lcov_line(
+  line: String,
+  rest: List(String),
+  position: LcovPosition,
+  open_record: Option(LcovRecord),
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  let next = LcovPosition(..position, line_number: position.line_number + 1)
+  case line, open_record {
+    "", _ -> parse_lcov_lines(rest, next, open_record, records_reversed)
+    "SF:" <> source_path, None if source_path != "" ->
+      parse_source_file_line(
+        source_path,
+        line,
+        rest,
+        position,
+        records_reversed,
+      )
+    "SF:" <> _, None ->
+      malformed(position, line, "SF must be followed by a source file path.")
+    "SF:" <> _, Some(_) ->
+      malformed(
+        position,
+        line,
+        "a new SF record starts before the previous one ends with end_of_record.",
+      )
+    "DA:" <> fields, Some(record) ->
+      parse_da_line(fields, line, rest, position, record, records_reversed)
+    "DA:" <> _, None ->
+      malformed(
+        position,
+        line,
+        "DA appears outside a record (no SF line before it).",
+      )
+    "end_of_record", Some(record) ->
+      parse_lcov_lines(rest, next, None, [record, ..records_reversed])
+    "end_of_record", None ->
+      malformed(
+        position,
+        line,
+        "end_of_record appears without an SF line before it.",
+      )
+    _, _ ->
+      parse_other_line(line, rest, position, open_record, records_reversed)
+  }
+}
+
+fn parse_other_line(
+  line: String,
+  rest: List(String),
+  position: LcovPosition,
+  open_record: Option(LcovRecord),
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  case starts_with_any(line, ignored_lcov_prefixes) {
+    True ->
+      parse_lcov_lines(
+        rest,
+        LcovPosition(..position, line_number: position.line_number + 1),
+        open_record,
+        records_reversed,
+      )
+    False ->
+      malformed(
+        position,
+        line,
+        "this is not an LCOV line; LCOV lines start with TN:, SF:, DA:, LF:, LH:, FN:, FNDA:, FNF:, FNH:, BRDA:, BRF:, BRH: or VER:, or are end_of_record.",
+      )
+  }
+}
+
+/// LCOV lines that are valid but carry nothing line coverage needs: `LF` and
+/// `LH` are recomputed from the `DA` lines, and function and branch records
+/// are not measured.
+const ignored_lcov_prefixes = [
+  "TN:", "LF:", "LH:", "FN:", "FNDA:", "FNF:", "FNH:", "BRDA:", "BRF:", "BRH:",
+  "VER:",
+]
+
+fn starts_with_any(line: String, prefixes: List(String)) -> Bool {
+  case prefixes {
+    [] -> False
+    [prefix, ..rest] ->
+      string.starts_with(line, prefix) || starts_with_any(line, rest)
+  }
+}
+
+fn parse_da_line(
+  fields: String,
+  line: String,
+  rest: List(String),
+  position: LcovPosition,
+  record: LcovRecord,
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  case parse_da_fields(string.split(fields, ",")) {
+    Ok(pair) ->
+      parse_lcov_lines(
+        rest,
+        LcovPosition(..position, line_number: position.line_number + 1),
+        Some(LcovRecord(..record, lines: [pair, ..record.lines])),
+        records_reversed,
+      )
+    Error(Nil) ->
+      malformed(
+        position,
+        line,
+        "DA must be DA:line,count (with an optional checksum), where line is 1 or more and count is 0 or more.",
+      )
+  }
+}
+
+fn parse_da_fields(fields: List(String)) -> Result(#(Int, Int), Nil) {
+  case fields {
+    [line_number, calls] -> da_numbers(int.parse(line_number), int.parse(calls))
+    [line_number, calls, _checksum] ->
+      da_numbers(int.parse(line_number), int.parse(calls))
+    _ -> Error(Nil)
+  }
+}
+
+fn da_numbers(
+  line_number: Result(Int, Nil),
+  calls: Result(Int, Nil),
+) -> Result(#(Int, Int), Nil) {
+  case line_number, calls {
+    Ok(line_number), Ok(calls) if line_number >= 1 && calls >= 0 ->
+      Ok(#(line_number, calls))
+    _, _ -> Error(Nil)
+  }
+}
+
+/// How the BEAM reads a path: `filename:pathtype/1`.
+type PathType {
+  Absolute
+  Relative
+  Volumerelative
+}
+
+@external(erlang, "filename", "pathtype")
+fn path_type(path: String) -> PathType
+
+/// Start a record at an `SF` line. The path is normalised the way measured
+/// and excluded paths are, so the same file always has one key. An
+/// absolute path is an error: it cannot match a measured or an excluded
+/// path, which are relative, so its counts would escape `coverage.exclude`.
+fn parse_source_file_line(
+  source_path: String,
+  line: String,
+  rest: List(String),
+  position: LcovPosition,
+  records_reversed: List(LcovRecord),
+) -> Result(List(LcovRecord), CoverageError) {
+  case path_type(source_path) {
+    Relative ->
+      parse_lcov_lines(
+        rest,
+        LcovPosition(..position, line_number: position.line_number + 1),
+        Some(LcovRecord(
+          source_path: normalise_path(source_path),
+          lines: [],
+          start: position,
+          start_line: line,
+        )),
+        records_reversed,
+      )
+    Absolute | Volumerelative ->
+      malformed(
+        position,
+        line,
+        "the SF path is absolute. Write it relative to the project folder, as coverage writes it, so that it matches the measured and excluded files.",
+      )
+  }
+}
+
+fn malformed(
+  position: LcovPosition,
+  line: String,
+  problem: String,
+) -> Result(a, CoverageError) {
+  Error(MalformedLcov(
+    path: position.path,
+    line_number: position.line_number,
+    line: line,
+    problem: problem,
+  ))
+}
+
+/// LCOV: per file `SF`, one `DA:line,calls` per executable line, `LF` (lines
+/// found), `LH` (lines hit) and `end_of_record`.
+fn render_lcov(coverage_report: CoverageReport) -> String {
+  coverage_report
+  |> report.files()
+  |> list.map(render_lcov_record)
+  |> string.concat()
+}
+
+fn render_lcov_record(file: FileCoverage) -> String {
+  "TN:\nSF:"
+  <> report.source_path(file)
+  <> "\n"
+  <> string.concat(list.map(report.lines(file), render_lcov_line))
+  <> "LF:"
+  <> int.to_string(report.executable_line_count(file))
+  <> "\nLH:"
+  <> int.to_string(report.hit_line_count(file))
+  <> "\nend_of_record\n"
+}
+
+fn render_lcov_line(line: LineCoverage) -> String {
+  "DA:" <> int.to_string(line.line) <> "," <> int.to_string(line.calls) <> "\n"
+}
+
+/// Check total coverage against `coverage.minimum_percent`.
+///
+/// Passes when no minimum is set, when there are no executable lines, or
+/// when `hit / total` is equal to the minimum or above it. The comparison is
+/// exact and uses the minimum rounded to one decimal place.
+///
+/// ## Parameters
+///
+/// - `config`: the settings that hold the minimum
+/// - `report`: the report to check
+///
+/// ## Returns
+///
+/// - `Ok(Nil)` when coverage meets the minimum
+/// - `Error(BelowMinimumPercent(..))` when it does not
+/// - `Error(InvalidMinimumPercent(..))` when the minimum is not from 0.0 to
+///   100.0
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent(80.0)
+/// |> coverage.check_minimum(coverage_report)
+/// // -> Error(BelowMinimumPercent(hit: 1567, total: 2230,
+/// //      minimum_percent: 80.0, lines_needed: 1784))
+/// ```
+pub fn check_minimum(
+  config config: CoverageConfig,
+  report coverage_report: CoverageReport,
+) -> Result(Nil, CoverageError) {
+  case
+    config.minimum_percent,
+    validate_minimum_percent(config.minimum_percent)
+  {
+    None, _ -> Ok(Nil)
+    _, Error(error) -> Error(error)
+    Some(minimum), Ok(Nil) ->
+      check_counts_against_minimum(
+        report.total_hit_line_count(coverage_report),
+        report.total_executable_line_count(coverage_report),
+        round(minimum *. 10.0),
+      )
+  }
+}
+
+fn check_counts_against_minimum(
+  hit: Int,
+  total: Int,
+  minimum_tenths: Int,
+) -> Result(Nil, CoverageError) {
+  case hit * 1000 >= minimum_tenths * total {
+    True -> Ok(Nil)
+    False ->
+      Error(BelowMinimumPercent(
+        hit: hit,
+        total: total,
+        minimum_percent: int.to_float(minimum_tenths) /. 10.0,
+        lines_needed: { minimum_tenths * total + 999 } / 1000,
+      ))
+  }
+}
+
+/// Check each file against `coverage.minimum_percent_per_file`.
+///
+/// Passes when no per-file minimum is set, or when every file in the report
+/// is equal to the minimum or above it. A file with no executable lines
+/// passes. Excluded files are not in the report, so they pass too. The
+/// comparison is exact and uses the minimum rounded to one decimal place,
+/// the same as `coverage.check_minimum`.
+///
+/// ## Parameters
+///
+/// - `config`: the settings that hold the per-file minimum
+/// - `report`: the report to check
+///
+/// ## Returns
+///
+/// - `Ok(Nil)` when every file meets the minimum
+/// - `Error(FilesBelowMinimumPercent(..))` with every file below it, sorted
+///   by path
+/// - `Error(InvalidMinimumPercentPerFile(..))` when the minimum is not from
+///   0.0 to 100.0
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.new()
+/// |> coverage.minimum_percent_per_file(50.0)
+/// |> coverage.check_minimum_per_file(coverage_report)
+/// // -> Error(FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
+/// //      coverage.file_below_minimum(source_path: "src/app/cart.gleam",
+/// //        hit: 3, total: 10, lines_needed: 5),
+/// //    ]))
+/// ```
+pub fn check_minimum_per_file(
+  config config: CoverageConfig,
+  report coverage_report: CoverageReport,
+) -> Result(Nil, CoverageError) {
+  case
+    config.minimum_percent_per_file,
+    validate_minimum_percent_per_file(config.minimum_percent_per_file)
+  {
+    None, _ -> Ok(Nil)
+    _, Error(error) -> Error(error)
+    Some(minimum), Ok(Nil) ->
+      files_below_minimum(
+        report.files(coverage_report),
+        round(minimum *. 10.0),
+        [],
+      )
+  }
+}
+
+fn files_below_minimum(
+  files: List(FileCoverage),
+  minimum_tenths: Int,
+  below_reversed: List(FileBelowMinimum),
+) -> Result(Nil, CoverageError) {
+  case files, below_reversed {
+    [], [] -> Ok(Nil)
+    [], _ ->
+      Error(FilesBelowMinimumPercent(
+        minimum_percent: int.to_float(minimum_tenths) /. 10.0,
+        files: list.sort(list.reverse(below_reversed), compare_file_paths),
+      ))
+    [file, ..rest], _ ->
+      files_below_minimum(
+        rest,
+        minimum_tenths,
+        add_if_below_minimum(below_reversed, file, minimum_tenths),
+      )
+  }
+}
+
+fn add_if_below_minimum(
+  below_reversed: List(FileBelowMinimum),
+  file: FileCoverage,
+  minimum_tenths: Int,
+) -> List(FileBelowMinimum) {
+  let hit = report.hit_line_count(file)
+  let total = report.executable_line_count(file)
+  case hit * 1000 >= minimum_tenths * total {
+    True -> below_reversed
+    False -> [
+      FileBelowMinimum(
+        source_path: report.source_path(file),
+        hit: hit,
+        total: total,
+        lines_needed: { minimum_tenths * total + 999 } / 1000,
+      ),
+      ..below_reversed
+    ]
+  }
+}
+
+fn compare_file_paths(
+  left: FileBelowMinimum,
+  right: FileBelowMinimum,
+) -> Order {
+  string.compare(left.source_path, right.source_path)
+}
+
+// =============================================================================
+// Files below the per-file minimum
+// =============================================================================
+
+/// Build a file below the per-file minimum.
+///
+/// Use it to build an expected `FilesBelowMinimumPercent` error yourself, for
+/// example to test your own output. `coverage.check_minimum_per_file` builds
+/// these for you.
+///
+/// ## Parameters
+///
+/// - `source_path`: the source file, as in the report
+/// - `hit`: executable lines that ran
+/// - `total`: executable lines
+/// - `lines_needed`: how many lines must run to reach the minimum
+///
+/// ## Returns
+///
+/// The file below the minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// ```
+pub fn file_below_minimum(
+  source_path source_path: String,
+  hit hit: Int,
+  total total: Int,
+  lines_needed lines_needed: Int,
+) -> FileBelowMinimum {
+  FileBelowMinimum(
+    source_path: source_path,
+    hit: hit,
+    total: total,
+    lines_needed: lines_needed,
+  )
+}
+
+/// The source file of a file below the per-file minimum, as in the report.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_source_path()
+/// // -> "src/app/cart.gleam"
+/// ```
+pub fn below_minimum_source_path(file file: FileBelowMinimum) -> String {
+  file.source_path
+}
+
+/// The executable lines that ran in a file below the per-file minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_hit()
+/// // -> 3
+/// ```
+pub fn below_minimum_hit(file file: FileBelowMinimum) -> Int {
+  file.hit
+}
+
+/// The executable lines of a file below the per-file minimum.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_total()
+/// // -> 10
+/// ```
+pub fn below_minimum_total(file file: FileBelowMinimum) -> Int {
+  file.total
+}
+
+/// How many lines must run in a file below the per-file minimum to reach it.
+///
+/// This is the full count, not the count of more lines: subtract
+/// `below_minimum_hit` to get the lines still to cover.
+///
+/// ## Example
+///
+/// ```gleam
+/// coverage.file_below_minimum(
+///   source_path: "src/app/cart.gleam",
+///   hit: 3,
+///   total: 10,
+///   lines_needed: 5,
+/// )
+/// |> coverage.below_minimum_lines_needed()
+/// // -> 5
+/// ```
+pub fn below_minimum_lines_needed(file file: FileBelowMinimum) -> Int {
+  file.lines_needed
+}
+
+// =============================================================================
+// Erlang
+// =============================================================================
+
+@external(erlang, "erlang", "round")
+fn round(value: Float) -> Int
+
+/// The time now, in milliseconds since the Unix epoch.
+@external(erlang, "dream_test_coverage_ffi", "system_time_ms")
+fn system_time_ms() -> Int
+
+@external(erlang, "dream_test_coverage_ffi", "list_source_files")
+fn list_source_files(directory: String) -> Result(List(String), CoverageError)
+
+/// Check that this BEAM can count lines natively, then give every module
+/// line counters. `erlang_externals` holds the `@external(erlang, ...)`
+/// functions of each source path, whose wrappers get no counters. Returns
+/// the measurement and the source paths of the modules built from Erlang
+/// source.
+@external(erlang, "dream_test_coverage_ffi", "start_measuring")
+fn start_measuring(
+  modules: List(CoveredModule),
+  erlang_externals: Dict(String, List(#(String, Int))),
+) -> Result(#(Measurement, List(String)), CoverageError)
+
+/// Read the line counts of every module, as `#(source_path, lines)`.
+@external(erlang, "dream_test_coverage_ffi", "stop_measuring")
+fn stop_measuring(
+  measurement: Measurement,
+  modules: List(CoveredModule),
+) -> Result(List(#(String, List(LineCoverage))), CoverageError)
+
+/// Delete a folder and everything in it. A folder that does not exist is
+/// fine.
+@external(erlang, "dream_test_coverage_ffi", "delete_html_pages")
+fn delete_html_pages(path: String) -> Result(Nil, CoverageError)
+
+@external(erlang, "dream_test_coverage_ffi", "match_files")
+fn match_files(pattern: String) -> List(String)
+
+@external(erlang, "dream_test_coverage_ffi", "is_regular_file")
+fn is_regular_file(path: String) -> Bool
+
+@external(erlang, "filename", "basename")
+fn base_name(path: String) -> String

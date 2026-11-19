@@ -1,0 +1,8 @@
+feature "Scenario Outline with a docstring"
+  scenario "Scenario Outline" "Greetings come in many forms"
+    step "Given" "this file:"
+      docstring "<type>" "Greeting:<content>"
+    examples ""
+      header "type" "content"
+      row "en" "Hello"
+      row "fr" "Bonjour"

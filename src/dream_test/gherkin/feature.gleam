@@ -10,13 +10,13 @@
 ////
 //// ```gleam
 //// pub fn tests() {
-////   // Define step handlers
+////   // Define the steps and the state each scenario starts from
 ////   let steps =
-////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when("I add {int} items", step_add_items)
+////     |> then("the cart should have {int} items", step_verify_count)
 ////
 ////   // Parse the .feature file
 ////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
@@ -32,11 +32,11 @@
 //// ```gleam
 //// pub fn tests() {
 ////   let steps =
-////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> given("the server is running", step_server_running)
+////     |> given("the cart is empty", step_empty_cart)
+////     |> when("I add {int} items", step_add_items)
+////     |> then("the cart should have {int} items", step_verify_count)
 ////
 ////   let bg = background([given("the server is running")])
 ////
@@ -57,21 +57,11 @@
 //// }
 //// ```
 
-import dream_test/gherkin/step_trie.{type StepMatch}
-import dream_test/gherkin/steps.{
-  type StepContext, type StepHandler, type StepRegistry, StepContext,
-}
+import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
-import dream_test/gherkin/world.{type World}
-import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, AssertionOk, GherkinScenario, Group, Root, Test,
-}
-import gleam/dict.{type Dict}
-import gleam/int
+import dream_test/suite.{type TestSuite}
 import gleam/list
-import gleam/option.{type Option, None, Some}
-import gleam/string
+import gleam/option.{None, Some}
 
 // ============================================================================
 // Types
@@ -80,13 +70,14 @@ import gleam/string
 /// Configuration for running a feature.
 ///
 /// Contains the parsed feature and step registry needed to execute it.
+/// `state` is the scenario state type of the step registry.
 ///
-pub type FeatureConfig {
+pub type FeatureConfig(state) {
   FeatureConfig(
     /// The parsed feature to run
     feature: gherkin_types.Feature,
     /// Registry of step definitions
-    step_registry: StepRegistry,
+    step_registry: StepRegistry(state),
   )
 }
 
@@ -107,10 +98,20 @@ pub type InlineScenario {
 
 /// An inline step for the DSL.
 ///
+/// The `given`, `when`, `then`, `and`, `but` and `asterisk` helpers build
+/// these for you.
+/// Build one by hand when you choose the keyword at run time.
+///
+/// ## Example
+///
+/// ```gleam
+/// InlineStep(keyword: gherkin_types.When, text: "I add 3 items")
+/// ```
+///
 pub type InlineStep {
   InlineStep(
-    /// Step keyword as string ("Given", "When", "Then", "And", "But")
-    keyword: String,
+    /// The step keyword (Given, When, Then, And, But, *)
+    keyword: gherkin_types.StepKeyword,
     /// Step text after the keyword
     text: String,
   )
@@ -119,12 +120,29 @@ pub type InlineStep {
 // ============================================================================
 // Feature → TestSuite Conversion
 // ============================================================================
-
 /// Convert a Feature to a TestSuite.
 ///
-/// Creates a TestSuite with one test per scenario. Background steps are
-/// prepended to each scenario. ScenarioOutlines are expanded based on
-/// their examples table.
+/// Creates a TestSuite with one test per scenario, and one test per example
+/// row of a scenario with `Examples`. Each Rule becomes a group named
+/// `Rule: <name>` (or `Rule:` when the Rule has no name), so the full name of
+/// a scenario in a Rule is `Feature > Rule: <name> > Scenario`.
+///
+/// The steps of the Feature Background run first, then the steps of the Rule
+/// Background, then the scenario steps. So a scenario that starts with `And`,
+/// `But` or `*` takes the phase of the last Background step.
+///
+/// An example row test is named `<scenario> (Example N)`, or
+/// `<scenario> (<examples name>, Example N)` when its `Examples` section has
+/// a name. N counts the rows of all `Examples` sections of the scenario, from
+/// 1.
+///
+/// Tags follow Gherkin: a scenario inherits the Feature tags and the Rule
+/// tags. The suite root holds the Feature tags, a Rule group holds the Rule
+/// tags, and a test holds the scenario tags, then the `Examples` tags. The
+/// runner adds the tags of the groups of a test in front of its own tags.
+/// So the tags of a test result, and the tags that a `runner.filter_tests`
+/// predicate sees, are the Feature tags, then the Rule tags, then the
+/// scenario tags, then the `Examples` tags, each one time.
 ///
 /// ## Parameters
 ///
@@ -140,353 +158,14 @@ pub type InlineStep {
 /// let config = FeatureConfig(feature: feature, step_registry: steps)
 /// to_test_suite(config)
 /// ```
-pub fn to_test_suite(config config: FeatureConfig) -> TestSuite(Nil) {
+pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
   let feature = config.feature
-  let children = build_suite_items(feature, config)
-
-  Root(
-    seed: Nil,
-    tree: Group(name: feature.name, tags: feature.tags, children: children),
+  steps.to_suite(
+    registry: config.step_registry,
+    name: feature.name,
+    tags: feature.tags,
+    children: [steps.Scenarios(feature: feature)],
   )
-}
-
-fn build_suite_items(
-  feature: gherkin_types.Feature,
-  config: FeatureConfig,
-) -> List(Node(Nil)) {
-  build_suite_items_loop(feature, feature.scenarios, config, [])
-}
-
-fn build_suite_items_loop(
-  feature: gherkin_types.Feature,
-  scenarios: List(gherkin_types.Scenario),
-  config: FeatureConfig,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case scenarios {
-    [] -> list.reverse(acc_rev)
-    [scenario, ..rest] -> {
-      let items = scenario_to_suite_items(feature, scenario, config)
-      build_suite_items_loop(
-        feature,
-        rest,
-        config,
-        reverse_append(items, acc_rev),
-      )
-    }
-  }
-}
-
-fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
-  case items {
-    [] -> acc
-    [item, ..rest] -> reverse_append(rest, [item, ..acc])
-  }
-}
-
-fn scenario_to_suite_items(
-  feature: gherkin_types.Feature,
-  scenario: gherkin_types.Scenario,
-  config: FeatureConfig,
-) -> List(Node(Nil)) {
-  case scenario {
-    gherkin_types.Scenario(name, tags, steps) -> {
-      let test_node =
-        build_scenario_test_node(feature, name, tags, steps, config, None)
-      [test_node]
-    }
-    gherkin_types.ScenarioOutline(name, tags, steps, examples) -> {
-      expand_scenario_outline(feature, name, tags, steps, examples, config)
-    }
-  }
-}
-
-fn build_scenario_test_node(
-  feature: gherkin_types.Feature,
-  scenario_name: String,
-  scenario_tags: List(String),
-  steps: List(gherkin_types.Step),
-  config: FeatureConfig,
-  example_suffix: Option(String),
-) -> Node(Nil) {
-  let full_name = build_full_name(feature.name, scenario_name, example_suffix)
-  let scenario_id = string.join(full_name, "::")
-  let all_tags = list.append(feature.tags, scenario_tags)
-
-  // Combine background and scenario steps
-  let all_steps = case feature.background {
-    Some(gherkin_types.Background(background_steps)) ->
-      list.append(background_steps, steps)
-    None -> steps
-  }
-  Test(
-    name: scenario_name,
-    tags: all_tags,
-    kind: GherkinScenario(scenario_id),
-    run: fn(_nil: Nil) {
-      Ok(execute_scenario(scenario_id, all_steps, config.step_registry))
-    },
-    timeout_ms: None,
-    source: feature.source,
-  )
-}
-
-fn build_full_name(
-  feature_name: String,
-  scenario_name: String,
-  example_suffix: Option(String),
-) -> List(String) {
-  case example_suffix {
-    None -> [feature_name, scenario_name]
-    Some(suffix) -> [feature_name, scenario_name <> " " <> suffix]
-  }
-}
-
-fn expand_scenario_outline(
-  feature: gherkin_types.Feature,
-  name: String,
-  tags: List(String),
-  steps: List(gherkin_types.Step),
-  examples: gherkin_types.ExamplesTable,
-  config: FeatureConfig,
-) -> List(Node(Nil)) {
-  let headers = examples.headers
-
-  expand_scenario_outline_rows_loop(
-    feature,
-    name,
-    tags,
-    steps,
-    config,
-    headers,
-    examples.rows,
-    0,
-    [],
-  )
-}
-
-fn expand_scenario_outline_rows_loop(
-  feature: gherkin_types.Feature,
-  name: String,
-  tags: List(String),
-  steps: List(gherkin_types.Step),
-  config: FeatureConfig,
-  headers: List(String),
-  rows: List(List(String)),
-  index: Int,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case rows {
-    [] -> list.reverse(acc_rev)
-    [row, ..rest] -> {
-      let substitutions = build_substitution_map(headers, row)
-      let expanded_steps = substitute_steps(steps, substitutions)
-      let suffix = "(Example " <> int.to_string(index + 1) <> ")"
-
-      let node =
-        build_scenario_test_node(
-          feature,
-          name,
-          tags,
-          expanded_steps,
-          config,
-          Some(suffix),
-        )
-
-      expand_scenario_outline_rows_loop(
-        feature,
-        name,
-        tags,
-        steps,
-        config,
-        headers,
-        rest,
-        index + 1,
-        [node, ..acc_rev],
-      )
-    }
-  }
-}
-
-fn build_substitution_map(
-  headers: List(String),
-  values: List(String),
-) -> Dict(String, String) {
-  build_substitution_map_loop(list.zip(headers, values), dict.new())
-}
-
-fn build_substitution_map_loop(
-  pairs: List(#(String, String)),
-  acc: Dict(String, String),
-) -> Dict(String, String) {
-  case pairs {
-    [] -> acc
-    [#(header, value), ..rest] ->
-      build_substitution_map_loop(rest, dict.insert(acc, header, value))
-  }
-}
-
-fn substitute_steps(
-  steps: List(gherkin_types.Step),
-  substitutions: Dict(String, String),
-) -> List(gherkin_types.Step) {
-  substitute_steps_loop(steps, substitutions, [])
-}
-
-fn substitute_steps_loop(
-  steps: List(gherkin_types.Step),
-  substitutions: Dict(String, String),
-  acc_rev: List(gherkin_types.Step),
-) -> List(gherkin_types.Step) {
-  case steps {
-    [] -> list.reverse(acc_rev)
-    [step, ..rest] ->
-      substitute_steps_loop(rest, substitutions, [
-        substitute_step(step, substitutions),
-        ..acc_rev
-      ])
-  }
-}
-
-fn substitute_step(
-  step: gherkin_types.Step,
-  substitutions: Dict(String, String),
-) -> gherkin_types.Step {
-  let new_text = substitute_placeholders(step.text, substitutions)
-  gherkin_types.Step(
-    keyword: step.keyword,
-    text: new_text,
-    argument: step.argument,
-  )
-}
-
-fn substitute_placeholders(
-  text: String,
-  substitutions: Dict(String, String),
-) -> String {
-  substitute_placeholders_loop(dict.to_list(substitutions), text)
-}
-
-fn substitute_placeholders_loop(
-  pairs: List(#(String, String)),
-  acc: String,
-) -> String {
-  case pairs {
-    [] -> acc
-    [#(header, value), ..rest] -> {
-      let placeholder = "<" <> header <> ">"
-      let next = string.replace(acc, placeholder, value)
-      substitute_placeholders_loop(rest, next)
-    }
-  }
-}
-
-// ============================================================================
-// Scenario Execution
-// ============================================================================
-
-fn execute_scenario(
-  scenario_id: String,
-  steps: List(gherkin_types.Step),
-  registry: StepRegistry,
-) -> AssertionResult {
-  // Create world for this scenario
-  let the_world = world.new_world(scenario_id)
-
-  // Execute all steps
-  let result = execute_steps(steps, registry, the_world, gherkin_types.Given)
-
-  // Clean up world
-  world.cleanup(the_world)
-
-  result
-}
-
-fn execute_steps(
-  steps: List(gherkin_types.Step),
-  registry: StepRegistry,
-  the_world: World,
-  previous_keyword: gherkin_types.StepKeyword,
-) -> AssertionResult {
-  case steps {
-    [] -> AssertionOk
-    [step, ..rest] -> {
-      case execute_step(step, registry, the_world, previous_keyword) {
-        AssertionOk -> {
-          let effective_keyword =
-            gherkin_types.resolve_keyword(step.keyword, previous_keyword)
-          execute_steps(rest, registry, the_world, effective_keyword)
-        }
-        failure -> failure
-      }
-    }
-  }
-}
-
-fn execute_step(
-  step: gherkin_types.Step,
-  registry: StepRegistry,
-  the_world: World,
-  previous_keyword: gherkin_types.StepKeyword,
-) -> AssertionResult {
-  // Resolve And/But to effective keyword
-  let effective_keyword =
-    gherkin_types.resolve_keyword(step.keyword, previous_keyword)
-
-  // Find matching step definition
-  case steps.find_step(registry, effective_keyword, step.text) {
-    Ok(match) -> {
-      let context = build_step_context(match, step, the_world)
-      case match.handler(context) {
-        Ok(result) -> result
-        Error(message) ->
-          AssertionFailed(AssertionFailure(
-            operator: "step",
-            message: message,
-            payload: None,
-          ))
-      }
-    }
-    Error(msg) -> {
-      AssertionFailed(AssertionFailure(
-        operator: "step",
-        message: msg,
-        payload: None,
-      ))
-    }
-  }
-}
-
-fn build_step_context(
-  match: StepMatch(StepHandler),
-  step: gherkin_types.Step,
-  the_world: World,
-) -> StepContext {
-  let table = extract_table_from_step(step)
-  let doc_string = extract_doc_string_from_step(step)
-
-  StepContext(
-    captures: match.captures,
-    table: table,
-    doc_string: doc_string,
-    world: the_world,
-  )
-}
-
-fn extract_table_from_step(
-  step: gherkin_types.Step,
-) -> Option(List(List(String))) {
-  case step.argument {
-    Some(gherkin_types.DataTable(rows)) -> Some(rows)
-    _ -> None
-  }
-}
-
-fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
-  case step.argument {
-    Some(gherkin_types.DocString(content, _)) -> Some(content)
-    _ -> None
-  }
 }
 
 // ============================================================================
@@ -512,10 +191,10 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 ///
 /// ```gleam
 /// let steps =
-///   steps.new()
-///   |> step("I have {int} items in my cart", step_have_items)
-///   |> step("I add {int} more items", step_add_items)
-///   |> step("I should have {int} items total", step_should_have)
+///   steps.new(initial: 0)
+///   |> given("I have {int} items in my cart", step_have_items)
+///   |> when("I add {int} more items", step_add_items)
+///   |> then("I should have {int} items total", step_should_have)
 ///
 /// feature("Shopping Cart", steps, [
 ///   scenario("Adding items to cart", [
@@ -528,9 +207,9 @@ fn extract_doc_string_from_step(step: gherkin_types.Step) -> Option(String) {
 /// ```
 pub fn feature(
   name name: String,
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   scenarios scenarios: List(InlineScenario),
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -540,6 +219,7 @@ pub fn feature(
       tags: [],
       background: None,
       scenarios: parsed_scenarios,
+      rules: [],
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
@@ -605,7 +285,7 @@ pub fn with_tags(
 /// ```
 ///
 pub fn given(text text: String) -> InlineStep {
-  InlineStep(keyword: "Given", text: text)
+  InlineStep(keyword: gherkin_types.Given, text: text)
 }
 
 /// Create a When step for inline DSL.
@@ -617,7 +297,7 @@ pub fn given(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn when(text text: String) -> InlineStep {
-  InlineStep(keyword: "When", text: text)
+  InlineStep(keyword: gherkin_types.When, text: text)
 }
 
 /// Create a Then step for inline DSL.
@@ -629,7 +309,7 @@ pub fn when(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn then(text text: String) -> InlineStep {
-  InlineStep(keyword: "Then", text: text)
+  InlineStep(keyword: gherkin_types.Then, text: text)
 }
 
 /// Create an And step for inline DSL.
@@ -641,7 +321,7 @@ pub fn then(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn and(text text: String) -> InlineStep {
-  InlineStep(keyword: "And", text: text)
+  InlineStep(keyword: gherkin_types.And, text: text)
 }
 
 /// Create a But step for inline DSL.
@@ -653,32 +333,43 @@ pub fn and(text text: String) -> InlineStep {
 /// ```
 ///
 pub fn but(text text: String) -> InlineStep {
-  InlineStep(keyword: "But", text: text)
+  InlineStep(keyword: gherkin_types.But, text: text)
+}
+
+/// Create a `*` step for inline DSL.
+///
+/// A `*` step takes the phase of the step before it, like `and` and `but`.
+/// Use it for a list of steps where Given, When or Then reads badly.
+///
+/// ## Example
+///
+/// ```gleam
+///       asterisk("I pack a passport"),
+/// ```
+///
+pub fn asterisk(text text: String) -> InlineStep {
+  InlineStep(keyword: gherkin_types.Asterisk, text: text)
 }
 
 fn inline_to_parsed_scenario(inline: InlineScenario) -> gherkin_types.Scenario {
   let parsed_steps = list.map(inline.steps, inline_to_parsed_step)
   gherkin_types.Scenario(
+    keyword: gherkin_types.KeywordScenario,
     name: inline.name,
+    description: None,
     tags: inline.tags,
     steps: parsed_steps,
+    examples: [],
   )
 }
 
 fn inline_to_parsed_step(inline: InlineStep) -> gherkin_types.Step {
-  let keyword = parse_keyword(inline.keyword)
-  gherkin_types.Step(keyword: keyword, text: inline.text, argument: None)
-}
-
-fn parse_keyword(keyword_str: String) -> gherkin_types.StepKeyword {
-  case keyword_str {
-    "Given" -> gherkin_types.Given
-    "When" -> gherkin_types.When
-    "Then" -> gherkin_types.Then
-    "And" -> gherkin_types.And
-    "But" -> gherkin_types.But
-    _ -> gherkin_types.Given
-  }
+  gherkin_types.Step(
+    keyword: inline.keyword,
+    text: inline.text,
+    doc_string: None,
+    data_table: None,
+  )
 }
 
 // ============================================================================
@@ -732,10 +423,10 @@ pub fn background(
 /// ```
 pub fn feature_with_background(
   name name: String,
-  registry registry: StepRegistry,
+  registry registry: StepRegistry(state),
   background_steps background_steps: List(gherkin_types.Step),
   scenarios scenarios: List(InlineScenario),
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let parsed_scenarios = list.map(scenarios, inline_to_parsed_scenario)
   let parsed_feature =
     gherkin_types.Feature(
@@ -743,8 +434,13 @@ pub fn feature_with_background(
       source: None,
       description: None,
       tags: [],
-      background: Some(gherkin_types.Background(steps: background_steps)),
+      background: Some(gherkin_types.Background(
+        name: "",
+        description: None,
+        steps: background_steps,
+      )),
       scenarios: parsed_scenarios,
+      rules: [],
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)

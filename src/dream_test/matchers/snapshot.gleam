@@ -228,7 +228,9 @@ fn normalize_snapshot_expected(expected: String) -> String {
 }
 
 fn drop_trailing_newlines(graphemes_reversed: List(String)) -> List(String) {
+  // "\r\n" is one grapheme, so it needs its own branch.
   case graphemes_reversed {
+    ["\r\n", ..rest] -> drop_trailing_newlines(rest)
     ["\n", ..rest] -> drop_trailing_newlines(rest)
     ["\r", ..rest] -> drop_trailing_newlines(rest)
     other -> other

@@ -16,4 +16,3 @@ Feature: Shopping Cart
     When I add 2 items
     And I add 3 items
     Then the cart should have 5 items
-

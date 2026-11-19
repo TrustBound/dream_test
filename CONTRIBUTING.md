@@ -42,8 +42,8 @@ All contributions are valued, no matter how small.
 
 ### Prerequisites
 
-- [Gleam](https://gleam.run/) v1.17.0+ — required, not just recommended. CI runs `gleam format --check` with the 1.17 formatter, and earlier formatters produce different output, so code formatted with an older Gleam will fail CI (and code formatted with 1.17 will fail the pre-commit hook on an older local Gleam).
-- Erlang/OTP 28+ (the version CI tests against)
+- [Gleam](https://gleam.run/) v1.19.0+ — required, not just recommended. CI runs Gleam 1.19.2. Coverage line numbers are exact only from Gleam 1.19, and the coverage tests expect exact line numbers. CI also runs `gleam format --check`, and other formatter versions can produce different output.
+- Erlang/OTP 28+ (the version CI tests against) with the JIT. Coverage counts lines with the native line counters of the BEAM, which need Erlang/OTP 27+ with the JIT, and the test run measures its own coverage code with them. `erl -noshell -eval 'io:format("~p~n", [code:coverage_support()]), halt().'` must print `true`.
 - Git
 - Make (optional but recommended)
 

@@ -5,7 +5,767 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-11-18
+
+Dream Test 3.0.0 adds built-in line coverage. It also gives the hooks of
+each scope one setup process, follows the official Gherkin grammar, and
+gives each Gherkin scenario one typed state value in place of the `world`
+store. This release has breaking changes. Read
+[Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) before you update.
+
+### Breaking changes
+
+#### Runner and run report
+
+- `runner.run` returns `types.RunReport`, not `List(TestResult)`. A
+  `RunReport` holds the test results and the tear-down hooks that failed.
+- `runner.has_failures` is removed. Use `types.failed(report)`, which is
+  also `True` for a tear-down failure.
+- `parallel.run_root_parallel` returns `types.RunReport`, not
+  `List(TestResult)`.
+- `parallel.RunRootParallelWithReporterConfig` has a new field
+  `outer_setups: List(parallel.OuterSetup)`, and
+  `parallel.RunRootParallelWithReporterResult` has the new fields
+  `teardown_failures` and `outer_setups`.
+- `runner.exit_on_failure` stops the BEAM with `init:stop(1)` in place of
+  `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
+  writes all its output and coverage files, and then ends the program with
+  status 1 inside `runner.run`: no code after `runner.run` runs. It also
+  stops with status 1 when a tear-down hook failed and every test passed.
+- `types.Root` holds the top-level group itself:
+  `Root(seed:, name:, tags:, children:)` in place of
+  `Root(seed:, tree: Group(name:, tags:, children:))`.
+- `types.TestResult` and `types.TestInfo` hold `groups: List(String)` (the
+  names of the groups around the test) in place of
+  `full_name: List(String)`.
+- The `run` field of `types.Test`, `BeforeAll`, `BeforeEach`, `AfterEach`
+  and `AfterAll` is a `types.Callback`, not a function. This affects only
+  code that builds `types.Node` values directly.
+- `types.ModuleCoverage` and `types.CoverageSummary` are removed. Use
+  `dream_test/coverage`.
+- `types.TestKind.Integration` is removed. No test ever had this kind. Tag
+  integration tests with `unit.with_tags` and select them with
+  `runner.filter_tests`.
+- The alias `types.TestSuiteItem` is removed. Use `types.Node`.
+- The module `dream_test/context` (`TestContext`, `new`, `failures`,
+  `add_failure`) is removed. Nothing in Dream Test used it.
+- `TestSuite` has no type parameter and moves to the new module
+  `dream_test/suite`. `types.TestSuite(context)` is removed. A suite keeps
+  its context inside it, so one `runner.new` takes a `unit` suite, a
+  `unit_context` suite and a Gherkin feature together. `unit.describe`,
+  `unit_context.describe`, the Gherkin suite functions and module
+  discovery give a `suite.TestSuite`. To run a tree that you build
+  yourself, give it to `suite.from_tree`.
+- `runner.RunBuilder` has no type parameter. `runner.before_each_test`
+  and `runner.after_each_test` take `fn(TestInfo) -> Result(Nil, String)`.
+  The hooks get the `TestInfo` of the test, not its context, and cannot
+  change the context.
+- `parallel.RunRootParallelWithReporterConfig` takes
+  `runner_before_each_test` and `runner_after_each_test` as
+  `List(fn(TestInfo) -> Result(Nil, String))`, the same type as the runner
+  hooks, in place of functions that also got and gave the context.
+- Module discovery loads a suite with a context, for example from
+  `unit_context`, and runs it with its own context. `discover.to_suite`
+  puts each module suite in one group, and each suite keeps its own
+  context. In 2.x, `discover.to_suite` gave the tests of such a suite
+  `Nil` in place of their context.
+- A module discovery pattern that matches no test module is an error:
+  `<pattern>: no test module matches the pattern`. A test module whose
+  beam file does not load is an error:
+  `<module>: cannot load the module: <reason>`. `discover.to_suites` and
+  `discover.to_suite` give a failing test for each, and
+  `discover.list_modules` gives `Error`. Before, both gave no module and
+  no error, so a wrong pattern gave a run that passed.
+- `types.AssertionResult` has the new variant `AssertionPending`, for
+  `unit.pending`. A `case` on an `AssertionResult` needs a branch for it.
+- The typed `parallel` functions take a `types.Root(context)`. Build one
+  with `types.root`, not with `unit.describe`.
+
+#### Hooks and processes
+
+- One rule for every hook failure. A failed set-up hook gives `SetupFailed`
+  to each test that it serves. A failed tear-down hook does not change a
+  test status, the remaining tear-down hooks still run, the failure goes
+  into the tear-down list of the run report, and the run fails.
+- When a `before_all` hook fails, times out or crashes, the tests of its
+  group and of every group inside it are `SetupFailed`, not `Failed`.
+- The hooks of each scope run in one setup process of that scope, and a
+  test runs in one process: its `before_each_test` hooks, `before_each`
+  hooks, body, `after_each` hooks and `after_each_test` hooks.
+- A test body that runs past its timeout is always `TimedOut`.
+
+#### Sandbox
+
+- `sandbox.run_isolated` takes the function and its input as two
+  parameters: `run_isolated(config:, run: fn(input) -> a, input:)` in place
+  of `run_isolated(config:, test_function: fn() -> a)`.
+
+#### Reporters
+
+- The reporter functions that format a whole run take a `types.RunReport`:
+  `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`,
+  `json.render`, `json.format`, `json.format_pretty`, `json.report`,
+  `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report`
+  functions return the report.
+- The JSON schema version is `2.0`. Its `summary` adds the counts
+  `teardown_failed` (tear-down hooks that failed) and `setup_stopped`
+  (set-ups whose process stopped).
+- The summary line of the BDD and Gherkin reporters lists the extra counts
+  in the order skipped, pending, timed out, setup failed.
+- The progress event API is removed: `reporters/types.ReporterEvent`,
+  `reporters/types.HookKind`, `reporters/types.HookOutcome` and
+  `progress.handle_event`. `progress.render` takes a
+  `progress.ProgressEvent`.
+
+#### Gherkin step definitions
+
+- The `world` key/value store is removed, with `dream_test/gherkin/world`
+  and its ETS table. Each scenario made one atom that was never freed.
+  Each scenario now has one typed state value.
+- `steps.new` takes the initial scenario state, and `StepRegistry`,
+  `FeatureConfig` and `discover.RunnableDiscovery` take the state type as a
+  type parameter.
+- The phase of a step definition sets its kind. `steps.given` and
+  `steps.when` take an action,
+  `fn(state, StepContext) -> Result(state, String)`. `steps.then` takes a
+  check, `fn(state, StepContext) -> Result(AssertionResult, String)`. A
+  check cannot change the state. The `StepHandler` type is removed.
+- `steps.when_` is now `steps.when`, and `steps.then_` is now `steps.then`.
+- `StepContext` has no `world` field. It has a `scenario_id` field.
+- `types.GherkinScenario(String)` is now
+  `GherkinScenario(scenario_id: String, rule: Option(String))`. `rule` is
+  the name of the Rule group, for example `Some("Rule: Stock")`, or `None`
+  for a scenario outside a Rule. The Gherkin reporter reads the Rule from
+  this field, not from a group name that starts with `Rule:`, so a Feature
+  named `Rule: refunds` prints as `Feature: Rule: refunds`. A Gherkin test
+  in the JSON report has `rule` after `kind` (a string, or `null`).
+- The scenario id ends with `#` and a number, for example
+  `"Shopping Cart::Adding items#12"`, so it is unique in the run, also for
+  two scenarios with the same name. In 2.x it was only the name path. The
+  number changes between runs. The JSON report writes the same id in
+  `"kind": "gherkin:<id>"`.
+- `steps.step` is removed. Each step definition belongs to exactly one
+  phase.
+- `steps.find_step` takes `phase: StepPhase` in place of
+  `keyword: StepKeyword`, and gives a `StepMatch(StepDefinition(state))`.
+- `step_trie.insert` and `step_trie.lookup` take `phase: StepPhase` in
+  place of a keyword `String`, and the trie has no `"*"` wildcard handler.
+  `insert` returns `Result(StepTrie(handler), String)`.
+- A pattern registered two times in one phase is an error. The first
+  definition stays, and each scenario that uses the registry fails with
+  `Duplicate step definition: ...`. The same pattern in two phases is not a
+  duplicate.
+- `feature.InlineStep` holds `keyword: gherkin/types.StepKeyword` in place
+  of `keyword: String`.
+- Step text and step patterns are split into words in the same way: at
+  spaces, with a double-quoted run kept in one word. A space in a pattern
+  must be a space in the text, so `$ {float}` does not match `$19.99`.
+  `{word}` matches only text with no space. Before, the step text was also
+  split where digits meet other characters, and the pattern was not.
+- `step_trie.parse_step_pattern` gives one `List(StepSegment)` for each
+  word, and `StepSegment.LiteralWord` is now `LiteralText`.
+  `step_trie.tokenize_step_text` splits only at spaces outside quotes. A
+  quoted run starts only at a double quote at the start of a word, and
+  ends only at a double quote before a space or at the end of the text,
+  so the quote in `O"Brien` or `5"` is an ordinary character.
+- `discover.with_registry` gives the opaque type `RunnableDiscovery`, and
+  `discover.to_suite` takes only that type.
+- A `discover.features` pattern that matches no files is an error.
+  `discover.to_suite` gives one failing test,
+  `No feature files match the pattern "<pattern>"`, tagged
+  `no-feature-files`. `discover.load` gives the new error
+  `parser.NoMatchingFeatureFiles(pattern)`. Before, both gave no features
+  and no errors, so a wrong pattern gave a run that passed.
+- A `discover.features` pattern that cannot be searched, for example
+  `features/{a.feature`, is an error, not a crash while the suite is
+  built. `discover.load` gives the new error
+  `parser.InvalidFeatureFilePattern(pattern, reason)`, and
+  `discover.to_suite` gives one failing test,
+  `Cannot search for feature files with the pattern "<pattern>": <reason>`,
+  tagged `no-feature-files`. A `case` on a `parser.FeatureFileError` needs
+  a branch for the new variant.
+
+#### Gherkin parser and syntax tree
+
+- `gherkin/types.Scenario` is one record,
+  `Scenario(keyword, name, description, tags, steps, examples)`, with
+  `examples: List(Examples)`. The `ScenarioOutline` variant is removed.
+- `gherkin/types.Background` holds `name` and `description`.
+- `gherkin/types.Feature` has a new field, `rules: List(Rule)`.
+- `gherkin/types.Step` holds `doc_string: Option(DocString)` and
+  `data_table: Option(DataTable)` in place of
+  `argument: Option(StepArgument)`. The `StepArgument` type is removed.
+- `gherkin/types.StepKeyword` has a new variant, `Asterisk`.
+- `gherkin/types.resolve_keyword` is removed. Use
+  `gherkin/types.resolve_phase`.
+- `parser.parse_string` returns `Result(Feature, ParseError)`,
+  `parser.parse_file` returns `Result(Feature, FeatureFileError)`, and
+  `discover.LoadResult.errors` is `List(parser.FeatureFileError)`, in place
+  of `String` errors.
+- The parser follows the official Gherkin grammar. A line that the grammar
+  does not permit at its position is an `UnexpectedLine` error. Before, the
+  parser ignored it.
+- Every parse error message starts with `line N:`, and
+  `DocString is not closed` is now
+  `The DocString that starts on line N is not closed`.
+- The first step of a Background, and of a Scenario when the Background
+  has no steps, must use Given, When or Then. A leading `And`, `But` or `*`
+  is a parse error in a `.feature` file, and fails each scenario of an
+  inline feature.
+- A description keeps the leading whitespace of each line and the empty
+  lines between its text lines.
+- The test of an `Examples` row has the row label in its name:
+  `<scenario> (Example N)`, or `<scenario> (<examples name>, Example N)`.
+- A scenario with no `Examples` section runs one time, also when its
+  keyword is `Scenario Outline`.
+- A tag line is read as Gherkin reads it: `@a@b` is two tags,
+  `@tag #comment` ignores the comment, and `@a b` is a
+  `TagContainsWhitespace` error.
+- A `# language:` line before the Feature must name `en`. Another language
+  is an `UnsupportedLanguage` error.
+
+### Upgrading from 2.x
+
+Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
+2.x code and the same code for 3.0.0 for each change below.
+
+- Gherkin steps get and return a typed scenario state. `world` is removed.
+- `steps.new` takes the initial state. `steps.step` is removed.
+- `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
+- `StepContext` has `scenario_id` in place of `world`.
+- `GherkinScenario` has the fields `scenario_id` and `rule`.
+- A pattern registered two times in one phase is an error.
+- `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
+- Step text and patterns split into words only at spaces.
+- A `discover.features` pattern that matches no files fails the run.
+- A module discovery pattern that matches no test module fails the run,
+  and so does a test module that does not load.
+- `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
+- `runner.has_failures` is now `types.failed`.
+- `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
+- `TestSuite` has no type parameter and is in `dream_test/suite`.
+- `runner.before_each_test` and `runner.after_each_test` get only the `TestInfo`.
+- Module discovery runs a suite with a context with its own context.
+- `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
+- `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
+- A failed set-up hook gives `SetupFailed`. A timeout is always `TimedOut`.
+- A failed tear-down hook goes into the run report, not into the results.
+- Hooks run in one setup process of their scope.
+- Reporter functions that format a whole run take a `RunReport`.
+- The JSON report has schema version `2.0`.
+- The summary line lists skipped, pending, timed out, setup failed.
+- `progress.handle_event` and the reporter event types are removed.
+- The Gherkin syntax tree changed: `Scenario`, `Step`, `Background`, `Feature`.
+- Parse errors are typed, and the parser follows the official grammar.
+- `sandbox.run_isolated` takes the function and its input.
+- `types.ModuleCoverage` and `types.CoverageSummary` are removed.
+- `types.TestKind.Integration`, `types.TestSuiteItem` and the module
+  `dream_test/context` are removed.
+
+### Added
+
+- **Suites with different contexts in one run** (`dream_test/suite`)
+
+  - Every suite has the type `suite.TestSuite`, whatever context its tests
+    get. One `runner.new` takes `unit` suites, `unit_context` suites and
+    Gherkin features together
+  - `suite.from_tree` makes a suite from a `types.Root` that you build
+    yourself. `suite.new` makes one from children and a
+    `types.SuiteContext`
+  - `suite.group` puts suites in one group, and `suite.join` puts them one
+    after the other in one suite. Each suite keeps its own context
+  - `suite.name`, `suite.tests` and `suite.run` read and run a suite.
+    `suite.run` takes a `suite.RunInput`: the concurrency and default
+    timeout, the test filter, the progress output, the runner hooks
+    around each test and the outer set-ups
+  - `suite.with_source` gives each test of a suite a source, for example
+    the module name. Module discovery uses it
+  - `parallel.run_suite` runs a typed tree inside groups, with the new
+    config type `parallel.RunSuiteConfig`: the fields of
+    `RunRootParallelWithReporterConfig`, the tree as `name`, `tags`,
+    `children` and `context`, and the groups around it
+  - Module discovery loads suites with a context, and `discover.to_suite`
+    keeps the context of each module suite
+
+- **Pending tests for writing test skeletons**
+
+  - `unit.pending(name)` and `unit_context.pending(name)` make a test with
+    a name and no body. Its status is `Pending`: the reporters show it with
+    `~` and count it as pending, and the run still passes
+  - `types.AssertionResult` has the new variant `AssertionPending`
+
+- **A context from a set-up**
+
+  - `unit_context.describe_with_set_up(name:, set_up:, tear_down:,
+    children:)` makes a suite whose context is the value of `set_up`
+  - `steps.new_with_set_up(set_up:, tear_down:)` makes a step registry whose
+    scenarios start from the value of `set_up`. `gherkin/discover.to_suite`
+    runs the set-up one time for the scenarios of all its files.
+    `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
+    that starts as the registry says. Its children are
+    `steps.SuiteChild` values: `Feature(feature)`, `Scenarios(feature)`,
+    `Group(name:, tags:, children:)` and `Node(node)`. The scenarios of
+    every Feature run with the steps of that registry, so a suite of
+    Features cannot mix the steps of one registry with the set-up of
+    another
+  - The set-up runs one time, before the first test, and only when at
+    least one test of the suite runs. The tear-down gets its value after
+    the last test. Both run in one process that lives while the tests run
+  - A failed set-up gives `SetupFailed` to each test, with the operator
+    `suite set-up`, and the tear-down does not run. A crash reads
+    `the suite set-up crashed in <suite>: <reason>`, and a timeout reads
+    `the suite set-up timed out in <suite>`. A failed tear-down is a
+    tear-down failure with the new hook `types.SuiteTearDownHook`, named
+    `suite tear-down` in the reports and in JSON. A set-up whose process
+    stops is a `SetupStopped` with the new hook `types.SuiteSetUpHook`,
+    named `suite set-up`, and each test that did not start gets
+    `not run: the suite set-up of "<suite>" stopped (<reason>)`
+  - `steps.SuiteChild` puts several Features in one suite with one
+    set-up: `Feature(feature)` is a group with the tests of a Feature
+
+- **Line coverage** (`dream_test/coverage`, `runner.coverage`)
+
+  - Opt-in line coverage with the native line counters of the BEAM, which
+    need Erlang/OTP 27 or later with the JIT. The runner prints a coverage
+    table after the results and writes an LCOV file to
+    `build/coverage/lcov.info` (`coverage.lcov_path`, `coverage.no_lcov`)
+  - More than one coverage run can measure in one BEAM, as long as no module
+    is in two runs at the same time. Coverage never stops a process that
+    runs old code of a measured module
+  - A run keeps its modules until `coverage.finish` reads their line
+    counts, or until the process that called `coverage.start` ends. Then
+    another run can measure them
+  - `coverage.source_directory` measures one folder in place of `src`
+  - `coverage.show_missing` adds a `Missing` column with the line ranges that
+    did not run
+  - `coverage.minimum_percent` and `coverage.minimum_percent_per_file` fail
+    the run when the total or one file is below the minimum
+  - `runner.coverage_from_environment` turns coverage on only when
+    `DREAM_TEST_COVERAGE` is `1` or `true`
+  - Every coverage error fails the run with a `Coverage failed` message that
+    gives what failed, the reason and the fix
+  - The line of a function with an `@external(erlang, ...)` attribute is not
+    counted, because Gleam code never calls the wrapper that Gleam compiles
+    for it. A function without the attribute whose body only calls an
+    external is counted
+  - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
+    coverage failure: the passed and failed tests, the tear-down hooks that
+    failed (`teardown_failed`), the set-ups that stopped (`setup_stopped`),
+    and whether the runner exits on failure, for example
+    `Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.`
+  - dream_test measures itself: its own tests cover 100% of the lines in
+    `src`, with no exclusions
+
+- **Coverage exclusions** (`dream_test/coverage`)
+
+  - `coverage.exclude` and `coverage.exclude_with_reason` remove files that
+    match a pattern
+  - `coverage:ignore`, `coverage:ignore-start` / `coverage:ignore-end` and
+    `coverage:ignore-function` comment markers ignore lines, blocks and whole
+    functions in `.gleam` and `.erl` files. Text after a marker is its reason
+  - A marker that cannot apply fails the run with the file and the line,
+    for example a `coverage:ignore` marker that another marker or the end
+    of the file follows before a line of code (`IgnoreLineWithoutCode`)
+  - A count line after the total shows what was excluded.
+    `coverage.show_excluded` adds an `Excluded` column with the reasons, and
+    `coverage.require_exclusion_reasons` fails the run when a reason is missing
+
+- **Coverage table options** (`dream_test/reporters/coverage`)
+
+  - `coverage.color`, `coverage.sort_by_coverage` and `coverage.hide_complete`
+  - `dream_test/reporters/ansi` holds the ANSI colour helpers.
+    `ansi.apply_if` applies a style only when colour is on
+
+- **Coverage output formats** (`dream_test/coverage/*`)
+
+  - JSON (`coverage.json_path`), Cobertura XML (`coverage.cobertura_path`),
+    Markdown (`coverage.markdown_path`) and HTML with annotated source
+    (`coverage.html_path`)
+  - `coverage.html_file` writes the same HTML report as one combined page:
+    the table, then the annotated source of each file, linked from the
+    table. `html.combined` renders it in a custom pipeline
+  - `coverage.html_path` deletes the `files` folder of the HTML directory
+    before it writes new pages, so no page of a removed source file stays
+
+- **Coverage from other BEAM instances** (`coverage.merge_lcov`)
+
+  - Merges LCOV files that match a pattern into the report, for example the
+    file that a separately run application server writes with
+    `coverage.start` and `coverage.finish`
+  - `SF:` paths lose their `.` parts and empty parts, as measured paths
+    do, so `coverage.exclude` also matches a merged file that is written
+    another way. An absolute `SF:` path is a `MalformedLcov` error
+
+- **Coverage without the runner** (`coverage.start`, `coverage.finish`,
+  `coverage.check_minimum`, `coverage.check_minimum_per_file`,
+  `dream_test/coverage/report`)
+
+- **Line accuracy warning**
+
+  - The coverage table warns when a Gleam version before 1.19 built a
+    measured file, because older versions map only the first line of each
+    function to its source line. The warning does not fail the run
+
+- **Coverage badge** (`.github/workflows/ci.yml`, `README.md`,
+  `documentation/12-coverage-badge.md`)
+
+  - A push to `main` publishes the coverage total to `coverage.json` on the
+    `badges` branch. The README shows it as a shields.io badge, with the
+    colour rule of the coverage table
+  - The CI coverage run writes its JSON summary to
+    `build/coverage/coverage.json`
+  - A new guide shows how to set up the same badge in your own repository
+
+- **Run report** (`dream_test/types`)
+
+  - `types.RunReport`, the result of a run: the test results and the
+    tear-down hooks that failed. Make one with
+    `types.run_report(tests:, teardown_failures:)`, read it with
+    `types.report_tests` and `types.report_teardown_failures`, and check it
+    with `types.failed`. `RunReport` is opaque, so it can grow without a
+    breaking change
+  - `types.TeardownFailure(hook:, groups:, message:)` and
+    `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
+    `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
+    `types.teardown_hook_name`
+  - `types.SetupStopped(set_up:, groups:, reason:, not_run:)`, a variant of
+    `types.TeardownFailure` for a set-up that stopped: the process that
+    keeps its set-up alive exited while or after its set-up hooks ran.
+    `not_run` is the full name of each test that had not started and was
+    not run. Also `types.SetUpHook` (`BeforeAllHook`,
+    `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
+    `types.set_up_hook_name`
+  - `types.is_failure(status)`, the one check for a failure status
+    (`Failed`, `SetupFailed`, `TimedOut`)
+  - `types.full_name(groups, name)` gives the full name of a test
+  - `types.Callback(input, output)` (`NoInput` and `WithInput`) and
+    `types.call`. A test body or hook in a `Node` keeps the shape that the
+    user wrote: `unit.before_all(setup)` stores `BeforeAll(NoInput(setup))`,
+    and `unit_context.before_all(setup)` stores
+    `BeforeAll(WithInput(setup))`
+
+- **Parallel runner** (`dream_test/parallel`)
+
+  - `parallel.OuterSetup`: a set-up around the suite that keeps its
+    resources alive in a process, for example the `before_all_suites` or
+    `before_each_suite` set-up. It is
+    `SetupRunning(set_up:, groups:, check_setup_process:)` or
+    `SetupStopped(set_up:, groups:, reason:, not_run:)`. The executor checks
+    each one before each test and each group starts
+
+- **Sandbox** (`dream_test/sandbox`)
+
+  - `sandbox.run_in_setup_process`, `sandbox.check_setup_process` and `sandbox.stop_setup_process`
+    with the types `sandbox.SetupProcess` and `sandbox.SetupProcessResult`. A setup
+    process runs functions one after another with a timeout for each, and
+    stays alive between them, so a pool or an ETS table that one function
+    starts lives for the next function. `sandbox.SetupProcessLost(reason)` says
+    that the setup process stopped before it started the function. Any process can
+    use a setup process, and a setup process that stopped is never waited for: after
+    `check_setup_process` gives `Error`, `run_in_setup_process` gives `SetupProcessLost` and
+    `stop_setup_process` returns at once. When a function times out, the setup process is
+    killed and `run_in_setup_process` returns only after the setup process has exited
+  - `sandbox.kill_and_wait(pid)` kills a process and returns when it has
+    exited, so its ETS tables and its registered name are free. The runner
+    uses it for each process that times out, so a tear-down hook never
+    starts while the process that timed out still holds a resource
+  - `sandbox.run_catching(run:, input:)` runs a function in the calling
+    process and gives `Ok(value)`, or `Error("class:reason")` when the
+    function crashes
+  - `sandbox.format_exit_reason` gives the text of a process exit reason, in
+    the same form that `run_isolated` and the parallel runner use for a
+    crash (`"normal"`, `"killed"`, `"the process had already stopped"`
+    for a monitor of a process that was gone, or the inspected reason)
+
+- **Reporters**
+
+  - `dream_test/reporters/summary` gives the summary line of the BDD and
+    Gherkin reporters (`summary.format` and `summary.format_in_color`) and
+    the counts behind it (`summary.count`, which gives `summary.Counts`)
+  - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
+    `Set-up and tear-down failures:` section of the BDD and Gherkin
+    reporters, from `types.report_teardown_failures(report)`
+  - `gherkin.format_scenarios` gives the feature and scenario lines of the
+    Gherkin reporter without the summary line
+  - `progress.line` and `progress.ProgressEvent` (`RunStartedProgress`,
+    `TestFinishedProgress`, `RunFinishedProgress`) give the text of the
+    progress bar for the start of a run, a finished test, or the end of a
+    run
+
+- **Typed Gherkin scenario state** (`dream_test/gherkin/steps`)
+
+  - `steps.new(initial:)` takes the state that each scenario starts from
+  - `StepContext.scenario_id` gives the id of the scenario, unique in
+    the run
+  - `steps.validate` returns the duplicate step definitions of a registry,
+    one line for each
+
+- **Gherkin conformance** (`dream_test/gherkin/*`)
+
+  - Conformance tests from the official Gherkin test files: 37 good files
+    parse to the official structure, 12 bad files give the official error
+    line, and 8 good files that dream_test rejects on purpose give the
+    dream_test error. The fixture README lists the skipped files and the
+    reasons
+  - `Rule:` sections. `gherkin/types.Rule` holds the name, description,
+    tags, an optional Background and the scenarios of a Rule. The steps of
+    the Feature Background run first, then the steps of the Rule
+    Background, then the scenario steps. Each Rule runs as a group named
+    `Rule: <name>`, and the Gherkin reporter prints the Rule as a heading
+    under its feature
+  - More than one `Examples` section for each scenario.
+    `gherkin/types.Examples` holds the name, description, tags and table of
+    a section, and every row of every section runs. The tags of a section
+    apply to the tests that its rows make. N in `(Example N)` counts the
+    rows of all sections, from 1
+  - The `*` step keyword. In a `.feature` file, `* I pack a passport` is a
+    step. In the inline DSL, `feature.asterisk("I pack a passport")` makes
+    one. A `*` step takes the phase of the step before it, like `And` and
+    `But`
+  - The English keyword synonyms: `Business Need:` and `Ability:` for
+    `Feature:`, `Example:` for `Scenario:`, `Scenario Template:` for
+    `Scenario Outline:`, `Scenarios:` for `Examples:`, and the
+    ```` ``` ```` DocString separator
+  - `gherkin/types.ScenarioKeyword` and
+    `gherkin/types.scenario_keyword_to_string`: the keyword that starts a
+    scenario
+  - The name and description of a Background, and the description of a
+    scenario, a Rule and an `Examples` section
+  - `gherkin/types.StepPhase` (`GivenPhase`, `WhenPhase`, `ThenPhase`), the
+    phase of a step, which maps to Arrange, Act and Assert.
+    `gherkin/types.resolve_phase` gives the phase of a step from its keyword
+    and the phase before it, and `gherkin/types.phase_to_string` gives the
+    name of a phase
+  - `gherkin/parser.ParseError`, `ParseProblem`, `TokenKind` and
+    `FeatureFileError`: typed parse errors, with one `ParseProblem` variant
+    for each kind of problem. `parser.problem_to_string`,
+    `parser.parse_error_to_string`, `parser.feature_file_error_to_string`
+    and `parser.token_kind_to_string` give the messages
+
+### Changed
+
+- Behaviour change: `{float}` matches a number as Cucumber reads it: an
+  optional sign, digits with an optional `.` and digits, or `.` and digits
+  alone, and an optional exponent, for example `20`, `.5`, `-3`, `1e5` and
+  `1.5e-3`. `5.`, `1,000`, `NaN` and `Infinity` do not match. This
+  changes which step matches: `{float}` now wins over `{word}` and `{}`
+  for a whole number such as `20`, and `${float}USD` matches `$20USD`.
+  `{int}` still wins over `{float}`. Before, `{float}` needed a `.`.
+
+- **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)
+
+  - CI and the publish workflows use Gleam 1.19.2. Contributors need
+    Gleam 1.19.0 or later, because coverage line numbers are exact only from
+    1.19 and the coverage self-tests check exact lines
+  - CI also runs the README snippet tests in `examples/snippets`
+
+- **Hook processes and set-ups**
+
+  - A set-up hook and its tear-down hook run only when at least one of
+    the tests that they serve runs, with or without a filter. A group,
+    a suite or a run with no test runs no `before_all`/`after_all`,
+    `before_each_suite`/`after_each_suite` or
+    `before_all_suites`/`after_all_suites`
+  - Each hook still gets the default timeout, and the messages are
+    `hook timed out in <scope>` and `hook crashed in <scope>: ...`
+  - A hook that kills its setup process does not stop the run. The runner
+    monitors the setup process. A tear-down hook that kills its setup process is recorded
+    as `hook crashed in <scope>: <reason>`, and the next hook of the scope
+    runs in a new setup process. A tear-down hook always runs, also when
+    the setup process of its scope stops just before the hook starts
+  - When the setup process of a set-up exits, during or after its set-up
+    hooks, the set-up stopped. It is reported once as `types.SetupStopped`,
+    no other set-up hook of the scope runs, and each test of the scope that
+    did not start is `SetupFailed` with
+    `not run: the set-up from before_all in "<group>" stopped (<reason>)`,
+    `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)`
+    or `not run: the set-up from before_all_suites stopped (<reason>)`. The
+    tear-down hooks of the scope run in a new setup process
+  - The `after_each` and `after_each_test` hooks run when the test process
+    stops, for example when a linked process crashes. They run in a new
+    process with their own timeouts and get the context after the last
+    `before_each` hook that returned. The test keeps its status
+
+- **Reporters**
+
+  - The BDD and Gherkin reporters show a `Set-up and tear-down failures:`
+    section before the summary, also in the BDD summary-only mode, and the summary line adds
+    `N tear-down failed` for failed tear-down hooks and `N set-up stopped`
+    for set-ups whose process stopped. A stopped set-up shows as
+    `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`,
+    then `These tests had not started and were not run:` and the full name
+    of each test, for example `root > b`
+  - The last progress line says `done, 1 tear-down failed` when a tear-down
+    hook failed, and `done, 1 set-up stopped` when a set-up stopped
+    (`progress.RunFinishedProgress` has `teardown_failures` and
+    `setup_stopped`)
+
+- **Gherkin**
+
+  - `gherkin/parser.parse_file` puts the path at the start of a parse
+    error, for example
+    `test/cart.feature: line 3: "And a" has no step before it. ...`
+  - A step line in a feature description, before the first Background or
+    Scenario, is description text. Before, a `Given`, `When`, `Then`,
+    `And` or `But` line there was dropped. A `* ` list item in a
+    description stays description text
+
+### Removed
+
+- `dream_test/gherkin/world` (`put`, `get`, `get_or`, `has`, `delete`,
+  `scenario_id`, `new_world`, `cleanup`)
+- `gherkin/steps.step`, `gherkin/steps.when_`, `gherkin/steps.then_` and
+  the `StepHandler` type
+- `gherkin/types.resolve_keyword`, `gherkin/types.StepArgument` and the
+  `ScenarioOutline` variant of `gherkin/types.Scenario`
+- `runner.has_failures`
+- `reporters/types.ReporterEvent`, `reporters/types.HookKind`,
+  `reporters/types.HookOutcome` and `progress.handle_event`
+- `types.ModuleCoverage` and `types.CoverageSummary`
+- BREAKING: `types.TestKind.Integration`. No test ever had this kind. Tag
+  integration tests with `unit.with_tags` and select them with
+  `runner.filter_tests`
+- BREAKING: the alias `types.TestSuiteItem`. Use `types.Node`
+- BREAKING: the module `dream_test/context` (`TestContext`, `new`,
+  `failures`, `add_failure`). Nothing in Dream Test used it
+
+### Fixed
+
+- A number with a comma, such as `1,000` or `1,5`, does not match
+  `{float}`. Before, `total 1,000` matched `total {float}` with the value
+  `1.0`, and `1,5` gave `1.5`.
+- The progress line of a run with no tests shows `0/0` and `100%`.
+  Before, it showed `0/1` and `0%`.
+- Pretty JSON keeps a string that starts with a combining mark, such as
+  a test name that starts with U+0301. Before, the mark joined the
+  opening quote, and the rest of the output had the wrong layout.
+- A process that a test starts and links to its test process, such as
+  the actor of `process.start_counter` or `process.start_actor`, stops
+  when the test ends, as the `dream_test/process` docs say. The test
+  process exits with reason `shutdown`. Before, a linked process that did
+  not trap exits stayed alive after a test that passed, failed or crashed.
+- A process that a suite set-up or a `before_all` hook starts and links
+  to its setup process stops when the setup process stops. The setup
+  process exits with reason `shutdown`. Before, it exited with reason
+  `normal`, and a linked process that did not trap exits stayed alive
+  after the run.
+- `process.await_ready` and `process.await_some` measure the timeout on
+  the monotonic clock. `interval_ms: 0` no longer waits forever, and the
+  time in the check counts toward the timeout.
+- `discover.load` gives an error that names the module when `tests()`
+  returns a value that is not a test suite. Before, the whole run crashed.
+  The error text of a `tests()` that crashes, and of a pattern that cannot
+  be searched, now has the real cause, for example
+  `tests() crashed: error:...` in place of `call_tests_failed`.
+- `sandbox.run_isolated` gives `SandboxTimedOut` only after the process
+  that timed out has exited, so what it held is free when the call
+  returns.
+- The capture helpers of `dream_test/gherkin/steps` (`get_int`,
+  `get_float`, `get_string`, `get_word`) give an error that names the
+  capture. Before: `Capture at index is not an integer` and
+  `No capture at index`. After:
+  `Capture 0 is the word "apples", not an integer` and
+  `No capture at index 2: the step has 1 capture`.
+- A resource that a group `before_all` hook starts lives for the tests of
+  the group. Before, the hook ran in a short-lived process, so a pool that
+  links to its caller (for example a supervisor) and an ETS table stopped
+  before the first test ran.
+- A resource that a `before_each` hook starts lives for the body and the
+  `after_each` hooks of the test. Before, a pool and an ETS table stopped
+  before the body ran.
+- A crash in a suite-level hook (`before_all_suites`, `before_each_suite`,
+  `after_each_suite`, `after_all_suites`) does not stop the whole run. The
+  runner records it as a failure of that hook, with the message
+  `hook crashed: <reason>` or `hook crashed in <suite>: <reason>`.
+- A suite-level hook or a group `before_all` or `after_all` hook that never
+  returns does not stop the run. A set-up hook gives `SetupFailed` with
+  `hook timed out` or `hook timed out in <scope>`, and a tear-down hook
+  gives a tear-down failure with the same message.
+- `match_snapshot` and `match_snapshot_inspect` ignore a CRLF (`\r\n`)
+  line end at the end of a snapshot file, as they already did for `\n` and
+  `\r`. Before, a snapshot file saved with Windows line ends did not match
+  the same text.
+- `file.delete_files_matching` and `snapshot.clear_snapshots_in_directory`
+  read the directory name as text. Before, they made a wildcard pattern
+  from the name, so a name with `{`, `[`, `*` or `?` gave a `badpattern`
+  error or deleted files in other directories.
+- `timing.format_duration_us` gives `"0.0ms"` for a negative duration, the
+  same as for `0`. Before, it gave text such as `"0.-5ms"`.
+- `sandbox.run_isolated` without crash reports gives `SandboxCrashed` when
+  an exit signal stops the worker, for example when a linked process
+  crashes. Before, it waited for the full timeout and gave
+  `SandboxTimedOut`.
+- `sandbox.run_isolated` waits only for the down message of its own worker,
+  and removes that message when it returns. Before, with crash reports on,
+  it left the down message in the mailbox, and a later call in the same
+  process took it and gave `SandboxCrashed("normal")`.
+- `sandbox.run_isolated` without crash reports gives the crash reason of
+  `SandboxCrashed` as a `String`. Before, it was an Erlang charlist, so the
+  parallel runner crashed when it put the reason of a crashed hook in its
+  error text.
+- The BDD reporter without colour writes the skipped, pending, timed out
+  and setup failed counts of its summary as plain text. Before, it put ANSI
+  colour codes around these counts, also when colour was off.
+- The Gherkin reporter writes the failures of a timed out scenario, for
+  example `timeout` with its message, under the scenario line. Before, it
+  showed only the `!` marker and no reason.
+- The Gherkin reporter uses the feature name for the `Feature:` line of a
+  discovered feature. Before, it used the suite name.
+- Pretty JSON (`json.format_pretty`, `json.report_pretty` and the JSON
+  reporter with `pretty`) writes an empty list as `[]`. Before, it wrote
+  `[`, a line of spaces, and `]`. Compact JSON does not change.
+- A Gherkin step can have both a DataTable and a DocString, in either
+  order, as in the official Gherkin grammar. The step definition gets both,
+  in `context.table` and `context.doc_string`. Before, the parser kept one
+  argument and dropped the other without a message.
+- A step with two DocStrings is the error
+  `Step cannot have more than one DocString` (`RepeatedDocString`). Before,
+  the parser kept the second DocString and dropped the first without a
+  message.
+- The parser gives an error for a DocString that has no closing `"""`.
+  Before, the DocString took all the lines to the end of the file, and the
+  parser dropped the scenarios in those lines without a message.
+- The parser removes the indentation of the opening `"""` from each
+  DocString line, as standard Gherkin does. A line with less indentation
+  loses only the indentation it has. Before, each line kept all its
+  indentation.
+- The parser reads `Background: <name>` and `Examples: <name>`, and keeps
+  the name in `Background.name` and `Examples.name`. Before, the parser
+  ignored a line with a name, so the background steps went to no
+  background and the Examples rows went to no table.
+- The values of an `Examples` row replace the `<header>` placeholders in
+  the scenario name, the DocStrings (content and media type) and the
+  DataTable cells, as in the official Gherkin compiler. Before, only the
+  step text changed, so a test was named `the <one>` in place of
+  `the un (Example 1)`. The headers replace in column order, so with two
+  columns of the same name the first column wins.
+- A scenario with no steps runs no Background steps, as in the official
+  Gherkin compiler. Before, a failing Background step failed a scenario
+  with no steps.
+- The Feature tags appear one time in the tags of a Gherkin test. Before, a
+  test of a Feature tagged `@f` with a scenario tagged `@s` had the tags
+  `["f", "f", "s"]`. Now it has `["f", "s"]`. The order is Feature, Rule,
+  scenario, `Examples`.
+- A DocString line unescapes each escaped separator of the active
+  separator, as the official Gherkin parser does: `\"\"\"` becomes `"""`
+  inside a `"""` DocString, and `` \`\`\` `` becomes ```` ``` ```` inside a
+  ```` ``` ```` DocString. Before, the backslashes stayed in the content.
+- A table cell can be empty. Before, `| a | | b |` gave `["a", "b"]`. Now
+  it gives `["a", "", "b"]`.
+- A table cell unescapes `\|`, `\\` and `\n`. The text before the first `|`
+  and after the last `|` of a row is not a cell.
+- A table row with a different number of cells than the first row of its
+  table is an `InconsistentCellCount` error.
+- A step pattern matches its own text. Before, `I enable 2FA` and
+  `I click "Save changes"` matched no step, and `the user is {word}` did
+  not match `the user is user42`.
+- Step lookup finds a match whenever one exists. Before, with
+  `I have {int} items` and `I have 5 apples`, the text `I have 5 items`
+  matched no step, because lookup took the literal word `5` and did not go
+  back. When two patterns match, a literal word wins over a placeholder.
+- `gherkin/discover.to_suite` gives the full file path as the source of a
+  parse error test. Before, it cut the path at the first `": "`, so a path
+  such as `features/a: b.feature` gave the source `features/a`.
 
 ## [2.1.3] - 2026-07-06
 
@@ -368,7 +1128,7 @@ first shipped in 2.1.3._
 - STANDARDS document for code conventions
 - API documentation for all public modules
 
-[Unreleased]: https://github.com/TrustBound/dream_test/compare/2.1.3...HEAD
+[3.0.0]: https://github.com/TrustBound/dream_test/compare/2.1.3...3.0.0
 [2.1.3]: https://github.com/TrustBound/dream_test/compare/2.1.1...2.1.3
 [2.1.2]: https://github.com/TrustBound/dream_test/compare/2.1.1...7c1daa617e276eef2f7ad4bf470f0ac8dfb634a3
 [2.1.1]: https://github.com/TrustBound/dream_test/compare/2.1.0...2.1.1

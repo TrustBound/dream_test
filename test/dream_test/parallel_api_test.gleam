@@ -1,83 +1,65 @@
+import dream_test/concurrency_probe.{type Probe}
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
-import dream_test/timing
-import dream_test/types.{AssertionFailed, AssertionFailure, AssertionOk}
+import dream_test/types.{type Status, Passed}
 import dream_test/unit.{describe, it}
-import gleam/erlang/process
-import gleam/int
 import gleam/list
-import gleam/option.{None}
-import gleam/string
 
 pub fn tests() {
   describe("dream_test/parallel", [
     it("runs tests in parallel and keeps deterministic ordering", fn() {
-      let suite =
-        describe("p", [
-          it("t1", fn() {
-            process.sleep(100)
-            Ok(AssertionOk)
-          }),
-          it("t2", fn() {
-            process.sleep(100)
-            Ok(AssertionOk)
-          }),
-          it("t3", fn() {
-            process.sleep(100)
-            Ok(AssertionOk)
-          }),
-          it("t4", fn() {
-            process.sleep(100)
-            Ok(AssertionOk)
-          }),
-        ])
+      // In the parallel run, no test goes on until all four run at the same
+      // time, so the run completes only when the runner runs four tests at
+      // the same time. The 2 second timeout is a safety limit: when the
+      // runner runs the tests one by one, the first test times out instead
+      // of the whole test. The serial run must never run two tests at the
+      // same time.
+      let parallel_probe = concurrency_probe.start(4)
+      let par_results =
+        runner.new([probe_suite(parallel_probe)])
+        |> runner.max_concurrency(4)
+        |> runner.default_timeout_ms(2000)
+        |> runner.run()
+        |> types.report_tests
 
-      let t_serial_start = timing.now_ms()
+      let serial_probe = concurrency_probe.start(1)
       let serial_results =
-        runner.new([suite])
+        runner.new([probe_suite(serial_probe)])
         |> runner.max_concurrency(1)
         |> runner.run()
-      let t_serial = timing.now_ms() - t_serial_start
+        |> types.report_tests
 
-      let t_par_start = timing.now_ms()
-      let par_results =
-        runner.new([suite])
-        |> runner.max_concurrency(4)
-        |> runner.run()
-      let t_par = timing.now_ms() - t_par_start
-
-      let _serial_names = list.map(serial_results, fn(r) { r.name })
-      let par_names = list.map(par_results, fn(r) { r.name })
-
-      let order_assertion = case par_names == ["t1", "t2", "t3", "t4"] {
-        True -> AssertionOk
-        False ->
-          AssertionFailed(AssertionFailure(
-            operator: "order",
-            message: "expected deterministic order, got "
-              <> string.inspect(par_names),
-            payload: None,
-          ))
-      }
-
-      case order_assertion {
-        AssertionOk ->
-          case t_serial > t_par + 150 {
-            True -> Ok(AssertionOk)
-            False ->
-              Ok(
-                AssertionFailed(AssertionFailure(
-                  operator: "parallel",
-                  message: "expected parallel run to be significantly faster, serial="
-                    <> int.to_string(t_serial)
-                    <> "ms parallel="
-                    <> int.to_string(t_par)
-                    <> "ms",
-                  payload: None,
-                )),
-              )
-          }
-        _ -> Ok(order_assertion)
-      }
+      #(
+        list.map(par_results, fn(r) { r.name }),
+        statuses(par_results),
+        concurrency_probe.peak(parallel_probe),
+        statuses(serial_results),
+        concurrency_probe.peak(serial_probe),
+      )
+      |> should
+      |> be_equal(#(
+        ["t1", "t2", "t3", "t4"],
+        [Passed, Passed, Passed, Passed],
+        4,
+        [Passed, Passed, Passed, Passed],
+        1,
+      ))
+      |> or_fail_with(
+        "expected four tests at the same time in a deterministic order, and one at a time in the serial run",
+      )
     }),
   ])
+}
+
+fn probe_suite(probe: Probe) {
+  describe("p", [
+    it("t1", fn() { concurrency_probe.run(probe) }),
+    it("t2", fn() { concurrency_probe.run(probe) }),
+    it("t3", fn() { concurrency_probe.run(probe) }),
+    it("t4", fn() { concurrency_probe.run(probe) }),
+  ])
+}
+
+fn statuses(results: List(types.TestResult)) -> List(Status) {
+  list.map(results, fn(r) { r.status })
 }

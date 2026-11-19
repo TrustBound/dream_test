@@ -1,0 +1,1902 @@
+feature "Long feature file"
+  description "  This is a long feature file"
+  scenario "Scenario" "scenario 01"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 02"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 03"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 04"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 05"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 06"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 07"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 08"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 09"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 10"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 11"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 12"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 13"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 14"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 15"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 16"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 17"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 18"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 19"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 20"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 21"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 22"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 23"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 24"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 25"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 26"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 27"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 28"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 29"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 30"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 31"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 32"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 33"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 34"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 35"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 36"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 37"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 38"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 39"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 40"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 41"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 42"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 43"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 44"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 45"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 46"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 47"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 48"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 49"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 50"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 51"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 52"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 53"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 54"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 55"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 56"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 57"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 58"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 59"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 60"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 61"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 62"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 63"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 64"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 65"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 66"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 67"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 68"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 69"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 70"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 71"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 72"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 73"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 74"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 75"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 76"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 77"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 78"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 79"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 80"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 81"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 82"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 83"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 84"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 85"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 86"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 87"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 88"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 89"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 90"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 91"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 92"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 93"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 94"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 95"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 96"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 97"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 98"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 99"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"
+  scenario "Scenario" "scenario 100"
+    step "Given" "a simple data table"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+    step "And" "a data table with a single cell"
+      table
+        row "foo"
+    step "And" "a data table with different fromatting"
+      table
+        row "foo" "bar" "boz"
+    step "And" "a data table with an empty cell"
+      table
+        row "foo" "" "boz"
+    step "And" "a data table with comments and newlines inside"
+      table
+        row "foo" "bar"
+        row "boz" "boo"
+        row "boz2" "boo2"

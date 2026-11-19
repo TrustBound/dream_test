@@ -17,9 +17,15 @@ What changes is the **shape of the suite**:
 
 In practice, “switching” between them is mostly swapping the import:
 
+#### The unit import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/dsl_import.gleam#L2-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/unit.{describe, it}
-// vs
+```
+
+#### The unit_context import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_dsl_import.gleam#L2-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
 import dream_test/unit_context.{describe, it}
 ```
 
@@ -53,7 +59,86 @@ That matters in Gleam because:
 
 This is the “make dependencies explicit” version of hooks: instead of setup functions writing to global state (or relying on process dictionaries), the setup returns a value, and that value is passed into the test body.
 
+### A context from a set-up (`describe_with_set_up`)
+
+Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_set_up` in place of `describe`:
+
+- `set_up` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
+- `tear_down` gets the same value after the last test.
+- Both run in one process that lives while the tests run, so a process that the set-up starts stays alive.
+- When `set_up` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite set-up crashed in Store: <reason>`, and a timeout reads `the suite set-up timed out in Store`.
+- When `tear_down` returns `Error`, crashes or times out, the run report gets a tear-down failure for the hook `suite tear-down`. The report shows `suite tear-down in Store`, then the message, for example `the suite tear-down crashed in Store: <reason>`.
+- When the process of the set-up stops, each test that did not start is `SetupFailed` with `not run: the suite set-up of "Store" stopped (<reason>)`.
+
+#### A suite whose context comes from a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_set_up.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/unit_context.{describe_with_set_up, it}
+import gleam/erlang/process.{type Subject}
+
+pub type Request {
+  Get(reply_to: Subject(Int))
+  Stop
+}
+
+// The set-up starts a process that holds a number. It lives while the tests
+// run, because it runs in the process of the set-up.
+
+fn start_store() -> Result(Subject(Request), String) {
+  let started = process.new_subject()
+  process.spawn(fn() { serve(started) })
+  case process.receive(started, 1000) {
+    Ok(store) -> Ok(store)
+    Error(Nil) -> Error("the store did not start")
+  }
+}
+
+fn stop_store(store: Subject(Request)) -> Result(Nil, String) {
+  process.send(store, Stop)
+  Ok(Nil)
+}
+
+fn serve(started: Subject(Subject(Request))) -> Nil {
+  let requests = process.new_subject()
+  process.send(started, requests)
+  answer(requests)
+}
+
+fn answer(requests: Subject(Request)) -> Nil {
+  case process.receive_forever(requests) {
+    Get(reply_to: reply_to) -> {
+      process.send(reply_to, 42)
+      answer(requests)
+    }
+    Stop -> Nil
+  }
+}
+
+pub fn tests() {
+  describe_with_set_up(
+    "Store",
+    set_up: start_store,
+    tear_down: stop_store,
+    children: [
+      it("gives the number", fn(store: Subject(Request)) {
+        process.call(store, 1000, Get)
+        |> should
+        |> be_equal(42)
+        |> or_fail_with("the store should give 42")
+      }),
+    ],
+  )
+}
+```
+
+### Context suites run with other suites
+
+The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for a run with all three kinds.
+
 ### A minimal example: counter context
+
+#### A counter context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -62,27 +147,27 @@ import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit_context.{before_each, describe, it}
 
-pub type Ctx {
-  Ctx(counter: Int)
+pub type Context {
+  Context(counter: Int)
 }
 
-fn increment(ctx: Ctx) {
-  Ok(Ctx(counter: ctx.counter + 1))
+fn increment_counter(context: Context) {
+  Ok(Context(counter: context.counter + 1))
 }
 
 pub fn suite() {
-  describe("Context-aware suite", Ctx(counter: 0), [
-    before_each(increment),
-    it("receives the updated context", fn(ctx: Ctx) {
-      ctx.counter
+  describe("Context-aware suite", Context(counter: 0), [
+    before_each(increment_counter),
+    it("receives the updated context", fn(context: Context) {
+      context.counter
       |> should
       |> be_equal(1)
       |> or_fail_with("expected counter to be 1 after before_each")
     }),
     // Hook can be repeated; each applies to subsequent tests.
-    before_each(increment),
-    it("sees hook effects for subsequent tests", fn(ctx: Ctx) {
-      ctx.counter
+    before_each(increment_counter),
+    it("sees hook effects for subsequent tests", fn(context: Context) {
+      context.counter
       |> should
       |> be_equal(2)
       |> or_fail_with("expected counter to be 2 after two before_each hooks")
@@ -99,14 +184,14 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/context_aware_tests.gleam)</sub>
-
 ### Grouping + hook scoping (`group`)
 
 `unit_context.group` is the same idea as `unit.group`: it lets you nest structure, and it scopes hooks.
 
 - Hooks declared in an **outer scope** apply inside nested groups.
 - Hooks declared in an **inner group** apply only to tests in that group.
+
+#### Hooks in context-aware groups <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_grouping.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -115,33 +200,33 @@ import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit_context.{before_each, describe, group, it}
 
-pub type Ctx {
-  Ctx(counter: Int)
+pub type Context {
+  Context(counter: Int)
 }
 
-fn inc(ctx: Ctx) {
-  Ok(Ctx(counter: ctx.counter + 1))
+fn increment_counter(context: Context) {
+  Ok(Context(counter: context.counter + 1))
 }
 
 pub fn suite() {
-  describe("Context-aware grouping", Ctx(counter: 0), [
+  describe("Context-aware grouping", Context(counter: 0), [
     // This outer hook applies everywhere under this describe, including groups.
-    before_each(inc),
+    before_each(increment_counter),
 
     group("inner group", [
       // This hook only applies to tests inside this group.
-      before_each(inc),
+      before_each(increment_counter),
 
-      it("sees both outer + inner hooks", fn(ctx: Ctx) {
-        ctx.counter
+      it("sees both outer + inner hooks", fn(context: Context) {
+        context.counter
         |> should
         |> be_equal(2)
         |> or_fail_with("expected counter to be 2 (outer + inner before_each)")
       }),
     ]),
 
-    it("sees only outer hook", fn(ctx: Ctx) {
-      ctx.counter
+    it("sees only outer hook", fn(context: Context) {
+      context.counter
       |> should
       |> be_equal(1)
       |> or_fail_with("expected counter to be 1 (outer before_each only)")
@@ -158,14 +243,12 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/hooks/context_aware_grouping.gleam)</sub>
-
 ### Important Gleam detail: when type inference needs help
 
-In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.world`.
+In a context-aware test, you’ll often access record fields like `ctx.counter` or `context.captures`.
 Gleam can only allow record-field access when it knows the record type, so sometimes you need a minimal type hint:
 
-- `fn my_step(context: StepContext) { ... context.world ... }`
+- `fn my_step(cart: Cart, context: StepContext) { ... context.captures ... }`
 
 That’s not “extra ceremony” — it’s the smallest annotation needed for record field access.
 

@@ -1,16 +1,12 @@
+import dream_test/concurrency_probe.{type Probe}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/parallel
 import dream_test/runner
-import dream_test/timing
-import dream_test/types.{
-  AssertionFailed, AssertionFailure, AssertionOk, Passed, TimedOut,
-}
+import dream_test/types.{AssertionOk, Passed, TimedOut}
 import dream_test/unit.{describe, it, with_tags}
 import gleam/erlang/process
 import gleam/list
-import gleam/option.{None}
 import gleam/result
-import gleam/string
 
 fn is_smoke(info: runner.TestInfo) -> Bool {
   list.contains(info.tags, "smoke")
@@ -20,7 +16,10 @@ pub fn tests() {
   describe("dream_test/runner", [
     it("runs suites and returns results", fn() {
       let suite = describe("s", [it("t", fn() { Ok(AssertionOk) })])
-      let results = runner.new([suite]) |> runner.run()
+      let results =
+        runner.new([suite])
+        |> runner.run()
+        |> types.report_tests
       let assert [r] = results
       r.status |> should |> be_equal(Passed) |> or_fail_with("test should pass")
     }),
@@ -36,6 +35,7 @@ pub fn tests() {
         runner.new([suite])
         |> runner.filter_tests(is_smoke)
         |> runner.run()
+        |> types.report_tests
 
       let assert [r] = results
       r.name
@@ -47,16 +47,13 @@ pub fn tests() {
     it("can add suites with a per-suite execution config override", fn() {
       let ok_suite =
         describe("ok", [
-          it("passes", fn() {
-            process.sleep(20)
-            Ok(AssertionOk)
-          }),
+          it("passes", fn() { Ok(AssertionOk) }),
         ])
 
       let slow_suite =
         describe("slow", [
           it("times out", fn() {
-            process.sleep(200)
+            process.sleep_forever()
             Ok(AssertionOk)
           }),
         ])
@@ -70,11 +67,12 @@ pub fn tests() {
         |> runner.add_suites([ok_suite])
         |> runner.add_suites_with_config(timeout_config, [slow_suite])
         |> runner.run()
+        |> types.report_tests
 
       let assert [r1, r2] = results
 
       use _ <- result.try(
-        r1.full_name
+        types.full_name(r1.groups, r1.name)
         |> should
         |> be_equal(["ok", "passes"])
         |> or_fail_with("expected first suite to run first"),
@@ -98,81 +96,72 @@ pub fn tests() {
     it(
       "per-suite max_concurrency override can mix sequential and parallel suites in one run",
       fn() {
-        let suite_a =
-          describe("parallel_suite", [
-            it("t1", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t2", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t3", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t4", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
+        // A probe with a barrier of 4 lets no test go on until four tests
+        // of its suite run at the same time. Without the override, both
+        // suites run four tests at the same time. With the override, the
+        // sequential suite runs one test at a time while the other suite
+        // still runs four at the same time. The 2 second timeouts are
+        // safety limits that a passing run never reaches.
+        let parallel_a = concurrency_probe.start(4)
+        let parallel_b = concurrency_probe.start(4)
+        let parallel_statuses =
+          runner.new([
+            probe_suite("parallel_suite", parallel_a),
+            probe_suite("sequential_suite", parallel_b),
           ])
-
-        let suite_b =
-          describe("sequential_suite", [
-            it("t1", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t2", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t3", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-            it("t4", fn() {
-              process.sleep(100)
-              Ok(AssertionOk)
-            }),
-          ])
-
-        let t_parallel_start = timing.now_ms()
-        let _ =
-          runner.new([suite_a, suite_b])
           |> runner.max_concurrency(4)
+          |> runner.default_timeout_ms(2000)
           |> runner.run()
-        let t_parallel = timing.now_ms() - t_parallel_start
+          |> types.report_tests
+          |> list.map(fn(r) { r.status })
 
         let seq_config =
-          parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 5000)
+          parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 2000)
 
-        let t_mixed_start = timing.now_ms()
-        let _ =
+        let mixed_a = concurrency_probe.start(4)
+        let mixed_b = concurrency_probe.start(1)
+        let mixed_statuses =
           runner.new([])
-          |> runner.add_suites([suite_a])
-          |> runner.add_suites_with_config(seq_config, [suite_b])
+          |> runner.add_suites([probe_suite("parallel_suite", mixed_a)])
+          |> runner.add_suites_with_config(seq_config, [
+            probe_suite("sequential_suite", mixed_b),
+          ])
           |> runner.max_concurrency(4)
+          |> runner.default_timeout_ms(2000)
           |> runner.run()
-        let t_mixed = timing.now_ms() - t_mixed_start
+          |> types.report_tests
+          |> list.map(fn(r) { r.status })
 
-        case t_mixed > t_parallel + 200 {
-          True -> Ok(AssertionOk)
-          False ->
-            Ok(
-              AssertionFailed(AssertionFailure(
-                operator: "mixed_concurrency",
-                message: "expected mixed run to be slower than fully-parallel run, parallel="
-                  <> string.inspect(t_parallel)
-                  <> "ms mixed="
-                  <> string.inspect(t_mixed)
-                  <> "ms",
-                payload: None,
-              )),
-            )
-        }
+        #(
+          parallel_statuses,
+          concurrency_probe.peak(parallel_a),
+          concurrency_probe.peak(parallel_b),
+          mixed_statuses,
+          concurrency_probe.peak(mixed_a),
+          concurrency_probe.peak(mixed_b),
+        )
+        |> should
+        |> be_equal(#(
+          list.repeat(Passed, 8),
+          4,
+          4,
+          list.repeat(Passed, 8),
+          4,
+          1,
+        ))
+        |> or_fail_with(
+          "expected the sequential suite to run one test at a time only with its override",
+        )
       },
     ),
+  ])
+}
+
+fn probe_suite(name: String, probe: Probe) {
+  describe(name, [
+    it("t1", fn() { concurrency_probe.run(probe) }),
+    it("t2", fn() { concurrency_probe.run(probe) }),
+    it("t3", fn() { concurrency_probe.run(probe) }),
+    it("t4", fn() { concurrency_probe.run(probe) }),
   ])
 }

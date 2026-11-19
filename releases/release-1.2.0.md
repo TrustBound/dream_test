@@ -25,7 +25,7 @@ it("renders user profile", fn() {
 
 **Output:**
 
-```
+```text
 User Profile
   ✓ renders user profile
 

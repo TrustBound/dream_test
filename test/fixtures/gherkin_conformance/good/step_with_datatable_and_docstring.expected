@@ -1,0 +1,13 @@
+feature "Step with DataTable and DocString"
+  scenario "Scenario" "DataTable followed by DocString"
+    step "Given" "a step with both arguments"
+      docstring none "hello"
+      table
+        row "id" "name"
+        row "1" "bob"
+  scenario "Scenario" "DocString followed by DataTable"
+    step "Given" "a step with both arguments"
+      docstring none "hello"
+      table
+        row "id" "name"
+        row "1" "bob"

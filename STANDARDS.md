@@ -11,7 +11,7 @@ This document defines the coding conventions for Dream Test. These are **project
 | Rule                                                                | Summary                                          |
 | ------------------------------------------------------------------- | ------------------------------------------------ |
 | [No nested `case`](#1-no-nested-case-expressions)                   | One `case` per function; extract helpers         |
-| [No closures](#2-no-closures)                                       | All functions defined at module level            |
+| [No closures](#2-no-closures)                                       | Only to start a process or store a callback      |
 | [No anonymous functions](#3-no-anonymous-functions-in-library-code) | Every function gets a name                       |
 | [No abbreviations](#4-no-abbreviated-identifiers)                   | `context` not `ctx`, `failure` not `f`           |
 | [Reserved words](#5-directory-and-module-naming)                    | Don't use `assert` in paths                      |
@@ -84,6 +84,43 @@ pub fn is_less_than(limit, value) {
 
 If you need configurable behavior, use a data type or explicit parameter—not a closure.
 
+If a function runs another function later, for example in a sandbox, give it the function and its input as two parameters. Then the caller passes a named function and its data, and needs no closure. `sandbox.run_isolated(config, run, input)` works this way.
+
+### The two allowed closures
+
+Library code may use a closure only in these two cases:
+
+1. **Process start.** The function given to `spawn` or `spawn_unlinked` can capture the values the new process needs.
+2. **Stored callbacks.** A function that the framework stores and calls later, such as a Gherkin scenario body in a `Node`, can capture the data that a named function needs.
+
+In both cases, the closure body is exactly one call to a named top-level function, as in `fn() { execute_scenario(scenario_id, steps, registry) }`. All logic is in a named function.
+
+Do not write a closure only to change the shape of a user function. A hook or a test body keeps the shape that the user wrote: `unit.before_all(setup)` stores `BeforeAll(NoInput(setup))`, and the runner calls it with `types.call`. If two function types do not match, change the stored type, not the function.
+
+**Why**: A new BEAM process gets its start data only through the function it runs. A stored callback must have the one shape of its record field, and a callback that needs captured data has no other way to get it. No named function can do these two jobs. A body that is one named call keeps the logic named, searchable and visible in stack traces, and the closure only moves data.
+
+❌ **Don't**
+
+```gleam
+spawn_unlinked(fn() {
+  let result = run_test(config, test_case)
+  send(subject, Finished(index: index, result: result))
+})
+```
+
+✅ **Do**
+
+```gleam
+spawn_unlinked(fn() { run_test_worker(input, index, test_case) })
+
+fn run_test_worker(input: WorkerInput, index: Int, test_case: TestCase) -> Nil {
+  let result = run_test(input.config, test_case)
+  send(input.subject, Finished(index: index, result: result))
+}
+```
+
+Erlang FFI follows the same rule: use a list comprehension or `fun name/arity`, not `fun(X) -> ... end`.
+
 ---
 
 ## 3. No Anonymous Functions in Library Code
@@ -114,7 +151,7 @@ fn adds_numbers_test() {
 }
 ```
 
-**Exception**: Test files may use anonymous functions for simple inline test bodies (as shown in the README examples). Library code (under `src/`) must not.
+**Exception**: Test files may use anonymous functions for simple inline test bodies (as shown in the README examples). Library code (under `src/`) must not, except for the [two allowed closures](#the-two-allowed-closures).
 
 ---
 
@@ -165,7 +202,7 @@ pub fn add_failure(context, failure) {
 **Module path conventions**:
 
 ```
-dream_test/context         # Per-test state
+dream_test/suite           # Test suites
 dream_test/matchers        # Matcher API
 dream_test/types           # Shared data types
 dream_test/runner          # Test execution
@@ -234,10 +271,10 @@ import dream_test/types.{TestResult}
 You can import both types and values:
 
 ```gleam
-import dream_test/context.{type TestContext, add_failure}
+import dream_test/types.{type TestResult, full_name}
 ```
 
-This imports `TestContext` as a type and `add_failure` as a function.
+This imports `TestResult` as a type and `full_name` as a function.
 
 ### Handling module name conflicts
 

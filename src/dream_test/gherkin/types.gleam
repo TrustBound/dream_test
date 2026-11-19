@@ -27,10 +27,12 @@ import gleam/option.{type Option}
 /// - `Given` - Describes initial context/preconditions
 /// - `When` - Describes an action
 /// - `Then` - Describes an expected outcome
-/// - `And` / `But` - Continues the previous step type
+/// - `And` / `But` - Continues the previous step
+/// - `Asterisk` - The `*` keyword, which also continues the previous step
 ///
-/// When matching step definitions, `And` and `But` inherit the keyword
-/// type from the previous step (e.g., `And` after `Given` is treated as `Given`).
+/// When matching step definitions, `And`, `But` and `*` take the phase of the
+/// step before them (e.g., `And` after `Given` is matched as a Given step).
+/// See `StepPhase` and `resolve_phase`.
 ///
 pub type StepKeyword {
   Given
@@ -38,60 +40,117 @@ pub type StepKeyword {
   Then
   And
   But
+  /// The `*` keyword. It takes the phase of the step before it.
+  Asterisk
 }
 
-/// Optional argument attached to a step.
+/// The phase of a step: the part of a scenario that the step belongs to.
 ///
-/// Steps can have additional structured data:
+/// Given, When and Then map to Arrange, Act and Assert. Every step definition
+/// belongs to exactly one phase, and a step matches only the definitions of
+/// its phase. `And`, `But` and `*` steps have no phase of their own: they take
+/// the phase of the step before them (see `resolve_phase`).
 ///
-/// ## DocString
+/// ## Example
 ///
-/// Multi-line text enclosed in triple quotes:
+/// ```gleam
+/// resolve_phase(keyword: And, previous: Some(GivenPhase))
+/// |> should
+/// |> be_equal(Ok(GivenPhase))
+/// |> or_fail_with("expected And after Given to be a Given step")
+/// ```
 ///
-/// In Dream Test these values are represented as `DocString(...)`.
-///
-/// ## DataTable
-///
-/// Tabular data with pipe-delimited rows:
-///
-/// In Dream Test these values are represented as `DataTable(...)`.
-///
-pub type StepArgument {
-  /// Multi-line text content.
-  /// - `content` - The text between the triple quotes
-  /// - `content_type` - Optional media type hint (e.g., "json", "xml")
-  DocString(content: String, content_type: Option(String))
+pub type StepPhase {
+  /// Arrange: the context before the action (`Given` steps).
+  GivenPhase
+  /// Act: the action (`When` steps).
+  WhenPhase
+  /// Assert: the expected outcome (`Then` steps).
+  ThenPhase
+}
 
-  /// Tabular data as a list of rows.
-  /// Each row is a list of cell values.
-  /// The first row is typically headers.
+/// Multi-line text after a step, between two `"""` (or two `` ``` ``) lines.
+///
+/// - `content` - The text between the separators
+/// - `content_type` - The media type after the opening separator, if any
+///   (for example `json` in `"""json`)
+///
+/// ## Example
+///
+/// ```gleam
+/// DocString(content: "{\"name\":\"example\"}", content_type: Some("json"))
+/// |> should
+/// |> be_equal(DocString(
+///   content: "{\"name\":\"example\"}",
+///   content_type: Some("json"),
+/// ))
+/// |> or_fail_with("expected DocString to be constructible")
+/// ```
+///
+pub type DocString {
+  DocString(content: String, content_type: Option(String))
+}
+
+/// Table rows after a step, one `| cell | cell |` line for each row.
+///
+/// Each row is a list of cell values. The first row is usually the headers.
+///
+/// ## Example
+///
+/// ```gleam
+/// DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]])
+/// |> should
+/// |> be_equal(
+///   DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]]),
+/// )
+/// |> or_fail_with("expected DataTable to be constructible")
+/// ```
+///
+pub type DataTable {
   DataTable(rows: List(List(String)))
 }
 
 /// A single step in a scenario.
 ///
 /// Steps are the executable units of a scenario. Each step has:
-/// - A keyword (Given/When/Then/And/But)
+/// - A keyword (Given/When/Then/And/But/*)
 /// - Text describing the action
-/// - Optional argument (DocString or DataTable)
+/// - An optional DocString
+/// - An optional DataTable
+///
+/// A step can have both a DocString and a DataTable, in either order, as
+/// in the official Gherkin grammar. A step handler gets them as
+/// `StepContext.doc_string` and `StepContext.table`.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// Step(keyword: Given, text: "I have 1 item", argument: None)
+/// Step(
+///   keyword: Given,
+///   text: "I have 1 item",
+///   doc_string: None,
+///   data_table: None,
+/// )
 /// |> should
-/// |> be_equal(Step(keyword: Given, text: "I have 1 item", argument: None))
+/// |> be_equal(Step(
+///   keyword: Given,
+///   text: "I have 1 item",
+///   doc_string: None,
+///   data_table: None,
+/// ))
 /// |> or_fail_with("expected Step to be constructible")
 /// ```
 ///
 pub type Step {
   Step(
-    /// The step keyword (Given, When, Then, And, But)
+    /// The step keyword (Given, When, Then, And, But, *)
     keyword: StepKeyword,
     /// The step text after the keyword
     text: String,
-    /// Optional DocString or DataTable argument
-    argument: Option(StepArgument),
+    /// The DocString after the step, if any
+    doc_string: Option(DocString),
+    /// The DataTable after the step, if any
+    data_table: Option(DataTable),
   )
 }
 
@@ -99,34 +158,40 @@ pub type Step {
 // Background
 // ============================================================================
 
-/// Background steps that run before each scenario.
+/// Steps that run before each scenario of a Feature or a Rule.
 ///
-/// A Background defines common setup steps that are executed before
-/// every scenario in the feature. It's useful for shared preconditions.
-///
-/// Background steps run before each scenario, as if they were prepended.
+/// A Feature can have one Background. Each Rule can also have one
+/// Background. The steps of a Feature Background run before the steps of a
+/// Rule Background, and both run before the steps of the scenario.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// empty_background()
 /// |> should
-/// |> be_equal(Background(steps: []))
+/// |> be_equal(Background(name: "", description: None, steps: []))
 /// |> or_fail_with("expected empty background")
 /// ```
 ///
 pub type Background {
-  Background(steps: List(Step))
+  Background(
+    /// The text after `Background:`. It is `""` when the line has no name.
+    name: String,
+    /// The free text below the `Background:` line, if there is some.
+    description: Option(String),
+    /// The steps, in file order.
+    steps: List(Step),
+  )
 }
 
 // ============================================================================
-// Examples Table (for Scenario Outline)
+// Examples (for Scenario Outline)
 // ============================================================================
 
-/// Examples table for Scenario Outline.
+/// The table of an `Examples:` section.
 ///
-/// Provides data for parameterized scenarios. Each row generates a
-/// separate scenario instance with placeholders replaced by values.
+/// The first row of the table is the header row. Each other row makes one
+/// scenario, with each `<placeholder>` replaced by the value in its column.
 ///
 /// ## Example
 ///
@@ -145,49 +210,157 @@ pub type ExamplesTable {
   )
 }
 
-// ============================================================================
-// Scenario Types
-// ============================================================================
-
-/// A scenario within a feature.
+/// One `Examples:` (or `Scenarios:`) section of a scenario.
 ///
-/// There are two variants:
-///
-/// A `Scenario` has concrete step text; a `ScenarioOutline` is parameterized
-/// with an examples table and uses `<placeholder>` values in step text.
+/// A scenario can have more than one `Examples` section. Every row of every
+/// section runs. The tags of an `Examples` section apply to the scenarios
+/// that its rows make.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
+/// let table = ExamplesTable(headers: ["quantity"], rows: [["1"]])
 ///
-/// Scenario(name: "Example scenario", tags: [], steps: [step])
+/// Examples(name: "Small", description: None, tags: ["fast"], table: Some(table))
 /// |> should
-/// |> be_equal(Scenario(name: "Example scenario", tags: [], steps: [step]))
+/// |> be_equal(Examples(
+///   name: "Small",
+///   description: None,
+///   tags: ["fast"],
+///   table: Some(table),
+/// ))
+/// |> or_fail_with("expected Examples to be constructible")
+/// ```
+///
+pub type Examples {
+  Examples(
+    /// The text after `Examples:`. It is `""` when the line has no name.
+    name: String,
+    /// The free text below the `Examples:` line, if there is some.
+    description: Option(String),
+    /// The tags on the lines above the `Examples:` line, without the `@`.
+    tags: List(String),
+    /// The table, or `None` when the section has no table rows.
+    table: Option(ExamplesTable),
+  )
+}
+
+// ============================================================================
+// Scenario Types
+// ============================================================================
+
+/// The keyword that starts a scenario.
+///
+/// Gherkin has two synonyms for a scenario and two synonyms for a scenario
+/// outline. The keyword does not change how the scenario runs: a scenario
+/// with `Examples` runs one time for each example row, and a scenario without
+/// `Examples` runs one time.
+///
+/// ## Example
+///
+/// ```gleam
+/// scenario_keyword_to_string(KeywordScenarioOutline)
+/// |> should
+/// |> be_equal("Scenario Outline")
+/// |> or_fail_with("expected Scenario Outline")
+/// ```
+///
+pub type ScenarioKeyword {
+  /// `Scenario:`
+  KeywordScenario
+  /// `Example:`, a synonym for `Scenario:`
+  KeywordExample
+  /// `Scenario Outline:`
+  KeywordScenarioOutline
+  /// `Scenario Template:`, a synonym for `Scenario Outline:`
+  KeywordScenarioTemplate
+}
+
+/// A scenario within a Feature or a Rule.
+///
+/// A scenario with no `examples` runs one time. A scenario with `examples`
+/// runs one time for each row of each `Examples` table, with each
+/// `<placeholder>` in the step text replaced by the value in its column.
+///
+/// ## Example
+///
+/// ```gleam
+/// let step =
+///   Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   )
+/// let scenario =
+///   Scenario(
+///     keyword: KeywordScenario,
+///     name: "Example scenario",
+///     description: None,
+///     tags: [],
+///     steps: [step],
+///     examples: [],
+///   )
+///
+/// scenario.name
+/// |> should
+/// |> be_equal("Example scenario")
 /// |> or_fail_with("expected Scenario to be constructible")
 /// ```
 ///
 pub type Scenario {
-  /// A standard scenario with fixed step values.
   Scenario(
+    /// The keyword that started the scenario
+    keyword: ScenarioKeyword,
     /// The scenario name
     name: String,
-    /// Tags applied to this scenario (e.g., @slow, @wip)
+    /// The free text below the scenario line, if there is some.
+    description: Option(String),
+    /// Tags applied to this scenario (e.g., @slow, @wip), without the `@`
     tags: List(String),
-    /// The steps to execute
+    /// The steps to execute. Outline steps use `<placeholder>` text.
     steps: List(Step),
+    /// The `Examples` sections, in file order
+    examples: List(Examples),
   )
+}
 
-  /// A parameterized scenario expanded from examples.
-  ScenarioOutline(
-    /// The scenario outline name
+// ============================================================================
+// Rule
+// ============================================================================
+
+/// A `Rule:` section of a Feature.
+///
+/// A Rule groups scenarios that show one business rule. A Rule can have its
+/// own Background. Its steps run after the steps of the Feature Background.
+///
+/// ## Example
+///
+/// ```gleam
+/// Rule(name: "Stock", description: None, tags: [], background: None, scenarios: [])
+/// |> should
+/// |> be_equal(Rule(
+///   name: "Stock",
+///   description: None,
+///   tags: [],
+///   background: None,
+///   scenarios: [],
+/// ))
+/// |> or_fail_with("expected Rule to be constructible")
+/// ```
+///
+pub type Rule {
+  Rule(
+    /// The text after `Rule:`. It is `""` when the line has no name.
     name: String,
-    /// Tags applied to this scenario outline
+    /// The free text below the `Rule:` line, if there is some.
+    description: Option(String),
+    /// The tags on the lines above the `Rule:` line, without the `@`.
     tags: List(String),
-    /// The step templates with <placeholder> syntax
-    steps: List(Step),
-    /// The examples table for parameterization
-    examples: ExamplesTable,
+    /// The Background of this Rule, if it has one
+    background: Option(Background),
+    /// The scenarios of this Rule, in file order
+    scenarios: List(Scenario),
   )
 }
 
@@ -199,32 +372,47 @@ pub type Scenario {
 ///
 /// A feature represents a complete `.feature` file containing:
 /// - Metadata (name, description, tags)
-/// - Optional background steps
-/// - One or more scenarios
+/// - An optional Background
+/// - Scenarios that are not in a Rule
+/// - Rules, each with an optional Background and its own scenarios
+///
+/// Gherkin puts these in a fixed order: the Background first, then the
+/// scenarios, then the Rules. The fields keep that order.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let step = Step(keyword: Given, text: "I have 1 item", argument: None)
-/// let scenario = Scenario(name: "Example scenario", tags: [], steps: [step])
+/// let step =
+///   Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   )
+/// let scenario =
+///   Scenario(
+///     keyword: KeywordScenario,
+///     name: "Example scenario",
+///     description: None,
+///     tags: [],
+///     steps: [step],
+///     examples: [],
+///   )
 ///
-/// Feature(
-///   name: "Example feature",
-///   description: None,
-///   tags: [],
-///   background: None,
-///   scenarios: [scenario],
-/// )
-/// |> should
-/// |> be_equal(
+/// let feature =
 ///   Feature(
 ///     name: "Example feature",
+///     source: None,
 ///     description: None,
 ///     tags: [],
 ///     background: None,
 ///     scenarios: [scenario],
-///   ),
-/// )
+///     rules: [],
+///   )
+///
+/// feature.name
+/// |> should
+/// |> be_equal("Example feature")
 /// |> or_fail_with("expected Feature to be constructible")
 /// ```
 ///
@@ -234,20 +422,43 @@ pub type Feature {
     name: String,
     /// Optional source identifier (typically the .feature file path)
     source: Option(String),
-    /// Optional description text below the feature name
+    /// Optional description text below the feature name. Each line keeps
+    /// its leading whitespace, as in the file.
     description: Option(String),
     /// Tags applied to the feature (inherited by all scenarios)
     tags: List(String),
     /// Optional background steps run before each scenario
     background: Option(Background),
-    /// The scenarios in this feature
+    /// The scenarios that are not in a Rule
     scenarios: List(Scenario),
+    /// The Rules, in file order
+    rules: List(Rule),
   )
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/// Convert a ScenarioKeyword to the keyword text used in a `.feature` file.
+///
+/// ## Example
+///
+/// ```gleam
+/// scenario_keyword_to_string(KeywordExample)
+/// |> should
+/// |> be_equal("Example")
+/// |> or_fail_with("expected Example")
+/// ```
+///
+pub fn scenario_keyword_to_string(keyword keyword: ScenarioKeyword) -> String {
+  case keyword {
+    KeywordScenario -> "Scenario"
+    KeywordExample -> "Example"
+    KeywordScenarioOutline -> "Scenario Outline"
+    KeywordScenarioTemplate -> "Scenario Template"
+  }
+}
 
 /// Convert a StepKeyword to its string representation.
 ///
@@ -267,6 +478,7 @@ pub fn keyword_to_string(keyword keyword: StepKeyword) -> String {
     Then -> "Then"
     And -> "And"
     But -> "But"
+    Asterisk -> "*"
   }
 }
 
@@ -290,32 +502,58 @@ pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
     "Then" -> option.Some(Then)
     "And" -> option.Some(And)
     "But" -> option.Some(But)
+    "*" -> option.Some(Asterisk)
     _ -> option.None
   }
 }
 
-/// Resolve And/But to the effective keyword based on previous step.
+/// Find the phase of a step from its keyword and the phase of the step
+/// before it.
 ///
-/// In Gherkin, `And` and `But` inherit meaning from the previous step.
-/// This function resolves them to their effective keyword type.
+/// `Given`, `When` and `Then` give their own phase. `And`, `But` and `*` give
+/// the phase of the step before them, so they need a previous phase. With no
+/// previous phase (`None`), they give `Error(Nil)`: a scenario cannot start
+/// with `And`, `But` or `*` unless a Background step comes before it.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// resolve_keyword(And, Given)
+/// resolve_phase(keyword: And, previous: Some(GivenPhase))
 /// |> should
-/// |> be_equal(Given)
-/// |> or_fail_with("expected And after Given to resolve to Given")
+/// |> be_equal(Ok(GivenPhase))
+/// |> or_fail_with("expected And after Given to be a Given step")
 /// ```
 ///
-pub fn resolve_keyword(
+pub fn resolve_phase(
   keyword keyword: StepKeyword,
-  previous previous: StepKeyword,
-) -> StepKeyword {
+  previous previous: Option(StepPhase),
+) -> Result(StepPhase, Nil) {
   case keyword {
-    And -> previous
-    But -> previous
-    other -> other
+    Given -> Ok(GivenPhase)
+    When -> Ok(WhenPhase)
+    Then -> Ok(ThenPhase)
+    And -> option.to_result(previous, Nil)
+    But -> option.to_result(previous, Nil)
+    Asterisk -> option.to_result(previous, Nil)
+  }
+}
+
+/// Convert a StepPhase to the name of its keyword.
+///
+/// ## Example
+///
+/// ```gleam
+/// phase_to_string(WhenPhase)
+/// |> should
+/// |> be_equal("When")
+/// |> or_fail_with("expected When")
+/// ```
+///
+pub fn phase_to_string(phase phase: StepPhase) -> String {
+  case phase {
+    GivenPhase -> "Given"
+    WhenPhase -> "When"
+    ThenPhase -> "Then"
   }
 }
 
@@ -345,10 +583,10 @@ pub fn empty_examples() -> ExamplesTable {
 /// ```gleam
 /// empty_background()
 /// |> should
-/// |> be_equal(Background(steps: []))
+/// |> be_equal(Background(name: "", description: None, steps: []))
 /// |> or_fail_with("expected empty background")
 /// ```
 ///
 pub fn empty_background() -> Background {
-  Background(steps: [])
+  Background(name: "", description: option.None, steps: [])
 }

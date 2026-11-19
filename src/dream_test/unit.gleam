@@ -5,10 +5,11 @@
 ////
 //// - Tests are written as `it("does something", fn() { ... })`
 //// - Hooks are also **0‑argument** functions (`before_each(fn() { ... })`)
-//// - All hooks/tests return `Result(AssertionResult, String)` so you can abort
-////   early with `Error("message")` when prerequisites fail.
+//// - Test bodies return `Result(AssertionResult, String)`, and hooks return
+////   `Result(Nil, String)`, so you can abort early with `Error("message")`
+////   when prerequisites fail.
 ////
-//// This module builds a `dream_test/types.TestSuite(Nil)` under the hood.
+//// This module builds a `dream_test/suite.TestSuite` under the hood.
 ////
 //// ## When should I use this module?
 ////
@@ -54,9 +55,10 @@
 //// }
 //// ```
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
 }
 import gleam/option.{None}
 
@@ -121,12 +123,12 @@ pub type UnitNode =
 ///
 /// ## Returns
 ///
-/// A `TestSuite(Nil)` you can pass to `runner.new([ ... ])`.
+/// A `TestSuite` you can pass to `runner.new([ ... ])`.
 pub fn describe(
   name name: String,
   children children: List(UnitNode),
-) -> TestSuite(Nil) {
-  Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
+) -> TestSuite {
+  suite.from_tree(Root(seed: Nil, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a suite.
@@ -182,7 +184,7 @@ pub fn describe(
 ///
 /// ## Parameters
 ///
-/// - `name`: the group name (shown in reports and in `runner.TestInfo.full_name`)
+/// - `name`: the group name (shown in reports and in `types.TestInfo.groups`)
 /// - `children`: nested tests/groups/hooks under this group
 ///
 /// ## Returns
@@ -253,13 +255,13 @@ pub fn it(
     name: name,
     tags: [],
     kind: Unit,
-    run: fn(_nil: Nil) { run() },
+    run: NoInput(run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn skipped_test_run() -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
 }
 
@@ -340,7 +342,7 @@ pub fn skip(
         name: name,
         tags: tags,
         kind: kind,
-        run: skipped_test_run,
+        run: NoInput(skipped_test_run),
         timeout_ms: timeout_ms,
         source: source,
       )
@@ -350,9 +352,11 @@ pub fn skip(
 
 /// Run once before any tests in the current suite/group.
 ///
-/// - Runs in a sandboxed process.
-/// - If it returns `Error("message")`, all tests under this scope become
-///   `SetupFailed`.
+/// - Runs in the setup process of the group, so a resource that it starts
+///   (for example a pool that links to the caller, or an ETS table) lives
+///   for all the tests of the group. It gets the default timeout.
+/// - If it returns `Error("message")` or crashes, all tests under this
+///   group become `SetupFailed`, and the `after_all` hooks still run.
 ///
 /// ## Example
 ///
@@ -432,17 +436,14 @@ pub fn skip(
 ///
 /// A `UnitNode` representing a `before_all` hook.
 pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeAll(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeAll(NoInput(setup))
 }
 
 /// Run before each test in the current scope.
 ///
-/// - Runs in a sandboxed process.
+/// - Runs in the process of the test, before the body, so a resource that
+///   it starts lives for the body and the `after_each` hooks. It gets the
+///   default timeout.
 /// - If it returns `Error("message")`, that test becomes `SetupFailed` and the
 ///   body does not run.
 ///
@@ -524,18 +525,18 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing a `before_each` hook.
 pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeEach(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeEach(NoInput(setup))
 }
 
 /// Run after each test in the current scope.
 ///
 /// This is useful for cleanup that must always run (even after assertion
-/// failures).
+/// failures). Every `after_each` hook runs, also after one fails. If it
+/// returns `Error("message")` or crashes, the status of the test does not
+/// change: the run report gets a `types.TeardownFailure` with hook
+/// `AfterEachHook`, and the run fails. It runs in the process of the test
+/// with the default timeout. If the body times out or the test process
+/// stops, it still runs, in a new process.
 ///
 /// ## Example
 ///
@@ -615,10 +616,16 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_each` hook.
 pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterEach(fn(_nil: Nil) { teardown() })
+  AfterEach(NoInput(teardown))
 }
 
 /// Run once after all tests in the current scope.
+///
+/// It runs in the setup process of the group, with the default timeout,
+/// so it can stop a resource that `before_all` started. Every `after_all` hook runs, also
+/// after one fails. If it returns `Error("message")` or crashes, the run
+/// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
+/// group path in `groups`, and the run fails. No test result is added.
 ///
 /// ## Example
 ///
@@ -698,7 +705,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_all` hook.
 pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterAll(fn(_nil: Nil) { teardown() })
+  AfterAll(NoInput(teardown))
 }
 
 /// Attach tags to a node.
@@ -757,4 +764,43 @@ pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
       )
     other -> other
   }
+}
+
+/// Define a pending test: a test with a name and no body yet.
+///
+/// Use it to write the skeleton of a suite first and fill in the tests
+/// later. A pending test has the status `Pending`. The reporters show it
+/// with `~` and count it as pending, and the run still passes, as with a
+/// skipped test.
+///
+/// ## Parameters
+///
+/// - `name`: the test name
+///
+/// ## Returns
+///
+/// A test whose status is `Pending` (`AssertionPending`).
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Cart", [
+///   it("adds an item", adds_an_item),
+///   pending("removes an item"),
+///   pending("empties the cart"),
+/// ])
+/// ```
+pub fn pending(name name: String) -> UnitNode {
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: NoInput(pending_test_run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn pending_test_run() -> Result(AssertionResult, String) {
+  Ok(AssertionPending)
 }

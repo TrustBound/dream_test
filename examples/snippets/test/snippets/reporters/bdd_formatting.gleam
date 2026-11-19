@@ -7,7 +7,7 @@ fn sample_results() -> List(types.TestResult) {
   [
     types.TestResult(
       name: "passes",
-      full_name: ["Example Suite", "passes"],
+      groups: ["Example Suite"],
       status: types.Passed,
       duration_ms: 0,
       tags: [],
@@ -20,7 +20,10 @@ fn sample_results() -> List(types.TestResult) {
 pub fn tests() {
   describe("BDD formatting", [
     it("format returns a report string", fn() {
-      let report = bdd.format(sample_results())
+      let report =
+        bdd.format(
+          types.run_report(tests: sample_results(), teardown_failures: []),
+        )
 
       report
       |> should

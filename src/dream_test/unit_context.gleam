@@ -7,7 +7,9 @@
 //// - `before_all` / `before_each` can transform the context.
 //// - `it` receives the current context.
 ////
-//// This builds a `dream_test/types.TestSuite(context)` under the hood.
+//// This builds a `dream_test/suite.TestSuite` under the hood. The context
+//// stays inside the suite, so a context suite runs with other suites in
+//// one `runner.new`.
 ////
 //// ## When should I use this?
 ////
@@ -53,9 +55,11 @@
 //// }
 //// ```
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
+  AssertionSkipped, BeforeAll, BeforeEach, ContextFromSetUp, Group, NoInput,
+  Root, Test, Unit, WithInput,
 }
 import gleam/option.{None}
 
@@ -73,7 +77,8 @@ pub type ContextNode(context) =
 ///
 /// ## Returns
 ///
-/// A `TestSuite(context)` you can run with `dream_test/runner`.
+/// A `TestSuite` you can run with `dream_test/runner`, also in one run with
+/// suites of other context types.
 ///
 /// ## Example
 ///
@@ -116,8 +121,8 @@ pub fn describe(
   name name: String,
   seed seed: context,
   children children: List(ContextNode(context)),
-) -> TestSuite(context) {
-  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
+) -> TestSuite {
+  suite.from_tree(Root(seed: seed, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a context-aware suite.
@@ -247,7 +252,7 @@ pub fn it(
     name: name,
     tags: [],
     kind: Unit,
-    run: run,
+    run: WithInput(run),
     timeout_ms: None,
     source: None,
   )
@@ -315,38 +320,54 @@ pub fn skip(
     name: name,
     tags: [],
     kind: Unit,
-    run: skipped_test_run,
+    run: WithInput(skipped_test_run),
     timeout_ms: None,
     source: None,
   )
 }
 
 /// Run once before any tests and produce/transform the context.
+///
+/// It runs in the setup process of the group, so a resource that it starts
+/// lives for all the tests of the group. It gets the default timeout. If it
+/// returns `Error`, times out or crashes, all tests under this group become
+/// `SetupFailed`.
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
-  BeforeAll(setup)
+  BeforeAll(WithInput(setup))
 }
 
 /// Run before each test and transform the context for that test.
 pub fn before_each(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
-  BeforeEach(setup)
+  BeforeEach(WithInput(setup))
 }
 
 /// Run after each test for cleanup.
+///
+/// If it returns `Error` or crashes, the status of the test does not change:
+/// the run report gets a `types.TeardownFailure`, and the run fails. If the
+/// body times out or the test process stops, it still runs, in a new
+/// process, with the context after the last `before_each` hook that
+/// returned.
 pub fn after_each(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
-  AfterEach(teardown)
+  AfterEach(WithInput(teardown))
 }
 
 /// Run once after all tests for cleanup.
+///
+/// It runs in the setup process of the group, with the default timeout.
+/// Every `after_all` hook
+/// runs, also after one fails. A failure goes into the tear-down failures of
+/// the run report, and the run fails.
 pub fn after_all(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
-  AfterAll(teardown)
+  AfterAll(WithInput(teardown))
 }
 
 /// Attach tags to a node.
@@ -419,4 +440,95 @@ pub fn with_tags(
 
 fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
+}
+
+/// Create a suite whose context comes from a set-up.
+///
+/// `set_up` runs once, before the first test of the suite, and only when
+/// at least one test of the suite runs. Its value is the context of every
+/// hook and test. `tear_down` gets the same value after the last test. The
+/// set-up and the tear-down run in one process that lives while the tests
+/// run, so a process that the set-up starts and links stays alive.
+///
+/// - When `set_up` returns `Error`, crashes or times out, each test is
+///   `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run.
+/// - When the process of the set-up stops, the tests that did not start
+///   are `SetupFailed`, and the run report gets a `types.SetupStopped` with
+///   the set-up `types.SuiteSetUpHook`. `tear_down` still runs when the
+///   set-up returned.
+/// - When `tear_down` returns `Error`, crashes or times out, the run report
+///   gets a `types.TeardownFailure` with the hook `types.SuiteTearDownHook`.
+///
+/// ## Parameters
+///
+/// - `name`: the suite name (shown in reports)
+/// - `set_up`: gives the context, or `Error` with a message
+/// - `tear_down`: gets the context after the last test
+/// - `children`: tests, groups and hooks that get the context
+///
+/// ## Returns
+///
+/// A `TestSuite` you can run with other suites in one `runner.new`.
+///
+/// ## Example
+///
+/// ```gleam
+/// describe_with_set_up(
+///   "Server",
+///   set_up: start_server,
+///   tear_down: stop_server,
+///   children: [it("answers a ping", answers_a_ping)],
+/// )
+/// ```
+pub fn describe_with_set_up(
+  name name: String,
+  set_up set_up: fn() -> Result(context, String),
+  tear_down tear_down: fn(context) -> Result(Nil, String),
+  children children: List(ContextNode(context)),
+) -> TestSuite {
+  suite.new(
+    name: name,
+    tags: [],
+    children: children,
+    context: ContextFromSetUp(set_up: set_up, tear_down: tear_down),
+  )
+}
+
+/// Define a pending test: a test with a name and no body yet.
+///
+/// Use it to write the skeleton of a suite first and fill in the tests
+/// later. A pending test has the status `Pending`. The reporters show it
+/// with `~` and count it as pending, and the run still passes, as with a
+/// skipped test.
+///
+/// ## Parameters
+///
+/// - `name`: the test name
+///
+/// ## Returns
+///
+/// A test whose status is `Pending` (`AssertionPending`).
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Cart", [
+///   it("adds an item", adds_an_item),
+///   pending("removes an item"),
+///   pending("empties the cart"),
+/// ])
+/// ```
+pub fn pending(name name: String) -> ContextNode(context) {
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: NoInput(pending_test_run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn pending_test_run() -> Result(AssertionResult, String) {
+  Ok(AssertionPending)
 }

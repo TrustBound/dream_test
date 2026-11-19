@@ -34,6 +34,8 @@ Use `max_concurrency` and `default_timeout_ms` to tune execution:
 - **Higher concurrency** speeds up independent tests.
 - **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
 
+#### Concurrency and timeouts <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
@@ -63,11 +65,11 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/runner_config.gleam)</sub>
-
 ### Sequential execution (when shared resources matter)
 
 When tests share external state, you often want `max_concurrency(1)` to avoid flakiness.
+
+#### Sequential execution <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/sequential_execution.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -106,18 +108,65 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/sequential_execution.gleam)</sub>
+### Suites with different contexts in one run
+
+`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
+
+To make a suite from a `types.Root` that you build yourself, use `suite.from_tree`.
+
+To make one suite from several suites, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
+
+- `suite.group(name:, suites:)` puts each suite in a group named `name`. The group name is the first name of each test: `["Shop", "Cart", "starts empty"]`.
+- `suite.join(name:, suites:)` adds no group. Each test keeps its own names: `["Cart", "starts empty"]`. The runner sees one suite named `name`, so `before_each_suite` runs one time for all of them.
+
+`discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
+
+A discovery pattern that matches no test module is a load error (`<pattern>: no test module matches the pattern`), and so is a test module that does not load (`<module>: cannot load the module: <reason>`). Each load error is a failing test, so a wrong pattern never gives a run that passes with no tests.
+
+#### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// Each suite becomes a group inside "Shop".
+pub fn grouped() -> TestSuite {
+  suite.group(name: "Shop", suites: [cart_suite(), stock_suite()])
+}
+```
+
+#### Join suites in one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L29-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// One suite named "Shop" that holds both suites as they are.
+pub fn joined() -> TestSuite {
+  suite.join(name: "Shop", suites: [cart_suite(), stock_suite()])
+}
+```
 
 ### Mixed execution policies (per-suite concurrency/timeout)
 
 If only *some* suites share external state (for example: database suites) you don’t need two separate runners.
 Instead, run everything in one runner and apply an execution config override to the suites that need it.
 
+#### Execution config for each suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/suite_specific_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
+import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
+import dream_test/unit.{describe, it}
+
+fn unit_tests() {
+  describe("Unit suite", [
+    it("is fast", fn() { Ok(succeed()) }),
+  ])
+}
+
+fn db_tests() {
+  describe("DB suite (sequential)", [
+    it("pretend db test", fn() { Ok(succeed()) }),
+  ])
+}
 
 pub fn main() {
   let db_config =
@@ -135,8 +184,6 @@ pub fn main() {
 }
 ```
 
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/suite_specific_config.gleam)</sub>
-
 ### Runner hooks (test/suite/run)
 
 Runner hooks let you apply setup/teardown **across suites** without modifying
@@ -146,9 +193,9 @@ about what is running.
 **`types.TestInfo` fields**:
 
 - `name`: leaf test name (`it("...")`)
-- `full_name`: group path + test name (e.g. `["outer", "inner", "leaf"]`)
+- `groups`: the names of the groups around the test, outermost first (e.g. `["outer", "inner"]`). `types.full_name(info.groups, info.name)` gives the group path + test name (e.g. `["outer", "inner", "leaf"]`).
 - `tags`: effective tags (includes inherited group tags)
-- `kind`: `types.TestKind` (Unit, GherkinScenario(id), etc.)
+- `kind`: `types.TestKind` (Unit, GherkinScenario(scenario_id:, rule:), etc.)
 - `source`: best-effort origin string (see below)
 
 **`types.SuiteInfo` fields**:
@@ -159,15 +206,23 @@ about what is running.
 
 **Hook signatures**:
 
-- `before_each_test` / `after_each_test` receive `types.TestInfo`.
+- `before_each_test` / `after_each_test` receive `types.TestInfo` and return `Result(Nil, String)`. They do not get the context of the test: the suites of one run can have different context types, and each suite keeps its own context.
 - `before_each_suite` / `after_each_suite` receive `types.SuiteInfo`.
 - `before_all_suites` / `after_all_suites` receive the full list of `SuiteInfo` after filtering.
+
+**Failures and where the hooks run**:
+
+- A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
+- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining tear-down hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
+- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out`, and the run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
 
 `source` is best-effort:
 
 - Unit discovery suites use the **module name**.
 - Gherkin discovery suites use the **.feature path**.
 - Manually constructed suites use `None`.
+
+#### Runner hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_hooks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -205,17 +260,17 @@ fn before_each_suite_hook(suite: SuiteInfo) -> Result(Nil, String) {
   Ok(Nil)
 }
 
-fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
-  io.println("test: " <> string.join(info.full_name, " > "))
-  Ok(ctx)
+fn before_each_test_hook(info: TestInfo) -> Result(Nil, String) {
+  io.println(
+    "test: " <> string.join(types.full_name(info.groups, info.name), " > "),
+  )
+  Ok(Nil)
 }
 
-fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
+fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
   Ok(Nil)
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/runner/runner_hooks.gleam)</sub>
 
 ### Choosing a concurrency number (practical guidance)
 
@@ -225,23 +280,27 @@ fn after_each_test_hook(_info: TestInfo, _ctx: Nil) -> Result(Nil, String) {
 
 ### Advanced: running the executor directly
 
-Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor.
+Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor. The executor runs a typed tree, a `types.Root(context)`. Build one with `types.root`, not with `unit.describe`, which gives a `TestSuite`.
+
+#### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 import dream_test/parallel
+import dream_test/types
 import dream_test/unit.{describe, it}
 
 pub fn tests() {
   describe("Parallel executor", [
-    it("can run a suite and return a list of results", fn() {
+    it("can run a suite and return a report of the results", fn() {
       let suite =
-        describe("Suite", [
+        types.root("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])
 
       parallel.run_root_parallel(parallel.default_config(), suite)
+      |> types.report_tests
       |> should
       |> have_length(2)
       |> or_fail_with("expected two results")
@@ -249,8 +308,6 @@ pub fn tests() {
   ])
 }
 ```
-
-<sub>🧪 [Tested source](../examples/snippets/test/snippets/utils/parallel_direct.gleam)</sub>
 
 ### What's Next?
 

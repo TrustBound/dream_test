@@ -2,23 +2,24 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/types
 import dream_test/unit.{describe, it}
+import gleam/option.{None}
 
 fn gherkin_result() -> types.TestResult {
   types.TestResult(
     name: "Scenario A",
-    full_name: ["Example Feature", "Scenario A"],
+    groups: ["Example Feature"],
     status: types.Passed,
     duration_ms: 0,
     tags: [],
     failures: [],
-    kind: types.GherkinScenario("example"),
+    kind: types.GherkinScenario(scenario_id: "example", rule: None),
   )
 }
 
 fn unit_result() -> types.TestResult {
   types.TestResult(
     name: "passes",
-    full_name: ["Example Suite", "passes"],
+    groups: ["Example Suite"],
     status: types.Passed,
     duration_ms: 0,
     tags: [],

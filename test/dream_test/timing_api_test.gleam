@@ -20,6 +20,58 @@ pub fn tests() {
       |> or_fail_with("500us should format as 0.5ms")
     }),
 
+    it("format_duration_us formats a negative duration as zero", fn() {
+      timing.format_duration_us(-500)
+      |> should
+      |> be_equal("0.0ms")
+      |> or_fail_with("-500us should format as 0.0ms")
+    }),
+
+    it("format_duration_us formats a negative duration over 1ms as zero", fn() {
+      timing.format_duration_us(-1500)
+      |> should
+      |> be_equal("0.0ms")
+      |> or_fail_with("-1500us should format as 0.0ms")
+    }),
+
+    it("format_duration_ms formats a duration in minutes and seconds", fn() {
+      timing.format_duration_ms(90_000)
+      |> should
+      |> be_equal("1m 30s")
+      |> or_fail_with("90_000 should format as 1m 30s")
+    }),
+
+    it("format_duration_ms formats a duration in whole minutes", fn() {
+      timing.format_duration_ms(120_000)
+      |> should
+      |> be_equal("2m")
+      |> or_fail_with("120_000 should format as 2m")
+    }),
+
+    it("format_duration_ms formats a duration in hours and minutes", fn() {
+      timing.format_duration_ms(5_400_000)
+      |> should
+      |> be_equal("1h 30m")
+      |> or_fail_with("5_400_000 should format as 1h 30m")
+    }),
+
+    it("format_duration_ms formats a duration in whole hours", fn() {
+      timing.format_duration_ms(3_600_000)
+      |> should
+      |> be_equal("1h")
+      |> or_fail_with("3_600_000 should format as 1h")
+    }),
+
+    it(
+      "format_duration_us formats a duration over 1ms with the ms format",
+      fn() {
+        timing.format_duration_us(1_500_000)
+        |> should
+        |> be_equal("1.5s")
+        |> or_fail_with("1_500_000 should format as 1.5s")
+      },
+    ),
+
     it("now_ms is monotonic", fn() {
       let a = timing.now_ms()
       let b = timing.now_ms()

@@ -98,8 +98,12 @@ pub fn format_duration_ms(duration_ms duration_ms: Int) -> String {
 /// ## Returns
 ///
 /// A human-readable duration string (for example `"0.5ms"` or `"42ms"`).
+/// A negative duration gives `"0.0ms"`, the same as `0`.
 pub fn format_duration_us(duration_us duration_us: Int) -> String {
   case duration_us {
+    // Negative: show zero, as for 0
+    us if us < 0 -> "0.0ms"
+
     // Under 1ms: show fractional milliseconds
     us if us < 1000 -> format_sub_millisecond(us)
 
@@ -193,23 +197,11 @@ fn format_hours_minutes(ms: Int) -> String {
   }
 }
 
+/// The value with one decimal place, rounded. The callers never pass a
+/// negative value.
 fn format_float_one_decimal(value: Float) -> String {
-  // Round to one decimal place
-  let rounded = float.round(value *. 10.0) |> int.to_float() |> divide_by_ten
-
-  // Format with one decimal place
-  let whole = float.truncate(rounded)
-  let decimal = float.round({ rounded -. int.to_float(whole) } *. 10.0)
-
-  // Handle edge case where decimal rounds to 10
-  case decimal {
-    10 -> int.to_string(whole + 1) <> ".0"
-    d -> int.to_string(whole) <> "." <> int.to_string(d)
-  }
-}
-
-fn divide_by_ten(value: Float) -> Float {
-  value /. 10.0
+  let tenths = float.round(value *. 10.0)
+  int.to_string(tenths / 10) <> "." <> int.to_string(tenths % 10)
 }
 
 // ============================================================================
