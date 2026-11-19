@@ -914,6 +914,8 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 - A failed set-up hook gives `SetupFailed` to each test that it serves.
 - A failed tear-down hook does not change the status of a test. The other tear-down hooks still run. The failure goes into the tear-down list of the run report, and the run fails.
 
+A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests.
+
 #### A failed `after_all` hook
 
 In 2.x, a failed `after_all`, `after_each_suite` or `after_all_suites` hook added a fake test to the results, with a name such as `<after_all>`. The test count grew by one, and the later hooks of the same kind did not run. In 3.0.0, every hook runs. `types.report_teardown_failures(report)` has one `TeardownFailure` for each failure.

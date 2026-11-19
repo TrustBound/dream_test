@@ -887,7 +887,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   let before_all_result =
     run_suite_level_hooks(
       SuiteSetUp(
-        hooks: builder.runner_before_all_suites,
+        hooks: all_suites_hooks(selected_runs, builder.runner_before_all_suites),
         input: suite_infos,
         scope: [],
         timeout_ms: all_suites_timeout_ms,
@@ -940,7 +940,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   let after_all_failures =
     finish_suite_scope(
       SuiteTearDown(
-        hooks: builder.runner_after_all_suites,
+        hooks: all_suites_hooks(selected_runs, builder.runner_after_all_suites),
         input: suite_infos,
         scope: [],
         timeout_ms: all_suites_timeout_ms,
@@ -1952,25 +1952,60 @@ fn maybe_exit_on_failure(
   }
 }
 
+/// The suite runs that keep at least one test, each with only the tests
+/// that the filter keeps. A suite with no test to run is left out, with or
+/// without a filter, so its suite hooks do not run.
 fn apply_test_filter(
   suite_runs: List(SuiteRun),
   predicate: Option(fn(TestInfo) -> Bool),
 ) -> List(SuiteRun) {
-  case predicate {
-    None -> suite_runs
-    Some(keep) -> list.filter_map(suite_runs, filter_suite_run(_, keep))
+  filter_suite_runs(suite_runs, option.unwrap(predicate, keep_every_test), [])
+}
+
+fn keep_every_test(_info: TestInfo) -> Bool {
+  True
+}
+
+fn filter_suite_runs(
+  suite_runs: List(SuiteRun),
+  keep: fn(TestInfo) -> Bool,
+  kept_rev: List(SuiteRun),
+) -> List(SuiteRun) {
+  case suite_runs {
+    [] -> list.reverse(kept_rev)
+    [suite_run, ..rest] ->
+      filter_suite_runs(
+        rest,
+        keep,
+        add_kept_suite_run(
+          suite_run,
+          list.filter(suite_run.tests, keep),
+          kept_rev,
+        ),
+      )
   }
 }
 
-/// The suite run with only the tests that `keep` keeps, or `Error(Nil)`
-/// when it keeps no test.
-fn filter_suite_run(
+/// Add the suite run with the tests `kept`, when there is at least one.
+fn add_kept_suite_run(
   suite_run: SuiteRun,
-  keep: fn(TestInfo) -> Bool,
-) -> Result(SuiteRun, Nil) {
-  case list.filter(suite_run.tests, keep) {
-    [] -> Error(Nil)
-    kept -> Ok(SuiteRun(..suite_run, tests: kept))
+  kept: List(TestInfo),
+  kept_rev: List(SuiteRun),
+) -> List(SuiteRun) {
+  case kept {
+    [] -> kept_rev
+    _ -> [SuiteRun(..suite_run, tests: kept), ..kept_rev]
+  }
+}
+
+/// The hooks around all suites: none when no suite has a test to run.
+fn all_suites_hooks(
+  suite_runs: List(SuiteRun),
+  hooks: List(hook),
+) -> List(hook) {
+  case suite_runs {
+    [] -> []
+    _ -> hooks
   }
 }
 

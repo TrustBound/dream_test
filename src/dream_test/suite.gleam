@@ -22,7 +22,7 @@ import dream_test/parallel.{
 import dream_test/reporters/progress.{type ProgressReporter}
 import dream_test/types.{
   type Node, type Root, type SuiteContext, type TestInfo, AfterAll, AfterEach,
-  BeforeAll, BeforeEach, ContextFromSetUp, FixedContext, Group, Test, TestInfo,
+  BeforeAll, BeforeEach, FixedContext, Group, Test, TestInfo,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -346,7 +346,7 @@ fn run_tree(
       placed_children(tree.children, place.source),
       list.append(place.groups, [tree.name]),
       tree.tags,
-      tree_keep(tree.context, input.keep),
+      option.unwrap(input.keep, keep_every_test),
     )
   {
     None -> nothing_ran(input)
@@ -372,18 +372,6 @@ fn run_tree(
         ),
         outer_setups: input.outer_setups,
       ))
-  }
-}
-
-/// The filter of a tree. A tree with a set-up always gets one, so it does
-/// not start its set-up when it has no test.
-fn tree_keep(
-  context: SuiteContext(context),
-  keep: Option(fn(TestInfo) -> Bool),
-) -> Option(fn(TestInfo) -> Bool) {
-  case context, keep {
-    ContextFromSetUp(..), None -> Some(keep_every_test)
-    _, _ -> keep
   }
 }
 
@@ -474,22 +462,10 @@ fn collect_children(
   })
 }
 
-/// The children to run: all of them without `keep`, else the tests that
-/// `keep` keeps, with the groups and hooks around them. `None` when `keep`
-/// keeps no test.
+/// The children to run: the tests that `keep` keeps, with the groups and
+/// hooks around them. A group with no kept test is left out, so its hooks
+/// do not run. `None` when `keep` keeps no test.
 fn selected_children(
-  children: List(Node(context)),
-  groups: List(String),
-  tags: List(String),
-  keep: Option(fn(TestInfo) -> Bool),
-) -> Option(List(Node(context))) {
-  case keep {
-    None -> Some(children)
-    Some(keep) -> kept_children(children, groups, tags, keep)
-  }
-}
-
-fn kept_children(
   children: List(Node(context)),
   groups: List(String),
   tags: List(String),

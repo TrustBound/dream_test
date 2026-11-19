@@ -509,6 +509,11 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 - **Hook processes and set-ups**
 
+  - A set-up hook and its tear-down hook run only when at least one of
+    the tests that they serve runs, with or without a filter. A group,
+    a suite or a run with no test runs no `before_all`/`after_all`,
+    `before_each_suite`/`after_each_suite` or
+    `before_all_suites`/`after_all_suites`
   - Each hook still gets the default timeout, and the messages are
     `hook timed out in <scope>` and `hook crashed in <scope>: ...`
   - A hook that kills its setup process does not stop the run. The runner
