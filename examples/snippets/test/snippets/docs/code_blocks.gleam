@@ -4,13 +4,16 @@
 //// - Every Gleam block under a heading with a "Tested snippet" badge is
 ////   the same, byte for byte, as the line range of the snippet file that
 ////   the badge links to.
+//// - Every Gleam block with a "Tested snippet" badge that shows a
+////   `pub fn main()` of a snippet module has that `main` run in a new BEAM.
+////   The `main` must end with exit status 0, or with the status that
+////   `mains_with_other_status` gives.
 //// - Every Gleam file that a "Tested snippet" badge links to is run by a
 ////   test. A file under `examples/snippets/test/snippets/` is run when its
-////   module exports `tests/0`: `snippets_test` discovers
-////   `snippets/**.gleam` and runs the `tests()` of each module, and skips
-////   a module without it. A snippet module with only a `main` must be in
-////   `run_by_snippet_tests`, with a snippet module that exports `tests/0`
-////   and imports it. A Gleam file of another example project must be in
+////   module exports `tests/0`, because `snippets_test` discovers
+////   `snippets/**.gleam` and runs the `tests()` of each module. It is also
+////   run when a block shows its `main`, because the check above runs that
+////   `main`. A Gleam file of another example project must be in
 ////   `run_by_other_projects`.
 //// - Every Gleam block under a "2.x code, from tag 2.1.3" badge is the same
 ////   as that line range at tag 2.1.3. This needs git and the tag; without
@@ -36,22 +39,28 @@ const doc_patterns = [
   "examples/*/README.md",
 ]
 
-/// The folder of the snippet modules, from the root. `snippets_test`
-/// discovers every module under it.
-const snippets_folder = "examples/snippets/test/"
+/// The folder that `snippets_test` discovers (`snippets/**.gleam`), from
+/// the root.
+const discovered_folder = "examples/snippets/test/snippets/"
 
-/// Snippet modules with only a `main`, and the snippet module whose tests
-/// run them, as paths under `examples/snippets/test/`.
-const run_by_snippet_tests = [
-  #(
-    "snippets/runner/discovery_runner.gleam",
-    "snippets/runner/runner_snippets_run.gleam",
-  ),
-  #(
-    "snippets/runner/suite_specific_config.gleam",
-    "snippets/runner/runner_snippets_run.gleam",
-  ),
+/// The folder of the coverage snippets, from the root. Their `main`
+/// functions write files under `build/coverage`, so they run one at a time.
+const coverage_folder = "examples/snippets/test/snippets/coverage/"
+
+/// Snippet files whose `main` ends with a status that is not 0 on purpose,
+/// and the status.
+/// - `coverage_badge.gleam` sets a minimum of 80.0%, and the snippets
+///   project measures its own `src`, which no snippet test covers.
+/// - `coverage_server.gleam` merges the LCOV files of servers, and no
+///   server runs, so no file matches.
+const mains_with_other_status = [
+  #("examples/snippets/test/snippets/coverage/coverage_badge.gleam", 1),
+  #("examples/snippets/test/snippets/coverage/coverage_server.gleam", 1),
 ]
+
+/// The time that one `main` in a new BEAM gets. Starting a BEAM takes
+/// longer than the default test timeout when many start at the same time.
+const main_timeout_ms = 60_000
 
 /// Gleam files of the other example projects that a "Tested snippet" badge
 /// links to. `make examples` runs `gleam test` in each project.
@@ -79,9 +88,14 @@ pub fn tests() {
     it("every tested snippet block matches its snippet file", fn() {
       check_blocks(CurrentCode)
     }),
-    it("every tested snippet file is run by a test", fn() {
-      check_snippets_run()
-    }),
+    it(
+      "every tested snippet file is run by discovery, by its shown main or by another example project",
+      fn() { check_snippets_run() },
+    ),
+    unit.group(
+      "every shown main of a snippet runs with the expected exit status",
+      list.map(shown_mains(), main_test),
+    ),
     old_code_test(git_show(root, old_tag <> ":gleam.toml")),
   ])
 }
@@ -125,16 +139,17 @@ fn check_blocks(code: Code) -> Result(AssertionResult, String) {
 /// Each Gleam file that a "Tested snippet" badge links to, which no test
 /// runs, is an error.
 fn check_snippets_run() -> Result(AssertionResult, String) {
+  let mains = shown_mains()
   docs()
   |> list.flat_map(linked_blocks)
   |> list.filter(is_current_code)
   |> list.map(block_path)
   |> list.unique
-  |> list.filter(is_not_run)
+  |> list.filter(is_not_run(_, mains))
   |> should
   |> be_equal([])
   |> or_fail_with(
-    "give each linked snippet module a pub fn tests(), or list the file in run_by_other_projects",
+    "give each linked snippet module a pub fn tests(), show its pub fn main() in a block, or list the file in run_by_other_projects",
   )
 }
 
@@ -146,45 +161,76 @@ fn block_path(block: LinkedBlock) -> String {
   block.link.path
 }
 
-/// Whether no test runs the file at `path`.
-fn is_not_run(path: String) -> Bool {
-  case string.split_once(path, snippets_folder) {
-    Ok(#("", module_path)) -> !is_run_snippet(module_path)
+/// Whether no test runs the file at `path`. `mains` are the snippet files
+/// whose `main` the main check runs.
+fn is_not_run(path: String, mains: List(String)) -> Bool {
+  case string.split_once(path, discovered_folder) {
+    Ok(#("", module_path)) ->
+      !exports_tests(module_name("snippets/" <> module_path))
+      && !list.contains(mains, path)
     _ -> !list.contains(run_by_other_projects, path)
   }
-}
-
-/// Whether discovery runs the snippet module, or a snippet module that
-/// discovery runs imports it.
-fn is_run_snippet(module_path: String) -> Bool {
-  exports_tests(module_name(module_path))
-  || list.key_find(run_by_snippet_tests, module_path)
-  |> result.map(runs_module(_, module_path))
-  |> result.unwrap(False)
-}
-
-/// Whether the snippet module at `runner_path` exports `tests/0` and
-/// imports the module at `module_path`. A file that cannot be read does
-/// not run it.
-fn runs_module(runner_path: String, module_path: String) -> Bool {
-  exports_tests(module_name(runner_path))
-  && file.read(root <> "/" <> snippets_folder <> runner_path)
-  |> result.map(string.contains(_, "import " <> import_path(module_path)))
-  |> result.unwrap(False)
-}
-
-/// The import path of a Gleam file under `test/`:
-/// `snippets/unit/cart.gleam` is `snippets/unit/cart`.
-fn import_path(module_path: String) -> String {
-  string.replace(module_path, ".gleam", "")
 }
 
 /// The Erlang module name of a Gleam file under `test/`:
 /// `snippets/unit/cart.gleam` is `snippets@unit@cart`.
 fn module_name(module_path: String) -> String {
   module_path
-  |> import_path
+  |> string.replace(".gleam", "")
   |> string.replace("/", "@")
+}
+
+// ---------------------------------------------------------------------------
+// Shown mains
+// ---------------------------------------------------------------------------
+
+/// The snippet files under the discovered folder that a "Tested snippet"
+/// block shows the `main` of, in order, each one time.
+fn shown_mains() -> List(String) {
+  docs()
+  |> list.flat_map(linked_blocks)
+  |> list.filter(is_current_code)
+  |> list.filter(shows_main)
+  |> list.map(block_path)
+  |> list.filter(string.starts_with(_, discovered_folder))
+  |> list.unique
+}
+
+fn shows_main(block: LinkedBlock) -> Bool {
+  list.contains(string.split(block.text, "\n"), "pub fn main() {")
+}
+
+/// A test that runs the `main` of the snippet file at `path` in a new BEAM.
+fn main_test(path: String) -> unit.UnitNode {
+  it(path, fn() { check_main(path) })
+  |> with_timeout(main_timeout_ms)
+}
+
+fn with_timeout(node: types.Node(Nil), timeout_ms: Int) -> types.Node(Nil) {
+  case node {
+    types.Test(..) -> types.Test(..node, timeout_ms: Some(timeout_ms))
+    other -> other
+  }
+}
+
+/// Run the `main` of the snippet file at `path` in a new BEAM, and compare
+/// its exit status with the expected status. The coverage snippets run one
+/// at a time.
+fn check_main(path: String) -> Result(AssertionResult, String) {
+  let module =
+    module_name("snippets/" <> string.replace(path, discovered_folder, ""))
+  let #(status, output) = case string.starts_with(path, coverage_folder) {
+    True -> run_main_in_new_vm_with_coverage_lock(module)
+    False -> run_main_in_new_vm(module)
+  }
+  status
+  |> should
+  |> be_equal(expected_status(path))
+  |> or_fail_with(path <> ": main ended with this output:\n" <> output)
+}
+
+fn expected_status(path: String) -> Int {
+  list.key_find(mains_with_other_status, path) |> result.unwrap(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -454,6 +500,16 @@ fn wildcard(pattern: String, root: String) -> List(String)
 
 @external(erlang, "snippets_doc_blocks_ffi", "exports_tests")
 fn exports_tests(module: String) -> Bool
+
+/// Run `module:main()` in a new `erl` process with the code path of this
+/// test run. Returns the exit status and the output (stdout and stderr).
+@external(erlang, "snippets_doc_blocks_ffi", "run_main_in_new_vm")
+fn run_main_in_new_vm(module: String) -> #(Int, String)
+
+/// `run_main_in_new_vm`, while no other snippet test holds the coverage
+/// lock of `snippets/utils/coverage_lock`.
+@external(erlang, "snippets_doc_blocks_ffi", "run_main_in_new_vm_with_coverage_lock")
+fn run_main_in_new_vm_with_coverage_lock(module: String) -> #(Int, String)
 
 @external(erlang, "snippets_doc_blocks_ffi", "git_show")
 fn git_show(root: String, spec: String) -> Result(String, Nil)
