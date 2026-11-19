@@ -179,15 +179,40 @@ run_measured_main_in_new_vm(Module, Function, Environment) ->
     ),
     run_in_new_vm(Eval, Environment).
 
+%% The new process gets 60 seconds in all, from its start. A worker process
+%% starts it and collects its output. At the deadline, the worker kills the
+%% operating system process of the new BEAM, and the status is -1. When the
+%% calling process stops first, for example because its test timed out, the
+%% worker kills the new BEAM too. Closing the port alone does not stop it.
 run_in_new_vm(Eval, Environment) ->
-    Erl = os:find_executable("erl"),
+    Caller = self(),
+    Ref = make_ref(),
+    {Worker, Monitor} = spawn_monitor(
+        fun() -> run_new_vm_for(Caller, Ref, Eval, Environment) end
+    ),
+    receive
+        {Ref, Result} ->
+            erlang:demonitor(Monitor, [flush]),
+            Result;
+        {'DOWN', Monitor, process, Worker, Reason} ->
+            erlang:error({new_vm_worker_stopped, Reason})
+    end.
+
+%% In the worker: start the new BEAM, collect its output and send the
+%% result to Caller.
+run_new_vm_for(Caller, Ref, Eval, Environment) ->
+    CallerMonitor = erlang:monitor(process, Caller),
+    Deadline = erlang:monotonic_time(millisecond) + 60000,
     Port = open_port(
-        {spawn_executable, Erl},
+        {spawn_executable, os:find_executable("erl")},
         [exit_status, binary, stderr_to_stdout, use_stdio,
-         {env, [environment_entry(Entry) || Entry <- Environment]},
+         {env, [{"ERL_CRASH_DUMP_SECONDS", "0"}
+                | [environment_entry(Entry) || Entry <- Environment]]},
          {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
     ),
-    collect_output(Port, <<>>).
+    {os_pid, OsPid} = erlang:port_info(Port, os_pid),
+    Result = collect_output(Port, OsPid, CallerMonitor, Deadline, <<>>),
+    Caller ! {Ref, Result}.
 
 %% In a new `erl` process: call `Module:Function()`.
 call_main(Module, Function) ->
@@ -231,25 +256,39 @@ start_server_in_new_vm(Module, Function) ->
 
 %% Send one request line and return the reply line. Returns
 %% `{error, Output}` when the server exits or does not reply in 60 seconds.
+%% A server that does not reply in time is killed.
 send_server_request(Port, Request) ->
     true = port_command(Port, [Request, "\n"]),
     receive
         {Port, {data, {eol, Reply}}} -> {ok, Reply};
         {Port, {exit_status, Status}} -> {error, format({exited, Status})}
     after 60000 ->
-        port_close(Port),
-        {error, <<"timed out after 60 seconds">>}
+        {error, <<"timed out after 60 seconds: ",
+                  (kill_text(kill_server(Port)))/binary>>}
     end.
 
 %% Wait for the server to halt and return its exit status, or -1 after 60
-%% seconds.
+%% seconds, when the server is killed. A kill that fails is an error.
 wait_for_server_exit(Port) ->
     receive
         {Port, {exit_status, Status}} -> Status
     after 60000 ->
-        port_close(Port),
-        -1
+        server_killed(kill_server(Port))
     end.
+
+server_killed(killed) ->
+    -1;
+server_killed({kill_failed, Text}) ->
+    erlang:error({kill_of_server_failed, Text}).
+
+%% Kill the operating system process of the server, and close its port.
+kill_server(Port) ->
+    kill_server_with(erlang:port_info(Port, os_pid), Port).
+
+kill_server_with({os_pid, OsPid}, Port) ->
+    kill_new_vm(Port, OsPid);
+kill_server_with(undefined, _Port) ->
+    {kill_failed, <<"the port of the server is already closed">>}.
 
 %% In the server: read one line from standard input, without the newline.
 %% The end of the input is `{error, nil}`.
@@ -260,14 +299,51 @@ read_line() ->
         Line -> {ok, string:trim(unicode:characters_to_binary(Line), trailing, "\n")}
     end.
 
-collect_output(Port, Output) ->
+%% Collect the output of the new BEAM until it exits, until the deadline,
+%% or until the calling process stops.
+collect_output(Port, OsPid, CallerMonitor, Deadline, Output) ->
+    Remaining = max(0, Deadline - erlang:monotonic_time(millisecond)),
     receive
-        {Port, {data, Data}} -> collect_output(Port, <<Output/binary, Data/binary>>);
-        {Port, {exit_status, Status}} -> {Status, Output}
-    after 60000 ->
-        port_close(Port),
-        {-1, <<Output/binary, "\n[timed out after 60 seconds]">>}
+        {Port, {data, Data}} ->
+            collect_output(Port, OsPid, CallerMonitor, Deadline,
+                           <<Output/binary, Data/binary>>);
+        {Port, {exit_status, Status}} ->
+            {Status, Output};
+        {'DOWN', CallerMonitor, process, _Caller, _Reason} ->
+            caller_stopped(kill_new_vm(Port, OsPid))
+    after Remaining ->
+        {-1, <<Output/binary, "\n[timed out after 60 seconds: ",
+               (kill_text(kill_new_vm(Port, OsPid)))/binary, "]">>}
     end.
+
+%% The caller stopped and the new BEAM is killed: stop the worker. A kill
+%% that failed stops the worker with the kill error, so the error shows.
+caller_stopped(killed) ->
+    exit(normal);
+caller_stopped({kill_failed, Text}) ->
+    exit({kill_of_new_vm_failed, Text}).
+
+kill_text(killed) ->
+    <<"the new BEAM was killed">>;
+kill_text({kill_failed, Text}) ->
+    <<"the kill of the new BEAM failed: ", Text/binary>>.
+
+%% Kill the operating system process of the new BEAM, and close its port.
+%% `kill` writes nothing when it succeeds. The port is already closed when
+%% the BEAM ended just before the kill.
+kill_new_vm(Port, OsPid) ->
+    KillOutput = os:cmd("kill -KILL " ++ integer_to_list(OsPid)),
+    try
+        port_close(Port)
+    catch
+        error:badarg -> ok
+    end,
+    kill_result(unicode:characters_to_binary(KillOutput)).
+
+kill_result(<<>>) ->
+    killed;
+kill_result(Text) ->
+    {kill_failed, string:trim(Text)}.
 
 code_path_args() ->
     lists:append([["-pa", Path] || Path <- code:get_path(), is_build_path(Path)]).

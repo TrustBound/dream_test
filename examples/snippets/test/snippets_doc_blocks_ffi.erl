@@ -101,27 +101,44 @@ collect_output(Port, OsPid, CallerMonitor, Deadline, DeadlineMs, Output) ->
         {Port, {exit_status, Status}} ->
             {Status, Output};
         {'DOWN', CallerMonitor, process, _Caller, _Reason} ->
-            kill_new_process(Port, OsPid),
-            exit(normal)
+            caller_stopped(kill_new_process(Port, OsPid))
     after Remaining ->
-        kill_new_process(Port, OsPid),
         Seconds = integer_to_binary(DeadlineMs div 1000),
-        {-1, <<Output/binary, "\n[killed: the main did not stop in ",
-               Seconds/binary, " seconds]">>}
+        {-1, <<Output/binary, "\n[the main did not stop in ", Seconds/binary,
+               " seconds: ", (kill_text(kill_new_process(Port, OsPid)))/binary,
+               "]">>}
     end.
+
+%% The caller stopped and the new process is killed: stop the worker. A
+%% kill that failed stops the worker with the kill error, so the error
+%% shows.
+caller_stopped(killed) ->
+    exit(normal);
+caller_stopped({kill_failed, Text}) ->
+    exit({kill_of_main_failed, Text}).
+
+kill_text(killed) ->
+    <<"killed">>;
+kill_text({kill_failed, Text}) ->
+    <<"the kill failed: ", Text/binary>>.
 
 %% Kill the operating system process of the new BEAM, and close its port.
 %% Closing the port alone does not stop it: the BEAM does not stop at the
-%% end of its standard input. The port is already closed when the process
-%% ended just before the kill.
+%% end of its standard input. `kill` writes nothing when it succeeds. The
+%% port is already closed when the process ended just before the kill.
 kill_new_process(Port, OsPid) ->
-    _ = os:cmd("kill -KILL " ++ integer_to_list(OsPid)),
+    KillOutput = os:cmd("kill -KILL " ++ integer_to_list(OsPid)),
     try
         port_close(Port)
     catch
         error:badarg -> ok
     end,
-    ok.
+    kill_result(unicode:characters_to_binary(KillOutput)).
+
+kill_result(<<>>) ->
+    killed;
+kill_result(Text) ->
+    {kill_failed, string:trim(Text)}.
 
 code_path_args() ->
     lists:append([["-pa", Path] || Path <- code:get_path(), is_build_path(Path)]).
