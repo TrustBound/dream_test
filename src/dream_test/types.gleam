@@ -726,19 +726,25 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 /// - `TeardownFailure(hook, groups, message)`: a tear-down hook failed.
 ///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
 ///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
-///   the group path. For `AfterEachSuiteHook`, the suite name. For
+///   the group path. For `SuiteTearDownHook` (the tear-down of a suite
+///   set-up), the group path of the suite: the groups around it and its
+///   name. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
 /// - `SetupStopped(set_up, groups, reason, not_run)`: a set-up stopped.
 ///   The process that keeps its set-up alive exited while or after its
 ///   set-up hooks ran, for example because a `before_all` hook killed it,
 ///   or a process that the hook linked to it crashed. `set_up` is the
-///   set-up hook. `groups` is the group path for `BeforeAllHook`, the suite
+///   set-up hook. `groups` is the group path for `BeforeAllHook`, the group
+///   path of the suite for `SuiteSetUpHook` (a suite set-up), the suite
 ///   name for `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`.
 ///   `reason` is the exit reason of the process. The tests of the scope
 ///   that had not started are not run: each one is `SetupFailed` with the
 ///   failure `not run: the set-up from <set-up hook> in "<groups>" stopped
-///   (<reason>)`. `not_run` is the full name of each of these tests (see
+///   (<reason>)`, without `in "<groups>"` for `BeforeAllSuitesHook`, or
+///   `not run: the suite set-up of "<suite>" stopped (<reason>)` for
+///   `SuiteSetUpHook`, where `<suite>` is the group path joined with
+///   ` > `. `not_run` is the full name of each of these tests (see
 ///   `full_name`), in the order of the run. The runner records each test
 ///   when it skips it. When a test is in the scope of more than one
 ///   stopped set-up, the outermost one records it. The tear-down hooks of
