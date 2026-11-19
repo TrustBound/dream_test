@@ -108,6 +108,12 @@ pub fn main() {
 }
 ```
 
+### Suites with different contexts in one run
+
+`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
+
+To make a suite from a `types.Root` that you build yourself, use `suite.from_root`. To put suites in one group, use `suite.group`.
+
 ### Mixed execution policies (per-suite concurrency/timeout)
 
 If only *some* suites share external state (for example: database suites) you don’t need two separate runners.
@@ -173,7 +179,7 @@ about what is running.
 
 **Hook signatures**:
 
-- `before_each_test` / `after_each_test` receive `types.TestInfo`.
+- `before_each_test` / `after_each_test` receive `types.TestInfo` and return `Result(Nil, String)`. They do not get the context of the test: the suites of one run can have different context types, and each suite keeps its own context.
 - `before_each_suite` / `after_each_suite` receive `types.SuiteInfo`.
 - `before_all_suites` / `after_all_suites` receive the full list of `SuiteInfo` after filtering.
 
@@ -247,7 +253,7 @@ fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
 
 ### Advanced: running the executor directly
 
-Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor.
+Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor. The executor runs a typed tree, a `types.Root(context)`. Build one with `types.root`, not with `unit.describe`, which gives a `TestSuite`.
 
 #### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

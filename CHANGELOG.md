@@ -230,6 +230,40 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Added
 
+- **Suites with different contexts in one run** (`dream_test/suite`)
+
+  - Every suite has the type `suite.TestSuite`, whatever context its tests
+    get. One `runner.new` takes `unit` suites, `unit_context` suites and
+    Gherkin features together
+  - `suite.from_root` makes a suite from a `types.Root` that you build
+    yourself. `suite.new` makes one from children and a
+    `types.SuiteContext`
+  - `suite.group` puts suites in one group, and `suite.join` puts them one
+    after the other in one suite. Each suite keeps its own context
+  - `suite.name`, `suite.tests` and `suite.run` read and run a suite.
+    `parallel.run_suite` runs a typed tree inside groups
+  - Module discovery loads suites with a context, and `discover.to_suite`
+    keeps the context of each module suite
+
+- **A context from a set-up**
+
+  - `unit_context.describe_with_set_up(name:, set_up:, tear_down:,
+    children:)` makes a suite whose context is the value of `set_up`
+  - `steps.new_with_set_up(set_up:, tear_down:)` makes a step registry whose
+    scenarios start from the value of `set_up`. `gherkin/discover.to_suite`
+    runs the set-up one time for the scenarios of all its files.
+    `steps.suite_context` gives where the scenarios of a registry start
+  - The set-up runs one time, before the first test, and only when at
+    least one test of the suite runs. The tear-down gets its value after
+    the last test. Both run in one process that lives while the tests run
+  - A failed set-up gives `SetupFailed` to each test, with the operator
+    `set_up`, and the tear-down does not run. A failed tear-down is a
+    tear-down failure with the new hook `types.SuiteTearDownHook`
+    (`tear_down`). A set-up whose process stops is a `SetupStopped` with
+    the new hook `types.SuiteSetUpHook` (`set_up`)
+  - `feature.to_group` gives a Feature as one group node, to put several
+    Features in one suite
+
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 
   - Opt-in line coverage with the native line counters of the BEAM, which

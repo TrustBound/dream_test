@@ -2,7 +2,7 @@
 
 Dream Test 3.0.0 has breaking changes. This page shows each change with real 2.x code and the same code for 3.0.0.
 
-Read this page if your project uses Dream Test 2.x. Most projects need only the first two sections. Code that uses only `unit`, `unit_context` and the runner with its default reporters compiles without changes, except for the Gherkin step definitions.
+Read this page if your project uses Dream Test 2.x. Most projects need only the first two sections. Code that uses only `unit`, `unit_context` and the runner with its default reporters compiles without changes, except for the Gherkin step definitions, `TestSuite` type annotations and the runner test hooks.
 
 Each 2.x example has one of two labels:
 
@@ -16,7 +16,7 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 Do the steps in this order. The first steps affect the most projects.
 
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
-2. **The run report.** `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. See [The runner and the run report](#the-runner-and-the-run-report).
+2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
@@ -443,6 +443,56 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 
 `runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results and the tear-down hooks that failed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
 
+#### Suites have one type, whatever their context
+
+`types.TestSuite(context)` is removed. A suite now has the type `TestSuite` from the new module `dream_test/suite`, with no type parameter. The suite keeps its context inside it, so one `runner.new` takes suites with different contexts: `unit` suites, `unit_context` suites and Gherkin features. `runner.RunBuilder` has no type parameter too. Change each `TestSuite(Nil)` or `TestSuite(context)` annotation to `TestSuite`, and import it from `dream_test/suite`.
+
+##### 2.x: a suite with the type `TestSuite(Nil)` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L5-L13"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/types.{type TestSuite}
+import dream_test/unit.{describe, it}
+import gleam/option.{type Option, None, Some}
+
+pub fn suite() -> TestSuite(Nil) {
+  describe("suite", [
+    it("passes", fn() { Ok(succeed()) }),
+  ])
+}
+```
+
+##### 3.0.0: suites with the type `TestSuite`, in one run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/suite_type.gleam#L1-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/runner
+import dream_test/suite.{type TestSuite}
+import dream_test/unit.{describe, it}
+import dream_test/unit_context
+
+pub fn suite() -> TestSuite {
+  describe("suite", [
+    it("passes", fn() { Ok(succeed()) }),
+  ])
+}
+
+pub fn context_suite() -> TestSuite {
+  unit_context.describe("context suite", 41, [
+    unit_context.it("gets 41", fn(number: Int) {
+      number
+      |> should
+      |> be_equal(41)
+      |> or_fail_with("expected 41")
+    }),
+  ])
+}
+
+pub fn main() {
+  runner.new([suite(), context_suite()])
+  |> runner.run()
+}
+```
+
 #### `runner.has_failures` is now `types.failed`
 
 `types.failed` is also `True` when a tear-down hook failed and every test passed.
@@ -516,7 +566,9 @@ fn failing_suite() {
 }
 ```
 
-#### Test names in runner hooks
+#### Runner test hooks: only the `TestInfo`, with `groups`
+
+A `before_each_test` or `after_each_test` hook gets only the `TestInfo` of the test: `fn(TestInfo) -> Result(Nil, String)`. It does not get the context, and it cannot change the context, because the suites of one run can have different context types. Remove the context argument, and return `Ok(Nil)`.
 
 `TestResult` and `TestInfo` hold `groups`, the names of the groups around the test. The `full_name` field is removed. `types.full_name(groups, name)` gives the old list. The JSON report still writes `full_name` as the full list.
 
@@ -545,7 +597,7 @@ fn test_label(info: TestInfo) -> String {
 
 #### Running a suite with `parallel`
 
-`parallel.run_root_parallel` returns a `RunReport`.
+`parallel.run_root_parallel` returns a `RunReport`. The typed `parallel` functions take a `types.Root(context)`. `unit.describe` gives a `TestSuite` now, so build the tree with `types.root`.
 
 ##### 2.x: `run_root_parallel` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L1-L20"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -743,7 +795,7 @@ pub fn main() {
 
 #### Suites built by hand
 
-This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` holds the fields of its top-level group: `Root(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context.
+This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` holds the fields of its top-level group: `Root(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Root` to `suite.from_root` to get a `TestSuite` for the runner.
 
 ##### 2.x: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L369-L396"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 

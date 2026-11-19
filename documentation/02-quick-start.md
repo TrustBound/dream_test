@@ -50,7 +50,7 @@ pub fn main() {
 What’s happening here (in English):
 
 - `from_path("snippets/unit/**.gleam")` finds test modules on disk, relative to `test/`.
-- `to_suites()` turns them into suite values.
+- `to_suites()` turns them into suite values. A module can return any suite: a `unit` suite, a `unit_context` suite with its own context, or a Gherkin feature.
 - The runner executes those suites and streams output via a reporter.
 
 ### Option B: explicit suites (simple and easy to reason about)

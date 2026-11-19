@@ -647,6 +647,168 @@ pub fn main() {
 }
 ```
 
+### A set-up for all scenarios (for example a server)
+
+Some features need a resource that lives for all their scenarios, for example a server. Make the registry with `steps.new_with_set_up` in place of `steps.new`:
+
+- The set-up runs one time, before the first scenario, and only when at least one scenario runs. A filter that keeps no scenario does not start the server.
+- Each scenario starts from the value of the set-up. A change that one scenario makes to its state does not reach the next scenario.
+- The tear-down gets the same value after the last scenario.
+- The set-up and the tear-down run in one process that lives while the scenarios run. A process that the set-up starts stays alive.
+- When the set-up returns `Error`, crashes or times out, each scenario is `SetupFailed`, and the tear-down does not run. When the tear-down fails, the run report gets a tear-down failure for the hook `tear_down`.
+
+With `discover.to_suite`, the set-up runs one time for the scenarios of all the files. A parse error test does not need the set-up, so it runs without it.
+
+#### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L13-L55"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+// A small server: a process that answers each ping with "pong".
+
+pub type Request {
+  Ping(reply_to: Subject(String))
+  Stop
+}
+
+pub type World {
+  World(server: Subject(Request), reply: String)
+}
+
+fn start_server() -> Result(World, String) {
+  let started = process.new_subject()
+  process.spawn(fn() { serve(started) })
+  process.receive(started, 1000)
+  |> result.replace_error("the server did not start")
+  |> result.map(new_world)
+}
+
+fn stop_server(world: World) -> Result(Nil, String) {
+  process.send(world.server, Stop)
+  Ok(Nil)
+}
+
+fn new_world(server: Subject(Request)) -> World {
+  World(server: server, reply: "")
+}
+
+fn serve(started: Subject(Subject(Request))) -> Nil {
+  let requests = process.new_subject()
+  process.send(started, requests)
+  answer(requests)
+}
+
+fn answer(requests: Subject(Request)) -> Nil {
+  case process.receive_forever(requests) {
+    Ping(reply_to: reply_to) -> {
+      process.send(reply_to, "pong")
+      answer(requests)
+    }
+    Stop -> Nil
+  }
+}
+```
+
+#### The steps with a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L57-L83"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+// The steps. The set-up starts the server once, before the first scenario.
+// Each scenario starts from its value. The tear-down stops the server after
+// the last scenario.
+
+fn server_steps() -> StepRegistry(World) {
+  steps.new_with_set_up(set_up: start_server, tear_down: stop_server)
+  |> steps.given("the server is running", server_is_running)
+  |> steps.when("I ping the server", ping)
+  |> steps.then("the reply is {string}", reply_is)
+}
+
+fn server_is_running(world: World, _context: StepContext) {
+  Ok(world)
+}
+
+fn ping(world: World, _context: StepContext) -> Result(World, String) {
+  let reply = process.call(world.server, 1000, Ping)
+  Ok(World(..world, reply: reply))
+}
+
+fn reply_is(world: World, context: StepContext) {
+  use expected <- result.try(steps.get_string(context.captures, 0))
+  world.reply
+  |> should
+  |> be_equal(expected)
+  |> or_fail_with("the server should answer")
+}
+```
+
+#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L85-L98"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn server_feature() -> TestSuite {
+  feature("Server", server_steps(), [
+    scenario("Ping the server", [
+      given("the server is running"),
+      when("I ping the server"),
+      then("the reply is \"pong\""),
+    ]),
+    scenario("Ping it again", [
+      given("the server is running"),
+      when("I ping the server"),
+      then("the reply is \"pong\""),
+    ]),
+  ])
+}
+```
+
+Each suite keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
+
+#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L100-L129"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+// Suites with other contexts run in the same `runner.new`.
+
+pub fn math_suite() -> TestSuite {
+  unit.describe("Math", [
+    unit.it("adds", fn() {
+      1 + 1
+      |> should
+      |> be_equal(2)
+      |> or_fail_with("1 + 1 should be 2")
+    }),
+  ])
+}
+
+pub fn counter_suite() -> TestSuite {
+  unit_context.describe("Counter", 41, [
+    unit_context.it("starts at 41", fn(count: Int) {
+      count
+      |> should
+      |> be_equal(41)
+      |> or_fail_with("the counter should start at 41")
+    }),
+  ])
+}
+
+pub fn main() {
+  runner.new([server_feature(), math_suite(), counter_suite()])
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+The run gives:
+
+```text
+Feature: Server
+  ✓ Scenario: Ping the server
+  ✓ Scenario: Ping it again
+Math
+  ✓ adds
+Counter
+  ✓ starts at 41
+
+Summary: 4 run, 0 failed, 4 passed
+```
+
 ### What's Next?
 
 - Go back to [Snapshot testing](09-snapshot-testing.md)
