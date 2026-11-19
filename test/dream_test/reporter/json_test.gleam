@@ -255,14 +255,18 @@ pub fn tests() {
       }),
 
       it("counts stopped set-ups apart from failed tear-down hooks", fn() {
-        types.run_report(tests: [], teardown_failures: [
-          types.SetupStopped(
-            set_up: types.BeforeAllHook,
-            groups: ["root"],
-            reason: "Boom",
-            not_run: [],
-          ),
-        ])
+        types.run_report(
+          tests: [],
+          teardown_failures: [
+            types.SetupStopped(
+              set_up: types.BeforeAllHook,
+              groups: ["root"],
+              reason: "Boom",
+              not_run: [],
+            ),
+          ],
+          reporter_crashes: [],
+        )
         |> json.format
         |> between("\"summary\":", ",\"tests\"")
         |> should
@@ -285,14 +289,18 @@ pub fn tests() {
       }),
 
       it("writes a stopped set-up with its set-up hook and reason", fn() {
-        types.run_report(tests: [], teardown_failures: [
-          types.SetupStopped(
-            set_up: types.BeforeAllHook,
-            groups: ["root"],
-            reason: "Boom",
-            not_run: [["root", "b"], ["root", "c"]],
-          ),
-        ])
+        types.run_report(
+          tests: [],
+          teardown_failures: [
+            types.SetupStopped(
+              set_up: types.BeforeAllHook,
+              groups: ["root"],
+              reason: "Boom",
+              not_run: [["root", "b"], ["root", "c"]],
+            ),
+          ],
+          reporter_crashes: [],
+        )
         |> json.format
         |> after("\"tests\":")
         |> should

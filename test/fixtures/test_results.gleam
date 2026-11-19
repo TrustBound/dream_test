@@ -34,7 +34,7 @@ pub fn make_test_with_duration(
 
 /// A run report with these test results and no tear-down failures.
 pub fn report_of(results: List(TestResult)) -> types.RunReport {
-  types.run_report(tests: results, teardown_failures: [])
+  types.run_report(tests: results, teardown_failures: [], reporter_crashes: [])
 }
 
 /// A tear-down failure of `after_all` in the group `root`.
@@ -51,5 +51,9 @@ pub fn cleanup_failure() -> types.TeardownFailure {
 pub fn report_with_cleanup_failure(
   results: List(TestResult),
 ) -> types.RunReport {
-  types.run_report(tests: results, teardown_failures: [cleanup_failure()])
+  types.run_report(
+    tests: results,
+    teardown_failures: [cleanup_failure()],
+    reporter_crashes: [],
+  )
 }

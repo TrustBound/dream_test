@@ -775,12 +775,13 @@ pub type TeardownFailure {
 /// render function crashed. Read them with `report_reporter_crashes`.
 ///
 /// - `position`: the place of the reporter in the list that
-///   `runner.results_reporters` got. The first reporter is at position 1,
-///   and every reporter in the list counts, the BDD and JSON reporters
-///   included.
+///   `runner.results_reporters` got, counted from 1. The first reporter is
+///   at position 1, and every reporter in the list counts, the BDD and
+///   JSON reporters included.
 /// - `reason`: the crash, as `class:reason`, for example
 ///   `error:badarith`. This is the full text, which can be longer than one
-///   line. The error output shows it on one line, cut at 200 characters.
+///   line. The error output shows it on one line, and cuts it at 200
+///   characters.
 ///
 /// ## Example
 ///
@@ -816,16 +817,18 @@ pub opaque type RunReport {
 /// - `tests`: the result of each test, in the order of the run
 /// - `teardown_failures`: the tear-down hooks that failed, in the order
 ///   that they ran
+/// - `reporter_crashes`: the results reporters that crashed, in list order.
+///   Give `[]` when no reporter crashed, or when no reporter ran yet.
 ///
 /// ## Returns
 ///
-/// A `RunReport` with these tests and tear-down failures, and no crashed
-/// results reporter.
+/// A `RunReport` with these tests, tear-down failures and crashed results
+/// reporters.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [])
+/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
 /// |> types.failed
 /// |> should
 /// |> be_equal(False)
@@ -834,11 +837,12 @@ pub opaque type RunReport {
 pub fn run_report(
   tests tests: List(TestResult),
   teardown_failures teardown_failures: List(TeardownFailure),
+  reporter_crashes reporter_crashes: List(ReporterCrash),
 ) -> RunReport {
   RunReport(
     tests: tests,
     teardown_failures: teardown_failures,
-    reporter_crashes: [],
+    reporter_crashes: reporter_crashes,
   )
 }
 
@@ -855,7 +859,7 @@ pub fn run_report(
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [])
+/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
 /// |> types.report_tests
 /// |> should
 /// |> be_equal([])
@@ -878,7 +882,7 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [])
+/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
 /// |> types.report_teardown_failures
 /// |> should
 /// |> be_equal([])
@@ -890,48 +894,15 @@ pub fn report_teardown_failures(
   report.teardown_failures
 }
 
-/// Add the results reporters that crashed to a report.
-///
-/// `runner.run` calls this after the results reporters ran, so the report
-/// that it returns has the crashes. Call it yourself in a custom runner
-/// that runs reporters.
-///
-/// ## Parameters
-///
-/// - `report`: the report of a run
-/// - `crashes`: the crashed reporters, in list order
-///
-/// ## Returns
-///
-/// The report with `crashes` after the crashes that it already has.
-///
-/// ## Example
-///
-/// ```gleam
-/// types.run_report(tests: [], teardown_failures: [])
-/// |> types.add_reporter_crashes([
-///   types.ReporterCrash(position: 1, reason: "error:badarith"),
-/// ])
-/// |> types.failed
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("a crashed reporter should fail the run")
-/// ```
-pub fn add_reporter_crashes(
-  report report: RunReport,
-  crashes crashes: List(ReporterCrash),
-) -> RunReport {
-  RunReport(
-    ..report,
-    reporter_crashes: list.append(report.reporter_crashes, crashes),
-  )
-}
-
 /// The results reporters whose render function crashed in a run, in list
 /// order.
 ///
 /// Use it when your code picks its own exit status from the report, or
 /// writes the crash somewhere else.
+///
+/// Only the report that `runner.run` returns has the crashes. The results
+/// reporters get the report before any reporter ran, so a reporter later
+/// in the list does not see the crash of a reporter before it.
 ///
 /// ## Parameters
 ///
@@ -944,7 +915,7 @@ pub fn add_reporter_crashes(
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [])
+/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
 /// |> types.report_reporter_crashes
 /// |> should
 /// |> be_equal([])
@@ -975,13 +946,17 @@ pub fn report_reporter_crashes(
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [
-///   types.TeardownFailure(
-///     hook: types.AfterAllSuitesHook,
-///     groups: [],
-///     message: "could not stop the pool",
-///   ),
-/// ])
+/// types.run_report(
+///   tests: [],
+///   teardown_failures: [
+///     types.TeardownFailure(
+///       hook: types.AfterAllSuitesHook,
+///       groups: [],
+///       message: "could not stop the pool",
+///     ),
+///   ],
+///   reporter_crashes: [],
+/// )
 /// |> types.failed
 /// |> should
 /// |> be_equal(True)

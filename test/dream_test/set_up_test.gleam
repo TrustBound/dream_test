@@ -248,7 +248,13 @@ pub fn tests() {
         |> types.report_teardown_failures
       #(
         teardown.format(failures),
-        json.format(types.run_report(tests: [], teardown_failures: failures))
+        json.format(
+          types.run_report(
+            tests: [],
+            teardown_failures: failures,
+            reporter_crashes: [],
+          ),
+        )
           |> string.contains(
             "{\"kind\":\"hook_failed\",\"hook\":\"suite tear-down\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
           ),
@@ -272,7 +278,13 @@ pub fn tests() {
       ]
       #(
         teardown.format(failures),
-        json.format(types.run_report(tests: [], teardown_failures: failures))
+        json.format(
+          types.run_report(
+            tests: [],
+            teardown_failures: failures,
+            reporter_crashes: [],
+          ),
+        )
           |> string.contains(
             "{\"kind\":\"setup_stopped\",\"hook\":\"suite set-up\",\"groups\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
           ),

@@ -120,19 +120,23 @@ pub fn tests() {
 
 /// A report with one failed tear-down hook and one stopped set-up.
 fn hook_failed_and_setup_stopped() -> types.RunReport {
-  types.run_report(tests: [], teardown_failures: [
-    types.TeardownFailure(
-      hook: types.AfterAllHook,
-      groups: ["root"],
-      message: "no cleanup",
-    ),
-    types.SetupStopped(
-      set_up: types.BeforeAllHook,
-      groups: ["root"],
-      reason: "Boom",
-      not_run: [],
-    ),
-  ])
+  types.run_report(
+    tests: [],
+    teardown_failures: [
+      types.TeardownFailure(
+        hook: types.AfterAllHook,
+        groups: ["root"],
+        message: "no cleanup",
+      ),
+      types.SetupStopped(
+        set_up: types.BeforeAllHook,
+        groups: ["root"],
+        reason: "Boom",
+        not_run: [],
+      ),
+    ],
+    reporter_crashes: [],
+  )
 }
 
 fn one_of_each_status() -> List(types.TestResult) {

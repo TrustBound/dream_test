@@ -46,10 +46,13 @@ pub fn main() {
 
   // Count failed tear-down hooks and stopped set-ups apart.
   let counts =
-    summary.count(types.run_report(
-      tests: results,
-      teardown_failures: teardown_failures,
-    ))
+    summary.count(
+      types.run_report(
+        tests: results,
+        teardown_failures: teardown_failures,
+        reporter_crashes: [],
+      ),
+    )
 
   progress.line(
     reporter,

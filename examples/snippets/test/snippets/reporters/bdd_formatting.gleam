@@ -22,7 +22,11 @@ pub fn tests() {
     it("format returns a report string", fn() {
       let report =
         bdd.format(
-          types.run_report(tests: sample_results(), teardown_failures: []),
+          types.run_report(
+            tests: sample_results(),
+            teardown_failures: [],
+            reporter_crashes: [],
+          ),
         )
 
       report

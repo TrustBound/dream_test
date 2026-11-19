@@ -55,7 +55,11 @@ pub fn tests() {
     it("format_summary_only returns a summary line", fn() {
       let summary =
         bdd.format_summary_only(
-          types.run_report(tests: [passing_result()], teardown_failures: []),
+          types.run_report(
+            tests: [passing_result()],
+            teardown_failures: [],
+            reporter_crashes: [],
+          ),
         )
 
       summary

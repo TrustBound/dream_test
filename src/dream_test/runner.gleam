@@ -851,7 +851,8 @@ pub fn after_all_suites(
 /// the position of the reporter in the list of `results_reporters`. The
 /// first reporter is at position 1, and every reporter in the list counts.
 /// The returned report has the crash (see `types.report_reporter_crashes`),
-/// so `types.failed` is `True` for it. With `exit_on_failure`, the crash
+/// so `types.failed` is `True` for it. The reporters themselves get the
+/// report without the crashes. With `exit_on_failure`, the crash
 /// also ends the program with exit status 1.
 ///
 /// ## Example
@@ -990,13 +991,13 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
       all_suites_setup_process_after_run,
     )
 
+  let teardown_failures =
+    list.append(collected.teardown_failures, after_all_failures)
   let report =
     types.run_report(
       tests: collected.tests,
-      teardown_failures: list.append(
-        collected.teardown_failures,
-        after_all_failures,
-      ),
+      teardown_failures: teardown_failures,
+      reporter_crashes: [],
     )
 
   let counts = summary.count(report)
@@ -1016,9 +1017,10 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   }
 
   let report =
-    types.add_reporter_crashes(
-      report: report,
-      crashes: write_results_reporters(
+    types.run_report(
+      tests: collected.tests,
+      teardown_failures: teardown_failures,
+      reporter_crashes: write_results_reporters(
         builder.results_reporters,
         report,
         output,

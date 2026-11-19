@@ -45,7 +45,11 @@ pub fn main() {
   ) = parallel_result
 
   let report =
-    types.run_report(tests: results, teardown_failures: teardown_failures)
+    types.run_report(
+      tests: results,
+      teardown_failures: teardown_failures,
+      reporter_crashes: [],
+    )
 
   // Count failed tear-down hooks and stopped set-ups apart.
   let counts = summary.count(report)

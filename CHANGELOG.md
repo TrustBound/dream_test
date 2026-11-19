@@ -18,7 +18,8 @@ store. This release has breaking changes. Read
 #### Runner and run report
 
 - `runner.run` returns `types.RunReport`, not `List(TestResult)`. A
-  `RunReport` holds the test results and the tear-down hooks that failed.
+  `RunReport` holds the test results, the tear-down hooks that failed and
+  the results reporters that crashed.
 - `runner.has_failures` is removed. Use `types.failed(report)`, which is
   also `True` for a tear-down failure and for a crashed results reporter.
 - `runner.silent()` drops normal output only. Errors still go to the
@@ -463,12 +464,13 @@ the guide labels them.
 
 - **Run report** (`dream_test/types`)
 
-  - `types.RunReport`, the result of a run: the test results and the
-    tear-down hooks that failed. Make one with
-    `types.run_report(tests:, teardown_failures:)`, read it with
-    `types.report_tests` and `types.report_teardown_failures`, and check it
-    with `types.failed`. `RunReport` is opaque, so it can grow without a
-    breaking change
+  - `types.RunReport`, the result of a run: the test results, the
+    tear-down hooks that failed and the results reporters that crashed.
+    Make one with
+    `types.run_report(tests:, teardown_failures:, reporter_crashes:)`, read
+    it with `types.report_tests`, `types.report_teardown_failures` and
+    `types.report_reporter_crashes`, and check it with `types.failed`.
+    `RunReport` is opaque, so it can grow without a breaking change
   - `types.TeardownFailure(hook:, groups:, message:)` and
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
     `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
@@ -610,9 +612,9 @@ the guide labels them.
   - The report that `runner.run` returns has each crash, so
     `types.failed(report)` is `True`. `types.report_reporter_crashes`
     gives a `types.ReporterCrash(position:, reason:)` with the full reason
-    of each crash, and `types.add_reporter_crashes` adds crashes to a
-    report in a custom runner. With `runner.exit_on_failure()`, the exit
-    status is 1
+    of each crash. The reporters get the report without the crashes, so a
+    reporter later in the list does not see the crash of a reporter before
+    it. With `runner.exit_on_failure()`, the exit status is 1
 
 ### Changed
 

@@ -73,19 +73,23 @@ pub fn tests() {
       |> or_fail_with("expected the report line for two passing tests")
     }),
     it("counts stopped set-ups apart from failed tear-down hooks", fn() {
-      types.run_report(tests: [], teardown_failures: [
-        types.TeardownFailure(
-          hook: types.AfterAllHook,
-          groups: ["Example Suite"],
-          message: "no cleanup",
-        ),
-        types.SetupStopped(
-          set_up: types.BeforeAllHook,
-          groups: ["Example Suite"],
-          reason: "killed",
-          not_run: [],
-        ),
-      ])
+      types.run_report(
+        tests: [],
+        teardown_failures: [
+          types.TeardownFailure(
+            hook: types.AfterAllHook,
+            groups: ["Example Suite"],
+            message: "no cleanup",
+          ),
+          types.SetupStopped(
+            set_up: types.BeforeAllHook,
+            groups: ["Example Suite"],
+            reason: "killed",
+            not_run: [],
+          ),
+        ],
+        reporter_crashes: [],
+      )
       |> render_my_report
       |> should
       |> be_equal(

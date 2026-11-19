@@ -74,7 +74,11 @@ pub fn tests() {
     }),
 
     it("run_report keeps the tests", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [])
+      types.run_report(
+        tests: [passed_result()],
+        teardown_failures: [],
+        reporter_crashes: [],
+      )
       |> types.report_tests
       |> should
       |> be_equal([passed_result()])
@@ -82,7 +86,11 @@ pub fn tests() {
     }),
 
     it("run_report keeps the tear-down failures", fn() {
-      types.run_report(tests: [], teardown_failures: [cleanup_failure()])
+      types.run_report(
+        tests: [],
+        teardown_failures: [cleanup_failure()],
+        reporter_crashes: [],
+      )
       |> types.report_teardown_failures
       |> should
       |> be_equal([cleanup_failure()])
@@ -90,7 +98,11 @@ pub fn tests() {
     }),
 
     it("failed is False when every test passed and no tear-down failed", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [])
+      types.run_report(
+        tests: [passed_result()],
+        teardown_failures: [],
+        reporter_crashes: [],
+      )
       |> types.failed
       |> should
       |> be_equal(False)
@@ -98,9 +110,13 @@ pub fn tests() {
     }),
 
     it("failed is True for a tear-down failure only", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [
-        cleanup_failure(),
-      ])
+      types.run_report(
+        tests: [passed_result()],
+        teardown_failures: [
+          cleanup_failure(),
+        ],
+        reporter_crashes: [],
+      )
       |> types.failed
       |> should
       |> be_equal(True)
@@ -111,6 +127,7 @@ pub fn tests() {
       types.run_report(
         tests: [types.TestResult(..passed_result(), status: types.TimedOut)],
         teardown_failures: [],
+        reporter_crashes: [],
       )
       |> types.failed
       |> should
@@ -118,22 +135,15 @@ pub fn tests() {
       |> or_fail_with("a timed-out test should fail the run")
     }),
 
-    it("run_report has no crashed reporter", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [])
-      |> types.report_reporter_crashes
-      |> should
-      |> be_equal([])
-      |> or_fail_with("a new report should have no crashed reporter")
-    }),
-
-    it("add_reporter_crashes adds after the crashes already there", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [])
-      |> types.add_reporter_crashes([
-        types.ReporterCrash(position: 1, reason: "error:first"),
-      ])
-      |> types.add_reporter_crashes([
-        types.ReporterCrash(position: 3, reason: "error:second"),
-      ])
+    it("run_report keeps the crashed reporters in list order", fn() {
+      types.run_report(
+        tests: [passed_result()],
+        teardown_failures: [],
+        reporter_crashes: [
+          types.ReporterCrash(position: 1, reason: "error:first"),
+          types.ReporterCrash(position: 3, reason: "error:second"),
+        ],
+      )
       |> types.report_reporter_crashes
       |> should
       |> be_equal([
@@ -144,10 +154,13 @@ pub fn tests() {
     }),
 
     it("failed is True for a crashed reporter only", fn() {
-      types.run_report(tests: [passed_result()], teardown_failures: [])
-      |> types.add_reporter_crashes([
-        types.ReporterCrash(position: 1, reason: "error:badarith"),
-      ])
+      types.run_report(
+        tests: [passed_result()],
+        teardown_failures: [],
+        reporter_crashes: [
+          types.ReporterCrash(position: 1, reason: "error:badarith"),
+        ],
+      )
       |> types.failed
       |> should
       |> be_equal(True)

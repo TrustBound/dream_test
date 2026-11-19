@@ -13,6 +13,7 @@ import dream_test/suite
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
 import gleam/erlang/process.{type Subject}
+import gleam/int
 import gleam/list
 import gleam/string
 
@@ -124,6 +125,17 @@ pub fn tests() {
       |> or_fail_with("expected the crashes at positions 2 and 3")
     }),
 
+    it("gives a later reporter the report without the earlier crash", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+        reporter_types.Custom(crash_count_report),
+      ])
+      |> list.last
+      |> should
+      |> be_equal(Ok(#("out", "crashes in the report: 0\n")))
+      |> or_fail_with("expected the second reporter to see no crash")
+    }),
+
     it("keeps the full reason of a long crash in the report", fn() {
       run_without_output([passing_suite()], [
         reporter_types.Custom(crash_render_with_long_reason),
@@ -197,7 +209,7 @@ fn long_crash_reason() -> String {
 }
 
 fn empty_report() -> types.RunReport {
-  types.run_report(tests: [], teardown_failures: [])
+  types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
 }
 
 /// The lines of `text`, each without the spaces at its start, joined with
@@ -223,6 +235,14 @@ fn run_without_output(
 
 fn discard(_text: String) -> Nil {
   Nil
+}
+
+/// A custom report that gives the number of crashed reporters in the
+/// report that it gets.
+fn crash_count_report(report: types.RunReport) -> String {
+  "crashes in the report: "
+  <> int.to_string(list.length(types.report_reporter_crashes(report)))
+  <> "\n"
 }
 
 fn first_report(_report: types.RunReport) -> String {

@@ -482,7 +482,7 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 
 ### The runner and the run report
 
-`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results and the tear-down hooks that failed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
+`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results, the tear-down hooks that failed and the results reporters that crashed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
 
 #### Suites have one type, whatever their context
 
@@ -778,7 +778,7 @@ pub fn main() {
 }
 ```
 
-##### 3.0.0: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L1-L65"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L1-L69"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -828,7 +828,11 @@ pub fn main() {
   ) = parallel_result
 
   let report =
-    types.run_report(tests: results, teardown_failures: teardown_failures)
+    types.run_report(
+      tests: results,
+      teardown_failures: teardown_failures,
+      reporter_crashes: [],
+    )
 
   // Count failed tear-down hooks and stopped set-ups apart.
   let counts = summary.count(report)
@@ -1117,7 +1121,7 @@ When a test ends, its process exits with reason `shutdown`. A process that the t
 
 #### Reporter functions take a `RunReport`
 
-These functions take a `types.RunReport` in place of `List(TestResult)`: `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`, `json.render`, `json.format`, `json.format_pretty`, `json.report`, `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report` functions return the report. To format a list of results that you made, use `types.run_report(tests: results, teardown_failures: [])`.
+These functions take a `types.RunReport` in place of `List(TestResult)`: `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`, `json.render`, `json.format`, `json.format_pretty`, `json.report`, `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report` functions return the report. To format a list of results that you made, use `types.run_report(tests: results, teardown_failures: [], reporter_crashes: [])`.
 
 ##### 2.x: format a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/bdd_formatting.gleam#L1-L31"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1155,7 +1159,7 @@ pub fn tests() {
 }
 ```
 
-##### 3.0.0: format a run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/bdd_formatting.gleam#L1-L34"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: format a run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/bdd_formatting.gleam#L1-L38"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{match_snapshot, or_fail_with, should}
@@ -1182,7 +1186,11 @@ pub fn tests() {
     it("format returns a report string", fn() {
       let report =
         bdd.format(
-          types.run_report(tests: sample_results(), teardown_failures: []),
+          types.run_report(
+            tests: sample_results(),
+            teardown_failures: [],
+            reporter_crashes: [],
+          ),
         )
 
       report

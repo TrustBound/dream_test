@@ -22,7 +22,11 @@ pub fn tests() {
   describe("Gherkin formatting", [
     it("format returns a report string", fn() {
       gherkin_reporter.format(
-        types.run_report(tests: sample_results(), teardown_failures: []),
+        types.run_report(
+          tests: sample_results(),
+          teardown_failures: [],
+          reporter_crashes: [],
+        ),
       )
       |> should
       |> match_snapshot("./test/snapshots/gherkin_format_report.snap")

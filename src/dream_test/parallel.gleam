@@ -633,6 +633,7 @@ pub fn run_root_parallel(
   types.run_report(
     tests: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
+    reporter_crashes: [],
   )
 }
 

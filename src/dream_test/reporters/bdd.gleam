@@ -296,7 +296,11 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
 ///
 /// ```gleam
 /// bdd.report(
-///   types.run_report(tests: [passing_result()], teardown_failures: []),
+///   types.run_report(
+///     tests: [passing_result()],
+///     teardown_failures: [],
+///     reporter_crashes: [],
+///   ),
 ///   write_bdd_report_to_file,
 /// )
 ///
@@ -487,7 +491,11 @@ pub fn format_incremental_parts_with_test_indent(
 /// ```gleam
 /// let summary =
 ///   bdd.format_summary_only(
-///     types.run_report(tests: [passing_result()], teardown_failures: []),
+///     types.run_report(
+///       tests: [passing_result()],
+///       teardown_failures: [],
+///       reporter_crashes: [],
+///     ),
 ///   )
 ///
 /// summary

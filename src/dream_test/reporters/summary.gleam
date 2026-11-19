@@ -37,6 +37,7 @@ import gleam/string
 /// summary.count(types.run_report(
 ///   tests: [passed_result, failed_result],
 ///   teardown_failures: [],
+///   reporter_crashes: [],
 /// ))
 /// // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
 /// //    timed_out: 0, setup_failed: 0, teardown_failed: 0, setup_stopped: 0,

@@ -36,7 +36,11 @@ pub fn tests() {
   describe("BDD reporter module", [
     it("report writes output", fn() {
       bdd.report(
-        types.run_report(tests: [passing_result()], teardown_failures: []),
+        types.run_report(
+          tests: [passing_result()],
+          teardown_failures: [],
+          reporter_crashes: [],
+        ),
         write_bdd_report_to_file,
       )
 
