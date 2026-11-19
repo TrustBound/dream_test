@@ -256,7 +256,8 @@ start_server_in_new_vm(Module, Function) ->
 
 %% Send one request line and return the reply line. Returns
 %% `{error, Output}` when the server exits or does not reply in 60 seconds.
-%% A server that does not reply in time is killed.
+%% A server that does not reply in time is killed. After an error the port
+%% is closed, so send no more requests to it.
 send_server_request(Port, Request) ->
     true = port_command(Port, [Request, "\n"]),
     receive
@@ -277,6 +278,8 @@ wait_for_server_exit(Port) ->
     end.
 
 server_killed(killed) ->
+    -1;
+server_killed(already_ended) ->
     -1;
 server_killed({kill_failed, Text}) ->
     erlang:error({kill_of_server_failed, Text}).
@@ -316,15 +319,24 @@ collect_output(Port, OsPid, CallerMonitor, Deadline, Output) ->
                (kill_text(kill_new_vm(Port, OsPid)))/binary, "]">>}
     end.
 
-%% The caller stopped and the new BEAM is killed: stop the worker. A kill
-%% that failed stops the worker with the kill error, so the error shows.
+%% The caller stopped and the new BEAM is killed or had already ended:
+%% stop the worker. No process monitors the worker after its caller
+%% stopped, so a kill that failed is written to the standard error stream
+%% before the worker stops with the kill error.
 caller_stopped(killed) ->
     exit(normal);
+caller_stopped(already_ended) ->
+    exit(normal);
 caller_stopped({kill_failed, Text}) ->
+    io:format(standard_error,
+              "the caller stopped, and the kill of its new BEAM failed: ~ts~n",
+              [Text]),
     exit({kill_of_new_vm_failed, Text}).
 
 kill_text(killed) ->
     <<"the new BEAM was killed">>;
+kill_text(already_ended) ->
+    <<"the new BEAM had already ended">>;
 kill_text({kill_failed, Text}) ->
     <<"the kill of the new BEAM failed: ", Text/binary>>.
 
@@ -343,7 +355,14 @@ kill_new_vm(Port, OsPid) ->
 kill_result(<<>>) ->
     killed;
 kill_result(Text) ->
-    {kill_failed, string:trim(Text)}.
+    kill_failure(string:find(Text, <<"No such process">>), string:trim(Text)).
+
+%% `kill` says `No such process` when the process had already ended, which
+%% is not a failure.
+kill_failure(nomatch, Text) ->
+    {kill_failed, Text};
+kill_failure(_Found, _Text) ->
+    already_ended.
 
 code_path_args() ->
     lists:append([["-pa", Path] || Path <- code:get_path(), is_build_path(Path)]).
