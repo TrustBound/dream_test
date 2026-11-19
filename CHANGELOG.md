@@ -539,6 +539,14 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Changed
 
+- Behaviour change: `{float}` matches a number as Cucumber reads it: an
+  optional sign, digits with an optional `.` and digits, or `.` and digits
+  alone, and an optional exponent, for example `20`, `.5`, `-3`, `1e5` and
+  `1.5e-3`. `5.`, `1,000`, `NaN` and `Infinity` do not match. This
+  changes which step matches: `{float}` now wins over `{word}` and `{}`
+  for a whole number such as `20`, and `${float}USD` matches `$20USD`.
+  `{int}` still wins over `{float}`. Before, `{float}` needed a `.`.
+
 - **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)
 
   - CI and the publish workflows use Gleam 1.19.2. Contributors need

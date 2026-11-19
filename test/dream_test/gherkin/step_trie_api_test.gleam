@@ -2,6 +2,7 @@ import dream_test/gherkin/step_trie
 import dream_test/gherkin/types.{GivenPhase, ThenPhase, WhenPhase}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
+import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
 
@@ -577,6 +578,98 @@ pub fn tests() {
       |> or_fail_with("{string} should win over {}")
     }),
 
+    it("lookup matches {float} against Cucumber numbers", fn() {
+      ["20", ".5", "-3", "+2", "007", "1e5", "1E5", "1.5e-3", "-2.5E+2"]
+      |> list.map(float_capture)
+      |> should
+      |> be_equal([
+        Ok(Some(20.0)),
+        Ok(Some(0.5)),
+        Ok(Some(-3.0)),
+        Ok(Some(2.0)),
+        Ok(Some(7.0)),
+        Ok(Some(100_000.0)),
+        Ok(Some(100_000.0)),
+        Ok(Some(0.0015)),
+        Ok(Some(-250.0)),
+      ])
+      |> or_fail_with("each text should be a float")
+    }),
+
+    it("lookup does not match {float} against text that is not a number", fn() {
+      [
+        "5.",
+        ".",
+        "-",
+        "e5",
+        "1,000",
+        "NaN",
+        "Infinity",
+        "1e",
+        "1e+",
+        "--1",
+        "1e5x",
+      ]
+      |> list.map(float_capture)
+      |> should
+      |> be_equal([
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+        Ok(None),
+      ])
+      |> or_fail_with("no text should be a float")
+    }),
+
+    it("lookup matches {float} with text around it", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "pay ${float}USD", "usd")
+      |> result.try(step_trie.insert(_, GivenPhase, "rate {float}%", "rate"))
+      |> result.try(step_trie.insert(_, GivenPhase, "it costs {float}.", "cost"))
+      |> result.map(lookup_floats_with_text)
+      |> should
+      |> be_equal(
+        Ok([
+          Some(step_trie.StepMatch("usd", [step_trie.CapturedFloat(20.0)])),
+          Some(step_trie.StepMatch("rate", [step_trie.CapturedFloat(50.0)])),
+          Some(step_trie.StepMatch("cost", [step_trie.CapturedFloat(20.0)])),
+        ]),
+      )
+      |> or_fail_with("{float} should take a whole number before the text")
+    }),
+
+    it("lookup prefers {float} to {word} and {} for a whole number", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "total {word}", "word")
+      |> result.try(step_trie.insert(_, GivenPhase, "total {}", "any"))
+      |> result.try(step_trie.insert(_, GivenPhase, "total {float}", "float"))
+      |> result.map(step_trie.lookup(_, GivenPhase, "total 20"))
+      |> should
+      |> be_equal(
+        Ok(Some(step_trie.StepMatch("float", [step_trie.CapturedFloat(20.0)]))),
+      )
+      |> or_fail_with("{float} should win over {word} and {}")
+    }),
+
+    it("lookup still prefers {int} to {float} for a whole number", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "total {float}", "float")
+      |> result.try(step_trie.insert(_, GivenPhase, "total {int}", "int"))
+      |> result.map(step_trie.lookup(_, GivenPhase, "total 20"))
+      |> should
+      |> be_equal(
+        Ok(Some(step_trie.StepMatch("int", [step_trie.CapturedInt(20)]))),
+      )
+      |> or_fail_with("{int} should win over {float}")
+    }),
+
     it("lookup prefers {float} to {}", fn() {
       step_trie.new()
       |> step_trie.insert(GivenPhase, "I see {}", "any")
@@ -606,5 +699,34 @@ fn lookup_quotes_in_words(
   [
     step_trie.lookup(trie, GivenPhase, "the input 5\" is valid"),
     step_trie.lookup(trie, GivenPhase, "O\"Brien says \"hi\""),
+  ]
+}
+
+/// The float that `n {float}` captures from `n <text>`, or `None`.
+fn float_capture(text: String) -> Result(option.Option(Float), Nil) {
+  step_trie.new()
+  |> step_trie.insert(GivenPhase, "n {float}", "n")
+  |> result.replace_error(Nil)
+  |> result.map(step_trie.lookup(_, GivenPhase, "n " <> text))
+  |> result.map(captured_float)
+}
+
+fn captured_float(
+  found: option.Option(step_trie.StepMatch(String)),
+) -> option.Option(Float) {
+  case found {
+    Some(step_trie.StepMatch(_, [step_trie.CapturedFloat(value)])) ->
+      Some(value)
+    _ -> None
+  }
+}
+
+fn lookup_floats_with_text(
+  trie: step_trie.StepTrie(String),
+) -> List(option.Option(step_trie.StepMatch(String))) {
+  [
+    step_trie.lookup(trie, GivenPhase, "pay $20USD"),
+    step_trie.lookup(trie, GivenPhase, "rate 50%"),
+    step_trie.lookup(trie, GivenPhase, "it costs 20."),
   ]
 }

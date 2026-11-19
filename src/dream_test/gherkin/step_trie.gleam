@@ -17,7 +17,10 @@
 //// ## Placeholder syntax
 ////
 //// - `{int}`: an integer, such as `42` or `-5`
-//// - `{float}`: a decimal number, such as `3.14` or `-0.5`
+//// - `{float}`: a number as Cucumber reads it: an optional sign, digits
+////   with an optional `.` and digits (or `.` and digits alone), and an
+////   optional exponent, such as `3.14`, `-0.5`, `20`, `.5` or `1.5e-3`.
+////   `5.`, `1,000` and `NaN` are not numbers
 //// - `{string}`: a double-quoted string, such as `"hello world"`. The
 ////   capture does not include the quotes.
 //// - `{word}`: a run of characters with no space, such as `alice` or `user42`
@@ -67,6 +70,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order.{type Order}
+import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -414,7 +418,7 @@ fn literal_text(segment: StepSegment) -> String {
 /// | Placeholder | Segment Type | Matches |
 /// |-------------|--------------|---------|
 /// | `{int}` | `IntParam` | Integers like `42`, `-5` |
-/// | `{float}` | `FloatParam` | Decimals like `3.14` |
+/// | `{float}` | `FloatParam` | Numbers like `3.14`, `20`, `.5`, `1e5` |
 /// | `{string}` | `StringParam` | Double-quoted strings like `"hello"` |
 /// | `{word}` | `WordParam` | A run of characters with no space |
 /// | `{}` | `AnyParam` | Any text in one word |
@@ -854,13 +858,92 @@ fn capture_int(text: String) -> Result(CapturedValue, Nil) {
   }
 }
 
-/// A float as `float.parse` reads it. The Erlang parser under it also
-/// reads a comma as the decimal point, so text with a comma, such as
-/// `1,000`, is not a float.
+/// A number as Cucumber reads `{float}`: an optional `+` or `-`, then
+/// digits with an optional `.` and digits, or `.` and digits alone, then
+/// an optional exponent: `e` or `E`, an optional `+` or `-`, and digits.
+/// For example `20`, `.5`, `-3`, `1e5` and `1.5e-3`. Any other text, such
+/// as `5.`, `1,000` or `NaN`, is not a float.
 fn capture_float(text: String) -> Result(CapturedValue, Nil) {
-  case string.contains(text, ","), float.parse(text) {
-    False, Ok(value) -> Ok(CapturedFloat(value))
-    _, _ -> Error(Nil)
+  float_text(text)
+  |> result.try(float.parse)
+  |> result.map(CapturedFloat)
+}
+
+/// The text of a float in the form that `float.parse` reads:
+/// `<sign><digits>.<digits>[e<sign><digits>]`.
+fn float_text(text: String) -> Result(String, Nil) {
+  let #(sign, unsigned) = take_sign(text)
+  let #(whole, after_whole) = take_digits(unsigned, "")
+  let #(fraction, after_fraction) = take_fraction(after_whole)
+  case whole, fraction {
+    "", NoFraction -> Error(Nil)
+    _, NoFraction -> exponent_text(sign <> whole <> ".0", after_fraction)
+    _, Fraction("") -> Error(Nil)
+    "", Fraction(digits) ->
+      exponent_text(sign <> "0." <> digits, after_fraction)
+    _, Fraction(digits) ->
+      exponent_text(sign <> whole <> "." <> digits, after_fraction)
+  }
+}
+
+/// The part after the digits of a number: no `.`, or a `.` and its digits.
+type Fraction {
+  NoFraction
+  Fraction(digits: String)
+}
+
+fn take_fraction(text: String) -> #(Fraction, String) {
+  case text {
+    "." <> after -> {
+      let #(digits, rest) = take_digits(after, "")
+      #(Fraction(digits), rest)
+    }
+    _ -> #(NoFraction, text)
+  }
+}
+
+/// `number`, with the exponent of `rest` when it has one. Any other text in
+/// `rest` makes it not a number.
+fn exponent_text(number: String, rest: String) -> Result(String, Nil) {
+  case rest {
+    "" -> Ok(number)
+    "e" <> exponent | "E" <> exponent -> signed_exponent(number, exponent)
+    _ -> Error(Nil)
+  }
+}
+
+fn signed_exponent(number: String, exponent: String) -> Result(String, Nil) {
+  let #(sign, unsigned) = take_sign(exponent)
+  case take_digits(unsigned, "") {
+    #("", _) -> Error(Nil)
+    #(digits, "") -> Ok(number <> "e" <> sign <> digits)
+    #(_, _) -> Error(Nil)
+  }
+}
+
+/// The `+` or `-` at the start of `text`, or `""`, and the rest.
+fn take_sign(text: String) -> #(String, String) {
+  case text {
+    "+" <> rest -> #("+", rest)
+    "-" <> rest -> #("-", rest)
+    _ -> #("", text)
+  }
+}
+
+/// The ASCII digits at the start of `text`, after `digits`, and the rest.
+fn take_digits(text: String, digits: String) -> #(String, String) {
+  case text {
+    "0" as digit <> rest
+    | "1" as digit <> rest
+    | "2" as digit <> rest
+    | "3" as digit <> rest
+    | "4" as digit <> rest
+    | "5" as digit <> rest
+    | "6" as digit <> rest
+    | "7" as digit <> rest
+    | "8" as digit <> rest
+    | "9" as digit <> rest -> take_digits(rest, digits <> digit)
+    _ -> #(digits, text)
   }
 }
 

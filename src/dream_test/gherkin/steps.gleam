@@ -68,7 +68,7 @@
 //// Step patterns use typed placeholders:
 ////
 //// - `{int}`: integers (e.g. `42`, `-5`)
-//// - `{float}`: decimals (e.g. `3.14`, `-0.5`)
+//// - `{float}`: numbers as Cucumber reads them (e.g. `3.14`, `-0.5`, `20`, `1e5`)
 //// - `{string}`: double-quoted strings (e.g. `"hello world"`)
 //// - `{word}`: a run of characters with no space (e.g. `alice`, `user42`)
 //// - `{}`: any text in one word

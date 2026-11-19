@@ -18,7 +18,7 @@ fn step_int(values: Values, context: StepContext) {
   Ok(Values(..values, int: value))
 }
 
-// {float} captures decimals (works with $ prefix too)
+// {float} captures numbers like 3.14, 20 or 1e5 (works with $ prefix too)
 fn step_float(values: Values, context: StepContext) {
   use value <- result.try(get_float(context.captures, 0))
   Ok(Values(..values, float: value))

@@ -434,6 +434,7 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 | `the user is {word}` did not match `the user is user42`. | It matches and captures `user42`. | Nothing. |
 | A pattern without placeholders, such as `I enable 2FA` or `I click "Save changes"`, did not match its own text. | It matches. | Nothing. |
 | A space in the pattern did not need a space in the text: `$ {float}` matched `$19.99`. | A space in the pattern must be a space in the text. | Write the pattern as the text is written, for example `${float}`. |
+| `{float}` needed a `.`: `total {float}` did not match `total 20`. | `{float}` matches a number as Cucumber reads it, such as `20`, `.5` or `1e5`. With `total {word}` and `total {float}`, the text `total 20` now matches `{float}`. | Check steps that use `{word}` or `{}` for numbers next to a `{float}` step. |
 | `{word}` matched a quoted run with spaces, for example `"Save changes"`. | `{word}` matches only text with no space. | Use `{string}`, or `{}` to keep the quotes. |
 | With `I have {int} items` and `I have 5 apples`, the text `I have 5 items` matched no step. Lookup took the literal word `5` and did not go back. | Lookup goes back and tries the next pattern, so the text matches `I have {int} items`. When two patterns match, a literal word wins over a placeholder. | Nothing. |
 | `step_trie.parse_step_pattern` gave a flat `List(StepSegment)` with `LiteralWord`. | It gives one `List(StepSegment)` for each word, with `LiteralText`. | Read the segments of each word. |

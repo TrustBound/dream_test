@@ -140,7 +140,7 @@ Placeholders let you capture values from the step text into `context.captures`.
 Typed helpers like `get_int` parse the capture into the right type.
 
 - `{int}`: an integer, such as `42` or `-5`
-- `{float}`: a decimal number, such as `3.14`
+- `{float}`: a number as Cucumber reads it: an optional sign, digits with an optional `.` and digits (or `.` and digits alone), and an optional exponent, such as `3.14`, `20`, `.5`, `-3` or `1.5e-3`. `5.`, `1,000` and `NaN` are not numbers. For a whole number, `{int}` wins over `{float}`, and `{float}` wins over `{word}` and `{}`.
 - `{string}`: a double-quoted string, such as `"hello world"`. The capture has no quotes.
 - `{word}`: text with no space, such as `alice` or `user42`
 - `{}`: any text in one word
@@ -170,7 +170,7 @@ fn step_int(values: Values, context: StepContext) {
   Ok(Values(..values, int: value))
 }
 
-// {float} captures decimals (works with $ prefix too)
+// {float} captures numbers like 3.14, 20 or 1e5 (works with $ prefix too)
 fn step_float(values: Values, context: StepContext) {
   use value <- result.try(get_float(context.captures, 0))
   Ok(Values(..values, float: value))
