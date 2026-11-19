@@ -107,9 +107,7 @@ store. This release has breaking changes. Read
 - A step can finish after its deadline, before the kill reaches its
   process. The test is still `TimedOut` for that step. Its report can then
   also hold what the process did after the deadline: the context and the
-  tear-down failures of the steps that finished then. No test can put a
-  message in this window, so this path is checked by reading the code, not
-  by a test.
+  tear-down failures of the steps that finished then.
 
 #### Sandbox
 
