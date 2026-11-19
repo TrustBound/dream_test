@@ -772,26 +772,27 @@ fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
 
 fn other_causes(outcome: RunOutcome) -> List(String) {
   list.flatten([
-    cause_when(outcome.teardown_failed, "a tear-down hook failed"),
-    cause_when(outcome.setup_stopped, "a set-up stopped"),
-    reporters_crashed_cause(outcome.reporters_crashed),
+    counted_cause(
+      outcome.teardown_failed,
+      "a tear-down hook failed",
+      "tear-down hooks failed",
+    ),
+    counted_cause(outcome.setup_stopped, "a set-up stopped", "set-ups stopped"),
+    counted_cause(
+      outcome.reporters_crashed,
+      "a results reporter crashed",
+      "results reporters crashed",
+    ),
   ])
 }
 
-/// `a results reporter crashed` for one crash, and
-/// `<count> results reporters crashed` for more.
-fn reporters_crashed_cause(count: Int) -> List(String) {
+/// No cause for a count of 0, `one` for 1, and `<count> <more>` for more,
+/// for example `a set-up stopped` and `2 set-ups stopped`.
+fn counted_cause(count: Int, one: String, more: String) -> List(String) {
   case count {
     0 -> []
-    1 -> ["a results reporter crashed"]
-    _ -> [int.to_string(count) <> " results reporters crashed"]
-  }
-}
-
-fn cause_when(count: Int, cause: String) -> List(String) {
-  case count {
-    0 -> []
-    _ -> [cause]
+    1 -> [one]
+    _ -> [int.to_string(count) <> " " <> more]
   }
 }
 

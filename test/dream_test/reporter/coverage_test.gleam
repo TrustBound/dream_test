@@ -1301,9 +1301,26 @@ pub fn tests() {
         )
         |> should
         |> be_equal(Ok(
-          "Tests: 3 passed, 1 tear-down failed, 2 set-up stopped. Exit status 1, because a tear-down hook failed, a set-up stopped and coverage is below the minimum.\n",
+          "Tests: 3 passed, 1 tear-down failed, 2 set-up stopped. Exit status 1, because a tear-down hook failed, 2 set-ups stopped and coverage is below the minimum.\n",
         ))
         |> or_fail_with("expected both counts and both causes")
+      }),
+      it("counts more than one failed tear-down hook in the cause", fn() {
+        last_line(
+          BelowMinimumPercent(
+            hit: 2,
+            total: 6,
+            minimum_percent: 50.0,
+            lines_needed: 3,
+          ),
+          3,
+          1,
+        )
+        |> should
+        |> be_equal(Ok(
+          "Tests: 3 passed, 3 tear-down failed, 1 set-up stopped. Exit status 1, because 3 tear-down hooks failed, a set-up stopped and coverage is below the minimum.\n",
+        ))
+        |> or_fail_with("expected 3 tear-down hooks and a set-up in the cause")
       }),
       it(
         "names a crashed results reporter together with a coverage error",
@@ -1326,7 +1343,7 @@ pub fn tests() {
             "Tests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed, 2 results reporters crashed and coverage did not complete.\n",
           ))
           |> or_fail_with(
-            "expected the tear-down failure and the crashed reporter",
+            "expected the tear-down failure and the two crashed reporters",
           )
         },
       ),
