@@ -672,14 +672,14 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 /// Each variant is the hook of the builder function with the same name:
 ///
 /// - `BeforeAllHook`: `unit.before_all` (and the same hook of the other
-///   DSLs). Its scope is one group.
-/// - `BeforeEachSuiteHook`: `runner.before_each_suite`. Its scope is one
-///   suite.
-/// - `BeforeAllSuitesHook`: `runner.before_all_suites`. Its scope is the
-///   whole run.
+///   DSLs). It serves the tests of one group.
+/// - `BeforeEachSuiteHook`: `runner.before_each_suite`. It serves the tests
+///   of one suite.
+/// - `BeforeAllSuitesHook`: `runner.before_all_suites`. It serves every
+///   test of the run.
 /// - `SuiteSetUpHook`: the set-up of a suite whose context comes from a
 ///   set-up (`unit_context.describe_with_set_up`, `steps.new_with_set_up`).
-///   Its scope is the suite. Its name is `"set_up"`.
+///   It serves the tests of that suite. Its name is `"set_up"`.
 pub type SetUpHook {
   BeforeAllHook
   BeforeEachSuiteHook

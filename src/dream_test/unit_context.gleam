@@ -329,8 +329,8 @@ pub fn skip(
 /// Run once before any tests and produce/transform the context.
 ///
 /// It runs in the setup process of the group, so a resource that it starts
-/// lives for all the tests of the scope. It gets the default timeout. If it
-/// returns `Error`, times out or crashes, all tests under this scope become
+/// lives for all the tests of the group. It gets the default timeout. If it
+/// returns `Error`, times out or crashes, all tests under this group become
 /// `SetupFailed`.
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),

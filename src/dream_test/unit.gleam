@@ -354,9 +354,9 @@ pub fn skip(
 ///
 /// - Runs in the setup process of the group, so a resource that it starts
 ///   (for example a pool that links to the caller, or an ETS table) lives
-///   for all the tests of the scope. It gets the default timeout.
+///   for all the tests of the group. It gets the default timeout.
 /// - If it returns `Error("message")` or crashes, all tests under this
-///   scope become `SetupFailed`, and the `after_all` hooks still run.
+///   group become `SetupFailed`, and the `after_all` hooks still run.
 ///
 /// ## Example
 ///
