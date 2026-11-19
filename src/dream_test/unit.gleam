@@ -357,6 +357,7 @@ pub fn skip(
 ///   for all the tests of the group. It gets the default timeout.
 /// - If it returns `Error("message")` or crashes, all tests under this
 ///   group become `SetupFailed`, and the `after_all` hooks still run.
+/// - It does not run for a group that has no test after filtering.
 ///
 /// ## Example
 ///
@@ -619,10 +620,11 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
   AfterEach(NoInput(teardown))
 }
 
-/// Run once after all tests in the current scope.
+/// Run once after all tests in the current group.
 ///
 /// It runs in the setup process of the group, with the default timeout,
-/// so it can stop a resource that `before_all` started. Every `after_all` hook runs, also
+/// so it can stop a resource that `before_all` started. It does not run for
+/// a group that has no test after filtering. Every `after_all` hook runs, also
 /// after one fails. If it returns `Error("message")` or crashes, the run
 /// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
 /// group path in `groups`, and the run fails. No test result is added.

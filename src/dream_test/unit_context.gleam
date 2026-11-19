@@ -331,7 +331,8 @@ pub fn skip(
 /// It runs in the setup process of the group, so a resource that it starts
 /// lives for all the tests of the group. It gets the default timeout. If it
 /// returns `Error`, times out or crashes, all tests under this group become
-/// `SetupFailed`.
+/// `SetupFailed`. It does not run for a group that has no test after
+/// filtering.
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
@@ -363,7 +364,8 @@ pub fn after_each(
 /// It runs in the setup process of the group, with the default timeout.
 /// Every `after_all` hook
 /// runs, also after one fails. A failure goes into the tear-down failures of
-/// the run report, and the run fails.
+/// the run report, and the run fails. It does not run for a group that has
+/// no test after filtering.
 pub fn after_all(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {

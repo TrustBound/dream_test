@@ -740,6 +740,8 @@ pub fn after_each_test(
 /// If it returns `Error("...")`, times out or crashes, all tests in that suite are
 /// marked `SetupFailed`, the suite does not run, and `after_each_suite`
 /// still runs.
+///
+/// The hook does not run for a suite that has no test after filtering.
 pub fn before_each_suite(
   builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -760,6 +762,8 @@ pub fn before_each_suite(
 /// returns `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailure` with hook `AfterEachSuiteHook`
 /// and the suite name in `groups`, and the run fails.
+///
+/// The hook does not run for a suite that has no test after filtering.
 pub fn after_each_suite(
   builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -778,6 +782,8 @@ pub fn after_each_suite(
 /// stops it. It gets the default timeout.
 /// If it returns `Error("...")`, times out or crashes, all selected tests are marked
 /// `SetupFailed`, no suite runs, and `after_all_suites` still runs.
+///
+/// The hook does not run when the run has no test after filtering.
 pub fn before_all_suites(
   builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
@@ -798,6 +804,8 @@ pub fn before_all_suites(
 /// `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailure` with hook `AfterAllSuitesHook`
 /// and `groups: []`, and the run fails.
+///
+/// The hook does not run when the run has no test after filtering.
 pub fn after_all_suites(
   builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
