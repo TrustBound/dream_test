@@ -579,7 +579,7 @@ pub fn tests() {
     }),
 
     it("lookup matches {float} against Cucumber numbers", fn() {
-      ["20", ".5", "-3", "+2", "007", "1e5", "1E5", "1.5e-3", "-2.5E+2"]
+      ["20", ".5", "-3", "+2", "007", "1e5", "1E5", "1.5e-3", "-2.5E+2", "4.68"]
       |> list.map(float_capture)
       |> should
       |> be_equal([
@@ -592,6 +592,7 @@ pub fn tests() {
         Ok(Some(100_000.0)),
         Ok(Some(0.0015)),
         Ok(Some(-250.0)),
+        Ok(Some(4.68)),
       ])
       |> or_fail_with("each text should be a float")
     }),
