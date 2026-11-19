@@ -56,6 +56,45 @@ pub fn tests() {
       |> or_fail_with("expected the four reports in list order")
     }),
 
+    it("writes a named error for a crashed reporter and runs the next", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+        reporter_types.Custom(coverage_runner_mains.custom_report),
+      ])
+      |> should
+      |> be_equal([
+        #(
+          "error",
+          "\nResults reporter failed\n"
+            <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: error:custom_render_crashed\n"
+            <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+            <> "  Fix: make the render function return a String for every RunReport.\n"
+            <> "\n",
+        ),
+        #("out", "Custom report: 1 passed, 0 failed\n"),
+      ])
+      |> or_fail_with("expected the crash error, then the next report")
+    }),
+
+    it("names the position of the crashed reporter in the list", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(first_report),
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+      ])
+      |> list.map(stream_and_first_line)
+      |> should
+      |> be_equal([
+        #("out", "first report"),
+        #(
+          "error",
+          "  The Custom results reporter at position 2 in runner.results_reporters crashed: error:custom_render_crashed",
+        ),
+      ])
+      |> or_fail_with(
+        "expected the first report, then the error for position 2",
+      )
+    }),
+
     it("prints the custom report, then exits 1, for a failed run", fn() {
       run_main_in_new_vm(
         "dream_test@coverage_runner_mains",
@@ -116,13 +155,55 @@ fn run_and_record(
   received(subject)
 }
 
-fn received(subject: Subject(String)) -> List(String) {
+fn received(subject: Subject(a)) -> List(a) {
   received_loop(subject, [])
 }
 
-fn received_loop(subject: Subject(String), acc: List(String)) -> List(String) {
+fn received_loop(subject: Subject(a), acc: List(a)) -> List(a) {
   case process.receive(subject, 0) {
     Ok(text) -> received_loop(subject, [text, ..acc])
     Error(Nil) -> list.reverse(acc)
+  }
+}
+
+/// Run `suites` with `reporters`, and return every text that the runner
+/// wrote, oldest first, each with the stream it went to: "out" or "error".
+fn run_and_record_streams(
+  suites: List(suite.TestSuite),
+  reporters: List(reporter_types.ResultsReporter),
+) -> List(#(String, String)) {
+  let subject = process.new_subject()
+  let _report =
+    runner.new(suites)
+    |> runner.results_reporters(reporters)
+    |> runner.output(
+      runner.Output(out: fn(text) { send_out(subject, text) }, error: fn(text) {
+        send_error(subject, text)
+      }),
+    )
+    |> runner.run()
+  received(subject)
+}
+
+fn send_out(subject: Subject(#(String, String)), text: String) -> Nil {
+  process.send(subject, #("out", text))
+}
+
+fn send_error(subject: Subject(#(String, String)), text: String) -> Nil {
+  process.send(subject, #("error", text))
+}
+
+/// The stream and the first line of a text that is not blank.
+fn stream_and_first_line(entry: #(String, String)) -> #(String, String) {
+  let #(stream, text) = entry
+  #(stream, first_line(string.split(text, "\n")))
+}
+
+fn first_line(lines: List(String)) -> String {
+  case lines {
+    [] -> ""
+    ["", ..rest] -> first_line(rest)
+    ["Results reporter failed", ..rest] -> first_line(rest)
+    [line, ..] -> line
   }
 }

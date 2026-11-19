@@ -127,6 +127,14 @@ fn below_minimum_per_file() -> String {
   <> "\n"
 }
 
+fn reporter_crash() -> String {
+  "\nResults reporter failed\n"
+  <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: error:custom_render_crashed\n"
+  <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+  <> "  Fix: make the render function return a String for every RunReport.\n"
+  <> "\n"
+}
+
 fn below_minimum_exit_line() -> String {
   "Tests: 1 passed. Exit status 1, because coverage is below the minimum.\n"
 }
@@ -183,6 +191,30 @@ pub fn tests() {
           <> below_minimum_exit_line(),
       ))
       |> or_fail_with("expected the custom report, the failure and status 1")
+    }),
+    it("names a crashed reporter, runs the rest and exits 1", fn() {
+      run_main("crashing_custom_reporter_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        reporter_crash() <> "Custom report: 1 passed, 0 failed\n" <> table(),
+      ))
+      |> or_fail_with(
+        "expected the crash error, the next report, the table and status 1",
+      )
+    }),
+    it("names a crashed reporter as a cause of a coverage failure", fn() {
+      run_main("crashing_custom_reporter_below_minimum_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        reporter_crash()
+          <> "Custom report: 1 passed, 0 failed\n"
+          <> table()
+          <> below_minimum()
+          <> "Tests: 1 passed. Exit status 1, because a results reporter crashed and coverage is below the minimum.\n",
+      ))
+      |> or_fail_with("expected both causes in the exit line and status 1")
     }),
     it("fails files below the per-file minimum and exits 1", fn() {
       run_main("below_minimum_per_file_with_exit_on_failure")

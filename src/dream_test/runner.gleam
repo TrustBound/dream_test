@@ -70,6 +70,7 @@ import dream_test/types.{
   BeforeAllSuitesHook, BeforeEachSuiteHook, Passed, SetupFailed, SetupStopped,
   TeardownFailure,
 }
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -832,6 +833,11 @@ pub fn after_all_suites(
 /// With `exit_on_failure`, a failed run does not return: it writes all its
 /// output and then ends the program with exit status 1.
 ///
+/// If the `render` function of a `reporter_types.Custom` reporter crashes,
+/// the runner writes a `Results reporter failed` error to the error output
+/// and goes on with the next reporter and with coverage. With
+/// `exit_on_failure`, the crash also ends the program with exit status 1.
+///
 /// ## Example
 ///
 /// ```gleam
@@ -871,7 +877,9 @@ pub fn after_all_suites(
 /// order, and the tear-down hooks that failed. Read it with
 /// `types.report_tests` and `types.report_teardown_failures`, and check it
 /// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
-/// when `types.failed(report)` is `True`.
+/// when `types.failed(report)` is `True`, when a `reporter_types.Custom`
+/// reporter crashes, or when coverage fails (a total or a file below a
+/// minimum, or coverage that did not complete).
 pub fn run(builder builder: RunBuilder) -> RunReport {
   let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
   let total = count_total_tests(selected_runs)
@@ -991,18 +999,20 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
       )
   }
 
-  write_results_reporters(builder.results_reporters, report, output)
+  let reporters_crashed =
+    write_results_reporters(builder.results_reporters, report, output)
 
   let coverage_succeeded =
     finish_coverage(
       coverage_state,
       output,
-      run_outcome(report, builder.should_exit_on_failure),
+      run_outcome(report, reporters_crashed, builder.should_exit_on_failure),
     )
 
   maybe_exit_on_failure(
     builder.should_exit_on_failure,
     report,
+    reporters_crashed,
     coverage_succeeded,
   )
 
@@ -1955,10 +1965,12 @@ fn discard_output(_text: String) -> Nil {
 fn maybe_exit_on_failure(
   should_exit: Bool,
   report: RunReport,
+  reporters_crashed: Int,
   coverage_succeeded: Bool,
 ) -> Nil {
   let should_stop =
-    should_exit && { types.failed(report) || !coverage_succeeded }
+    should_exit
+    && { types.failed(report) || reporters_crashed > 0 || !coverage_succeeded }
   case should_stop {
     // Gleam 1.13 and older halt the BEAM with status 0 at once when `main`
     // returns. `end_program` does not return, so `main` does not return, no
@@ -2165,6 +2177,7 @@ fn write_coverage_error(
 
 fn run_outcome(
   report: RunReport,
+  reporters_crashed: Int,
   exit_on_failure: Bool,
 ) -> coverage_reporter.RunOutcome {
   let tests = types.report_tests(report)
@@ -2174,6 +2187,7 @@ fn run_outcome(
     failed: list.count(tests, is_failure),
     teardown_failed: counts.teardown_failed,
     setup_stopped: counts.setup_stopped,
+    reporters_crashed: reporters_crashed,
     exit_on_failure: exit_on_failure,
   )
 }
@@ -2194,37 +2208,93 @@ fn write_progress_event(
   output_out(output)(progress.line(reporter, event))
 }
 
+/// Write the report of each results reporter in list order, and return
+/// how many crashed. A crash does not stop the run: the runner writes a
+/// named error to the error output and goes on with the next reporter.
 fn write_results_reporters(
   reporters: List(reporter_types.ResultsReporter),
   report: RunReport,
   output: Output,
-) -> Nil {
-  write_results_reporters_loop(reporters, report, output_out(output))
+) -> Int {
+  write_results_reporters_loop(reporters, report, output, 1, 0)
 }
 
 fn write_results_reporters_loop(
   reporters: List(reporter_types.ResultsReporter),
   report: RunReport,
-  write: fn(String) -> Nil,
-) -> Nil {
+  output: Output,
+  position: Int,
+  crashed: Int,
+) -> Int {
   case reporters {
-    [] -> Nil
-    [reporter, ..rest] -> {
-      write(render_results_reporter(reporter, report))
-      write_results_reporters_loop(rest, report, write)
+    [] -> crashed
+    [reporter, ..rest] ->
+      write_results_reporters_loop(
+        rest,
+        report,
+        output,
+        position + 1,
+        crashed + write_results_reporter(reporter, report, output, position),
+      )
+  }
+}
+
+/// Write the report of one results reporter, and return 1 when its
+/// render function crashed, else 0.
+fn write_results_reporter(
+  reporter: reporter_types.ResultsReporter,
+  report: RunReport,
+  output: Output,
+  position: Int,
+) -> Int {
+  let Output(out: write_out, error: write_error) = output
+  case reporter {
+    reporter_types.Bdd(config) -> {
+      write_out(bdd.render(config, report))
+      0
+    }
+    reporter_types.Json(config) -> {
+      write_out(json.render(config, report))
+      0
+    }
+    reporter_types.Custom(render) ->
+      write_custom_report(
+        sandbox.run_catching(render, report),
+        write_out,
+        write_error,
+        position,
+      )
+  }
+}
+
+fn write_custom_report(
+  rendered: Result(String, String),
+  write_out: fn(String) -> Nil,
+  write_error: fn(String) -> Nil,
+  position: Int,
+) -> Int {
+  case rendered {
+    Ok(text) -> {
+      write_out(text)
+      0
+    }
+    Error(crash) -> {
+      write_error(custom_reporter_crash(position, crash))
+      1
     }
   }
 }
 
-fn render_results_reporter(
-  reporter: reporter_types.ResultsReporter,
-  report: RunReport,
-) -> String {
-  case reporter {
-    reporter_types.Bdd(config) -> bdd.render(config, report)
-    reporter_types.Json(config) -> json.render(config, report)
-    reporter_types.Custom(render) -> render(report)
-  }
+fn custom_reporter_crash(position: Int, crash: String) -> String {
+  "\nResults reporter failed\n"
+  <> "  The Custom results reporter at position "
+  <> int.to_string(position)
+  <> " in runner.results_reporters crashed: "
+  <> crash
+  <> "\n"
+  <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+  <> "  Fix: make the render function return a String for every RunReport.\n"
+  <> "\n"
 }
 
 fn output_out(output: Output) -> fn(String) -> Nil {

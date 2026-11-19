@@ -329,6 +329,42 @@ pub fn custom_reporter_below_minimum_with_exit_on_failure() -> Nil {
   Nil
 }
 
+/// A run where every test passes, with a custom results reporter that
+/// crashes, a custom results reporter that works, coverage and
+/// `exit_on_failure`.
+pub fn crashing_custom_reporter_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.results_reporters([
+      reporter_types.Custom(crash_render),
+      reporter_types.Custom(custom_report),
+    ])
+    |> runner.coverage(fixture_coverage())
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+/// Like `crashing_custom_reporter_with_exit_on_failure`, but coverage is
+/// also below the minimum.
+pub fn crashing_custom_reporter_below_minimum_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.results_reporters([
+      reporter_types.Custom(crash_render),
+      reporter_types.Custom(custom_report),
+    ])
+    |> runner.coverage(fixture_coverage() |> coverage.minimum_percent(50.0))
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+/// A render function for `reporter_types.Custom` that crashes with
+/// `erlang:error(custom_render_crashed)`.
+@external(erlang, "dream_test_reporter_test_ffi", "crash_render")
+pub fn crash_render(report: types.RunReport) -> String
+
 /// The text of the custom results reporter of the mains above.
 pub fn custom_report(report: types.RunReport) -> String {
   let counts = summary.count(report)

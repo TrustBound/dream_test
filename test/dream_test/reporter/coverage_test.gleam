@@ -160,6 +160,7 @@ fn passing_outcome() {
     failed: 0,
     teardown_failed: 0,
     setup_stopped: 0,
+    reporters_crashed: 0,
     exit_on_failure: True,
   )
 }
@@ -1223,6 +1224,7 @@ pub fn tests() {
             failed: 2,
             teardown_failed: 0,
             setup_stopped: 0,
+            reporters_crashed: 0,
             exit_on_failure: True,
           ),
         )
@@ -1244,6 +1246,7 @@ pub fn tests() {
             failed: 0,
             teardown_failed: 1,
             setup_stopped: 0,
+            reporters_crashed: 0,
             exit_on_failure: True,
           ),
         )
@@ -1265,6 +1268,7 @@ pub fn tests() {
             failed: 2,
             teardown_failed: 1,
             setup_stopped: 0,
+            reporters_crashed: 0,
             exit_on_failure: True,
           ),
         )
@@ -1301,6 +1305,31 @@ pub fn tests() {
         ))
         |> or_fail_with("expected both counts and both causes")
       }),
+      it(
+        "names a crashed results reporter together with a coverage error",
+        fn() {
+          coverage_reporter.render_failure(
+            error: NoSourceFiles("lib"),
+            outcome: RunOutcome(
+              passed: 3,
+              failed: 0,
+              teardown_failed: 1,
+              setup_stopped: 0,
+              reporters_crashed: 2,
+              exit_on_failure: True,
+            ),
+          )
+          |> string.split("\n\n")
+          |> list.last
+          |> should
+          |> be_equal(Ok(
+            "Tests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed, a results reporter crashed and coverage did not complete.\n",
+          ))
+          |> or_fail_with(
+            "expected the tear-down failure and the crashed reporter",
+          )
+        },
+      ),
       it("says the exit status is unchanged without exit_on_failure", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
@@ -1309,6 +1338,7 @@ pub fn tests() {
             failed: 0,
             teardown_failed: 0,
             setup_stopped: 0,
+            reporters_crashed: 0,
             exit_on_failure: False,
           ),
         )
@@ -1375,6 +1405,7 @@ pub fn tests() {
             failed: 1,
             teardown_failed: 0,
             setup_stopped: 0,
+            reporters_crashed: 0,
             exit_on_failure: True,
           ),
         )
@@ -1406,6 +1437,7 @@ fn last_line(
       failed: 0,
       teardown_failed: teardown_failed,
       setup_stopped: setup_stopped,
+      reporters_crashed: 0,
       exit_on_failure: True,
     ),
   )

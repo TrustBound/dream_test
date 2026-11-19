@@ -124,6 +124,7 @@ import gleam/string
 /// - `failed`: tests with status `Failed`, `SetupFailed` or `TimedOut`
 /// - `teardown_failed`: tear-down hooks that failed
 /// - `setup_stopped`: set-ups whose process stopped while their tests ran
+/// - `reporters_crashed`: results reporters whose render function crashed
 /// - `exit_on_failure`: whether the runner exits with status 1 on failure
 pub type RunOutcome {
   RunOutcome(
@@ -131,6 +132,7 @@ pub type RunOutcome {
     failed: Int,
     teardown_failed: Int,
     setup_stopped: Int,
+    reporters_crashed: Int,
     exit_on_failure: Bool,
   )
 }
@@ -755,19 +757,21 @@ fn outcome_line(outcome: RunOutcome, reason: ExitReason) -> String {
 }
 
 /// The causes of the exit status 1, in a sentence. Failed tests come
-/// first and alone; else each failed tear-down hook and stopped set-up.
+/// first and alone; else each failed tear-down hook, stopped set-up and
+/// crashed results reporter.
 fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
-  case outcome.failed, hook_causes(outcome) {
+  case outcome.failed, other_causes(outcome) {
     0, [] -> reason.alone
-    0, hooks -> string.join(hooks, ", ") <> " and " <> reason.coverage
+    0, others -> string.join(others, ", ") <> " and " <> reason.coverage
     _, _ -> "tests failed and " <> reason.coverage
   }
 }
 
-fn hook_causes(outcome: RunOutcome) -> List(String) {
+fn other_causes(outcome: RunOutcome) -> List(String) {
   list.flatten([
     cause_when(outcome.teardown_failed, "a tear-down hook failed"),
     cause_when(outcome.setup_stopped, "a set-up stopped"),
+    cause_when(outcome.reporters_crashed, "a results reporter crashed"),
   ])
 }
 

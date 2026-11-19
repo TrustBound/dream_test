@@ -382,7 +382,8 @@ the guide labels them.
   - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
     coverage failure: the passed and failed tests, the tear-down hooks that
     failed (`teardown_failed`), the set-ups that stopped (`setup_stopped`),
-    and whether the runner exits on failure, for example
+    the results reporters that crashed (`reporters_crashed`), and whether
+    the runner exits on failure, for example
     `Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.`
   - dream_test measures itself: its own tests cover 100% of the lines in
     `src`, with no exclusions
@@ -587,6 +588,11 @@ the guide labels them.
     `runner.exit_on_failure()` ends the program. Thus a custom report or a
     Gherkin report (`reporter_types.Custom(gherkin.format)`) prints, and the
     exit status is 1 when the run fails or coverage is below a minimum
+  - A `render` function that crashes does not stop the run. The runner
+    writes a `Results reporter failed` error to the error output, with the
+    position of the reporter and the crash, and goes on with the next
+    reporter and with coverage. With `runner.exit_on_failure()`, the exit
+    status is 1
 
 ### Changed
 

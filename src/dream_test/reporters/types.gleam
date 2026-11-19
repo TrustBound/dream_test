@@ -48,6 +48,12 @@ pub type ResultsReporter {
   /// `render` one time with the run report, and writes the text that it
   /// returns. The runner adds no newline, so end the text with `"\n"`.
   ///
+  /// If `render` crashes, the runner writes a `Results reporter failed`
+  /// error to the error output. The error names the position of the
+  /// reporter in the list and the crash. The runner then goes on with the
+  /// next reporter and with coverage. With `runner.exit_on_failure()`, a
+  /// crash ends the run with exit status 1.
+  ///
   /// ```gleam
   /// import dream_test/reporters/types as reporter_types
   /// import dream_test/runner
