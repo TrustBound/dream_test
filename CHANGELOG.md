@@ -570,6 +570,17 @@ the guide labels them.
     `parser.parse_error_to_string`, `parser.feature_file_error_to_string`
     and `parser.token_kind_to_string` give the messages
 
+- **Custom results reporters** (`dream_test/reporters/types`)
+
+  - `reporter_types.Custom(render)` adds your own report format to
+    `runner.results_reporters`. `render` is a `fn(RunReport) -> String`.
+    The runner calls it one time at the end of the run and writes the text,
+    in list order with the `bdd` and `json` reports
+  - The reports print before the coverage check and before
+    `runner.exit_on_failure()` ends the program. Thus a custom report or a
+    Gherkin report (`reporter_types.Custom(gherkin.format)`) prints, and the
+    exit status is 1 when the run fails or coverage is below a minimum
+
 ### Changed
 
 - **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)

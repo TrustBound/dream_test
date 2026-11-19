@@ -1,10 +1,11 @@
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/summary
+import dream_test/reporters/types as reporter_types
 import dream_test/runner
 import dream_test/types.{type RunReport}
 import dream_test/unit.{describe, it}
+import gleam/erlang/process.{type Subject}
 import gleam/int
-import gleam/io
 import gleam/string
 
 pub fn render_my_report(report: RunReport) -> String {
@@ -28,22 +29,11 @@ pub fn render_my_report(report: RunReport) -> String {
 }
 
 pub fn main() {
-  let report = runner.new([tests()]) |> runner.run()
-  io.print(render_my_report(report))
-  halt(exit_status(report))
+  runner.new([tests()])
+  |> runner.results_reporters([reporter_types.Custom(render_my_report)])
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
-
-/// 1 when a test or a hook failed, else 0.
-fn exit_status(report: RunReport) -> Int {
-  case types.failed(report) {
-    True -> 1
-    False -> 0
-  }
-}
-
-/// End the program with an exit status. It never returns.
-@external(erlang, "erlang", "halt")
-fn halt(status: Int) -> Nil
 
 fn example_suite() {
   describe("Example Suite", [
@@ -54,6 +44,23 @@ fn example_suite() {
 
 pub fn tests() {
   describe("Custom post-run reporter", [
+    it("the runner writes the report at the end of the run", fn() {
+      let written = process.new_subject()
+      let _report =
+        runner.new([example_suite()])
+        |> runner.results_reporters([reporter_types.Custom(render_my_report)])
+        |> runner.output(runner.Output(
+          out: send_to(written),
+          error: send_to(written),
+        ))
+        |> runner.run()
+      process.receive(written, 0)
+      |> should
+      |> be_equal(Ok(
+        "MyReport: 2 total; 2 passed; 0 failed; 0 tear-down failed; 0 set-up stopped\n",
+      ))
+      |> or_fail_with("expected the runner to write the custom report")
+    }),
     it("renders the counts of a run", fn() {
       runner.new([example_suite()])
       |> runner.silent()
@@ -87,4 +94,9 @@ pub fn tests() {
       |> or_fail_with("expected one failed hook and one stopped set-up")
     }),
   ])
+}
+
+/// A writer that sends each text to `subject`.
+fn send_to(subject: Subject(String)) -> fn(String) -> Nil {
+  fn(text) { process.send(subject, text) }
 }

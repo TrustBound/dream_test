@@ -1310,6 +1310,10 @@ pub fn tests() {
 }
 ```
 
+#### Custom reports
+
+In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. See [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
+
 ### The JSON report
 
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:

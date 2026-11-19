@@ -172,6 +172,18 @@ pub fn tests() {
       ))
       |> or_fail_with("expected the minimum failure and exit status 1")
     }),
+    it("prints a custom report, then exits 1 below the minimum", fn() {
+      run_main("custom_reporter_below_minimum_with_exit_on_failure")
+      |> should
+      |> be_equal(#(
+        1,
+        "Custom report: 1 passed, 0 failed\n"
+          <> table()
+          <> below_minimum()
+          <> below_minimum_exit_line(),
+      ))
+      |> or_fail_with("expected the custom report, the failure and status 1")
+    }),
     it("fails files below the per-file minimum and exits 1", fn() {
       run_main("below_minimum_per_file_with_exit_on_failure")
       |> should

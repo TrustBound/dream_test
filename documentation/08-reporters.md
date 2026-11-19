@@ -165,17 +165,12 @@ pub fn tests() {
 
 ### Custom reporters
 
-Dream Test currently supports **custom reporting** in two practical ways:
+Dream Test supports **custom reporting** in two ways:
 
 - **Custom output routing**: decide where runner output goes (stdout, stderr, file, in-memory buffer).
-- **Custom post-run reporters**: write your own formatter over the `types.RunReport` that `runner.run()` gives, and print it.
+- **Custom results reporters**: write your own formatter over the `types.RunReport`, and give it to `runner.results_reporters` as `reporter_types.Custom(..)`.
 
-Note: the runner’s built-in “attach” points are intentionally small today:
-
-- `runner.progress_reporter(...)` currently accepts only `progress.ProgressReporter`
-- `runner.results_reporters([...])` currently accepts the built-in `bdd`/`json` results reporters
-
-If you want “plug in an arbitrary reporter module” wired into the runner, you can still do it by building your own driver around `runner.run()` (post-run), or by implementing a custom executor/event loop (advanced).
+`runner.progress_reporter(...)` accepts only `progress.ProgressReporter`.
 
 #### Custom output routing (capture output)
 
@@ -255,18 +250,19 @@ fn example_suite() {
 #### Custom post-run reporter (format a `RunReport`)
 
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
-write a pure formatter over the `types.RunReport` that `runner.run()` gives. Read the tests with `types.report_tests` and the set-up and tear-down failures with `types.report_teardown_failures`, or get all the counts with `summary.count`. It counts the tear-down hooks that failed (`teardown_failed`) apart from the set-ups whose process stopped (`setup_stopped`).
+write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the set-up and tear-down failures with `types.report_teardown_failures`, or get all the counts with `summary.count`. It counts the tear-down hooks that failed (`teardown_failed`) apart from the set-ups whose process stopped (`setup_stopped`).
 
-##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L28"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/summary
+import dream_test/reporters/types as reporter_types
 import dream_test/runner
 import dream_test/types.{type RunReport}
 import dream_test/unit.{describe, it}
+import gleam/erlang/process.{type Subject}
 import gleam/int
-import gleam/io
 import gleam/string
 
 pub fn render_my_report(report: RunReport) -> String {
@@ -290,30 +286,19 @@ pub fn render_my_report(report: RunReport) -> String {
 }
 ```
 
-Then call it from your runner `main()`.
+Then give the formatter to the runner as `reporter_types.Custom(render_my_report)`. At the end of the run, the runner calls the formatter one time and writes the text that it returns. The runner adds no newline, so end the text with `"\n"`. The reports print in list order, with `bdd` and `json` reports in the same list.
 
-A custom report cannot be added to `runner.results_reporters`, which takes only the built-in reporters. Thus `main` runs the tests, prints the report, then ends the program itself. Do not add `runner.exit_on_failure` here. It ends the program inside `runner.run` when the run fails, so the custom report would never print. Without an exit of its own, `main` ends with exit status 0, also when tests fail. The `halt` below gives exit status 1 when `types.failed` is `True`: a test failed, timed out or had a failed set-up, or a hook failed.
+The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. The run fails when a test fails, times out or has a failed set-up, when a hook fails, or when coverage is below a minimum.
 
-##### Call the formatter from main <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L30-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Give the formatter to the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L31-L36"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn main() {
-  let report = runner.new([tests()]) |> runner.run()
-  io.print(render_my_report(report))
-  halt(exit_status(report))
+  runner.new([tests()])
+  |> runner.results_reporters([reporter_types.Custom(render_my_report)])
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
-
-/// 1 when a test or a hook failed, else 0.
-fn exit_status(report: RunReport) -> Int {
-  case types.failed(report) {
-    True -> 1
-    False -> 0
-  }
-}
-
-/// End the program with an exit status. It never returns.
-@external(erlang, "erlang", "halt")
-fn halt(status: Int) -> Nil
 ```
 
 For a run with one passing and one failing test, this `main` prints `MyReport: 2 total; 1 passed; 1 failed; 0 tear-down failed; 0 set-up stopped`, then ends with exit status 1.
@@ -341,9 +326,8 @@ import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps
 import dream_test/matchers.{succeed}
 import dream_test/reporters/gherkin as gherkin_reporter
+import dream_test/reporters/types as reporter_types
 import dream_test/runner
-import dream_test/types.{type RunReport}
-import gleam/io
 
 fn step_ok(state: Nil, _context: steps.StepContext) {
   Ok(state)
@@ -368,25 +352,16 @@ pub fn tests() {
 }
 
 pub fn main() {
-  let report = runner.new([tests()]) |> runner.run()
-  gherkin_reporter.report(report, io.print)
-  halt(exit_status(report))
+  runner.new([tests()])
+  |> runner.results_reporters([
+    reporter_types.Custom(gherkin_reporter.format),
+  ])
+  |> runner.exit_on_failure()
+  |> runner.run()
 }
-
-/// 1 when a test or a hook failed, else 0.
-fn exit_status(report: RunReport) -> Int {
-  case types.failed(report) {
-    True -> 1
-    False -> 0
-  }
-}
-
-/// End the program with an exit status. It never returns.
-@external(erlang, "erlang", "halt")
-fn halt(status: Int) -> Nil
 ```
 
-The Gherkin report is not a results reporter either, so this `main` ends the program itself, as in [the custom report](#custom-post-run-reporter-format-a-runreport) above.
+`gherkin_reporter.format` takes a `RunReport` and gives a `String`, so it goes in `results_reporters` as `reporter_types.Custom(gherkin_reporter.format)`, as in [the custom report](#custom-post-run-reporter-format-a-runreport) above. With `runner.exit_on_failure()`, the report prints, then the program ends with exit status 1 when the run fails.
 
 ### Choosing a reporter (a quick heuristic)
 

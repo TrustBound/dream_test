@@ -10,9 +10,12 @@ import dream_test/coverage
 import dream_test/coverage_fixture_server
 import dream_test/file
 import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/summary
+import dream_test/reporters/types as reporter_types
 import dream_test/runner
 import dream_test/types
 import dream_test/unit.{before_all, describe, it}
+import gleam/int
 import gleam/io
 import gleam/result
 
@@ -302,4 +305,36 @@ fn second_run_tests() {
 
 fn write_after_run_marker() -> Result(Nil, String) {
   Ok(io.println(after_run_marker))
+}
+
+/// A failed run with a custom results reporter and `exit_on_failure`.
+pub fn custom_reporter_failed_run_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([failing_tests()])
+    |> runner.results_reporters([reporter_types.Custom(custom_report)])
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+/// A run where every test passes but coverage is below the minimum, with
+/// a custom results reporter and `exit_on_failure`.
+pub fn custom_reporter_below_minimum_with_exit_on_failure() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.results_reporters([reporter_types.Custom(custom_report)])
+    |> runner.coverage(fixture_coverage() |> coverage.minimum_percent(50.0))
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+/// The text of the custom results reporter of the mains above.
+pub fn custom_report(report: types.RunReport) -> String {
+  let counts = summary.count(report)
+  "Custom report: "
+  <> int.to_string(counts.passed)
+  <> " passed, "
+  <> int.to_string(counts.failed)
+  <> " failed\n"
 }

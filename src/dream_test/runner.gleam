@@ -2223,6 +2223,7 @@ fn render_results_reporter(
   case reporter {
     reporter_types.Bdd(config) -> bdd.render(config, report)
     reporter_types.Json(config) -> json.render(config, report)
+    reporter_types.Custom(render) -> render(report)
   }
 }
 
