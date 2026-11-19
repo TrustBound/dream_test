@@ -57,18 +57,27 @@ const coverage_folder = "examples/snippets/test/snippets/coverage/"
 type MainEnd {
   /// Exit status 0.
   EndsWithStatusZero
+  /// Exit status 0, with `line` as a line of the output.
+  EndsWithStatusZeroAndLine(line: String)
   /// Exit status `status`, with `line` as a line of the output and
   /// `last_line` as the last line that is not blank.
   EndsWith(status: Int, line: String, last_line: String)
 }
 
-/// Snippet files whose `main` ends with a status that is not 0 on purpose,
-/// and how it ends.
+/// Snippet files whose `main` must end with more than exit status 0, and
+/// how it ends.
+/// - `custom_post_run_reporter.gleam` prints the line that its doc shows.
 /// - `coverage_badge.gleam` sets a minimum of 80.0%, and the snippets
 ///   project measures its own `src`, which no snippet test covers.
 /// - `coverage_server.gleam` merges the LCOV files of servers, and no
 ///   server runs, so no file matches.
 const mains_with_other_end = [
+  #(
+    "examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam",
+    EndsWithStatusZeroAndLine(
+      line: "MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped",
+    ),
+  ),
   #(
     "examples/snippets/test/snippets/coverage/coverage_badge.gleam",
     EndsWith(
@@ -121,7 +130,7 @@ pub fn tests() {
       fn() { check_snippets_run() },
     ),
     unit.group(
-      "every shown main of a snippet runs with the expected exit status",
+      "every shown main of a snippet ends with the expected exit status and output lines",
       main_tests(result.try(docs(), shown_mains)),
     ),
     old_code_test(git_show(root, old_tag <> ":gleam.toml")),
@@ -332,6 +341,11 @@ fn end_problems(
 ) -> List(String) {
   case expected {
     EndsWithStatusZero -> status_problem(0, status)
+    EndsWithStatusZeroAndLine(line: line) ->
+      list.append(
+        status_problem(0, status),
+        line_problem(line, string.split(output, "\n")),
+      )
     EndsWith(status: expected_status, line: line, last_line: last_line) -> {
       let lines = string.split(output, "\n")
       list.flatten([
