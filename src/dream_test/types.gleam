@@ -821,7 +821,7 @@ pub fn report_teardown_failures(
 /// Whether a run failed: a test has a failure status (see `is_failure`), or
 /// a tear-down hook failed.
 ///
-/// `runner.exit_on_failure` stops the BEAM with status 1 when this is
+/// `runner.exit_on_failure` ends the program with status 1 when this is
 /// `True`.
 ///
 /// ## Parameters

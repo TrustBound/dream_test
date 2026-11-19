@@ -5,6 +5,7 @@ import coverage_fixtures/sample
 import dream_test/child_timeout.{with_child_timeout}
 import dream_test/coverage.{type CoverageConfig}
 import dream_test/coverage_project_support.{with_fixture_lock}
+import dream_test/coverage_runner_mains
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
@@ -20,6 +21,18 @@ import gleam/string
 @external(erlang, "dream_test_coverage_test_ffi", "run_main_in_new_vm")
 fn run_main_in_new_vm(module: String, function: String) -> #(Int, String)
 
+@external(erlang, "dream_test_coverage_test_ffi", "run_main_like_new_gleam_in_new_vm")
+fn run_main_like_new_gleam_in_new_vm(
+  module: String,
+  function: String,
+) -> #(Int, String)
+
+/// The exit status, and whether the output has the marker that the mains
+/// write after a failed run.
+fn status_and_marker(run: #(Int, String)) -> #(Int, Bool) {
+  #(run.0, string.contains(run.1, coverage_runner_mains.after_run_marker))
+}
+
 pub fn tests() {
   describe("dream_test/runner paths", [
     it("exit_on_failure stops with status 1 for a tear-down failure only", fn() {
@@ -30,6 +43,48 @@ pub fn tests() {
       |> should
       |> be_equal(1)
       |> or_fail_with("a tear-down failure should give exit status 1")
+    })
+      |> with_child_timeout,
+
+    it(
+      "a failed run ends the program before the next line (Gleam 1.13 and older)",
+      fn() {
+        run_main_in_new_vm(
+          "dream_test@coverage_runner_mains",
+          "failed_run_then_marker",
+        )
+        |> status_and_marker
+        |> should
+        |> be_equal(#(1, False))
+        |> or_fail_with("expected status 1 and no line after runner.run")
+      },
+    )
+      |> with_child_timeout,
+
+    it(
+      "a failed run ends the program before the next line (Gleam 1.14 and newer)",
+      fn() {
+        run_main_like_new_gleam_in_new_vm(
+          "dream_test@coverage_runner_mains",
+          "failed_run_then_marker",
+        )
+        |> status_and_marker
+        |> should
+        |> be_equal(#(1, False))
+        |> or_fail_with("expected status 1 and no line after runner.run")
+      },
+    )
+      |> with_child_timeout,
+
+    it("a second run does not start after a failed run", fn() {
+      run_main_in_new_vm(
+        "dream_test@coverage_runner_mains",
+        "failed_run_then_second_run",
+      )
+      |> status_and_marker
+      |> should
+      |> be_equal(#(1, False))
+      |> or_fail_with("expected status 1 and no before_all of a second run")
     })
       |> with_child_timeout,
 

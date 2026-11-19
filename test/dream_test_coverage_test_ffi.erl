@@ -6,6 +6,7 @@
     run_in_peer/1,
     run_in_embedded_peer/1,
     run_main_in_new_vm/2,
+    run_main_like_new_gleam_in_new_vm/2,
     run_measured_main_in_new_vm/3,
     set_environment_variable/2,
     unset_environment_variable/1,
@@ -146,20 +147,29 @@ delete_directory(Directory) ->
 %% Running a main in a new `erl` process
 %% ---------------------------------------------------------------------------
 
-%% Run `Module:Function()` in a new `erl` process, then stop it with status
-%% 0, the same way as Gleam's own wrapper of a main: `init:stop(0)` after
-%% the main returns. A main that already asked for `init:stop(1)` keeps
-%% status 1, because the first stop request wins.
+%% Run `Module:Function()` in a new `erl` process, then halt it with status
+%% 0 at once, the same way as the wrapper of a main in Gleam 1.13 and older:
+%% `erlang:halt(0)` after the main returns. A main that returns after it
+%% asked for `init:stop(1)` exits with status 0 here, so a test that expects
+%% status 1 shows that the main did not return.
 %% Returns {ExitStatus, Output}, with stdout and stderr together.
 run_main_in_new_vm(Module, Function) ->
+    Eval = io_lib:format("'~ts':'~ts'(), erlang:halt(0).", [Module, Function]),
+    run_in_new_vm(Eval, []).
+
+%% The same, but stop the process the same way as the wrapper of a main in
+%% Gleam 1.14 and newer: `init:stop(0)` after the main returns.
+run_main_like_new_gleam_in_new_vm(Module, Function) ->
     Eval = io_lib:format("'~ts':'~ts'(), init:stop(0).", [Module, Function]),
     run_in_new_vm(Eval, []).
 
-%% The same, but the process measures dream_test's own `src` from before
-%% the call until the BEAM stops, and writes an LCOV part that the test run
-%% merges (see test/dream_test/coverage_child_measure.gleam). Use it only for a main
-%% that runs runner lines that no other test reaches, because each measured
-%% process adds about 1.4 seconds.
+%% Like `run_main_like_new_gleam_in_new_vm`, but the process measures
+%% dream_test's own `src` from before the call until the BEAM stops, and
+%% writes an LCOV part that the test run merges (see
+%% test/dream_test/coverage_child_measure.gleam). The process stops with
+%% `init:stop(0)`, so the part application can write the part when the
+%% BEAM stops. Use it only for a main that runs runner lines that no other
+%% test reaches, because each measured process adds about 1.4 seconds.
 %% Environment is a Gleam list of #(Name, Option(Value)): `Some(Value)` sets
 %% the variable and `None` removes it.
 run_measured_main_in_new_vm(Module, Function, Environment) ->

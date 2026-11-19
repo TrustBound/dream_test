@@ -414,11 +414,17 @@ pub fn default_timeout_ms(
 ///
 /// Useful for CI pipelines.
 ///
-/// `runner.run` asks the BEAM to stop with status 1 (`init:stop(1)`), the
-/// same way that Gleam stops a `main` that crashes. The BEAM then shuts
-/// down cleanly: the output is written, and applications stop. Code after
-/// `runner.run` can still run until the shutdown stops it, and the exit
-/// status stays 1 when `main` returns.
+/// When the run fails, `runner.run` first writes all its output, the
+/// reports and the coverage files. Then it ends the program with exit
+/// status 1 and does not return, so no code after `runner.run` runs. A
+/// second `runner.run` in the same `main` does not start. This is the same
+/// on every Gleam version, for `gleam test` and for `gleam run`.
+///
+/// To end the program, `runner.run` asks the BEAM to stop with status 1
+/// (`init:stop(1)`) and waits until the BEAM stops. The BEAM shuts down
+/// cleanly: the output is written, and applications stop.
+///
+/// When the run passes, `runner.run` returns the report.
 ///
 /// ## Example
 ///
@@ -805,6 +811,9 @@ pub fn after_all_suites(
 ///
 /// If a progress reporter is attached, the runner will emit progress output during
 /// the run. Results reporters print at the end of the run.
+///
+/// With `exit_on_failure`, a failed run does not return: it writes all its
+/// output and then ends the program with exit status 1.
 ///
 /// ## Example
 ///
@@ -1935,10 +1944,10 @@ fn maybe_exit_on_failure(
   let should_stop =
     should_exit && { types.failed(report) || !coverage_succeeded }
   case should_stop {
-    True -> {
-      let _ = stop_with_status(1)
-      Nil
-    }
+    // Gleam 1.13 and older halt the BEAM with status 0 at once when `main`
+    // returns. `end_program` does not return, so `main` does not return, no
+    // line after `runner.run` runs, and the status stays 1.
+    True -> end_program(1)
     False -> Nil
   }
 }
@@ -2385,13 +2394,7 @@ fn append_suite_runs_with_override(
   list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
 }
 
-/// What `init:stop/1` gives back: the atom `ok`. The BEAM stops after the
-/// call returns, when the init process shuts it down.
-type StopRequested
-
-/// Ask the BEAM to shut down and then exit with `status`. Gleam stops a
-/// program in the same way: `init:stop(0)` when `main` returns, and
-/// `init:stop(1)` when it crashes. The first request wins, so the status
-/// stays the same when `main` returns after this call.
-@external(erlang, "init", "stop")
-fn stop_with_status(status: Int) -> StopRequested
+/// Ask the BEAM to stop with `status`, then wait until the BEAM stops.
+/// Never returns.
+@external(erlang, "dream_test_runner_ffi", "end_program")
+fn end_program(status: Int) -> Nil

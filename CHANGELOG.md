@@ -28,8 +28,10 @@ store. This release has breaking changes. Read
   `parallel.RunRootParallelWithReporterResult` has the new fields
   `teardown_failures` and `outer_setups`.
 - `runner.exit_on_failure` stops the BEAM with `init:stop(1)` in place of
-  `erlang:halt(1)`. It also stops with status 1 when a tear-down hook
-  failed and every test passed.
+  `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
+  writes all its output and coverage files, and then ends the program with
+  status 1 inside `runner.run`: no code after `runner.run` runs. It also
+  stops with status 1 when a tear-down hook failed and every test passed.
 - `types.Root` holds the top-level group itself:
   `Root(seed:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
@@ -177,7 +179,6 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - A `discover.features` pattern that matches no files fails the run.
 - `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
-- `exit_on_failure` stops with `init:stop(1)`: code after `runner.run` can run.
 - `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
 - `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
 - `types.Root` holds the group fields, and hooks and tests hold a `Callback`.

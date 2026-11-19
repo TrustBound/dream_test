@@ -514,50 +514,6 @@ fn failing_suite() {
 }
 ```
 
-#### Code after `runner.run` with `exit_on_failure`
-
-In 2.x, `exit_on_failure` stopped the BEAM with `erlang:halt(1)` inside `runner.run`. Code after `runner.run` did not run when a test failed. In 3.0.0, it stops the BEAM with `init:stop(1)`. The exit status is still 1, and the output is complete. But code after `runner.run` can now run before the BEAM stops. If that code must not run after a failure, check `types.failed(report)` first.
-
-##### 2.x: work after the run <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/runner.gleam#L1299-L1305"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
-
-```gleam
-pub fn main() {
-  runner.new([tests()])
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
-
-  publish_build()
-}
-
-fn publish_build() {
-  io.println("publishing the build")
-}
-```
-
-##### 3.0.0: work after the run, only when the run passed <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/exit_on_failure.gleam#L15-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
-```gleam
-pub fn main() {
-  let report =
-    runner.new([tests()])
-    |> runner.progress_reporter(progress.new())
-    |> runner.results_reporters([bdd.new()])
-    |> runner.exit_on_failure()
-    |> runner.run()
-
-  case types.failed(report) {
-    True -> Nil
-    False -> publish_build()
-  }
-}
-
-fn publish_build() {
-  io.println("publishing the build")
-}
-```
-
 #### Test names in runner hooks
 
 `TestResult` and `TestInfo` hold `groups`, the names of the groups around the test. The `full_name` field is removed. `types.full_name(groups, name)` gives the old list. The JSON report still writes `full_name` as the full list.

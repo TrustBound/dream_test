@@ -13,6 +13,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
 import dream_test/types
 import dream_test/unit.{before_all, describe, it}
+import gleam/io
 import gleam/result
 
 fn fixture_tests() {
@@ -246,4 +247,59 @@ pub fn teardown_failure_with_exit_on_failure() -> Nil {
 
 fn fail_teardown(_suites: List(types.SuiteInfo)) -> Result(Nil, String) {
   Error("the pool did not stop")
+}
+
+/// A run where a test fails, with `exit_on_failure`, and then a line that
+/// writes a marker. The marker must not be written, because a failed run
+/// ends the program inside `runner.run`.
+pub fn failed_run_then_marker() -> Nil {
+  let _ =
+    runner.new([failing_tests()])
+    |> runner.exit_on_failure()
+    |> runner.run()
+  io.println(after_run_marker)
+}
+
+/// A failed run with `exit_on_failure`, then a second run whose
+/// `before_all` hook writes a marker. The second run must not start.
+pub fn failed_run_then_second_run() -> Nil {
+  let _ =
+    runner.new([failing_tests()])
+    |> runner.exit_on_failure()
+    |> runner.run()
+  let _ =
+    runner.new([second_run_tests()])
+    |> runner.exit_on_failure()
+    |> runner.run()
+  Nil
+}
+
+/// The text that the mains write after a failed run.
+pub const after_run_marker = "the program went on after the failed run"
+
+fn failing_tests() {
+  describe("failing", [
+    it("fails", fn() {
+      sample.classify(1)
+      |> should
+      |> be_equal("negative")
+      |> or_fail_with("expected negative")
+    }),
+  ])
+}
+
+fn second_run_tests() {
+  describe("second run", [
+    before_all(write_after_run_marker),
+    it("passes", fn() {
+      sample.classify(1)
+      |> should
+      |> be_equal("positive")
+      |> or_fail_with("expected positive")
+    }),
+  ])
+}
+
+fn write_after_run_marker() -> Result(Nil, String) {
+  Ok(io.println(after_run_marker))
 }
