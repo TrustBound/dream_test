@@ -9,6 +9,10 @@
 //// - You provide one or more **module path globs** (e.g. `"unit/**_test.gleam"`).
 //// - Dream Test finds matching modules under `./test/` that export `tests/0`.
 //// - It calls `tests/0` to get `TestSuite(Nil)` values.
+//// - A module whose `tests/0` returns a suite with a context (for example
+////   from `unit_context`) is a load error that names the module. Give such
+////   a suite to the runner with `runner.new` or `runner.add_suites`, so
+////   its tests get their context.
 ////
 //// ## Example
 ////

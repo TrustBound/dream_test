@@ -844,6 +844,12 @@ pub fn tests() -> TestSuite(Nil) {
 - A `tests()` function whose value is not a test suite gives `tests() did not return a test suite: <value>`, or `tests() returned a node that is not a test, a group or a hook: <node>`. In 2.x the run crashed.
 - A pattern that cannot be searched gives `cannot search for test modules: <class>:<reason>`. In 2.x the text was `discover_test_modules_failed`.
 
+#### Discovered suites with a context
+
+Module discovery accepts only suites without a context, such as the suites of `unit.describe`. A test module whose `tests()` returns a suite with a context, for example from `unit_context.describe`, is now a discovery error. In 2.x, `discover.to_suite` gave its tests `Nil` in place of their context. With `discover.to_suites`, its tests got their context, but a runner hook typed on `Nil` also got that context and could replace it. The error starts with the module name, then `tests() returned a suite with a context (for example from unit_context).`
+
+Exclude the module from the discovery patterns, and give its suite to the runner with `runner.new` or `runner.add_suites`. The runner runs each suite with its own context. See [Context-aware tests](04-context-aware-tests.md).
+
 ### Hooks
 
 3.0.0 has one rule for every hook failure:

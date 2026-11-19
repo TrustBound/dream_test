@@ -43,6 +43,13 @@ store. This release has breaking changes. Read
   code that builds `types.Node` values directly.
 - `types.ModuleCoverage` and `types.CoverageSummary` are removed. Use
   `dream_test/coverage`.
+- Module discovery (`discover.load`, `discover.to_suites`,
+  `discover.to_suite`) rejects a test module whose `tests()` returns a
+  suite with a context, for example from `unit_context`. The error names
+  the module and says to add the suite with `runner.new` or
+  `runner.add_suites`. In 2.x, `discover.to_suite` gave the tests of
+  such a suite `Nil` in place of their context, and with
+  `discover.to_suites` a runner hook typed on `Nil` got the real context.
 
 #### Hooks and processes
 
@@ -193,6 +200,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
+- Module discovery rejects a suite with a context. Add it with `runner.new`.
 - `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
 - `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
 - A failed set-up hook gives `SetupFailed`. A timeout is always `TimedOut`.

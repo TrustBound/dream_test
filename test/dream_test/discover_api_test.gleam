@@ -32,6 +32,36 @@ fn node_test_sources(node: types.Node(Nil)) -> List(Option(String)) {
   }
 }
 
+/// The load error for test/discovery_fixtures/context_suite.gleam.
+const context_suite_error =
+  "discovery_fixtures@context_suite: tests() returned a suite with a context (for example from unit_context). Discovery gives every suite the context Nil, so its tests would not get their context. Add this suite with runner.new or runner.add_suites in place of discovery."
+
+/// A runner hook for suites without a context: it gives each test `Nil`.
+fn give_nil_context(
+  _info: types.TestInfo,
+  _context: Nil,
+) -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+/// The result that discovery gives for test/discovery_fixtures/context_suite.gleam.
+fn context_suite_result() -> #(String, Status, List(String)) {
+  #("Discovery Error: " <> context_suite_error, Failed, [
+    "Failed to discover/load test modules (see test name for details)",
+  ])
+}
+
+/// The name, the status and the failure messages of a result.
+fn name_status_and_messages(
+  result: TestResult,
+) -> #(String, Status, List(String)) {
+  #(result.name, result.status, list.map(result.failures, failure_message))
+}
+
+fn failure_message(failure: AssertionFailure) -> String {
+  failure.message
+}
+
 pub fn tests() {
   describe("dream_test/discover", [
     it("can discover a specific test module", fn() {
@@ -89,6 +119,44 @@ pub fn tests() {
         "{: cannot search for test modules: error:{badpattern,missing_delimiter}",
       ))
       |> or_fail_with("a bad pattern should give an error")
+    }),
+
+    it("load rejects a module whose suite has a context", fn() {
+      load_errors("context_suite")
+      |> should
+      |> be_equal([context_suite_error])
+      |> or_fail_with("load should name the module and say how to add it")
+    }),
+
+    it("to_suite does not run a context suite with no context", fn() {
+      runner.new([
+        discover.new()
+        |> from_path("discovery_fixtures/context_suite.gleam")
+        |> discover.to_suite("discovered"),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(name_status_and_messages)
+      |> should
+      |> be_equal([context_suite_result()])
+      |> or_fail_with("the context suite should be a discovery error")
+    }),
+
+    it("to_suites does not give a context suite to a Nil runner hook", fn() {
+      runner.new(
+        discover.new()
+        |> from_path("discovery_fixtures/context_suite.gleam")
+        |> discover.to_suites(),
+      )
+      |> runner.before_each_test(give_nil_context)
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(name_status_and_messages)
+      |> should
+      |> be_equal([context_suite_result()])
+      |> or_fail_with("the context suite should be a discovery error")
     }),
 
     it("accepts a module path without an extension", fn() {
