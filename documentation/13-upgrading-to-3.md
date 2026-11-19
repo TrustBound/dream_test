@@ -1671,7 +1671,7 @@ fn crash(message: String) -> Int {
 pub fn tests() {
   describe("Sandboxing", [
     it("run_isolated returns SandboxCompleted(value) on success", fn() {
-      let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+      let config = SandboxConfig(timeout_ms: 60_000, show_crash_reports: False)
       let result = sandbox.run_isolated(config, double, 61)
 
       result
@@ -1694,7 +1694,7 @@ pub fn tests() {
     ),
 
     it("run_isolated returns SandboxCrashed when the function panics", fn() {
-      let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
+      let config = SandboxConfig(timeout_ms: 60_000, show_crash_reports: False)
       let result = sandbox.run_isolated(config, crash, "boom")
 
       let did_crash = case result {

@@ -377,17 +377,18 @@ pub fn tests() {
 
     it("a timed-out test process has exited before its after_each runs", fn() {
       // before_each gives the pid of the test process to the after_each
-      // hook. The body never returns, so the test times out, and the
+      // hook. The body never returns, so it times out after its own 20ms;
+      // the hooks get 60s, so they always finish. The test times out, and the
       // after_each hook runs in a new process. It must not see the old
       // process alive: that process could still own a table or a name.
       unit_context.describe("root", process.self(), [
         unit_context.before_each(test_process),
-        unit_context.it("hangs", hang_with_context),
+        timed_context_test("hangs", 20, hang_with_context),
         unit_context.after_each(fail_if_alive),
       ])
       |> list.wrap
       |> runner.new
-      |> runner.default_timeout_ms(20)
+      |> runner.default_timeout_ms(60_000)
       |> runner.silent()
       |> runner.run()
       |> types.report_teardown_failures
@@ -521,6 +522,22 @@ fn timed_test(
     kind: Unit,
     run: types.WithInput(fn(_nil) { body() }),
     timeout_ms: timeout_ms,
+    source: None,
+  )
+}
+
+/// A test with a context and its own timeout.
+fn timed_context_test(
+  name: String,
+  timeout_ms: Int,
+  body: fn(Pid) -> Result(AssertionResult, String),
+) -> Node(Pid) {
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: types.WithInput(body),
+    timeout_ms: Some(timeout_ms),
     source: None,
   )
 }

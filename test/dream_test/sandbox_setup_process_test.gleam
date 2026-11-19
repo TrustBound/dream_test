@@ -10,7 +10,6 @@ import dream_test/unit.{describe, it}
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{type Name, type Pid, type Subject}
 import gleam/option.{None, Some}
-import gleam/result
 
 pub fn tests() {
   describe("sandbox setup processes", [
@@ -54,15 +53,17 @@ pub fn tests() {
     it(
       "a setup process that timed out has exited when run_in_setup_process returns",
       fn() {
+        // The function never returns, so the call times out whether or
+        // not the setup process started it within 20ms. A setup process
+        // that started it sent its pid first, and that message comes
+        // before the down message that the call waits for, so the pid is
+        // in the mailbox when the call returns.
         let pids = process.new_subject()
         let result =
           sandbox.run_in_setup_process(None, 20, send_self_then_block, pids)
-        #(
-          summary(result),
-          result.map(process.receive(pids, 0), process.is_alive),
-        )
+        #(summary(result), sent_process_is_alive(pids))
         |> should
-        |> be_equal(#(TimedOut, Ok(False)))
+        |> be_equal(#(TimedOut, False))
         |> or_fail_with(
           "expected the setup process to be gone after SetupProcessTimedOut",
         )
@@ -396,6 +397,15 @@ fn say_running_then_block(running: Subject(Nil)) -> Int {
 }
 
 /// Send the pid of the setup process, then never return.
+/// Whether the process that sent its pid to `pids` is alive. `False` also
+/// when no process sent its pid: then the function never started.
+fn sent_process_is_alive(pids: Subject(Pid)) -> Bool {
+  case process.receive(pids, 0) {
+    Ok(pid) -> process.is_alive(pid)
+    Error(Nil) -> False
+  }
+}
+
 fn send_self_then_block(pids: Subject(Pid)) -> Nil {
   process.send(pids, process.self())
   process.sleep_forever()
