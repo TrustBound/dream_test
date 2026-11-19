@@ -131,10 +131,8 @@ pub type RunRootParallelWithReporterConfig(context) {
     write: fn(String) -> Nil,
     total: Int,
     completed: Int,
-    runner_before_each_test: List(
-      fn(TestInfo, context) -> Result(context, String),
-    ),
-    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
     outer_setups: List(OuterSetup),
   )
 }
@@ -162,10 +160,8 @@ pub type RunSuiteConfig(context) {
     write: fn(String) -> Nil,
     total: Int,
     completed: Int,
-    runner_before_each_test: List(
-      fn(TestInfo, context) -> Result(context, String),
-    ),
-    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
     outer_setups: List(OuterSetup),
   )
 }
@@ -243,10 +239,8 @@ type ExecuteNodeConfig(context) {
     context: context,
     inherited_before_each: List(Callback(context, Result(context, String))),
     inherited_after_each: List(Callback(context, Result(Nil, String))),
-    runner_before_each_test: List(
-      fn(TestInfo, context) -> Result(context, String),
-    ),
-    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
     node: Node(context),
     progress_output: Option(ProgressOutput),
     total: Int,
@@ -309,11 +303,11 @@ type TestCase(context) {
 /// the runner `before_each_test` hooks, the `before_each` hooks, the body,
 /// the `after_each` hooks and the runner `after_each_test` hooks.
 type TestStep(context) {
-  RunnerBeforeEachStep(hook: fn(TestInfo, context) -> Result(context, String))
+  RunnerBeforeEachStep(hook: fn(TestInfo) -> Result(Nil, String))
   BeforeEachStep(hook: Callback(context, Result(context, String)))
   BodyStep
   AfterEachStep(hook: Callback(context, Result(Nil, String)))
-  RunnerAfterEachStep(hook: fn(TestInfo, context) -> Result(Nil, String))
+  RunnerAfterEachStep(hook: fn(TestInfo) -> Result(Nil, String))
 }
 
 /// What is known about one test when a step starts.
@@ -400,10 +394,8 @@ type GroupRun(context) {
     scope: List(String),
     inherited_tags: List(String),
     context: context,
-    runner_before_each_test: List(
-      fn(TestInfo, context) -> Result(context, String),
-    ),
-    runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+    runner_before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
     before_each_hooks: List(Callback(context, Result(context, String))),
     after_each_hooks: List(Callback(context, Result(Nil, String))),
     progress_output: Option(ProgressOutput),
@@ -685,7 +677,8 @@ pub fn run_root_parallel(
 /// - `total`: total number of tests in the overall run (across all suites)
 /// - `completed`: number of tests already completed before this suite starts
 /// - `runner_before_each_test` and `runner_after_each_test`: hooks that run
-///   around each test, outside its `before_each` and `after_each` hooks
+///   around each test, outside its `before_each` and `after_each` hooks.
+///   They get the `TestInfo` of the test, not its context
 /// - `outer_setups`: the set-ups around the suite that keep their
 ///   resources alive in a process, outermost first. After the process of
 ///   one stopped, no test or hook of the suite starts (see `OuterSetup`)
@@ -2000,10 +1993,8 @@ fn run_child_groups_sequentially(
   scope: List(String),
   inherited_tags: List(String),
   context: context,
-  runner_before_each_test: List(
-    fn(TestInfo, context) -> Result(context, String),
-  ),
-  runner_after_each_test: List(fn(TestInfo, context) -> Result(Nil, String)),
+  runner_before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+  runner_after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
   before_each_hooks: List(Callback(context, Result(context, String))),
   after_each_hooks: List(Callback(context, Result(Nil, String))),
   groups: List(Node(context)),
@@ -2735,13 +2726,12 @@ fn run_step(
 ) -> TestState(context) {
   case step {
     RunnerBeforeEachStep(hook: hook) ->
-      set_up_step_result(
+      runner_set_up_step_result(
         job,
         state,
-        "before_each_test",
         sandbox.run_catching(
           call_runner_hook,
-          RunnerHookCall(hook: hook, info: job.info, context: state.context),
+          RunnerHookCall(hook: hook, info: job.info),
         ),
       )
     BeforeEachStep(hook: hook) ->
@@ -2779,7 +2769,7 @@ fn run_step(
         AfterEachTestHook,
         sandbox.run_catching(
           call_runner_hook,
-          RunnerHookCall(hook: hook, info: job.info, context: state.context),
+          RunnerHookCall(hook: hook, info: job.info),
         ),
       )
   }
@@ -2796,6 +2786,25 @@ fn set_up_step_result(
     Ok(Error(message)) -> set_up_failed(state, operator, message)
     Error(reason) ->
       set_up_failed(state, operator, hook_crash_message(job.scope, reason))
+  }
+}
+
+/// The result of a runner `before_each_test` hook. It gets only the
+/// `TestInfo`, so the context stays as it is.
+fn runner_set_up_step_result(
+  job: TestJob(context),
+  state: TestState(context),
+  caught: Result(Result(Nil, String), String),
+) -> TestState(context) {
+  case caught {
+    Ok(Ok(Nil)) -> state
+    Ok(Error(message)) -> set_up_failed(state, "before_each_test", message)
+    Error(reason) ->
+      set_up_failed(
+        state,
+        "before_each_test",
+        hook_crash_message(job.scope, reason),
+      )
   }
 }
 
@@ -2937,16 +2946,12 @@ fn test_outcome(
 
 /// A runner hook with the two arguments it gets, so that it can run as a
 /// function of one input.
-type RunnerHookCall(context, output) {
-  RunnerHookCall(
-    hook: fn(TestInfo, context) -> output,
-    info: TestInfo,
-    context: context,
-  )
+type RunnerHookCall {
+  RunnerHookCall(hook: fn(TestInfo) -> Result(Nil, String), info: TestInfo)
 }
 
-fn call_runner_hook(call: RunnerHookCall(context, output)) -> output {
-  call.hook(call.info, call.context)
+fn call_runner_hook(call: RunnerHookCall) -> Result(Nil, String) {
+  call.hook(call.info)
 }
 
 /// A group hook with its input, so that it can run as a function of one

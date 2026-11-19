@@ -54,6 +54,10 @@ store. This release has breaking changes. Read
   and `runner.after_each_test` take `fn(TestInfo) -> Result(Nil, String)`.
   The hooks get the `TestInfo` of the test, not its context, and cannot
   change the context.
+- `parallel.RunRootParallelWithReporterConfig` takes
+  `runner_before_each_test` and `runner_after_each_test` as
+  `List(fn(TestInfo) -> Result(Nil, String))`, the same type as the runner
+  hooks, in place of functions that also got and gave the context.
 - Module discovery loads a suite with a context, for example from
   `unit_context`, and runs it with its own context. `discover.to_suite`
   puts each module suite in one group, and each suite keeps its own

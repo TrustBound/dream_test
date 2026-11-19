@@ -26,7 +26,6 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 
 /// A suite that the runner can run.
 ///
@@ -186,7 +185,7 @@ pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
 pub fn group(name name: String, suites suites: List(TestSuite)) -> TestSuite {
   TestSuite(
     name: name,
-    parts: list.map(list.flat_map(suites, suite_parts), put_in_group(_, name)),
+    parts: put_in_group(list.flat_map(suites, suite_parts), name, []),
   )
 }
 
@@ -214,7 +213,7 @@ pub fn join(name name: String, suites suites: List(TestSuite)) -> TestSuite {
 /// suite.with_source(suite: tests(), source: "cart_test")
 /// ```
 pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
-  TestSuite(..suite, parts: list.map(suite.parts, set_source(_, source)))
+  TestSuite(..suite, parts: set_source(suite.parts, source, []))
 }
 
 /// Run the tests of the suite. The runner calls this for each suite.
@@ -236,9 +235,7 @@ pub fn run(
   suite suite: TestSuite,
   input input: RunInput,
 ) -> RunRootParallelWithReporterResult {
-  list.fold(suite.parts, nothing_ran(input), fn(ran, part) {
-    run_next_part(input, ran, part)
-  })
+  run_parts(suite.parts, input, nothing_ran(input))
 }
 
 // ============================================================================
@@ -253,16 +250,55 @@ fn part_tests(part: Part) -> List(TestInfo) {
   part.tests
 }
 
-fn put_in_group(part: Part, name: String) -> Part {
-  move_part(part, Place(..part.place, groups: [name, ..part.place.groups]))
+/// The parts, each inside one more group `name`.
+fn put_in_group(
+  parts: List(Part),
+  name: String,
+  moved_rev: List(Part),
+) -> List(Part) {
+  case parts {
+    [] -> list.reverse(moved_rev)
+    [part, ..rest] ->
+      put_in_group(rest, name, [
+        move_part(
+          part,
+          Place(..part.place, groups: [name, ..part.place.groups]),
+        ),
+        ..moved_rev
+      ])
+  }
 }
 
-fn set_source(part: Part, source: String) -> Part {
-  move_part(part, Place(..part.place, source: Some(source)))
+/// The parts, each with `source` as the source of its tests.
+fn set_source(
+  parts: List(Part),
+  source: String,
+  moved_rev: List(Part),
+) -> List(Part) {
+  case parts {
+    [] -> list.reverse(moved_rev)
+    [part, ..rest] ->
+      set_source(rest, source, [
+        move_part(part, Place(..part.place, source: Some(source))),
+        ..moved_rev
+      ])
+  }
 }
 
 fn move_part(part: Part, place: Place) -> Part {
   Part(..part, place: place, tests: part.tests_at(place))
+}
+
+/// Run the parts one after the other, each after what `ran` holds.
+fn run_parts(
+  parts: List(Part),
+  input: RunInput,
+  ran: RunRootParallelWithReporterResult,
+) -> RunRootParallelWithReporterResult {
+  case parts {
+    [] -> ran
+    [part, ..rest] -> run_parts(rest, input, run_next_part(input, ran, part))
+  }
 }
 
 fn run_next_part(
@@ -362,14 +398,8 @@ fn run_tree(
         write: input.write,
         total: input.total,
         completed: input.completed,
-        runner_before_each_test: list.map(
-          input.before_each_test,
-          typed_before_each_test,
-        ),
-        runner_after_each_test: list.map(
-          input.after_each_test,
-          typed_after_each_test,
-        ),
+        runner_before_each_test: input.before_each_test,
+        runner_after_each_test: input.after_each_test,
         outer_setups: input.outer_setups,
       ))
   }
@@ -379,26 +409,6 @@ fn keep_every_test(_info: TestInfo) -> Bool {
   True
 }
 
-fn typed_before_each_test(
-  hook: fn(TestInfo) -> Result(Nil, String),
-) -> fn(TestInfo, context) -> Result(context, String) {
-  fn(info, context) { run_before_each_test(hook, info, context) }
-}
-
-fn run_before_each_test(
-  hook: fn(TestInfo) -> Result(Nil, String),
-  info: TestInfo,
-  context: context,
-) -> Result(context, String) {
-  result.replace(hook(info), context)
-}
-
-fn typed_after_each_test(
-  hook: fn(TestInfo) -> Result(Nil, String),
-) -> fn(TestInfo, context) -> Result(Nil, String) {
-  fn(info, _context) { hook(info) }
-}
-
 /// The children with `source` as the source of each test, when it is set.
 fn placed_children(
   children: List(Node(context)),
@@ -406,7 +416,20 @@ fn placed_children(
 ) -> List(Node(context)) {
   case source {
     None -> children
-    Some(source) -> list.map(children, node_with_source(_, source))
+    Some(source) -> nodes_with_source(children, source)
+  }
+}
+
+fn nodes_with_source(
+  nodes: List(Node(context)),
+  source: String,
+) -> List(Node(context)) {
+  case nodes {
+    [] -> []
+    [node, ..rest] -> [
+      node_with_source(node, source),
+      ..nodes_with_source(rest, source)
+    ]
   }
 }
 
@@ -416,7 +439,7 @@ fn node_with_source(node: Node(context), source: String) -> Node(context) {
       Group(
         name: name,
         tags: tags,
-        children: list.map(children, node_with_source(_, source)),
+        children: nodes_with_source(children, source),
       )
     Test(..) -> Test(..node, source: Some(source))
     BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) -> node
@@ -457,9 +480,16 @@ fn collect_children(
   inherited_tags: List(String),
   tests_rev: List(TestInfo),
 ) -> List(TestInfo) {
-  list.fold(children, tests_rev, fn(collected, child) {
-    collect_node(child, groups, inherited_tags, collected)
-  })
+  case children {
+    [] -> tests_rev
+    [child, ..rest] ->
+      collect_children(
+        rest,
+        groups,
+        inherited_tags,
+        collect_node(child, groups, inherited_tags, tests_rev),
+      )
+  }
 }
 
 /// The children to run: the tests that `keep` keeps, with the groups and
@@ -485,10 +515,29 @@ fn filter_children(
   keep: fn(TestInfo) -> Bool,
 ) -> #(List(Node(context)), Bool) {
   let #(kept_rev, has_tests) =
-    list.fold(children, #([], False), fn(filtered, child) {
-      add_filtered(filtered, child, groups, inherited_tags, keep)
-    })
+    filter_each_child(children, groups, inherited_tags, keep, #([], False))
   #(list.reverse(kept_rev), has_tests)
+}
+
+/// Add each child that `keep` keeps to `filtered`, newest first.
+fn filter_each_child(
+  children: List(Node(context)),
+  groups: List(String),
+  inherited_tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+  filtered: #(List(Node(context)), Bool),
+) -> #(List(Node(context)), Bool) {
+  case children {
+    [] -> filtered
+    [child, ..rest] ->
+      filter_each_child(
+        rest,
+        groups,
+        inherited_tags,
+        keep,
+        add_filtered(filtered, child, groups, inherited_tags, keep),
+      )
+  }
 }
 
 fn add_filtered(
