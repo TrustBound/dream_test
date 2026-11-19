@@ -207,7 +207,7 @@ The run fails when one of these is true:
 - a test is `Failed`, `TimedOut` or `SetupFailed`
 - a tear-down hook failed
 - the process of a set-up stopped while its tests ran (`SetupStopped`)
-- the `render` function of a `reporter_types.Custom` results reporter crashed
+- the `render` function of a `reporter_types.Custom` results reporter crashed, or did not return in the default timeout of the run (`runner.default_timeout_ms`)
 - coverage failed, for example a total below `coverage.minimum_percent`
 
 The first four make `types.failed` return `True` for the report that `runner.run` returns. `types.report_reporter_crashes` gives the position and the full reason of each crashed results reporter. Use it when your code picks its own exit status from the report.

@@ -769,17 +769,22 @@ pub type TeardownFailure {
   )
 }
 
-/// A results reporter whose render function crashed.
+/// A results reporter whose render function crashed or did not return in
+/// time.
 ///
 /// `runner.run` records one for each `reporter_types.Custom` reporter whose
-/// render function crashed. Read them with `report_reporter_crashes`.
+/// render function crashed, or did not return in the default timeout of the
+/// run (`runner.default_timeout_ms`). Read them with
+/// `report_reporter_crashes`.
 ///
 /// - `position`: the place of the reporter in the list that
 ///   `runner.results_reporters` got, counted from 1. The first reporter is
 ///   at position 1, and every reporter in the list counts, the BDD and
 ///   JSON reporters included.
 /// - `reason`: the crash, as `class:reason`, for example
-///   `error:badarith`. This is the full text, which can be longer than one
+///   `error:badarith`, or `did not return in <N> ms` for a render function
+///   that did not return in the timeout of `<N>` milliseconds. This is the
+///   full text, which can be longer than one
 ///   line. The error output shows it on one line, and cuts it at 200
 ///   characters.
 ///

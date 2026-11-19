@@ -609,6 +609,10 @@ the guide labels them.
     position of the reporter: the first reporter in the list is at
     position 1, and every reporter counts, `bdd` and `json` included. It
     shows the crash on one line, cut at 200 characters
+  - `render` runs in a new process with the default timeout of the run
+    (`runner.default_timeout_ms`). A `render` function that does not
+    return in time is stopped, and counts as a crash with the reason
+    `did not return in <N> ms`
   - The report that `runner.run` returns has each crash, so
     `types.failed(report)` is `True`. `types.report_reporter_crashes`
     gives a `types.ReporterCrash(position:, reason:)` with the full reason

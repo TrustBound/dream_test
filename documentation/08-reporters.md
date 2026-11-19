@@ -288,6 +288,8 @@ The runner writes every report before it checks coverage. Thus `runner.exit_on_f
 
 If the formatter crashes, the runner writes a `Results reporter failed` error to the error output, with the position of the reporter in the list and the crash. The first reporter in the list is at position 1, and every reporter counts, `bdd` and `json` included. The error shows the crash on one line, cut at 200 characters. Then the runner goes on with the next reporter and with coverage. The crash makes the run fail: the report that `runner.run` returns has the crash, so `types.failed` is `True`. `types.report_reporter_crashes` gives the position and the full reason of each crash. A silent run still writes this error to the standard error stream.
 
+The formatter runs in a new process. When it does not return in the default timeout of the run (`runner.default_timeout_ms`), the runner stops it. The error then says `did not return in <N> ms`, and the run fails the same way as for a crash.
+
 ##### Give the formatter to the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L31-L36"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
