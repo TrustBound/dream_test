@@ -202,7 +202,7 @@ pub fn add_failure(context, failure) {
 **Module path conventions**:
 
 ```
-dream_test/context         # Per-test state
+dream_test/suite           # Test suites
 dream_test/matchers        # Matcher API
 dream_test/types           # Shared data types
 dream_test/runner          # Test execution
@@ -271,10 +271,10 @@ import dream_test/types.{TestResult}
 You can import both types and values:
 
 ```gleam
-import dream_test/context.{type TestContext, add_failure}
+import dream_test/types.{type TestResult, full_name}
 ```
 
-This imports `TestContext` as a type and `add_failure` as a function.
+This imports `TestResult` as a type and `full_name` as a function.
 
 ### Handling module name conflicts
 
