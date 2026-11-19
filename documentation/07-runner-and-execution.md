@@ -121,7 +121,7 @@ To make one suite from several suites, use `suite.group` or `suite.join`. Each s
 
 `discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
 
-Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. A pattern names files under `test/`, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
+Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`. A pattern names files under `test/`, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
 
 Discovery has five load errors. Each one is a failing test, so a wrong pattern never gives a run that passes with no tests:
 
@@ -207,13 +207,14 @@ The run fails when one of these is true:
 - a test is `Failed`, `TimedOut` or `SetupFailed`
 - a tear-down hook failed
 - the process of a set-up stopped while its tests ran (`SetupStopped`)
+- the `render` function of a `reporter_types.Custom` results reporter crashed
 - coverage failed, for example a total below `coverage.minimum_percent`
 
 The first three make `types.failed` return `True`.
 
 `exit_on_failure` does not stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1. `runner.run` does not return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
 
-In these docs, "the run fails" means one of these four cases. Only with `exit_on_failure` does a failed run give exit status 1.
+In these docs, "the run fails" means one of these five cases. Only with `exit_on_failure` does a failed run give exit status 1.
 
 #### End with exit status 1 when the run fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/exit_status.gleam#L1-L18"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

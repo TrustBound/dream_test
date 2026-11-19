@@ -33,8 +33,9 @@ store. This release has breaking changes. Read
   `runner.run`: no code after `runner.run` runs. In 3.0.0 it also writes
   the coverage files first. It also stops with status 1 when a tear-down
   hook failed and every test passed, when a set-up stopped
-  (`SetupStopped`), and when coverage failed. 2.x had no tear-down
-  failures in the report, no stopped set-ups and no coverage.
+  (`SetupStopped`), when a `reporter_types.Custom` reporter crashed, and
+  when coverage failed. 2.x had no tear-down failures in the report, no
+  stopped set-ups, no custom reporters and no coverage.
 - `types.Root` holds the top-level group itself:
   `Root(seed:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
@@ -121,7 +122,10 @@ store. This release has breaking changes. Read
   reporter) ends with a newline. Before, text that a reporter wrote after
   it joined its last line.
 - The summary line of the BDD and Gherkin reporters lists the extra counts
-  in the order skipped, pending, timed out, setup failed.
+  in the order skipped, pending, timed out, setup failed, then the new
+  counts tear-down failed and set-up stopped, before ` in <duration>`.
+- `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
+  A `case` on a `ResultsReporter` needs a branch for it.
 - The progress event API is removed: `reporters/types.ReporterEvent`,
   `reporters/types.HookKind`, `reporters/types.HookOutcome` and
   `progress.handle_event`. `progress.render` takes a

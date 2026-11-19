@@ -25,7 +25,7 @@ Do the steps in this order. The first steps affect the most projects.
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
 2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
-4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. See [Reporters](#reporters).
+4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
 6. **The Gherkin parser and syntax tree.** The parser follows the official Gherkin grammar, and parse errors are typed. See [The Gherkin parser and syntax tree](#the-gherkin-parser-and-syntax-tree).
 7. **The sandbox.** `sandbox.run_isolated` takes the function and its input. See [The sandbox](#the-sandbox).
@@ -1223,7 +1223,7 @@ fn sample_results() -> List(types.TestResult) {
 
 #### The summary line
 
-The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. The line can also end with two new counts: `N tear-down failed` and `N set-up stopped`. Update a test or a tool that compares the exact summary text.
+The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. The extra counts come after `N passed` and before ` in <duration>`, and each shows only when it is not 0. Two counts are new, after setup failed: `N tear-down failed` and `N set-up stopped`. For example: `Summary: 4 run, 1 failed, 2 passed, 1 skipped, 1 tear-down failed in 12ms`. Update a test or a tool that compares the exact summary text.
 
 #### Progress events
 
@@ -1312,6 +1312,10 @@ pub fn tests() {
 #### Custom reports
 
 In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. See [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
+
+#### `ResultsReporter` has the variant `Custom`
+
+`reporters/types.ResultsReporter` has a new variant: `Custom(render:)`. In 2.x it had only `Bdd` and `Json`. A `case` on a `ResultsReporter` needs a branch for `Custom`, or the code does not compile. Code that only builds reporters with `bdd.new()` and `json.new()` needs no change.
 
 ### The JSON report
 

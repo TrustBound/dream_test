@@ -115,8 +115,20 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   typed, and lines that the grammar does not permit are errors.
 - Hook failures: set-up failures give `SetupFailed`, and tear-down failures
   go into the run report in place of fake `<after_all>` tests.
-- The JSON report schema is `2.0`.
-- `runner.exit_on_failure` stops the BEAM with `init:stop(1)`.
+- The JSON report schema is `2.0`. Its `system` object has
+  `gleam_stdlib_version` in place of `gleam_version`, with the same value:
+  the version of the `gleam_stdlib` package. The JSON report ends with a
+  newline.
+- The summary line of the BDD and Gherkin reporters lists the extra counts
+  in the order skipped, pending, timed out, setup failed, tear-down failed,
+  set-up stopped, before ` in <duration>`. Each count shows only when it is
+  not 0. `tear-down failed` and `set-up stopped` are new.
+- `runner.exit_on_failure` stops the BEAM with `init:stop(1)`. It stops the
+  run when a test fails, times out or has a failed set-up, when a tear-down
+  hook fails, when a set-up stops (`SetupStopped`), when a
+  `reporter_types.Custom` reporter crashes, and when coverage fails.
+- `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
+  A `case` on a `ResultsReporter` needs a branch for it.
 - `sandbox.run_isolated` takes the function and its input as two parameters.
 - `types.Root`, `types.TestResult` and `types.TestInfo` changed shape, and
   `types.ModuleCoverage` and `types.CoverageSummary` are removed.

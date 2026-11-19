@@ -24,7 +24,7 @@ In your own project, run:
 gleam test
 ```
 
-Dream Test itself and its examples also have a Makefile. In this repository, `make test` runs `gleam test`:
+Only the Dream Test repository has a Makefile, in its top folder. The example projects have none. In the repository, `make examples` runs the tests of each example project, and `make test` runs `gleam test`:
 
 ```sh
 make test
@@ -72,7 +72,7 @@ pub fn suites() {
 
 ### What you just setup
 
-- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it.
+- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`.
 - The pattern names files under `test/`. `snippets/unit/**.gleam` is the folder of this repository's examples. In your project, use your own folder, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
 - `runner` executes suites with isolation, timeouts, and configurable parallelism.
 - `reporters` decide how results are rendered (human output vs JSON vs more).

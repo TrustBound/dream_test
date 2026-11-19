@@ -288,7 +288,9 @@ pub fn render_my_report(report: RunReport) -> String {
 
 Then give the formatter to the runner as `reporter_types.Custom(render_my_report)`. At the end of the run, the runner calls the formatter one time and writes the text that it returns. The runner adds no newline, so end the text with `"\n"`. The reports print in list order, with `bdd` and `json` reports in the same list.
 
-The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. The run fails when a test fails, times out or has a failed set-up, when a hook fails, or when coverage is below a minimum.
+The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists when the run fails.
+
+If the formatter crashes, the runner writes a `Results reporter failed` error to the error output, with the position of the reporter in the list and the crash. Then it goes on with the next reporter and with coverage. The crash makes the run fail.
 
 ##### Give the formatter to the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L31-L36"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -301,7 +303,7 @@ pub fn main() {
 }
 ```
 
-For a run with one passing and one failing test, this `main` prints `MyReport: 2 total; 1 passed; 1 failed; 0 tear-down failed; 0 set-up stopped`, then ends with exit status 1.
+The three tests of this snippet pass, so this `main` prints `MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped`, and the exit status is 0. If a test fails, the line counts it in `failed`, and the program ends with exit status 1.
 
 #### Driving the progress reporter manually (advanced)
 

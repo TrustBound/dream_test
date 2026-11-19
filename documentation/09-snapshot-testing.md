@@ -132,7 +132,8 @@ pub fn main() {
 
 1. Delete the `.snap` file, or remove it with `snapshot.clear_snapshot(path)`. `snapshot.clear_snapshots_in_directory(directory)` removes every `.snap` file in a directory, but not in its subdirectories.
 2. Run the tests again. The test writes the new value to the file and passes.
-3. Read the new file, then commit it.
+3. If you added a `clear_snapshot` or `clear_snapshots_in_directory` call for the update, remove it. If it stays, each run deletes the snapshot and writes it again, so the test checks nothing.
+4. Read the new file, then commit it.
 
 ### What's Next?
 
