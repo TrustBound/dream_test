@@ -11,7 +11,7 @@ import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("dream_test/suite", [
-    it("from_root makes a suite with the name and tests of the tree", fn() {
+    it("from_tree makes a suite with the name and tests of the tree", fn() {
       let made = number_suite()
       #(suite.name(made), list.map(suite.tests(made), full_name))
       |> should
@@ -19,7 +19,7 @@ pub fn tests() {
       |> or_fail_with("the suite should hold the tree")
     }),
 
-    it("from_root gives each test the seed of the tree", fn() {
+    it("from_tree gives each test the seed of the tree", fn() {
       run_all([number_suite()])
       |> should
       |> be_equal([#(["number", "gets 41"], Passed)])
@@ -146,7 +146,7 @@ fn plain_suite() {
 }
 
 fn number_suite() {
-  suite.from_root(
+  suite.from_tree(
     types.root("number", 41, [unit_context.it("gets 41", check_number)]),
   )
 }

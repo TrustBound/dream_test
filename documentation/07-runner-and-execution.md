@@ -112,7 +112,7 @@ pub fn main() {
 
 `runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
 
-To make a suite from a `types.Root` that you build yourself, use `suite.from_root`.
+To make a suite from a `types.Root` that you build yourself, use `suite.from_tree`.
 
 To make one suite from several suites, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
 

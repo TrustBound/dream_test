@@ -391,7 +391,7 @@ fn suite_source(sources: List(Option(String))) -> String {
   let seen = process.new_subject()
   let _ =
     runner.new([
-      suite.from_root(Root(seed: Nil, name: "s", tags: [], children: tests)),
+      suite.from_tree(Root(seed: Nil, name: "s", tags: [], children: tests)),
     ])
     |> runner.before_each_suite(fn(info) {
       record(seen, string.inspect(info.source))

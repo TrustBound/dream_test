@@ -795,7 +795,7 @@ pub fn main() {
 
 #### Suites built by hand
 
-This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` holds the fields of its top-level group: `Root(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Root` to `suite.from_root` to get a `TestSuite` for the runner.
+This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` holds the fields of its top-level group: `Root(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Root` to `suite.from_tree` to get a `TestSuite` for the runner.
 
 ##### 2.x: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L369-L396"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 
@@ -882,7 +882,7 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 }
 
 pub fn tests() -> TestSuite {
-  suite.from_root(
+  suite.from_tree(
     Root(seed: Nil, name: "doubling", tags: [], children: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)

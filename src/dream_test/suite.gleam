@@ -12,7 +12,7 @@
 //// Most code does not use this module directly: `unit.describe`,
 //// `unit_context.describe` and the Gherkin functions give a `TestSuite`,
 //// and the runner runs it. Use this module to make a suite from a tree that
-//// you build yourself (`from_root`), to put suites in one group (`group`),
+//// you build yourself (`from_tree`), to put suites in one group (`group`),
 //// or to read what a suite holds (`name`, `tests`).
 
 import dream_test/parallel.{
@@ -30,7 +30,7 @@ import gleam/option.{type Option, None, Some}
 /// A suite that the runner can run.
 ///
 /// Make one with `unit.describe`, `unit_context.describe`, the Gherkin
-/// functions or `from_root`. The context of the tests is inside the suite,
+/// functions or `from_tree`. The context of the tests is inside the suite,
 /// so it does not show in the type: suites with different contexts go in
 /// one list.
 pub opaque type TestSuite {
@@ -83,12 +83,12 @@ pub type RunInput {
 
 /// Make a suite from a typed tree that you build yourself.
 ///
-/// The `seed` of the root is the context of the tests. `unit.describe`
+/// The `seed` of the tree is the context of the tests. `unit.describe`
 /// and `unit_context.describe` call this for you.
 ///
 /// ## Parameters
 ///
-/// - `root`: the tree, with its name, tags, children and context
+/// - `tree`: the tree, with its name, tags, children and context
 ///
 /// ## Returns
 ///
@@ -97,14 +97,14 @@ pub type RunInput {
 /// ## Example
 ///
 /// ```gleam
-/// suite.from_root(types.root("numbers", 41, [unit_context.it("is 41", is_41)]))
+/// suite.from_tree(types.root("numbers", 41, [unit_context.it("is 41", is_41)]))
 /// ```
-pub fn from_root(root root: Root(context)) -> TestSuite {
+pub fn from_tree(tree tree: Root(context)) -> TestSuite {
   new(
-    name: root.name,
-    tags: root.tags,
-    children: root.children,
-    context: FixedContext(root.seed),
+    name: tree.name,
+    tags: tree.tags,
+    children: tree.children,
+    context: FixedContext(tree.seed),
   )
 }
 
@@ -112,7 +112,7 @@ pub fn from_root(root root: Root(context)) -> TestSuite {
 /// their context.
 ///
 /// With `types.FixedContext(value)`, each test starts from `value`, as
-/// with `from_root`. With `types.ContextFromSetUp(set_up, tear_down)`, the
+/// with `from_tree`. With `types.ContextFromSetUp(set_up, tear_down)`, the
 /// set-up runs once, before the first test, and only when at least one
 /// test of the suite runs. Its value is the context of every hook and test,
 /// and the tear-down gets it after the last test (see

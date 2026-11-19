@@ -55,7 +55,7 @@ store. This release has breaking changes. Read
   `unit_context` suite and a Gherkin feature together. `unit.describe`,
   `unit_context.describe`, the Gherkin suite functions and module
   discovery give a `suite.TestSuite`. To run a tree that you build
-  yourself, give it to `suite.from_root`.
+  yourself, give it to `suite.from_tree`.
 - `runner.RunBuilder` has no type parameter. `runner.before_each_test`
   and `runner.after_each_test` take `fn(TestInfo) -> Result(Nil, String)`.
   The hooks get the `TestInfo` of the test, not its context, and cannot
@@ -269,7 +269,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - Every suite has the type `suite.TestSuite`, whatever context its tests
     get. One `runner.new` takes `unit` suites, `unit_context` suites and
     Gherkin features together
-  - `suite.from_root` makes a suite from a `types.Root` that you build
+  - `suite.from_tree` makes a suite from a `types.Root` that you build
     yourself. `suite.new` makes one from children and a
     `types.SuiteContext`
   - `suite.group` puts suites in one group, and `suite.join` puts them one

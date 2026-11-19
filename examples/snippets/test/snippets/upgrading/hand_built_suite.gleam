@@ -33,7 +33,7 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 }
 
 pub fn tests() -> TestSuite {
-  suite.from_root(
+  suite.from_tree(
     Root(seed: Nil, name: "doubling", tags: [], children: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)
