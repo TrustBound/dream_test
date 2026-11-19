@@ -6,6 +6,7 @@ import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
+import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -104,11 +105,11 @@ pub fn tests() {
         |> steps.given("the value is {int}", gherkin_step_ok)
 
       run_parsed(content, registry)
-      |> list.map(fn(result) { #(result.kind, result.status) })
+      |> list.map(name_path_and_status)
       |> should
       |> be_equal([
-        #(test_types.GherkinScenario("F::O (Example 1)"), test_types.Passed),
-        #(test_types.GherkinScenario("F::O (Example 2)"), test_types.Passed),
+        #("F::O (Example 1)", test_types.Passed),
+        #("F::O (Example 2)", test_types.Passed),
       ])
       |> or_fail_with("each examples row should run with its value")
     }),
@@ -164,13 +165,9 @@ pub fn tests() {
 
     it("to_test_suite gives the Rule scenario id the Rule group", fn() {
       run_parsed(rules_feature(), rules_registry())
-      |> list.map(result_kind)
+      |> list.map(scenario_name_path)
       |> should
-      |> be_equal([
-        test_types.GherkinScenario("F::Outside"),
-        test_types.GherkinScenario("F::Rule: Stock::Sell"),
-        test_types.GherkinScenario("F::Rule:::Nameless"),
-      ])
+      |> be_equal(["F::Outside", "F::Rule: Stock::Sell", "F::Rule:::Nameless"])
       |> or_fail_with("expected the Rule group in each id")
     }),
 
@@ -771,10 +768,55 @@ pub fn tests() {
         ])
 
       run_suites([suite])
-      |> list.map(result_failure_messages)
+      |> scenario_id_check("F::S#")
       |> should
-      |> be_equal([["F::S"]])
+      |> be_equal(#([True], 1))
       |> or_fail_with("the step context should hold the scenario id")
+    }),
+
+    it(
+      "two scenarios with the same name in one feature get different ids",
+      fn() {
+        let suite =
+          gfeature.feature("F", scenario_id_registry(), [
+            gfeature.scenario("S", [gfeature.then("the id is right")]),
+            gfeature.scenario("S", [gfeature.then("the id is right")]),
+          ])
+
+        run_suites([suite])
+        |> scenario_id_check("F::S#")
+        |> should
+        |> be_equal(#([True, True], 2))
+        |> or_fail_with("each scenario should get its own id")
+      },
+    ),
+
+    it("scenarios with the same name in two features get different ids", fn() {
+      let first =
+        gfeature.feature("F", scenario_id_registry(), [
+          gfeature.scenario("S", [gfeature.then("the id is right")]),
+        ])
+      let second =
+        gfeature.feature("F", scenario_id_registry(), [
+          gfeature.scenario("S", [gfeature.then("the id is right")]),
+        ])
+
+      run_suites([first, second])
+      |> scenario_id_check("F::S#")
+      |> should
+      |> be_equal(#([True, True], 2))
+      |> or_fail_with("each feature should give its scenario its own id")
+    }),
+
+    it("one feature built as two suites gives different ids", fn() {
+      let content = "Feature: F\n  Scenario: S\n    Then the id is right\n"
+      let registry = scenario_id_registry()
+
+      list.append(run_parsed(content, registry), run_parsed(content, registry))
+      |> scenario_id_check("F::S#")
+      |> should
+      |> be_equal(#([True, True], 2))
+      |> or_fail_with("each built suite should give its scenario its own id")
     }),
 
     it("a feature suite runs with a unit suite in one runner", fn() {
@@ -865,8 +907,54 @@ fn check_never_runs(
   Error("this step should not run")
 }
 
+fn scenario_id_registry() -> steps.StepRegistry(Nil) {
+  steps.new(initial: Nil)
+  |> steps.then("the id is right", fail_with_scenario_id)
+}
+
+/// For each result: whether the id that the step got is the id in the
+/// result kind, starts with `prefix` and ends with a positive number. Also
+/// the count of different ids.
+fn scenario_id_check(
+  results: List(test_types.TestResult),
+  prefix: String,
+) -> #(List(Bool), Int) {
+  let ids = list.map(results, step_scenario_id)
+  #(
+    list.map(results, has_scenario_id_shape(_, prefix)),
+    list.length(list.unique(ids)),
+  )
+}
+
+fn step_scenario_id(result: test_types.TestResult) -> String {
+  string.concat(result_failure_messages(result))
+}
+
+fn has_scenario_id_shape(
+  result: test_types.TestResult,
+  prefix: String,
+) -> Bool {
+  let id = step_scenario_id(result)
+  result.kind == test_types.GherkinScenario(id) && has_number_after(id, prefix)
+}
+
+fn has_number_after(id: String, prefix: String) -> Bool {
+  string.starts_with(id, prefix)
+  && is_positive_number(string.drop_start(id, string.length(prefix)))
+}
+
+fn is_positive_number(text: String) -> Bool {
+  int.parse(text)
+  |> result.map(is_above_zero)
+  |> result.unwrap(False)
+}
+
+fn is_above_zero(number: Int) -> Bool {
+  number > 0
+}
+
 fn fail_with_scenario_id(
-  _count: Int,
+  _count: a,
   context: steps.StepContext,
 ) -> Result(test_types.AssertionResult, String) {
   Error(context.scenario_id)
@@ -1111,6 +1199,24 @@ fn result_status(result: test_types.TestResult) -> test_types.Status {
   result.status
 }
 
-fn result_kind(result: test_types.TestResult) -> test_types.TestKind {
-  result.kind
+fn name_path_and_status(
+  result: test_types.TestResult,
+) -> #(String, test_types.Status) {
+  #(scenario_name_path(result), result.status)
+}
+
+/// The scenario id of a Gherkin result without its `#<number>` end: the
+/// Feature, Rule and scenario names joined with `::`. Another kind gives
+/// `""`.
+fn scenario_name_path(result: test_types.TestResult) -> String {
+  case result.kind {
+    test_types.GherkinScenario(id) -> without_number(id)
+    _ -> ""
+  }
+}
+
+fn without_number(id: String) -> String {
+  let parts = string.split(id, "#")
+  list.take(parts, list.length(parts) - 1)
+  |> string.join("#")
 }

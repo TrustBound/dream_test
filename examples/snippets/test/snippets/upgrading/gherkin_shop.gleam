@@ -2,10 +2,11 @@ import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_int, get_string, get_word,
 }
-import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, be_true, or_fail_with, should}
 import gleam/dict.{type Dict}
 import gleam/option
 import gleam/result
+import gleam/string
 
 pub type Shop {
   Shop(cart: Dict(String, Int), last_error: String, order_id: String)
@@ -56,7 +57,7 @@ pub fn register(registry: StepRegistry(Shop)) -> StepRegistry(Shop) {
   |> steps.when("I place the order", step_place_order)
   |> steps.then("the cart has {int} {word}", step_cart_has)
   |> steps.then("the error is {string}", step_error_is)
-  |> steps.then("the order id is {string}", step_order_id_is)
+  |> steps.then("the order id starts with {string}", step_order_id_starts)
 }
 
 fn step_empty_cart(_shop: Shop, _context: StepContext) -> Result(Shop, String) {
@@ -88,12 +89,12 @@ fn step_error_is(shop: Shop, context: StepContext) {
   |> or_fail_with("wrong error")
 }
 
-fn step_order_id_is(shop: Shop, context: StepContext) {
-  use expected <- result.try(get_string(context.captures, 0))
-  shop.order_id
+fn step_order_id_starts(shop: Shop, context: StepContext) {
+  use prefix <- result.try(get_string(context.captures, 0))
+  string.starts_with(shop.order_id, prefix)
   |> should
-  |> be_equal(expected)
-  |> or_fail_with("wrong order id")
+  |> be_true()
+  |> or_fail_with("the order id should start with " <> prefix)
 }
 
 pub fn tests() {
@@ -116,7 +117,7 @@ pub fn tests() {
       given("I have an empty cart"),
       when("I add 1 apples to the cart"),
       when("I place the order"),
-      then("the order id is \"Shop::Placing an order\""),
+      then("the order id starts with \"Shop::Placing an order#\""),
     ]),
   ])
 }

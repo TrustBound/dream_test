@@ -286,6 +286,23 @@ fn scenario_to_nodes(
   }
 }
 
+/// A number that no other scenario in the BEAM instance gets: each call
+/// gives a new, larger number. It makes the scenario id unique in the run,
+/// also across separately built suites.
+fn scenario_number() -> String {
+  int.to_string(unique_integer([Positive, Monotonic]))
+}
+
+/// The options of `erlang:unique_integer/1`. Gleam gives them to Erlang as
+/// the atoms `positive` and `monotonic`.
+type UniqueIntegerOption {
+  Positive
+  Monotonic
+}
+
+@external(erlang, "erlang", "unique_integer")
+fn unique_integer(options: List(UniqueIntegerOption)) -> Int
+
 /// One test to build: its name, its own tags and its steps.
 type ScenarioRun {
   ScenarioRun(name: String, tags: List(String), steps: List(gherkin_types.Step))
@@ -294,7 +311,7 @@ type ScenarioRun {
 fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
   let full_name =
     list.flatten([[scope.feature_name], scope.rule_groups, [run.name]])
-  let scenario_id = string.join(full_name, "::")
+  let scenario_id = string.join(full_name, "::") <> "#" <> scenario_number()
   let all_steps = with_background(scope.background_steps, run.steps)
   let registry = scope.registry
 

@@ -184,7 +184,7 @@ fn step_try_add_product(
 }
 ```
 
-##### 3.0.0: a step that changes two record fields <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L10-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a step that changes two record fields <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L11-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub type Shop {
@@ -229,6 +229,8 @@ fn step_try_add_product(
 
 `StepContext` has a `scenario_id` field. It replaces `world.scenario_id(context.world)`.
 
+The id is different. In 2.x it was the name path, for example `"Shopping Cart::Adding items"`, and two scenarios with the same name had the same id. In 3.0.0 it ends with `#` and a number, for example `"Shopping Cart::Adding items#12"`, so it is unique in the run. The number changes between runs, so do not use the id to key data that you keep between runs. The JSON report writes the same id in `"kind": "gherkin:<id>"`. A check that compares the whole id must now compare only the start.
+
 ##### 2.x: read the scenario id from `world` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/gherkin/world.gleam#L558-L560"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
@@ -238,7 +240,7 @@ fn step_place_order(context: StepContext) -> Result(AssertionResult, String) {
 }
 ```
 
-##### 3.0.0: read the scenario id from the context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L47-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: read the scenario id from the context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L48-L50"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn step_place_order(shop: Shop, context: StepContext) -> Result(Shop, String) {
@@ -263,7 +265,7 @@ pub fn register(registry: StepRegistry) -> StepRegistry {
 }
 ```
 
-##### 3.0.0: a register function with one phase for each pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L51-L60"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a register function with one phase for each pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_shop.gleam#L52-L61"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn register(registry: StepRegistry(Shop)) -> StepRegistry(Shop) {
@@ -274,7 +276,7 @@ pub fn register(registry: StepRegistry(Shop)) -> StepRegistry(Shop) {
   |> steps.when("I place the order", step_place_order)
   |> steps.then("the cart has {int} {word}", step_cart_has)
   |> steps.then("the error is {string}", step_error_is)
-  |> steps.then("the order id is {string}", step_order_id_is)
+  |> steps.then("the order id starts with {string}", step_order_id_starts)
 }
 ```
 

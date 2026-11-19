@@ -63,7 +63,7 @@ The `StepContext` fields:
 - `context.captures`: the placeholder captures extracted from the step text
 - `context.table`: the DataTable of the step, if any
 - `context.doc_string`: the DocString of the step, if any
-- `context.scenario_id`: the id of the scenario, for example `"Shopping Cart::Adding items"`
+- `context.scenario_id`: the id of the scenario, for example `"Shopping Cart::Adding items#12"`. It is the name path of the scenario, then `#` and a number. The id is unique in the run, also for two scenarios with the same name. The number after `#` changes between runs, so do not use the id to key data that you keep between runs.
 
 When a step fails, the steps after it do not run.
 

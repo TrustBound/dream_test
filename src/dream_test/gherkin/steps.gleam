@@ -131,9 +131,12 @@ pub type StepContext {
     /// Optional DocString attached to the step
     doc_string: Option(String),
     /// The scenario id: the Feature name, the Rule group (if any) and the
-    /// scenario name, joined with `::`, for example
-    /// `"Shopping Cart::Adding items"`. Use it to make names (for example
-    /// database rows or files) that no other scenario uses.
+    /// scenario name, joined with `::`, then `#` and a number, for
+    /// example `"Shopping Cart::Adding items#12"`. The id is unique in the
+    /// run, also for two scenarios with the same name. Use it to make names
+    /// (for example database rows or files) that no other scenario uses.
+    /// The number after `#` changes between runs, so do not use the id to
+    /// key data that you keep between runs.
     scenario_id: String,
   )
 }

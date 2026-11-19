@@ -95,6 +95,11 @@ store. This release has breaking changes. Read
   check cannot change the state. The `StepHandler` type is removed.
 - `steps.when_` is now `steps.when`, and `steps.then_` is now `steps.then`.
 - `StepContext` has no `world` field. It has a `scenario_id` field.
+- The scenario id ends with `#` and a number, for example
+  `"Shopping Cart::Adding items#12"`, so it is unique in the run, also for
+  two scenarios with the same name. In 2.x it was only the name path. The
+  number changes between runs. The JSON report writes the same id in
+  `"kind": "gherkin:<id>"`.
 - `steps.step` is removed. Each step definition belongs to exactly one
   phase.
 - `steps.find_step` takes `phase: StepPhase` in place of
@@ -369,7 +374,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
   - `steps.new(initial:)` takes the state that each scenario starts from,
     and `steps.initial_state(registry)` gives it
-  - `StepContext.scenario_id` gives the id of the scenario
+  - `StepContext.scenario_id` gives the id of the scenario, unique in
+    the run
   - `steps.validate` returns the duplicate step definitions of a registry,
     one line for each
 
