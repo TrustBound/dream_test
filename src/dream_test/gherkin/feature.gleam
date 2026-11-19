@@ -164,7 +164,7 @@ pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
     registry: config.step_registry,
     name: feature.name,
     tags: feature.tags,
-    children: [steps.Scenarios(feature: feature)],
+    children: [steps.SuiteScenarios(feature: feature)],
   )
 }
 

@@ -349,11 +349,11 @@ the guide labels them.
     runs the set-up one time for the scenarios of all its files.
     `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
     that starts as the registry says. Its children are
-    `steps.SuiteChild` values: `Feature(feature)`, `Scenarios(feature)`,
-    `Group(name:, tags:, children:)` and `Node(node)`. The scenarios of
-    every Feature run with the steps of that registry, so a suite of
-    Features cannot mix the steps of one registry with the set-up of
-    another
+    `steps.SuiteChild` values: `SuiteFeature(feature)`,
+    `SuiteScenarios(feature)`, `SuiteGroup(name:, tags:, children:)` and
+    `SuiteNode(node)`. The scenarios of every Feature run with the steps
+    of that registry, so a suite of Features cannot mix the steps of one
+    registry with the set-up of another
   - The set-up runs one time, before the first test, and only when at
     least one test of the suite runs. The tear-down gets its value after
     the last test. Both run in one process that lives while the tests run
@@ -367,7 +367,7 @@ the guide labels them.
     named `suite set-up`, and each test that did not start gets
     `not run: the suite set-up of "<suite>" stopped (<reason>)`
   - `steps.SuiteChild` puts several Features in one suite with one
-    set-up: `Feature(feature)` is a group with the tests of a Feature
+    set-up: `SuiteFeature(feature)` is a group with the tests of a Feature
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 

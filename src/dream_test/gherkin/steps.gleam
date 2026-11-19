@@ -283,23 +283,33 @@ pub fn new_with_set_up(
 
 /// One child of the suite of `to_suite`.
 ///
-/// - `Feature(feature)`: a group named after the Feature, with its tags and
-///   a test for each scenario, as in `feature.to_test_suite`. The scenarios
-///   run with the steps of the registry of `to_suite`. A Feature gets its
-///   tests only here, so it cannot run with the steps of one registry and
-///   the start of another.
-/// - `Scenarios(feature)`: the tests of the scenarios of a Feature, and a
-///   group for each Rule, with no group for the Feature.
-/// - `Group(name, tags, children)`: a group of your own, for example with a
-///   tag, that holds more children.
-/// - `Node(node)`: a test, a hook or a group that you make, for example
-///   with `unit_context.it` or `unit_context.before_each`. It gets the same
-///   start as the scenarios.
+/// The names have the prefix `Suite`, so `SuiteGroup` and `SuiteFeature` do
+/// not clash with `dream_test/types.Group` or
+/// `dream_test/gherkin/types.Feature` when you import them unqualified. The
+/// other two names take the same prefix, so all four match.
+///
+/// - `SuiteFeature(feature)`: a group named after the Feature, with its
+///   tags and a test for each scenario, as in `feature.to_test_suite`. The
+///   scenarios run with the steps of the registry of `to_suite`. A Feature
+///   gets its tests only here, so it cannot run with the steps of one
+///   registry and the start of another.
+/// - `SuiteScenarios(feature)`: the tests of the scenarios of a Feature,
+///   and a group for each Rule, with no group for the Feature. The tags of
+///   the Feature itself are not on these tests.
+/// - `SuiteGroup(name, tags, children)`: a group of your own, for example
+///   with a tag, that holds more children.
+/// - `SuiteNode(node)`: a test, a hook or a group that you make, for
+///   example with `unit_context.it` or `unit_context.before_each`. It gets
+///   the same start as the scenarios.
 pub type SuiteChild(state) {
-  Feature(feature: types.Feature)
-  Scenarios(feature: types.Feature)
-  Group(name: String, tags: List(String), children: List(SuiteChild(state)))
-  Node(node: dream_types.Node(state))
+  SuiteFeature(feature: types.Feature)
+  SuiteScenarios(feature: types.Feature)
+  SuiteGroup(
+    name: String,
+    tags: List(String),
+    children: List(SuiteChild(state)),
+  )
+  SuiteNode(node: dream_types.Node(state))
 }
 
 /// Make a suite whose tests start as the registry says: from the state of
@@ -309,8 +319,8 @@ pub type SuiteChild(state) {
 ///
 /// `feature.to_test_suite` and `gherkin/discover.to_suite` use it. Use it
 /// to run several Features with one start, for example one server for all
-/// of them. The scenarios of every `Feature` and `Scenarios` child run with
-/// the steps of `registry`.
+/// of them. The scenarios of every `SuiteFeature` and `SuiteScenarios`
+/// child run with the steps of `registry`.
 ///
 /// ## Parameters
 ///
@@ -323,9 +333,11 @@ pub type SuiteChild(state) {
 ///
 /// ```gleam
 /// to_suite(registry: steps, name: "Shop", tags: [], children: [
-///   Feature(cart),
-///   Group(name: "Billing", tags: ["billing"], children: [Feature(invoice)]),
-///   Node(unit_context.it("the server answers", answers)),
+///   SuiteFeature(cart),
+///   SuiteGroup(name: "Billing", tags: ["billing"], children: [
+///     SuiteFeature(invoice),
+///   ]),
+///   SuiteNode(unit_context.it("the server answers", answers)),
 /// ])
 /// ```
 ///
@@ -362,22 +374,22 @@ fn child_to_nodes(
   registry: StepRegistry(state),
 ) -> List(dream_types.Node(state)) {
   case child {
-    Feature(feature) -> [
+    SuiteFeature(feature) -> [
       dream_types.Group(
         name: feature.name,
         tags: feature.tags,
         children: feature_children(feature, registry),
       ),
     ]
-    Scenarios(feature) -> feature_children(feature, registry)
-    Group(name: name, tags: tags, children: children) -> [
+    SuiteScenarios(feature) -> feature_children(feature, registry)
+    SuiteGroup(name: name, tags: tags, children: children) -> [
       dream_types.Group(
         name: name,
         tags: tags,
         children: children_to_nodes(children, registry),
       ),
     ]
-    Node(node) -> [node]
+    SuiteNode(node) -> [node]
   }
 }
 

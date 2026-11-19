@@ -81,7 +81,7 @@ pub fn tests() {
           registry: steps.new(initial: 7),
           name: "start",
           tags: [],
-          children: [steps.Node(unit_context.it("gets 7", is_7))],
+          children: [steps.SuiteNode(unit_context.it("gets 7", is_7))],
         ),
       ])
       |> statuses
@@ -98,7 +98,7 @@ pub fn tests() {
             registry: counter_steps(events, Ok(7)),
             name: "start",
             tags: [],
-            children: [steps.Node(unit_context.it("gets 7", is_7))],
+            children: [steps.SuiteNode(unit_context.it("gets 7", is_7))],
           ),
         ])
       #(statuses(report), receive_all(events, []))
@@ -110,26 +110,27 @@ pub fn tests() {
     }),
 
     it("to_suite runs every kind of child under one set-up", fn() {
-      // Feature, Scenarios, a Group with a tag that holds a Feature, and
-      // Node with a unit_context.it and a before_each. The set-up runs one
-      // time; before_each runs before each of the four tests. The tests
+      // SuiteFeature, SuiteScenarios, a SuiteGroup with a tag that holds a
+      // SuiteFeature, and SuiteNode with a unit_context.it and a
+      // before_each. The set-up runs one time; before_each runs before each
+      // of the four tests. The tests
       // directly in the suite run before the tests of its groups.
       let events = process.new_subject()
       let registry = counter_steps(events, Ok(10))
       let report =
         run([
           steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
-            steps.Node(
+            steps.SuiteNode(
               unit_context.before_each(fn(value) {
                 record_before_each(events, value)
               }),
             ),
-            steps.Feature(counter_parsed("Cart")),
-            steps.Scenarios(counter_parsed("Stock")),
-            steps.Group(name: "Billing", tags: ["billing"], children: [
-              steps.Feature(counter_parsed("Invoice")),
+            steps.SuiteFeature(counter_parsed("Cart")),
+            steps.SuiteScenarios(counter_parsed("Stock")),
+            steps.SuiteGroup(name: "Billing", tags: ["billing"], children: [
+              steps.SuiteFeature(counter_parsed("Invoice")),
             ]),
-            steps.Node(unit_context.it("gets 10", is_10)),
+            steps.SuiteNode(unit_context.it("gets 10", is_10)),
           ]),
         ])
       #(
@@ -168,13 +169,13 @@ pub fn tests() {
               registry: counter_steps(cart_events, Ok(10)),
               name: "Cart suite",
               tags: [],
-              children: [steps.Feature(counter_parsed("Cart"))],
+              children: [steps.SuiteFeature(counter_parsed("Cart"))],
             ),
             steps.to_suite(
               registry: counter_steps(stock_events, Ok(10)),
               name: "Stock suite",
               tags: [],
-              children: [steps.Feature(counter_parsed("Stock"))],
+              children: [steps.SuiteFeature(counter_parsed("Stock"))],
             ),
           ]),
         ])
@@ -211,8 +212,8 @@ pub fn tests() {
               name: "Shop",
               tags: [],
               children: [
-                steps.Feature(counter_parsed("Cart")),
-                steps.Feature(shop_parsed()),
+                steps.SuiteFeature(counter_parsed("Cart")),
+                steps.SuiteFeature(shop_parsed()),
               ],
             ),
           ])
