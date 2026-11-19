@@ -75,6 +75,64 @@ pub fn tests() {
       )
     }),
 
+    it("tokenize_step_text ends a quoted run before punctuation", fn() {
+      [
+        step_trie.tokenize_step_text("I add \"apple\", \"banana\""),
+        step_trie.tokenize_step_text("call (\"hello world\")"),
+        step_trie.tokenize_step_text("the page is \"Home\"."),
+        step_trie.tokenize_step_text("pick \"a\" \"b\""),
+        step_trie.tokenize_step_text("the name is \"\" now"),
+        step_trie.tokenize_step_text("ask \"why\"? \"how\"! \"so\"; \"then\":"),
+      ]
+      |> should
+      |> be_equal([
+        ["I", "add", "\"apple\",", "\"banana\""],
+        ["call", "(\"hello world\")"],
+        ["the", "page", "is", "\"Home\"."],
+        ["pick", "\"a\"", "\"b\""],
+        ["the", "name", "is", "\"\"", "now"],
+        ["ask", "\"why\"?", "\"how\"!", "\"so\";", "\"then\":"],
+      ])
+      |> or_fail_with(
+        "a quoted run ends at a quote before a space, the end, or punctuation",
+      )
+    }),
+
+    it("lookup matches quoted values next to punctuation", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "I add {string}, {string}", "add")
+      |> result.try(step_trie.insert(_, GivenPhase, "call ({string})", "call"))
+      |> result.try(step_trie.insert(
+        _,
+        GivenPhase,
+        "the page is {string}.",
+        "page",
+      ))
+      |> result.map(lookup_quotes_before_punctuation)
+      |> should
+      |> be_equal(
+        Ok([
+          Some(
+            step_trie.StepMatch(handler: "add", captures: [
+              step_trie.CapturedString("apple"),
+              step_trie.CapturedString("banana"),
+            ]),
+          ),
+          Some(
+            step_trie.StepMatch(handler: "call", captures: [
+              step_trie.CapturedString("hello world"),
+            ]),
+          ),
+          Some(
+            step_trie.StepMatch(handler: "page", captures: [
+              step_trie.CapturedString("Home"),
+            ]),
+          ),
+        ]),
+      )
+      |> or_fail_with("a quoted value next to punctuation should match")
+    }),
+
     it("lookup matches step text with a quote inside a word", fn() {
       step_trie.new()
       |> step_trie.insert(GivenPhase, "the input {word} is valid", "valid")
@@ -691,6 +749,16 @@ fn lookup_comma_numbers(
   [
     step_trie.lookup(trie, GivenPhase, "total 1,000"),
     step_trie.lookup(trie, GivenPhase, "total 1,5"),
+  ]
+}
+
+fn lookup_quotes_before_punctuation(
+  trie: step_trie.StepTrie(String),
+) -> List(option.Option(step_trie.StepMatch(String))) {
+  [
+    step_trie.lookup(trie, GivenPhase, "I add \"apple\", \"banana\""),
+    step_trie.lookup(trie, GivenPhase, "call (\"hello world\")"),
+    step_trie.lookup(trie, GivenPhase, "the page is \"Home\"."),
   ]
 }
 

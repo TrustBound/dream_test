@@ -165,9 +165,11 @@ store. This release has breaking changes. Read
 - `step_trie.parse_step_pattern` gives one `List(StepSegment)` for each
   word, and `StepSegment.LiteralWord` is now `LiteralText`.
   `step_trie.tokenize_step_text` splits only at spaces outside quotes. A
-  quoted run starts only at a double quote at the start of a word, and
-  ends only at a double quote before a space or at the end of the text,
-  so the quote in `O"Brien` or `5"` is an ordinary character.
+  quoted run starts at a double quote at the start of a word, also after
+  `(` or `[`. It ends at a double quote before a space, the end of the
+  text, or one of `,` `.` `)` `]` `;` `:` `!` `?`. So
+  `"apple", "banana"` is two words, and the quote in `O"Brien` or `5"`
+  is an ordinary character.
 - `discover.with_registry` gives the opaque type `RunnableDiscovery`, and
   `discover.to_suite` takes only that type.
 - A `discover.features` pattern that matches no files is an error.

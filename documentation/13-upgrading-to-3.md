@@ -427,7 +427,7 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
 
 #### How step text matches a pattern
 
-In 3.0.0, step text and step patterns are split into words in the same way: at spaces, with a double-quoted run kept in one word. A quoted run starts only at a double quote at the start of a word, and ends only at a double quote before a space or at the end of the text, so the quote in `O"Brien` or `5"` is an ordinary character. A pattern without placeholders always matches its own text. In 2.x, the step text was also split where digits meet other characters, but the pattern was not.
+In 3.0.0, step text and step patterns are split into words in the same way: at spaces, with a double-quoted run kept in one word. A quoted run starts at a double quote at the start of a word, also after `(` or `[`. It ends at a double quote before a space, the end of the text, or one of `,` `.` `)` `]` `;` `:` `!` `?`. So `"apple", "banana"` is two words, and the quote in `O"Brien` or `5"` is an ordinary character. A pattern without placeholders always matches its own text. In 2.x, the step text was also split where digits meet other characters, but the pattern was not.
 
 | 2.x | 3.0.0 | What to do |
 |---|---|---|

@@ -8,9 +8,10 @@
 //// Step text and step patterns are split into words by one function,
 //// `tokenize_step_text`. A space ends a word. A double-quoted run, such as
 //// `"Red Widget"`, stays in one word with its spaces. A quoted run starts
-//// only at a double quote at the start of a word, and ends only at a double
-//// quote before a space or at the end of the text, so the quote in
-//// `O"Brien` or `5"` is an ordinary character. Because both sides use
+//// at a double quote at the start of a word, also after `(` or `[`. It
+//// ends at a double quote before a space, the end of the text, or closing
+//// punctuation (`,` `.` `)` `]` `;` `:` `!` `?`). So the quote in `O"Brien`
+//// or `5"` is an ordinary character, and `"apple", "banana"` is two words. Because both sides use
 //// the same split, a pattern without placeholders always matches its own
 //// text.
 ////
@@ -571,9 +572,12 @@ pub fn lookup(
 /// 1. A space ends a word. Two or more spaces do not make an empty word.
 /// 2. A double-quoted run, such as `"Red Widget"`, stays in one word with its
 ///    spaces and quotes.
-/// 3. A quoted run starts only at a double quote at the start of a word,
-///    and ends only at a double quote before a space or at the end of the
-///    text. Any other double quote is an ordinary character: in
+/// 3. A quoted run starts at a double quote at the start of a word, also
+///    after `(` or `[`. It ends at a double quote before a space, before
+///    the end of the text, or before one of `,` `.` `)` `]` `;` `:` `!`
+///    `?`. So `I add "apple", "banana"` gives the words `"apple",` and
+///    `"banana"`, and `call ("hello world")` gives `("hello world")`.
+/// 4. Any other double quote is an ordinary character: in
 ///    `the input 5" is valid` and `O"Brien says "hi"`, the words are
 ///    `5"` and `O"Brien`.
 ///
@@ -602,8 +606,9 @@ fn tokenize_preserving_quotes(
   }
 }
 
-/// A double quote starts a quoted run only at the start of a word, and
-/// ends it only before a space or at the end of the text. Any other double
+/// A double quote starts a quoted run at the start of a word, or after
+/// opening brackets at the start of a word. It ends the run when a space,
+/// the end of the text, or closing punctuation comes next. Any other double
 /// quote is an ordinary character of the word.
 fn process_char(
   char: String,
@@ -612,9 +617,9 @@ fn process_char(
   current: String,
   in_quotes: Bool,
 ) -> List(String) {
-  let starts_word = current == ""
-  let ends_word = rest == "" || string.starts_with(rest, " ")
-  case char, in_quotes, starts_word, ends_word {
+  let starts_word = is_only_opening_brackets(current)
+  let ends_run = quoted_run_ends_before(rest)
+  case char, in_quotes, starts_word, ends_run {
     "\"", False, True, _ ->
       tokenize_preserving_quotes(rest, tokens, current <> char, True)
     "\"", True, _, True ->
@@ -625,6 +630,27 @@ fn process_char(
     }
     _, _, _, _ ->
       tokenize_preserving_quotes(rest, tokens, current <> char, in_quotes)
+  }
+}
+
+/// True when the word so far is empty or holds only `(` and `[`.
+fn is_only_opening_brackets(current: String) -> Bool {
+  current
+  |> string.to_graphemes
+  |> list.all(is_opening_bracket)
+}
+
+fn is_opening_bracket(char: String) -> Bool {
+  char == "(" || char == "["
+}
+
+/// True when the text after a quote is empty, or starts with a space or
+/// with punctuation that cannot start a word.
+fn quoted_run_ends_before(rest: String) -> Bool {
+  case string.first(rest) {
+    Error(Nil) -> True
+    Ok(next) ->
+      list.contains([" ", ",", ".", ")", "]", ";", ":", "!", "?"], next)
   }
 }
 
