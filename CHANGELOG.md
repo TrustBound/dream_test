@@ -103,7 +103,9 @@ store. This release has breaking changes. Read
 - The hooks of each scope run in one setup process of that scope, and a
   test runs in one process: its `before_each_test` hooks, `before_each`
   hooks, body, `after_each` hooks and `after_each_test` hooks.
-- A test body that runs past its timeout is always `TimedOut`.
+- A test body that runs past its timeout is `TimedOut` when the runner stops
+  it at the deadline. A body that finished and sent its result just before
+  that keeps its result.
 - A step can finish after its deadline, before the kill reaches its
   process. The test is still `TimedOut` for that step. Its report can then
   also hold what the process did after the deadline: the context and the

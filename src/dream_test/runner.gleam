@@ -393,9 +393,9 @@ pub fn max_concurrency(
 /// - `timeout_ms`: timeout in milliseconds applied to tests without an explicit timeout
 ///   and to each hook. Give a value of at least 1. With 0, the tests and
 ///   hooks get no time, so they almost always time out, and the result is
-///   not dependable. A value below 0 stops the run with the Erlang error
-///   `timeout_value` when the run waits for a hook in a set-up process, for
-///   example a `before_all` hook.
+///   not dependable. A value below 0 almost always stops the run with the
+///   Erlang error `timeout_value` when the run waits for a hook in a set-up
+///   process, for example a `before_all` hook.
 ///
 /// ## Returns
 ///
