@@ -8,7 +8,7 @@ Dream Test uses the same setup for its own badge.
 
 - **The test job measures.** `gleam test` writes a JSON summary of the coverage.
 - **The test job reads the total.** A shell step turns the total into a badge text (`80.0%`) and a colour.
-- **A second job publishes.** It runs only on a push to `main`. It commits `coverage.json` to the `badges` branch. It runs no project code, so it is the only job with write access.
+- **A second job publishes.** It runs only on a push to `main`, also when the tests failed. It commits `coverage.json` to the `badges` branch. It runs no project code, so it is the only job with write access.
 - **shields.io draws.** The README image asks shields.io for a badge. shields.io reads `coverage.json` from the `badges` branch.
 
 The `badges` branch has no shared history with your code. It holds only `coverage.json`, and each changed total adds one commit.
@@ -35,7 +35,7 @@ pub fn main() {
 }
 ```
 
-The minimum is optional. It sets the badge colour (see below). If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written and the badge step fails.
+The minimum is optional. It sets the badge colour (see below). With `runner.exit_on_failure`, a total below the minimum makes `gleam test` end with exit status 1, so the `test` job fails. The workflow below still reads the total and publishes it, in red. If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written and the badge step fails.
 
 ### 2. Add the workflow
 
@@ -70,15 +70,25 @@ jobs:
           gleam-version: "1.19.2"
           rebar3-version: "3"
 
-      - run: gleam test
+      - name: Run tests
+        id: tests
+        run: gleam test
 
       - name: Read coverage for the badge
         id: coverage_badge
+        if: ${{ !cancelled() }}
         env:
           COVERAGE_JSON: build/coverage/coverage.json
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
         run: |
           set -euo pipefail
           if [ ! -f "$COVERAGE_JSON" ]; then
+            if [ "$TESTS_OUTCOME" != "success" ]; then
+              # The test run stopped before it wrote the JSON, for example
+              # at a compile error. The failed test step shows why.
+              echo "No coverage badge: the test run wrote no $COVERAGE_JSON."
+              exit 0
+            fi
             echo "Coverage badge failed: $COVERAGE_JSON does not exist."
             echo "Fix: set coverage.json_path(\"$COVERAGE_JSON\") in the test main."
             exit 1
@@ -102,7 +112,7 @@ jobs:
           echo "color=$color" >> "$GITHUB_OUTPUT"
 
   coverage-badge:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'OWNER/REPO'
+    if: ${{ !cancelled() && needs.test.outputs.coverage_message != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'OWNER/REPO' }}
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -165,9 +175,10 @@ What each part does:
 
 | Part | Why |
 |---|---|
-| `Read coverage for the badge` | Runs on every event, so a pull request also shows that the JSON is readable. It fails when the file is missing or has no executable lines. |
-| `if:` on `coverage-badge` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. |
-| `needs: test` | The badge changes only after the tests pass. |
+| `id: tests` | The read step gets the result of `gleam test` from it. |
+| `Read coverage for the badge` | Runs on every event, so a pull request also shows that the JSON is readable. `!cancelled()` makes it run also when `gleam test` failed. It fails when the tests passed and the file is missing, or when the file has no executable lines. When `gleam test` failed and wrote no file, it writes no badge text. |
+| `if:` on `coverage-badge` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. `!cancelled()` makes it run also when the `test` job failed, and `coverage_message != ''` skips it when no badge text was read. |
+| `needs: test` | The job starts after the `test` job and reads its badge text. |
 | `permissions: contents: write` | The push needs it. Only this job gets it, and this job runs no project code. |
 | `concurrency` | Two quick pushes to `main` publish one after the other, not at the same time. |
 | `git ls-remote` | Exit status `2` means there is no `badges` branch yet, so the step makes it as an orphan branch. |
@@ -223,6 +234,7 @@ The link opens the runs of the workflow on `main`. Add `&style=flat-square` (or 
 | `Permission to OWNER/REPO.git denied to github-actions[bot]` (403) | The job has no write access. Keep `permissions: contents: write` on the job. If your organization blocks write access for workflows, an admin must allow it in Settings, Actions, General, Workflow permissions. |
 | `protected branch hook declined` or a ruleset error | A branch protection rule or ruleset covers `badges`, often with a pattern such as `*` or `**`. Remove `badges` from the rule, or let GitHub Actions bypass it. |
 | `Coverage badge failed: build/coverage/coverage.json does not exist.` | The test run did not write the JSON. Set `coverage.json_path`, and turn coverage on in CI (`DREAM_TEST_COVERAGE` when you use `runner.coverage_from_environment`). |
+| The badge does not turn red when the total falls below the minimum | The total below the minimum fails `gleam test`. Steps and jobs without a status function in their `if:` are skipped after a failure. Keep `!cancelled()` in the `if:` of the read step and of the `coverage-badge` job. |
 | `the coverage JSON has no executable lines` | Coverage found no lines to measure. Check `coverage.source_directory` and your exclusions. |
 | `failed to push some refs` (not a fast-forward) | Another run pushed to `badges` at the same time. Keep the `concurrency` group, then run the job again. |
 | The badge never loads in a private repository | `raw.githubusercontent.com` needs a token for a private repository, and shields.io has none. This setup works only for a public repository. |
