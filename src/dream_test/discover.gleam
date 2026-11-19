@@ -522,7 +522,7 @@ fn discover_all_modules_loop_next(
         rest,
         seen2,
         acc2,
-        list.append(list.reverse(unloaded_modules(found)), errors_rev),
+        list.fold(unloaded_modules(found), errors_rev, add_unique_error),
       )
     }
     Error(message) ->
@@ -530,6 +530,16 @@ fn discover_all_modules_loop_next(
         format_discover_error(pattern, message),
         ..errors_rev
       ])
+  }
+}
+
+/// Add an error that is not in the list yet. Two patterns can match the
+/// same module, and its load error is reported one time, as the module is
+/// found one time.
+fn add_unique_error(errors_rev: List(String), error: String) -> List(String) {
+  case list.contains(errors_rev, error) {
+    True -> errors_rev
+    False -> [error, ..errors_rev]
   }
 }
 

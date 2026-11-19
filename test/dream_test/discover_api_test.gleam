@@ -327,6 +327,27 @@ pub fn tests() {
       ))
       |> or_fail_with("a module that cannot load should be an error")
     }),
+
+    it("reports a module that cannot load once for two patterns", fn() {
+      let directory = "build/discovery_broken_beams_twice"
+      add_broken_beam_first_in_path(
+        directory,
+        "discovery_fixtures@unloadable_suite",
+      )
+      let result =
+        discover.new()
+        |> from_path("discovery_fixtures/unloadable_suite.gleam")
+        |> from_path("discovery_fixtures/unloadable_*.gleam")
+        |> list_modules()
+      remove_from_path(directory)
+
+      result
+      |> should
+      |> be_equal(Error(
+        "discovery_fixtures@unloadable_suite: cannot load the module: badfile",
+      ))
+      |> or_fail_with("a module that cannot load should be one error")
+    }),
   ])
 }
 
