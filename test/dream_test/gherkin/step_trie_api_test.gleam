@@ -5,6 +5,7 @@ import dream_test/unit.{describe, it}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/string
 
 pub fn tests() {
   describe("dream_test/gherkin/step_trie", [
@@ -96,6 +97,28 @@ pub fn tests() {
       |> or_fail_with(
         "a quoted run ends at a quote before a space, the end, or punctuation",
       )
+    }),
+
+    it("lookup matches a quoted payload of 20000 characters", fn() {
+      let payload = string.repeat("ab cd ", 3334) |> string.drop_end(4)
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "I send {string}", "send")
+      |> result.map(step_trie.lookup(
+        _,
+        GivenPhase,
+        "I send \"" <> payload <> "\"",
+      ))
+      |> should
+      |> be_equal(
+        Ok(
+          Some(
+            step_trie.StepMatch(handler: "send", captures: [
+              step_trie.CapturedString(payload),
+            ]),
+          ),
+        ),
+      )
+      |> or_fail_with("expected the whole payload as one captured string")
     }),
 
     it("lookup matches quoted values next to punctuation", fn() {

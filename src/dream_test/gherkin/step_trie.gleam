@@ -591,18 +591,27 @@ pub fn lookup(
 /// ```
 ///
 pub fn tokenize_step_text(text text: String) -> List(String) {
-  tokenize_preserving_quotes(text, [], "", False)
+  tokenize_preserving_quotes(text, [], "", AtWordStart, False)
+}
+
+/// Whether the word so far is empty or holds only `(` and `[`. The
+/// tokenizer keeps this as it reads, so it never reads the word again.
+type WordStart {
+  AtWordStart
+  PastWordStart
 }
 
 fn tokenize_preserving_quotes(
   remaining: String,
   tokens: List(String),
   current: String,
+  word_start: WordStart,
   in_quotes: Bool,
 ) -> List(String) {
   case string.pop_grapheme(remaining) {
     Error(_) -> finalize_tokens(tokens, current)
-    Ok(#(char, rest)) -> process_char(char, rest, tokens, current, in_quotes)
+    Ok(#(char, rest)) ->
+      process_char(char, rest, tokens, current, word_start, in_quotes)
   }
 }
 
@@ -615,33 +624,49 @@ fn process_char(
   rest: String,
   tokens: List(String),
   current: String,
+  word_start: WordStart,
   in_quotes: Bool,
 ) -> List(String) {
-  let starts_word = is_only_opening_brackets(current)
   let ends_run = quoted_run_ends_before(rest)
-  case char, in_quotes, starts_word, ends_run {
-    "\"", False, True, _ ->
-      tokenize_preserving_quotes(rest, tokens, current <> char, True)
+  case char, in_quotes, word_start, ends_run {
+    "\"", False, AtWordStart, _ ->
+      tokenize_preserving_quotes(
+        rest,
+        tokens,
+        current <> char,
+        PastWordStart,
+        True,
+      )
     "\"", True, _, True ->
-      tokenize_preserving_quotes(rest, tokens, current <> char, False)
+      tokenize_preserving_quotes(
+        rest,
+        tokens,
+        current <> char,
+        PastWordStart,
+        False,
+      )
     " ", False, _, _ -> {
       let updated_tokens = add_token_if_non_empty(tokens, current)
-      tokenize_preserving_quotes(rest, updated_tokens, "", False)
+      tokenize_preserving_quotes(rest, updated_tokens, "", AtWordStart, False)
     }
     _, _, _, _ ->
-      tokenize_preserving_quotes(rest, tokens, current <> char, in_quotes)
+      tokenize_preserving_quotes(
+        rest,
+        tokens,
+        current <> char,
+        word_start_after(word_start, char),
+        in_quotes,
+      )
   }
 }
 
-/// True when the word so far is empty or holds only `(` and `[`.
-fn is_only_opening_brackets(current: String) -> Bool {
-  current
-  |> string.to_graphemes
-  |> list.all(is_opening_bracket)
-}
-
-fn is_opening_bracket(char: String) -> Bool {
-  char == "(" || char == "["
+/// The word start after `char` joins the word: only `(` and `[` keep the
+/// word at its start.
+fn word_start_after(word_start: WordStart, char: String) -> WordStart {
+  case word_start, char {
+    AtWordStart, "(" | AtWordStart, "[" -> AtWordStart
+    _, _ -> PastWordStart
+  }
 }
 
 /// True when the text after a quote is empty, or starts with a space or
