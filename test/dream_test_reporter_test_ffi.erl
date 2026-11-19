@@ -5,7 +5,9 @@
     with_columns_variable/2,
     without_gleam_stdlib_application/1,
     crash_render/1,
-    crash_render_with_long_reason/1
+    crash_render_with_long_reason/1,
+    throw_render/1,
+    exit_render/1
 ]).
 
 %% Helpers for the reporter tests. They change only the state that the
@@ -110,3 +112,13 @@ crash_render(_Report) ->
 %% whose text is longer than one line: `~p` breaks it over many lines.
 crash_render_with_long_reason(_Report) ->
     erlang:error({long_reason, lists:seq(1, 120)}).
+
+%% A render function for reporter_types.Custom that throws a stable value.
+throw_render(_Report) ->
+    erlang:throw(custom_render_thrown).
+
+%% A render function for reporter_types.Custom that calls exit/1 with a
+%% stable reason. This is an exception in the calling process, not an exit
+%% signal from another process.
+exit_render(_Report) ->
+    erlang:exit(custom_render_exited).

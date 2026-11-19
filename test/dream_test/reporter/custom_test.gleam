@@ -11,6 +11,7 @@ import dream_test/runner
 import dream_test/suite
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
+import gleam/bool
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/list
@@ -21,6 +22,12 @@ fn run_main_in_new_vm(module: String, function: String) -> #(Int, String)
 
 @external(erlang, "dream_test_reporter_test_ffi", "crash_render_with_long_reason")
 fn crash_render_with_long_reason(report: types.RunReport) -> String
+
+@external(erlang, "dream_test_reporter_test_ffi", "throw_render")
+fn throw_render(report: types.RunReport) -> String
+
+@external(erlang, "dream_test_reporter_test_ffi", "exit_render")
+fn exit_render(report: types.RunReport) -> String
 
 pub fn tests() {
   describe("dream_test/reporters/types Custom", [
@@ -165,6 +172,64 @@ pub fn tests() {
         ),
       ])
       |> or_fail_with("expected the reason on one line, cut at 200 characters")
+    }),
+
+    it("calls render in the process of the run", fn() {
+      let run_process = process.self()
+      run_and_record([passing_suite()], [
+        reporter_types.Custom(fn(_report) {
+          "render ran in the process of the run: "
+          <> bool.to_string(process.self() == run_process)
+          <> "\n"
+        }),
+      ])
+      |> should
+      |> be_equal(["render ran in the process of the run: True\n"])
+      |> or_fail_with("expected render to run in the process of the run")
+    }),
+
+    it("writes a named error for a reporter that throws", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(throw_render),
+      ])
+      |> list.map(stream_and_first_line)
+      |> should
+      |> be_equal([
+        #(
+          "error",
+          "  The Custom results reporter at position 1 in runner.results_reporters crashed: throw:custom_render_thrown",
+        ),
+      ])
+      |> or_fail_with("expected the named error for the throw")
+    }),
+
+    it("writes a named error for a reporter that exits", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(exit_render),
+      ])
+      |> list.map(stream_and_first_line)
+      |> should
+      |> be_equal([
+        #(
+          "error",
+          "  The Custom results reporter at position 1 in runner.results_reporters crashed: exit:custom_render_exited",
+        ),
+      ])
+      |> or_fail_with("expected the named error for the exit")
+    }),
+
+    it("keeps the class of a throw and of an exit in the crash reason", fn() {
+      run_without_output([passing_suite()], [
+        reporter_types.Custom(throw_render),
+        reporter_types.Custom(exit_render),
+      ])
+      |> types.report_reporter_crashes
+      |> should
+      |> be_equal([
+        types.ReporterCrash(position: 1, reason: "throw:custom_render_thrown"),
+        types.ReporterCrash(position: 2, reason: "exit:custom_render_exited"),
+      ])
+      |> or_fail_with("expected the throw and the exit with their classes")
     }),
 
     it("drops the normal output of a silent run and writes the crash", fn() {
