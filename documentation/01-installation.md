@@ -55,16 +55,18 @@ import dream_test/runner.{
 }
 
 pub fn main() {
-  let suites =
-    discover.new()
-    |> from_path("snippets/unit/**.gleam")
-    |> to_suites()
-
-  runner.new(suites)
+  runner.new(suites())
   |> progress_reporter(progress.new())
   |> results_reporters([bdd.new()])
   |> exit_on_failure()
   |> run()
+}
+
+/// The suites of every test module under `test/snippets/unit/`.
+pub fn suites() {
+  discover.new()
+  |> from_path("snippets/unit/**.gleam")
+  |> to_suites()
 }
 ```
 

@@ -138,6 +138,8 @@ The context stays inside the suite, so every suite has the same type, `TestSuite
 
 ### A minimal example: counter context
 
+A `before_each` hook runs before every test of its group, wherever it stands in the list of the group. A hook after a test still runs before that test. To give a hook to some tests only, put them in a nested `group`.
+
 #### A counter context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
@@ -145,7 +147,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
-import dream_test/unit_context.{before_each, describe, it}
+import dream_test/unit_context.{before_each, describe, group, it}
 
 pub type Context {
   Context(counter: Int)
@@ -155,7 +157,7 @@ fn increment_counter(context: Context) {
   Ok(Context(counter: context.counter + 1))
 }
 
-pub fn suite() {
+pub fn tests() {
   describe("Context-aware suite", Context(counter: 0), [
     before_each(increment_counter),
     it("receives the updated context", fn(context: Context) {
@@ -164,19 +166,22 @@ pub fn suite() {
       |> be_equal(1)
       |> or_fail_with("expected counter to be 1 after before_each")
     }),
-    // Hook can be repeated; each applies to subsequent tests.
-    before_each(increment_counter),
-    it("sees hook effects for subsequent tests", fn(context: Context) {
-      context.counter
-      |> should
-      |> be_equal(2)
-      |> or_fail_with("expected counter to be 2 after two before_each hooks")
-    }),
+    // A hook applies to every test of its group, wherever it is in the
+    // list. To add a hook for some tests only, put them in a nested group.
+    group("with a second hook", [
+      before_each(increment_counter),
+      it("sees both hooks", fn(context: Context) {
+        context.counter
+        |> should
+        |> be_equal(2)
+        |> or_fail_with("expected counter to be 2 after two before_each hooks")
+      }),
+    ]),
   ])
 }
 
 pub fn main() {
-  runner.new([suite()])
+  runner.new([tests()])
   |> runner.progress_reporter(progress.new())
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
@@ -184,12 +189,12 @@ pub fn main() {
 }
 ```
 
-### Grouping + hook scoping (`group`)
+### Hooks in nested groups (`group`)
 
-`unit_context.group` is the same idea as `unit.group`: it lets you nest structure, and it scopes hooks.
+`unit_context.group` works like `unit.group`: it nests tests, and it limits hooks.
 
-- Hooks declared in an **outer scope** apply inside nested groups.
-- Hooks declared in an **inner group** apply only to tests in that group.
+- A hook of an **outer group** applies to every test in it, also in nested groups.
+- A hook of an **inner group** applies only to the tests in that group.
 
 #### Hooks in context-aware groups <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_grouping.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -208,7 +213,7 @@ fn increment_counter(context: Context) {
   Ok(Context(counter: context.counter + 1))
 }
 
-pub fn suite() {
+pub fn tests() {
   describe("Context-aware grouping", Context(counter: 0), [
     // This outer hook applies everywhere under this describe, including groups.
     before_each(increment_counter),
@@ -235,7 +240,7 @@ pub fn suite() {
 }
 
 pub fn main() {
-  runner.new([suite()])
+  runner.new([tests()])
   |> runner.progress_reporter(progress.new())
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()

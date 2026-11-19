@@ -12,7 +12,7 @@ fn increment_counter(context: Context) {
   Ok(Context(counter: context.counter + 1))
 }
 
-pub fn suite() {
+pub fn tests() {
   describe("Context-aware grouping", Context(counter: 0), [
     // This outer hook applies everywhere under this describe, including groups.
     before_each(increment_counter),
@@ -39,7 +39,7 @@ pub fn suite() {
 }
 
 pub fn main() {
-  runner.new([suite()])
+  runner.new([tests()])
   |> runner.progress_reporter(progress.new())
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()

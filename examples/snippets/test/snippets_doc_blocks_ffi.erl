@@ -1,5 +1,5 @@
 -module(snippets_doc_blocks_ffi).
--export([wildcard/2, git_show/2]).
+-export([wildcard/2, git_show/2, exports_tests/1]).
 
 %% The files under Root that match Pattern, as paths relative to Root, in
 %% order.
@@ -26,4 +26,13 @@ collect(Port, Text) ->
         {Port, {data, Data}} -> collect(Port, <<Text/binary, Data/binary>>);
         {Port, {exit_status, 0}} -> {ok, Text};
         {Port, {exit_status, _Status}} -> {error, nil}
+    end.
+
+%% Whether the module Name loads and exports `tests/0`. This is the test
+%% that discovery makes: a module without `tests/0` is skipped.
+exports_tests(Name) ->
+    Module = binary_to_atom(Name),
+    case code:ensure_loaded(Module) of
+        {module, Module} -> erlang:function_exported(Module, tests, 0);
+        {error, _Reason} -> false
     end.

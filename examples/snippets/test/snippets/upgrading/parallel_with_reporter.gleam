@@ -64,3 +64,22 @@ pub fn main() {
 
   results
 }
+
+pub fn tests() {
+  unit.describe("Upgrading: a run with a progress reporter", [
+    it("runs the suite, and its test passes", fn() { run_suite() }),
+  ])
+}
+
+fn run_suite() -> Result(types.AssertionResult, String) {
+  types.run_report(tests: main(), teardown_failures: [])
+  |> summary.count
+  |> passed
+  |> matchers.should
+  |> matchers.be_equal(1)
+  |> matchers.or_fail_with("expected the one test of the suite to pass")
+}
+
+fn passed(counts: summary.Counts) -> Int {
+  counts.passed
+}

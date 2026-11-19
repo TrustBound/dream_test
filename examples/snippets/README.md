@@ -70,4 +70,4 @@ This project contains **small, compile-ready examples** for every `dream_test` f
   - `test/snippets/gherkin/gherkin_discover.gleam` (glob discovery)
 - **Context-aware tests (`unit_context`)**:
   - `test/snippets/hooks/context_aware_tests.gleam`
-    - Note: uses a custom context type, so it’s run standalone via `gleam run -m snippets/hooks/context_aware_tests`.
+    - Note: `gleam test` runs it with the other snippets. It also has a `main`, so `gleam run -m snippets/hooks/context_aware_tests` runs it alone.

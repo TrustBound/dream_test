@@ -4,6 +4,14 @@
 //// - Every Gleam block under a heading with a "Tested snippet" badge is
 ////   the same, byte for byte, as the line range of the snippet file that
 ////   the badge links to.
+//// - Every Gleam file that a "Tested snippet" badge links to is run by a
+////   test. A file under `examples/snippets/test/snippets/` is run when its
+////   module exports `tests/0`: `snippets_test` discovers
+////   `snippets/**.gleam` and runs the `tests()` of each module, and skips
+////   a module without it. A snippet module with only a `main` must be in
+////   `run_by_snippet_tests`, with a snippet module that exports `tests/0`
+////   and imports it. A Gleam file of another example project must be in
+////   `run_by_other_projects`.
 //// - Every Gleam block under a "2.x code, from tag 2.1.3" badge is the same
 ////   as that line range at tag 2.1.3. This needs git and the tag; without
 ////   them the check is skipped, and its name says so.
@@ -28,6 +36,34 @@ const doc_patterns = [
   "examples/*/README.md",
 ]
 
+/// The folder of the snippet modules, from the root. `snippets_test`
+/// discovers every module under it.
+const snippets_folder = "examples/snippets/test/"
+
+/// Snippet modules with only a `main`, and the snippet module whose tests
+/// run them, as paths under `examples/snippets/test/`.
+const run_by_snippet_tests = [
+  #(
+    "snippets/runner/discovery_runner.gleam",
+    "snippets/runner/runner_snippets_run.gleam",
+  ),
+  #(
+    "snippets/runner/suite_specific_config.gleam",
+    "snippets/runner/runner_snippets_run.gleam",
+  ),
+]
+
+/// Gleam files of the other example projects that a "Tested snippet" badge
+/// links to. `make examples` runs `gleam test` in each project.
+/// - `cache_app_test.gleam` is the test main of `cache_app`.
+/// - The shopping cart feature and steps run from `shopping_cart_test`.
+const run_by_other_projects = [
+  "examples/cache_app/test/cache_app_test.gleam",
+  "examples/shopping_cart/test/features/shopping_cart.gleam",
+  "examples/shopping_cart/test/steps/cart.gleam",
+  "examples/shopping_cart/test/steps/cart_world.gleam",
+]
+
 /// The tag of the 2.x code that the upgrade guide shows.
 const old_tag = "2.1.3"
 
@@ -42,6 +78,9 @@ pub fn tests() {
     }),
     it("every tested snippet block matches its snippet file", fn() {
       check_blocks(CurrentCode)
+    }),
+    it("every tested snippet file is run by a test", fn() {
+      check_snippets_run()
     }),
     old_code_test(git_show(root, old_tag <> ":gleam.toml")),
   ])
@@ -81,6 +120,71 @@ fn check_blocks(code: Code) -> Result(AssertionResult, String) {
   |> should
   |> be_equal([])
   |> or_fail_with("copy each block from its snippet range, or fix the link")
+}
+
+/// Each Gleam file that a "Tested snippet" badge links to, which no test
+/// runs, is an error.
+fn check_snippets_run() -> Result(AssertionResult, String) {
+  docs()
+  |> list.flat_map(linked_blocks)
+  |> list.filter(is_current_code)
+  |> list.map(block_path)
+  |> list.unique
+  |> list.filter(is_not_run)
+  |> should
+  |> be_equal([])
+  |> or_fail_with(
+    "give each linked snippet module a pub fn tests(), or list the file in run_by_other_projects",
+  )
+}
+
+fn is_current_code(block: LinkedBlock) -> Bool {
+  block_code(block.link) == Some(CurrentCode)
+}
+
+fn block_path(block: LinkedBlock) -> String {
+  block.link.path
+}
+
+/// Whether no test runs the file at `path`.
+fn is_not_run(path: String) -> Bool {
+  case string.split_once(path, snippets_folder) {
+    Ok(#("", module_path)) -> !is_run_snippet(module_path)
+    _ -> !list.contains(run_by_other_projects, path)
+  }
+}
+
+/// Whether discovery runs the snippet module, or a snippet module that
+/// discovery runs imports it.
+fn is_run_snippet(module_path: String) -> Bool {
+  exports_tests(module_name(module_path))
+  || list.key_find(run_by_snippet_tests, module_path)
+  |> result.map(runs_module(_, module_path))
+  |> result.unwrap(False)
+}
+
+/// Whether the snippet module at `runner_path` exports `tests/0` and
+/// imports the module at `module_path`. A file that cannot be read does
+/// not run it.
+fn runs_module(runner_path: String, module_path: String) -> Bool {
+  exports_tests(module_name(runner_path))
+  && file.read(root <> "/" <> snippets_folder <> runner_path)
+  |> result.map(string.contains(_, "import " <> import_path(module_path)))
+  |> result.unwrap(False)
+}
+
+/// The import path of a Gleam file under `test/`:
+/// `snippets/unit/cart.gleam` is `snippets/unit/cart`.
+fn import_path(module_path: String) -> String {
+  string.replace(module_path, ".gleam", "")
+}
+
+/// The Erlang module name of a Gleam file under `test/`:
+/// `snippets/unit/cart.gleam` is `snippets@unit@cart`.
+fn module_name(module_path: String) -> String {
+  module_path
+  |> import_path
+  |> string.replace("/", "@")
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +451,9 @@ fn source(link: Link) -> Result(String, Nil) {
 
 @external(erlang, "snippets_doc_blocks_ffi", "wildcard")
 fn wildcard(pattern: String, root: String) -> List(String)
+
+@external(erlang, "snippets_doc_blocks_ffi", "exports_tests")
+fn exports_tests(module: String) -> Bool
 
 @external(erlang, "snippets_doc_blocks_ffi", "git_show")
 fn git_show(root: String, spec: String) -> Result(String, Nil)

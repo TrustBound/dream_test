@@ -18,6 +18,16 @@ fn db_tests() {
 }
 
 pub fn main() {
+  configured_runner()
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+
+/// The unit suite runs with the run config. The DB suite runs one test at
+/// a time, with a 60s timeout.
+pub fn configured_runner() -> runner.RunBuilder {
   let db_config =
     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
 
@@ -26,8 +36,4 @@ pub fn main() {
   |> runner.add_suites_with_config(db_config, [db_tests()])
   |> runner.max_concurrency(8)
   |> runner.default_timeout_ms(10_000)
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
 }
