@@ -199,7 +199,8 @@ pub fn with_registry(
 /// `"parse-error"`. A pattern that matches no files gives one failing test
 /// tagged `"no-feature-files"`, named
 /// `No feature files match the pattern "<pattern>"`. A pattern that cannot
-/// be searched gives one failing test with the same tag, named
+/// be searched gives one failing test tagged `"invalid-feature-pattern"`,
+/// named
 /// `Cannot search for feature files with the pattern "<pattern>": <reason>`.
 ///
 /// ## What does this produce?
@@ -225,8 +226,8 @@ pub fn with_registry(
 ///
 /// A `TestSuite` containing one test per discovered scenario, plus failing
 /// tests for any parse errors (tagged `"parse-error"`), or one failing test
-/// when no file matches or the pattern cannot be searched (tagged
-/// `"no-feature-files"`).
+/// when no file matches (tagged `"no-feature-files"`) or the pattern cannot
+/// be searched (tagged `"invalid-feature-pattern"`).
 pub fn to_suite(
   discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
@@ -236,8 +237,7 @@ pub fn to_suite(
 
   let children = list.map(parsed.features, steps.Feature)
   let error_nodes = errors_to_nodes(parsed.failures, [])
-  let missing_nodes =
-    list.map(missing_files_errors(discovery.pattern, found), missing_files_node)
+  let missing_nodes = missing_files_nodes(discovery.pattern, found)
   suite.join(name: suite_name, suites: [
     suite.from_tree(Root(
       seed: Nil,
@@ -348,10 +348,29 @@ fn missing_files_errors(
   }
 }
 
-fn missing_files_node(error: FeatureFileError) -> Node(Nil) {
+/// The failing test for a pattern that matches no files is tagged
+/// `no-feature-files`. The failing test for a pattern that cannot be
+/// searched is tagged `invalid-feature-pattern`.
+fn missing_files_nodes(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(Node(Nil)) {
+  case found {
+    Error(error) -> [missing_files_node(error, "invalid-feature-pattern")]
+    Ok([]) -> [
+      missing_files_node(
+        parser.NoMatchingFeatureFiles(pattern: pattern),
+        "no-feature-files",
+      ),
+    ]
+    Ok(_) -> []
+  }
+}
+
+fn missing_files_node(error: FeatureFileError, tag: String) -> Node(Nil) {
   Test(
     name: parser.feature_file_error_to_string(error),
-    tags: ["no-feature-files"],
+    tags: [tag],
     kind: Unit,
     run: types.NoInput(missing_files_test_run),
     timeout_ms: None,

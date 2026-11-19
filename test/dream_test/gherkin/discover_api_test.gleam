@@ -205,7 +205,11 @@ pub fn tests() {
         |> runner.run()
         |> test_types.report_tests
 
-      #(list.map(results, result_name), list.map(results, result_status))
+      #(
+        list.map(results, result_name),
+        list.map(results, result_status),
+        list.map(results, result_tags),
+      )
       |> should
       |> be_equal(
         #(
@@ -213,6 +217,7 @@ pub fn tests() {
             "No feature files match the pattern \"./test/tmp/features/no_such_*.feature\"",
           ],
           [test_types.Failed],
+          [["no-feature-files"]],
         ),
       )
       |> or_fail_with("a pattern without files should fail the run")
@@ -268,7 +273,11 @@ pub fn tests() {
         |> runner.run()
         |> test_types.report_tests
 
-      #(list.map(results, result_name), list.map(results, result_status))
+      #(
+        list.map(results, result_name),
+        list.map(results, result_status),
+        list.map(results, result_tags),
+      )
       |> should
       |> be_equal(
         #(
@@ -276,6 +285,7 @@ pub fn tests() {
             "Cannot search for feature files with the pattern \"./test/tmp/features/{a.feature\": error:{badpattern,missing_delimiter}",
           ],
           [test_types.Failed],
+          [["invalid-feature-pattern"]],
         ),
       )
       |> or_fail_with("a malformed pattern should fail the run")
@@ -327,6 +337,10 @@ fn result_status(result: test_types.TestResult) -> test_types.Status {
 
 fn step_ok(_state: Nil, _context: steps.StepContext) -> Result(Nil, String) {
   Ok(Nil)
+}
+
+fn result_tags(result: test_types.TestResult) -> List(String) {
+  result.tags
 }
 
 fn result_name(result: test_types.TestResult) -> String {

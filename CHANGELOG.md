@@ -184,7 +184,7 @@ store. This release has breaking changes. Read
   `parser.InvalidFeatureFilePattern(pattern, reason)`, and
   `discover.to_suite` gives one failing test,
   `Cannot search for feature files with the pattern "<pattern>": <reason>`,
-  tagged `no-feature-files`. A `case` on a `parser.FeatureFileError` needs
+  tagged `invalid-feature-pattern`. A `case` on a `parser.FeatureFileError` needs
   a branch for the new variant.
 - `discover.list_files` returns
   `Result(List(String), parser.FeatureFileError)`, not `List(String)`. A

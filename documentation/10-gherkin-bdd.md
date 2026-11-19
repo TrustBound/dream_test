@@ -579,6 +579,7 @@ A `# language:` line must name `en`, because the parser knows only English.
 
 `parser.parse_string` returns a `ParseError(line, problem)`.
 `parser.parse_file` returns a `FeatureFileError`: `UnreadableFeatureFile(error)` when the file cannot be read, or `InvalidFeatureFile(path, error)` when the text is not valid Gherkin.
+`FeatureFileError` has two more variants, which only discovery gives: `NoMatchingFeatureFiles(pattern)` when a pattern matches no files, and `InvalidFeatureFilePattern(pattern, reason)` when a pattern cannot be searched.
 `ParseProblem` has one variant for each kind of problem, for example `UnexpectedLine`, `InconsistentCellCount` or `MissingPreviousStep`.
 Use `parser.feature_file_error_to_string` for a message such as `test/cart.feature: line 3: ...`.
 `discover.load` gives the same `FeatureFileError` values in `LoadResult.errors`.
@@ -646,6 +647,15 @@ pub fn main() {
   |> runner.run()
 }
 ```
+
+A relative pattern is read from the current directory. `gleam test` runs in the project directory, so `test/*.feature` finds the files in its `test` folder.
+
+When the pattern finds no `.feature` file, the suite has no scenarios, so `to_suite` adds one failing test in their place:
+
+- A pattern that matches no files gives the test `No feature files match the pattern "<pattern>"`, tagged `no-feature-files`.
+- A pattern that cannot be searched, for example `features/{a.feature`, gives the test `Cannot search for feature files with the pattern "<pattern>": <reason>`, tagged `invalid-feature-pattern`.
+
+`discover.load` gives the same problems as the errors `NoMatchingFeatureFiles(pattern)` and `InvalidFeatureFilePattern(pattern, reason)`.
 
 ### A set-up for all scenarios (for example a server)
 
