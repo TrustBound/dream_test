@@ -29,9 +29,12 @@ store. This release has breaking changes. Read
   `teardown_failures` and `outer_setups`.
 - `runner.exit_on_failure` stops the BEAM with `init:stop(1)` in place of
   `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
-  writes all its output and coverage files, and then ends the program with
-  status 1 inside `runner.run`: no code after `runner.run` runs. It also
-  stops with status 1 when a tear-down hook failed and every test passed.
+  writes all its output, and then ends the program with status 1 inside
+  `runner.run`: no code after `runner.run` runs. In 3.0.0 it also writes
+  the coverage files first. It also stops with status 1 when a tear-down
+  hook failed and every test passed, when a set-up stopped
+  (`SetupStopped`), and when coverage failed. 2.x had no tear-down
+  failures in the report, no stopped set-ups and no coverage.
 - `types.Root` holds the top-level group itself:
   `Root(seed:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
@@ -184,8 +187,14 @@ store. This release has breaking changes. Read
   `parser.InvalidFeatureFilePattern(pattern, reason)`, and
   `discover.to_suite` gives one failing test,
   `Cannot search for feature files with the pattern "<pattern>": <reason>`,
-  tagged `invalid-feature-pattern`. A `case` on a `parser.FeatureFileError` needs
-  a branch for the new variant.
+  tagged `invalid-feature-pattern`.
+- `{float}` matches a number as Cucumber reads it: an optional sign,
+  digits with an optional `.` and digits, or `.` and digits alone, and an
+  optional exponent, for example `20`, `.5`, `-3`, `1e5` and `1.5e-3`.
+  `5.`, `1,000`, `NaN` and `Infinity` do not match. This changes which
+  step runs: with `total {word}` and `total {float}`, the text `total 20`
+  now runs the `{float}` step, and `${float}USD` matches `$20USD`.
+  `{int}` still wins over `{float}`. Before, `{float}` needed a `.`.
 - `discover.list_files` returns
   `Result(List(String), parser.FeatureFileError)`, not `List(String)`. A
   pattern that cannot be searched gives
@@ -208,7 +217,10 @@ store. This release has breaking changes. Read
 - `parser.parse_string` returns `Result(Feature, ParseError)`,
   `parser.parse_file` returns `Result(Feature, FeatureFileError)`, and
   `discover.LoadResult.errors` is `List(parser.FeatureFileError)`, in place
-  of `String` errors.
+  of `String` errors. `FeatureFileError` is new, with four variants:
+  `UnreadableFeatureFile(error)`, `InvalidFeatureFile(path, error)`,
+  `NoMatchingFeatureFiles(pattern)` and
+  `InvalidFeatureFilePattern(pattern, reason)`.
 - The parser follows the official Gherkin grammar. A line that the grammar
   does not permit at its position is an `UnexpectedLine` error. Before, the
   parser ignored it.
@@ -233,8 +245,10 @@ store. This release has breaking changes. Read
 
 ### Upgrading from 2.x
 
-Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
-2.x code and the same code for 3.0.0 for each change below.
+Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows 2.x
+code and the same code for 3.0.0 for each change below. Some 2.x examples
+are copies of files at tag 2.1.3. The others use only the 2.1.3 API, and
+the guide labels them.
 
 - Gherkin steps get and return a typed scenario state. `world` is removed.
 - `steps.new` takes the initial state. `steps.step` is removed.
@@ -244,6 +258,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - A pattern registered two times in one phase is an error.
 - `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
 - Step text and patterns split into words only at spaces.
+- `{float}` matches whole numbers, so `total 20` can run a different step.
+- `steps.given` and `steps.when` take `action:`, and `steps.then` takes
+  `check:`, in place of `handler:`.
 - A `discover.features` pattern that matches no files fails the run.
 - A module discovery pattern that matches no test module fails the run,
   and so does a test module that does not load.
@@ -433,14 +450,18 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     breaking change
   - `types.TeardownFailure(hook:, groups:, message:)` and
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
-    `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`), with
+    `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
+    `SuiteTearDownHook`), with
     `types.teardown_hook_name`
   - `types.SetupStopped(set_up:, groups:, reason:, not_run:)`, a variant of
     `types.TeardownFailure` for a set-up that stopped: the process that
     keeps its set-up alive exited while or after its set-up hooks ran.
     `not_run` is the full name of each test that had not started and was
-    not run. Also `types.SetUpHook` (`BeforeAllHook`,
-    `BeforeEachSuiteHook`, `BeforeAllSuitesHook`) with
+    not run. Each such test is `SetupFailed` with a failure such as
+    `not run: the set-up from before_all in "Database" stopped (killed)`,
+    the tear-down hooks still run, and `types.failed` is `True`. Also
+    `types.SetUpHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
+    `BeforeAllSuitesHook`, `SuiteSetUpHook`) with
     `types.set_up_hook_name`
   - `types.is_failure(status)`, the one check for a failure status
     (`Failed`, `SetupFailed`, `TimedOut`)
@@ -550,14 +571,6 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     and `parser.token_kind_to_string` give the messages
 
 ### Changed
-
-- Behaviour change: `{float}` matches a number as Cucumber reads it: an
-  optional sign, digits with an optional `.` and digits, or `.` and digits
-  alone, and an optional exponent, for example `20`, `.5`, `-3`, `1e5` and
-  `1.5e-3`. `5.`, `1,000`, `NaN` and `Infinity` do not match. This
-  changes which step matches: `{float}` now wins over `{word}` and `{}`
-  for a whole number such as `20`, and `${float}USD` matches `$20USD`.
-  `{int}` still wins over `{float}`. Before, `{float}` needed a `.`.
 
 - **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)
 

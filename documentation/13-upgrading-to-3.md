@@ -1,8 +1,15 @@
 ## Upgrading to 3.0.0
 
-Dream Test 3.0.0 has breaking changes. This page shows each change with real 2.x code and the same code for 3.0.0.
+Dream Test 3.0.0 has breaking changes. This page shows each change with 2.x code and the same code for 3.0.0.
 
-Read this page if your project uses Dream Test 2.x. Most projects need only the first two sections. Code that uses only `unit`, `unit_context` and the runner with its default reporters compiles without changes, except for the Gherkin step definitions, `TestSuite` type annotations and the runner test hooks.
+Read this page if your project uses Dream Test 2.x. Most projects need only the first two sections. Code that uses only `unit`, `unit_context` and the runner with its default reporters compiles without changes, except for these items:
+
+- the Gherkin step definitions
+- `TestSuite` type annotations
+- the runner test hooks
+- filter predicates and other code that reads `full_name` of a `TestInfo` or a `TestResult`
+- `runner.has_failures`
+- code that uses the result of `runner.run` as a list
 
 Each 2.x example has one of two labels:
 
@@ -153,6 +160,8 @@ Look for these in your code:
 - `steps.new()`: give the initial state, for example `steps.new(initial: 0)`.
 - `steps.step`, `steps.when_` and `steps.then_`: use `steps.given`, `steps.when` or `steps.then`.
 - `result.unwrap` on a capture: use `result.try`. Then a wrong capture fails the scenario with a clear message.
+
+If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_set_up`. Its set-up runs one time, and each scenario starts from its value. To share one set-up between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server).
 
 #### A record for more than one value
 
@@ -422,6 +431,8 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 | `discover.to_suite` on a `FeatureDiscovery` | Call `discover.with_registry` first. `to_suite` takes only a `RunnableDiscovery`. |
 | `FeatureConfig` | `FeatureConfig(state)` |
 | A `discover.features` pattern that matched no files gave an empty suite, and the run passed. | `to_suite` gives one failing test, `No feature files match the pattern "<pattern>"`, tagged `no-feature-files`. `load` gives the error `parser.NoMatchingFeatureFiles(pattern)`. Fix the pattern. |
+| A `discover.features` pattern that cannot be searched, for example `features/{a.feature`, crashed the test run. | `to_suite` gives one failing test, `Cannot search for feature files with the pattern "<pattern>": <reason>`, tagged `invalid-feature-pattern`. `load` gives the error `parser.InvalidFeatureFilePattern(pattern, reason)`. Fix the pattern. |
+| `steps.given(registry, pattern, handler: f)` | `steps.given` and `steps.when` take `action: f`, and `steps.then` takes `check: f`. Code that does not write the label does not change. |
 
 The usual chain `discover.features(...) |> discover.with_registry(steps) |> discover.to_suite(...)` does not change.
 
@@ -683,7 +694,7 @@ pub fn tests() {
 
 #### `RunRootParallelWithReporterConfig` has `outer_setups`
 
-This change affects only code that calls `parallel.run_root_parallel_with_reporter` directly. `RunRootParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. `RunRootParallelWithReporterResult` has two new fields, `teardown_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
+This change affects only code that calls `parallel.run_root_parallel_with_reporter` directly. `RunRootParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunRootParallelWithReporterResult` has two new fields, `teardown_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
 
 ##### 2.x: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L1-L62"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -946,7 +957,16 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 - A failed set-up hook gives `SetupFailed` to each test that it serves.
 - A failed tear-down hook does not change the status of a test. The other tear-down hooks still run. The failure goes into the tear-down list of the run report, and the run fails.
 
-A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests.
+A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that a whole suite shares, use `unit_context.describe_with_set_up`, or `steps.new_with_set_up` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
+
+#### A set-up whose process stops
+
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a suite set-up, runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(set_up, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
+
+- Each test that had not started is `SetupFailed`, with a failure such as `not run: the set-up from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
+- The tear-down hooks still run, in a new process.
+- `types.failed` is `True`, and the summary line counts it as `set-up stopped`.
+- 2.x had no such result.
 
 #### A failed `after_all` hook
 
@@ -1204,7 +1224,7 @@ fn sample_results() -> List(types.TestResult) {
 
 #### The summary line
 
-The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. Update a test or a tool that compares the exact summary text.
+The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. The line can also end with two new counts: `N tear-down failed` and `N set-up stopped`. Update a test or a tool that compares the exact summary text.
 
 #### Progress events
 
@@ -1295,7 +1315,7 @@ pub fn tests() {
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
 
 - `summary` has the counts `teardown_failed` (tear-down hooks that failed) and `setup_stopped` (set-ups whose process stopped).
-- The object has the list `teardown_failures`. In 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
+- The object has the list `teardown_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
 - A failed tear-down hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
 - A set-up that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
 - A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
@@ -1541,7 +1561,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
 
 #### Parse errors are typed
 
-`parser.parse_string` returns `Result(Feature, ParseError)`. `parser.parse_file` returns `Result(Feature, FeatureFileError)`. `discover.LoadResult.errors` is a `List(parser.FeatureFileError)`. In 2.x, each error was a `String`. Use `parser.parse_error_to_string` or `parser.feature_file_error_to_string` to get the text. Each message starts with `line N:`.
+`parser.parse_string` returns `Result(Feature, ParseError)`. `parser.parse_file` returns `Result(Feature, FeatureFileError)`. `discover.LoadResult.errors` is a `List(parser.FeatureFileError)`. In 2.x, each error was a `String`. Use `parser.parse_error_to_string` or `parser.feature_file_error_to_string` to get the text. A `parse_error_to_string` message starts with `line N:`. A `feature_file_error_to_string` message starts with the path for a parse error, for example `test/cart.feature: line 3: ...`. For the other errors it starts with `Failed to read feature file:`, `No feature files match the pattern` or `Cannot search for feature files with the pattern`.
 
 ##### 2.x: a parse error is a `String` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/parser.gleam#L8-L22"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
