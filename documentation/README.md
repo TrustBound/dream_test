@@ -47,4 +47,4 @@ That’s why you’ll see the same patterns repeated:
 - **I want to get a test running**: start at [Quick Start](02-quick-start.md).
 - **I am upgrading from 2.x**: read [Upgrading to 3.0.0](13-upgrading-to-3.md).
 - **My tests are flaky**: read [Runner & execution model](07-runner-and-execution.md) and [Lifecycle hooks](06-lifecycle-hooks.md).
-- **I need better CI integration**: jump to [Reporters](08-reporters.md) (JSON) and [Runner & execution model](07-runner-and-execution.md) (exit codes).
+- **I need better CI integration**: jump to [Reporters](08-reporters.md) (JSON) and [Runner & execution model](07-runner-and-execution.md#exit-status-exit_on_failure) (exit status).

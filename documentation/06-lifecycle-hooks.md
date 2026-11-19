@@ -256,7 +256,7 @@ pub fn main() {
 A hook fails when it returns `Error(message)` or crashes. What happens next depends on the kind of hook:
 
 - **Set-up hook** (`before_all`, `before_each`, `before_each_test`, `before_each_suite`, `before_all_suites`): each test that it serves gets the status `SetupFailed`, and its body does not run. The tear-down hooks of the levels that started still run.
-- **Tear-down hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining tear-down hooks still run. The run report keeps the failure in its own list (`types.report_teardown_failures`), the reporters show it, and the run fails.
+- **Tear-down hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining tear-down hooks still run. The run report keeps the failure in its own list (`types.report_teardown_failures`), the reporters show it, and the run fails. With `runner.exit_on_failure`, a failed run ends with exit status 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
 
 #### Report a setup error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

@@ -8,7 +8,7 @@ Suites describe behavior; the runner decides execution policy. The runner exists
 
 - You control **how fast** tests run with `max_concurrency`.
 - You control **how long** tests may run with `default_timeout_ms`.
-- You control **CI behavior** with `exit_on_failure`.
+- You control **CI behavior** with `exit_on_failure`. See [Exit status](#exit-status-exit_on_failure).
 
 Dream Test is **suite-first**:
 
@@ -189,6 +189,48 @@ pub fn configured_runner() -> runner.RunBuilder {
   |> runner.default_timeout_ms(10_000)
 }
 ```
+
+### Exit status (`exit_on_failure`)
+
+CI reads the exit status of `gleam test`. Without `runner.exit_on_failure`, the exit status is 0, also when tests fail. `runner.run` returns the report, `main` returns, and the CI step passes.
+
+The run fails when one of these is true:
+
+- a test is `Failed`, `TimedOut` or `SetupFailed`
+- a tear-down hook failed
+- the process of a set-up stopped while its tests ran (`SetupStopped`)
+- coverage failed, for example a total below `coverage.minimum_percent`
+
+The first three make `types.failed` return `True`.
+
+`exit_on_failure` does not stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1. `runner.run` does not return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
+
+In these docs, "the run fails" means one of these four cases. Only with `exit_on_failure` does a failed run give exit status 1.
+
+#### End with exit status 1 when the run fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/exit_status.gleam#L1-L18"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/reporters/bdd
+import dream_test/runner
+import dream_test/types.{type AssertionResult}
+import dream_test/unit.{describe, it}
+
+fn example_tests() {
+  describe("Example", [
+    it("passes", fn() { Ok(succeed()) }),
+  ])
+}
+
+pub fn main() {
+  runner.new([example_tests()])
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+To print your own report after the run and still end with exit status 1, see [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
 
 ### Runner hooks (test/suite/run)
 

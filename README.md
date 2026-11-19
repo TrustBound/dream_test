@@ -77,7 +77,7 @@ One line in your test `main` turns it on. [Read more](#coverage).
 | 🛡️ **Isolation**                       | Crashes and timeouts don't break the run                                                                  |
 | ⏱️ **Timeouts**                        | Per-test timeout control                                                                                  |
 | 🔍 **Test discovery**                  | Find tests from file paths                                                                                |
-| 🚨 **Exit-on-failure**                 | Fail fast for CI                                                                                          |
+| 🚨 **Exit-on-failure**                 | Exit status 1 for CI when the run fails, after every test ran and all output is written                   |
 | 🪝 **Runner hooks**                    | Runner-level hooks for per-test/per-suite/per-run setup and teardown                                       |
 | 🧩 **Suite-specific execution config** | Run some suites sequential/with custom timeouts in the same runner (`runner.add_suites_with_config(...)`) |
 
@@ -422,7 +422,7 @@ Before it writes the HTML pages, coverage deletes the `files` folder in the HTML
 
 Code in another BEAM instance, for example an application server that integration tests start as an OS process, is not in the test run. The server measures itself with `coverage.start` and `coverage.finish` and writes an LCOV file when it stops. The test run adds that file with `coverage.merge_lcov`:
 
-#### A server that measures itself <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_server.gleam#L10-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### A server that measures itself <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_server.gleam#L10-L47"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // The server: it measures itself and writes an LCOV file when it stops.
@@ -460,6 +460,7 @@ pub fn main() {
     coverage.new()
     |> coverage.merge_lcov("build/coverage/servers/*.info"),
   )
+  |> runner.exit_on_failure()
   |> runner.run()
 }
 ```
@@ -493,7 +494,7 @@ fn coverage_table() -> String {
 
 ### Errors
 
-Every coverage error fails the run. The runner prints the error under `Coverage failed`, with what failed, the reason and the fix. More than one coverage run can measure in one BEAM instance, but a module can be in only one run at a time.
+Every coverage error fails the run, so with `runner.exit_on_failure()` the exit status is 1. The runner prints the error under `Coverage failed`, with what failed, the reason and the fix. More than one coverage run can measure in one BEAM instance, but a module can be in only one run at a time.
 
 ### Coverage badge
 

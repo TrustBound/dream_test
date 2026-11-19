@@ -42,6 +42,7 @@ pub fn main() {
     coverage.new()
     |> coverage.merge_lcov("build/coverage/servers/*.info"),
   )
+  |> runner.exit_on_failure()
   |> runner.run()
 }
 
