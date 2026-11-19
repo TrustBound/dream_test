@@ -52,10 +52,11 @@ pub type ResultsReporter {
   ///
   /// If `render` crashes, the runner writes a `Results reporter failed`
   /// error to the error output, also in a silent run. The error names the
-  /// position of the reporter in the list and the crash, on one line. A
-  /// crash longer than 200 characters is cut there, and the line ends with
-  /// ` ... (cut at 200 characters, and types.report_reporter_crashes has
-  /// the full reason)`. The first reporter in the list is at position
+  /// position of the reporter in the list and the crash, on one line: the
+  /// lines of the crash, each without the spaces at its start, joined with
+  /// one space. When that line is longer than 200 characters, the error
+  /// shows the first 200 characters and then ` ... (cut at 200 characters,
+  /// and types.report_reporter_crashes has the full reason)`. The first reporter in the list is at position
   /// 1, and every reporter counts, `Bdd` and `Json` included. The runner
   /// then goes on with the next reporter and with coverage. The report that
   /// `runner.run` returns has the crash (see

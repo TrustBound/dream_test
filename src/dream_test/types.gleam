@@ -781,9 +781,10 @@ pub type TeardownFailure {
 ///   JSON reporters included.
 /// - `reason`: the crash, as `class:reason`, for example
 ///   `error:badarith`. This is the full text, which can be longer than one
-///   line. The error output shows it on one line. When that line is longer
-///   than 200 characters, the error output shows the first 200 characters
-///   and then ` ... (cut at 200 characters, and
+///   line. The error output shows it on one line: the lines of the reason,
+///   each without the spaces at its start, joined with one space. When
+///   that line is longer than 200 characters, the error output shows the
+///   first 200 characters and then ` ... (cut at 200 characters, and
 ///   types.report_reporter_crashes has the full reason)`.
 ///
 /// ## Example

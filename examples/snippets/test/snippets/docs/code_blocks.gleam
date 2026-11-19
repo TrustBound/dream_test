@@ -7,8 +7,9 @@
 //// - Every Gleam block with a "Tested snippet" badge that shows a
 ////   `pub fn main()` of a snippet module has that `main` run in a new BEAM.
 ////   The `main` must end with exit status 0, or the way that
-////   `mains_with_other_end` gives: its status, a line of its output and
-////   its last line.
+////   `mains_with_other_end` gives: exit status 0 with a given line in its
+////   output, or a given status with a given line in its output and a
+////   given last line.
 //// - Every Gleam file that a "Tested snippet" badge links to is run by a
 ////   test. A file under `examples/snippets/test/snippets/` is run when its
 ////   module exports `tests/0`, because `snippets_test` discovers
