@@ -164,13 +164,19 @@ fn config(color: Bool, mode: reporter_types.BddOutputMode) {
 
 fn gherkin_results() -> List(types.TestResult) {
   [
-    result_of(["Cart"], "adds", types.Passed, [], types.GherkinScenario("c1")),
+    result_of(
+      ["Cart"],
+      "adds",
+      types.Passed,
+      [],
+      types.GherkinScenario(scenario_id: "c1", rule: None),
+    ),
     result_of(
       ["Cart"],
       "removes",
       types.Failed,
       [failure("gone", types.EqualityFailure(actual: "1", expected: "0"))],
-      types.GherkinScenario("c2"),
+      types.GherkinScenario(scenario_id: "c2", rule: None),
     ),
   ]
 }

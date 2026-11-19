@@ -3,6 +3,7 @@ import dream_test/gherkin/parser
 import dream_test/gherkin/steps
 import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
+import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/runner
 import dream_test/types as test_types
 import dream_test/unit.{describe, it}
@@ -170,6 +171,53 @@ pub fn tests() {
       |> be_equal(["F::Outside", "F::Rule: Stock::Sell", "F::Rule:::Nameless"])
       |> or_fail_with("expected the Rule group in each id")
     }),
+
+    it("to_test_suite gives a scenario in a Rule the Rule in its kind", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(scenario_rule)
+      |> should
+      |> be_equal([None, Some("Rule: Stock"), Some("Rule:")])
+      |> or_fail_with(
+        "expected the Rule group in the kind of each Rule scenario",
+      )
+    }),
+
+    it("the Gherkin report prints a Rule and a scenario outside it", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(without_duration)
+      |> gherkin_reporter.format_scenarios
+      |> should
+      |> be_equal(
+        "Feature: F
+  Scenario: Outside ✓
+  Rule: Stock
+    Scenario: Sell ✓
+  Rule:
+    Scenario: Nameless ✓
+",
+      )
+      |> or_fail_with("expected the Rule headings from the result kinds")
+    }),
+
+    it(
+      "the Gherkin report prints a Feature named like a Rule as a Feature",
+      fn() {
+        let registry =
+          steps.new(initial: Nil)
+          |> steps.then("done", gherkin_check_ok)
+        let suite =
+          gfeature.feature("Rule: refunds", registry, [
+            gfeature.scenario("Paying back", [gfeature.then("done")]),
+          ])
+
+        run_suites([suite])
+        |> list.map(without_duration)
+        |> gherkin_reporter.format_scenarios
+        |> should
+        |> be_equal("Feature: Rule: refunds\n  Scenario: Paying back ✓\n")
+        |> or_fail_with("a Feature named like a Rule should print as a Feature")
+      },
+    ),
 
     it("to_test_suite names example rows after their Examples section", fn() {
       run_parsed(examples_feature(), examples_registry())
@@ -935,7 +983,8 @@ fn has_scenario_id_shape(
   prefix: String,
 ) -> Bool {
   let id = step_scenario_id(result)
-  result.kind == test_types.GherkinScenario(id) && has_number_after(id, prefix)
+  result.kind == test_types.GherkinScenario(scenario_id: id, rule: None)
+  && has_number_after(id, prefix)
 }
 
 fn has_number_after(id: String, prefix: String) -> Bool {
@@ -1210,8 +1259,21 @@ fn name_path_and_status(
 /// `""`.
 fn scenario_name_path(result: test_types.TestResult) -> String {
   case result.kind {
-    test_types.GherkinScenario(id) -> without_number(id)
+    test_types.GherkinScenario(scenario_id: id, ..) -> without_number(id)
     _ -> ""
+  }
+}
+
+/// The result with a duration of 0, so the report has no duration text.
+fn without_duration(result: test_types.TestResult) -> test_types.TestResult {
+  test_types.TestResult(..result, duration_ms: 0)
+}
+
+/// The Rule in the kind of a Gherkin result. Another kind gives `None`.
+fn scenario_rule(result: test_types.TestResult) -> option.Option(String) {
+  case result.kind {
+    test_types.GherkinScenario(rule: rule, ..) -> rule
+    _ -> None
   }
 }
 

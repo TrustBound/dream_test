@@ -119,12 +119,18 @@ pub type Status {
 ///
 /// - `Unit` - Standard unit tests from `describe`/`it`
 /// - `Integration` - Integration tests (for future use)
-/// - `GherkinScenario(id)` - Tests from Gherkin features (inline DSL or `.feature` files)
+/// - `GherkinScenario(scenario_id:, rule:)` - Tests from Gherkin features
+///   (inline DSL or `.feature` files)
 ///
 pub type TestKind {
   Unit
   Integration
-  GherkinScenario(String)
+  /// A Gherkin scenario. `scenario_id` is the id that the steps get in
+  /// `StepContext.scenario_id`. `rule` is the name of the Rule group, for
+  /// example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None`
+  /// for a scenario outside a Rule. The Rule group is the last group of the
+  /// result, and the Feature is the group before it.
+  GherkinScenario(scenario_id: String, rule: Option(String))
 }
 
 /// Structured details about why an assertion failed.
@@ -317,7 +323,7 @@ pub type TestResult {
 ///   group in. Use `full_name(groups, name)` for the group path and the
 ///   test name together (deterministic, good for identifiers).
 /// - `tags`: effective tags (includes inherited group tags)
-/// - `kind`: `TestKind` (Unit, Integration, or GherkinScenario(id))
+/// - `kind`: `TestKind` (Unit, Integration, or GherkinScenario(scenario_id:, rule:))
 /// - `source`: best-effort origin string (module name or `.feature` path)
 ///
 /// ### Source behavior

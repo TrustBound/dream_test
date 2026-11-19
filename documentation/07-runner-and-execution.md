@@ -162,7 +162,7 @@ about what is running.
 - `name`: leaf test name (`it("...")`)
 - `groups`: the names of the groups around the test, outermost first (e.g. `["outer", "inner"]`). `types.full_name(info.groups, info.name)` gives the group path + test name (e.g. `["outer", "inner", "leaf"]`).
 - `tags`: effective tags (includes inherited group tags)
-- `kind`: `types.TestKind` (Unit, GherkinScenario(id), etc.)
+- `kind`: `types.TestKind` (Unit, GherkinScenario(scenario_id:, rule:), etc.)
 - `source`: best-effort origin string (see below)
 
 **`types.SuiteInfo` fields**:

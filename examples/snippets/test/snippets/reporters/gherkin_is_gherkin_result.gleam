@@ -2,6 +2,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/gherkin as gherkin_reporter
 import dream_test/types
 import dream_test/unit.{describe, it}
+import gleam/option.{None}
 
 fn gherkin_result() -> types.TestResult {
   types.TestResult(
@@ -11,7 +12,7 @@ fn gherkin_result() -> types.TestResult {
     duration_ms: 0,
     tags: [],
     failures: [],
-    kind: types.GherkinScenario("example"),
+    kind: types.GherkinScenario(scenario_id: "example", rule: None),
   )
 }
 

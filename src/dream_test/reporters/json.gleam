@@ -13,7 +13,11 @@
 ////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
 ////   number of tear-down hooks that failed, and `setup_stopped`, the number
 ////   of set-ups whose process stopped
-//// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
+//// - `tests`: per-test details (name, full_name, status, duration_ms, tags,
+////   kind, failures). `kind` is `"unit"`, `"integration"` or
+////   `"gherkin:<scenario id>"`. Only a Gherkin test has `rule`, after
+////   `kind`: the name of its Rule group, for example `"Rule: Stock"`, or
+////   `null` for a scenario outside a Rule.
 //// - `teardown_failures`: one object for each tear-down hook that failed
 ////   and each set-up that stopped, in the order that they happened. Each object
 ////   has `kind`, `hook`, `groups` and `message`:
@@ -368,18 +372,34 @@ fn teardown_failure_fields(
 }
 
 fn build_test_json(result: TestResult) -> Json {
-  json.object([
-    #("name", json.string(result.name)),
-    #(
-      "full_name",
-      json.array(types.full_name(result.groups, result.name), json.string),
-    ),
-    #("status", json.string(status_to_string(result.status))),
-    #("duration_ms", json.int(result.duration_ms)),
-    #("tags", json.array(result.tags, json.string)),
-    #("kind", json.string(kind_to_string(result.kind))),
-    #("failures", json.array(result.failures, build_failure_json)),
-  ])
+  json.object(
+    list.flatten([
+      [
+        #("name", json.string(result.name)),
+        #(
+          "full_name",
+          json.array(types.full_name(result.groups, result.name), json.string),
+        ),
+        #("status", json.string(status_to_string(result.status))),
+        #("duration_ms", json.int(result.duration_ms)),
+        #("tags", json.array(result.tags, json.string)),
+        #("kind", json.string(kind_to_string(result.kind))),
+      ],
+      rule_fields(result.kind),
+      [#("failures", json.array(result.failures, build_failure_json))],
+    ]),
+  )
+}
+
+/// Only a Gherkin scenario has `rule`: the name of its Rule group, or
+/// `null` for a scenario outside a Rule.
+fn rule_fields(kind: TestKind) -> List(#(String, Json)) {
+  case kind {
+    GherkinScenario(rule: rule, ..) -> [
+      #("rule", json.nullable(rule, json.string)),
+    ]
+    _ -> []
+  }
 }
 
 fn build_failure_json(failure: AssertionFailure) -> Json {
@@ -460,7 +480,7 @@ fn kind_to_string(kind: TestKind) -> String {
   case kind {
     Unit -> "unit"
     Integration -> "integration"
-    GherkinScenario(id) -> "gherkin:" <> id
+    GherkinScenario(scenario_id: id, ..) -> "gherkin:" <> id
   }
 }
 

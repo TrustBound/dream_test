@@ -1,6 +1,6 @@
 //// Gherkin-style report formatting.
 ////
-//// This module formats `TestResult` values with kind `GherkinScenario(_ )` in a
+//// This module formats `TestResult` values with kind `GherkinScenario(..)` in a
 //// Cucumber-like layout (Feature → Scenario), so you can print or persist a
 //// human-readable report for BDD runs.
 ////
@@ -21,6 +21,7 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -70,9 +71,12 @@ pub fn format(report report: RunReport) -> String {
 /// Format test results as Gherkin feature and scenario lines, with no
 /// summary.
 ///
-/// The feature is the last group of a result that is not a Rule group. A
-/// Rule group (`Rule: <name>`, made by `gherkin/feature`) prints as a heading
-/// under its feature, and the scenarios of the Rule indent two more spaces.
+/// The headings come from the result kind, not from the group names. For a
+/// scenario inside a Rule (`GherkinScenario(rule: Some(rule), ..)`), the
+/// Rule prints as a heading under its feature, the feature is the group
+/// before the Rule group, and the scenarios of the Rule indent two more
+/// spaces. For every other result, the feature is the last group. So a
+/// Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
 ///
 /// `format` gives these lines, then an empty line and the summary line.
 /// Use `format_scenarios` when you write your own summary, for example in a
@@ -98,7 +102,7 @@ pub fn format(report report: RunReport) -> String {
 ///           duration_ms: 0,
 ///           tags: [],
 ///           failures: [],
-///           kind: GherkinScenario("cart"),
+///           kind: GherkinScenario(scenario_id: "cart", rule: None),
 ///         )
 ///
 ///       gherkin_reporter.format_scenarios([result])
@@ -169,10 +173,10 @@ pub fn report(
 ///
 /// ## Returns
 ///
-/// `True` when `result.kind` is `GherkinScenario(_)`, otherwise `False`.
+/// `True` when `result.kind` is `GherkinScenario(..)`, otherwise `False`.
 pub fn is_gherkin_result(result result: TestResult) -> Bool {
   case result.kind {
-    GherkinScenario(_) -> True
+    GherkinScenario(..) -> True
     _ -> False
   }
 }
@@ -182,7 +186,7 @@ pub fn is_gherkin_result(result result: TestResult) -> Bool {
 // ============================================================================
 
 /// The headings that a scenario line belongs under. `rule` is the name of the
-/// `Rule: <name>` group that `gherkin/feature` makes for a Rule.
+/// Rule group, from the result kind.
 type Heading {
   Heading(feature: String, rule: Option(String))
 }
@@ -195,7 +199,7 @@ fn format_all_results(
   case results {
     [] -> accumulated
     [result, ..rest] -> {
-      let heading = heading_of(result.groups)
+      let heading = heading_of(result)
       let heading_text = format_heading_if_new(heading, previous)
       let scenario_text = format_scenario(result, heading)
       let updated = string.concat([accumulated, heading_text, scenario_text])
@@ -204,31 +208,25 @@ fn format_all_results(
   }
 }
 
-/// The feature is the last group that is not a Rule group. Discovery puts
-/// the suite name before the feature name, so the first group is not always
-/// the feature.
-fn heading_of(groups: List(String)) -> Heading {
-  heading_from_newest(list.reverse(groups))
-}
-
-fn heading_from_newest(groups_newest_first: List(String)) -> Heading {
-  case groups_newest_first {
-    [] -> Heading(feature: unknown_feature, rule: None)
-    [last, ..rest] ->
-      heading_with_last(last, rest, string.starts_with(last, "Rule:"))
+/// The headings of a result. The Rule comes from the result kind. Discovery
+/// puts the suite name before the feature name, so the feature is the last
+/// group (or the group before the Rule group), not the first group.
+fn heading_of(result: TestResult) -> Heading {
+  case result.kind {
+    GherkinScenario(rule: Some(rule), ..) ->
+      Heading(feature: feature_before_rule(result.groups), rule: Some(rule))
+    _ -> Heading(feature: last_group(result.groups), rule: None)
   }
 }
 
-fn heading_with_last(
-  last: String,
-  rest: List(String),
-  last_is_rule: Bool,
-) -> Heading {
-  case last_is_rule, rest {
-    False, _ -> Heading(feature: last, rule: None)
-    True, [feature, ..] -> Heading(feature: feature, rule: Some(last))
-    True, [] -> Heading(feature: unknown_feature, rule: Some(last))
-  }
+/// The group before the last group. The last group is the Rule group.
+fn feature_before_rule(groups: List(String)) -> String {
+  last_group(list.take(groups, list.length(groups) - 1))
+}
+
+fn last_group(groups: List(String)) -> String {
+  list.last(groups)
+  |> result.unwrap(unknown_feature)
 }
 
 const unknown_feature = "Unknown Feature"

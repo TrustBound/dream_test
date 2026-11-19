@@ -174,7 +174,7 @@ pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite(Nil) {
       feature_name: feature.name,
       source: feature.source,
       registry: config.step_registry,
-      rule_groups: [],
+      rule_group: None,
       background_steps: background_steps(feature.background),
     )
   let scenario_nodes = scenarios_to_nodes(scope, feature.scenarios, [])
@@ -194,7 +194,9 @@ type ScenarioScope(state) {
     feature_name: String,
     source: Option(String),
     registry: StepRegistry(state),
-    rule_groups: List(String),
+    /// The name of the Rule group (`Rule: <name>`) for the scenarios of a
+    /// Rule, or `None` for the scenarios outside a Rule.
+    rule_group: Option(String),
     background_steps: List(gherkin_types.Step),
   )
 }
@@ -231,7 +233,7 @@ fn rule_to_node(
   let rule_scope =
     ScenarioScope(
       ..scope,
-      rule_groups: [group_name],
+      rule_group: Some(group_name),
       background_steps: list.append(
         scope.background_steps,
         background_steps(rule.background),
@@ -310,7 +312,11 @@ type ScenarioRun {
 
 fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
   let full_name =
-    list.flatten([[scope.feature_name], scope.rule_groups, [run.name]])
+    list.flatten([
+      [scope.feature_name],
+      option.values([scope.rule_group]),
+      [run.name],
+    ])
   let scenario_id = string.join(full_name, "::") <> "#" <> scenario_number()
   let all_steps = with_background(scope.background_steps, run.steps)
   let registry = scope.registry
@@ -318,7 +324,7 @@ fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
   Test(
     name: run.name,
     tags: run.tags,
-    kind: GherkinScenario(scenario_id),
+    kind: GherkinScenario(scenario_id: scenario_id, rule: scope.rule_group),
     run: NoInput(fn() { execute_scenario(scenario_id, all_steps, registry) }),
     timeout_ms: None,
     source: scope.source,

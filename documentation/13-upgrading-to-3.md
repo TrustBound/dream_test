@@ -18,7 +18,7 @@ Do the steps in this order. The first steps affect the most projects.
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
 2. **The run report.** `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
-4. **Reporters.** The functions that format a whole run take a `RunReport`. The progress event API is removed. See [Reporters](#reporters).
+4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
 6. **The Gherkin parser and syntax tree.** The parser follows the official Gherkin grammar, and parse errors are typed. See [The Gherkin parser and syntax tree](#the-gherkin-parser-and-syntax-tree).
 7. **The sandbox.** `sandbox.run_isolated` takes the function and its input. See [The sandbox](#the-sandbox).
@@ -1063,6 +1063,48 @@ pub fn tests() {
 }
 ```
 
+#### A Gherkin result kind has the Rule
+
+`types.GherkinScenario` has two labelled fields: `GherkinScenario(scenario_id:, rule:)`. `rule` is the name of the Rule group, for example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None` for a scenario outside a Rule. Code that builds a result gives `rule: None` for a scenario outside a Rule. A pattern that matches the kind uses `GherkinScenario(..)` or names the fields.
+
+The Gherkin reporter reads the Rule from the kind, not from a group name that starts with `Rule:`. In 2.x, a Feature named `Rule: refunds` printed as `Feature: Unknown Feature` with a `Rule: refunds` heading. In 3.0.0 it prints as `Feature: Rule: refunds`.
+
+##### 2.x: a Gherkin result with only the id <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L6-L18"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+fn sample_results() -> List(types.TestResult) {
+  [
+    types.TestResult(
+      name: "Scenario A",
+      full_name: ["Example Feature", "Scenario A"],
+      status: types.Passed,
+      duration_ms: 0,
+      tags: [],
+      failures: [],
+      kind: types.GherkinScenario("example"),
+    ),
+  ]
+}
+```
+
+##### 3.0.0: a Gherkin result with the id and the Rule <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L7-L19"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+fn sample_results() -> List(types.TestResult) {
+  [
+    types.TestResult(
+      name: "Scenario A",
+      groups: ["Example Feature"],
+      status: types.Passed,
+      duration_ms: 0,
+      tags: [],
+      failures: [],
+      kind: types.GherkinScenario(scenario_id: "example", rule: None),
+    ),
+  ]
+}
+```
+
 #### The summary line
 
 The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. Update a test or a tool that compares the exact summary text.
@@ -1159,6 +1201,7 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 - The object has the list `teardown_failures`. In 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
 - A failed tear-down hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
 - A set-up that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
+- A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
 
 ##### 2.x: JSON from a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/json_api_format.gleam#L6-L15"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 

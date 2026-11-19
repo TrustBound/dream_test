@@ -409,6 +409,8 @@ A Rule can have its own Background.
 The Feature Background steps run first, then the Rule Background steps, then the scenario steps.
 So the first step of a Rule Background, or of a scenario in a Rule, can use `And`, `But` or `*` when a Background step runs before it.
 
+A scenario in a Rule is in a group named `Rule: <name>` (or `Rule:` for a Rule with no name), under the Feature group. Its result kind is `GherkinScenario(scenario_id:, rule: Some("Rule: <name>"))`. A scenario outside a Rule has `rule: None`. The Gherkin reporter prints the Rule heading from this field, so a Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
+
 A scenario can have more than one `Examples` section, and every row of every section runs.
 The tags of an `Examples` section apply to the tests that its rows make.
 

@@ -3,6 +3,7 @@ import dream_test/reporters/gherkin
 import dream_test/types
 import dream_test/unit.{describe, group, it}
 import fixtures/test_results.{report_of, report_with_cleanup_failure}
+import gleam/list
 import gleam/option.{type Option, None, Some}
 
 fn scenario(
@@ -18,7 +19,19 @@ fn scenario(
     duration_ms: 0,
     tags: [],
     failures: failures,
-    kind: types.GherkinScenario("id"),
+    kind: types.GherkinScenario(scenario_id: "id", rule: None),
+  )
+}
+
+/// A passed scenario inside the Rule `rule`, under the groups `groups`.
+fn scenario_in_rule(
+  groups: List(String),
+  rule: String,
+  name: String,
+) -> types.TestResult {
+  types.TestResult(
+    ..scenario(list.append(groups, [rule]), name, types.Passed, []),
+    kind: types.GherkinScenario(scenario_id: "id", rule: Some(rule)),
   )
 }
 
@@ -54,11 +67,11 @@ pub fn tests() {
     it("format_scenarios prints a Rule heading under its Feature", fn() {
       gherkin.format_scenarios([
         scenario(["Suite", "F"], "Outside", types.Passed, []),
-        scenario(["Suite", "F", "Rule: A"], "One", types.Passed, []),
-        scenario(["Suite", "F", "Rule: A"], "Two", types.Passed, []),
-        scenario(["Suite", "F", "Rule: B"], "Three", types.Passed, []),
-        scenario(["G", "Rule: C"], "Four", types.Passed, []),
-        scenario(["Rule: D"], "Five", types.Passed, []),
+        scenario_in_rule(["Suite", "F"], "Rule: A", "One"),
+        scenario_in_rule(["Suite", "F"], "Rule: A", "Two"),
+        scenario_in_rule(["Suite", "F"], "Rule: B", "Three"),
+        scenario_in_rule(["G"], "Rule: C", "Four"),
+        scenario_in_rule([], "Rule: D", "Five"),
       ])
       |> should
       |> be_equal(
@@ -78,6 +91,15 @@ Feature: Unknown Feature
 ",
       )
       |> or_fail_with("expected Feature and Rule headings")
+    }),
+
+    it("format_scenarios prints a Feature named like a Rule as a Feature", fn() {
+      gherkin.format_scenarios([
+        scenario(["Rule: refunds"], "Paying back", types.Passed, []),
+      ])
+      |> should
+      |> be_equal("Feature: Rule: refunds\n  Scenario: Paying back ✓\n")
+      |> or_fail_with("a scenario outside a Rule has no Rule heading")
     }),
 
     it("is_gherkin_result is false for non-gherkin kinds", fn() {
