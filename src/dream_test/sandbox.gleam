@@ -300,7 +300,7 @@ pub fn run_isolated(
   let worker_monitor = monitor(worker_pid)
   let selector = build_result_selector(result_subject, worker_monitor)
 
-  wait_for_result(config, selector, worker_pid, worker_monitor)
+  wait_for_result(config, selector, result_subject, worker_pid, worker_monitor)
 }
 
 /// Spawn a worker process that runs the function and sends the result.
@@ -424,12 +424,13 @@ fn abnormal_reason_text(reason: Dynamic) -> String {
 fn wait_for_result(
   config: SandboxConfig,
   selector: Selector(WorkerMessage(a)),
+  result_subject: Subject(WorkerMessage(a)),
   worker_pid: Pid,
   worker_monitor: Monitor,
 ) -> SandboxResult(a) {
   let result = case selector_receive(selector, config.timeout_ms) {
     Ok(message) -> handle_worker_message(message)
-    Error(Nil) -> handle_timeout(worker_pid)
+    Error(Nil) -> handle_timeout(worker_pid, result_subject)
   }
   // Remove the monitor and any down message it left in the mailbox, so the
   // caller's mailbox does not fill up and a later selector cannot see it.
@@ -447,8 +448,20 @@ fn handle_worker_message(message: WorkerMessage(a)) -> SandboxResult(a) {
 
 /// Handle timeout by killing the worker, waiting until it has exited, and
 /// returning timeout result.
-fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
+///
+/// The worker can send its result after the time-out and before the kill.
+/// That result is late, and the caller does not use it. It is removed from
+/// the caller's mailbox, so it does not stay there for good. The worker has
+/// exited when `kill_and_wait` returns, and a message from a process
+/// arrives before its exit, so a receive with no wait finds a late result.
+/// No test shows this: a result that arrives in the short time between the
+/// time-out and the kill depends on timing.
+fn handle_timeout(
+  worker_pid: Pid,
+  result_subject: Subject(WorkerMessage(a)),
+) -> SandboxResult(a) {
   kill_and_wait(worker_pid)
+  let _late_result = process.receive(result_subject, 0)
   SandboxTimedOut
 }
 
