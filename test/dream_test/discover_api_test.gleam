@@ -81,22 +81,46 @@ pub fn tests() {
       |> or_fail_with("expected no duplicates")
     }),
 
-    it("skips a module that has no test source", fn() {
+    it("gives an error when only a module with no test source matches", fn() {
       discover.new()
       |> from_path("dream_test/file.gleam")
       |> list_modules()
       |> should
-      |> be_equal(Ok([]))
+      |> be_equal(Error(
+        "dream_test/file.gleam: no test module matches the pattern",
+      ))
       |> or_fail_with("a src module should not be discovered")
     }),
 
-    it("skips a test module that has no tests function", fn() {
+    it("gives an error when only a module with no tests function matches", fn() {
       discover.new()
       |> from_path("fixtures/test_results.gleam")
       |> list_modules()
       |> should
-      |> be_equal(Ok([]))
+      |> be_equal(Error(
+        "fixtures/test_results.gleam: no test module matches the pattern",
+      ))
       |> or_fail_with("a module without tests() should not be discovered")
+    }),
+
+    it("to_suites fails a run whose pattern matches no module", fn() {
+      discover.new()
+      |> from_path("no_such_folder/**_test.gleam")
+      |> discover.to_suites()
+      |> runner.new()
+      |> runner.silent()
+      |> runner.run()
+      |> types.report_tests
+      |> list.map(name_status_and_messages)
+      |> should
+      |> be_equal([
+        #(
+          "Discovery Error: no_such_folder/**_test.gleam: no test module matches the pattern",
+          Failed,
+          ["Failed to discover/load test modules (see test name for details)"],
+        ),
+      ])
+      |> or_fail_with("a pattern with no module should fail the run")
     }),
 
     it("reports a pattern it cannot search", fn() {
@@ -284,7 +308,7 @@ pub fn tests() {
       |> or_fail_with("every test should have the module as its source")
     }),
 
-    it("skips a module whose beam file cannot be loaded", fn() {
+    it("reports a module whose beam file cannot be loaded", fn() {
       let directory = "build/discovery_broken_beams"
       add_broken_beam_first_in_path(
         directory,
@@ -298,8 +322,10 @@ pub fn tests() {
 
       result
       |> should
-      |> be_equal(Ok([]))
-      |> or_fail_with("a module that cannot load should not be discovered")
+      |> be_equal(Error(
+        "discovery_fixtures@unloadable_suite: cannot load the module: badfile",
+      ))
+      |> or_fail_with("a module that cannot load should be an error")
     }),
   ])
 }

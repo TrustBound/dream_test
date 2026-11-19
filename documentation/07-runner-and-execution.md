@@ -121,6 +121,8 @@ To make one suite from several suites, use `suite.group` or `suite.join`. Each s
 
 `discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
 
+A discovery pattern that matches no test module is a load error (`<pattern>: no test module matches the pattern`), and so is a test module that does not load (`<module>: cannot load the module: <reason>`). Each load error is a failing test, so a wrong pattern never gives a run that passes with no tests.
+
 #### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam

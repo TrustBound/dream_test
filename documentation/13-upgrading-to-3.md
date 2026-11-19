@@ -902,6 +902,8 @@ This change affects only code that has a `case` on a `types.AssertionResult`. Th
 - A `tests()` function that crashes gives `tests() crashed: <class>:<reason>`, for example `tests() crashed: error:...`. In 2.x the text was `call_tests_failed`.
 - A `tests()` function whose value is not a test suite gives `tests() did not return a test suite: <value>`. In 2.x the run crashed.
 - A pattern that cannot be searched gives `cannot search for test modules: <class>:<reason>`. In 2.x the text was `discover_test_modules_failed`.
+- A pattern that matches no test module gives `<pattern>: no test module matches the pattern`, and the run fails. In 2.x the run had no tests from it and passed. Check each pattern, for example after you move a test folder.
+- A test module whose beam file does not load gives `<module>: cannot load the module: <reason>`, and the run fails. In 2.x the module was skipped.
 
 #### Discovered suites with a context are now supported
 

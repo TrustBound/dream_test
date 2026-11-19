@@ -21,7 +21,10 @@ has_matching_test_source(ModuleStr) ->
 %%
 %% - beam_glob: a glob like "unit@*_test.beam" (basename pattern)
 %%
-%% Returns: {ok, [<<"unit@foo_test">>, ...]} or {error, <<"message">>}
+%% Returns: {ok, [Found, ...]} or {error, <<"message">>}. Each Found is
+%% {ok, <<"unit@foo_test">>} for a module that loads and exports tests/0,
+%% or {error, <<"unit@foo_test: cannot load the module: <reason>">>} for a
+%% module with a test source whose beam file does not load.
 discover_test_modules(BeamGlob) ->
     try
         GlobStr = binary_to_list(BeamGlob),
@@ -38,11 +41,13 @@ discover_test_modules(BeamGlob) ->
                                Class, Reason)}
     end.
 
-%% The module name of a `.beam` file that discovery keeps, as
-%% `{true, Name}`, or `false`. The glob always ends in `.beam` (see
-%% `to_beam_glob` in discover.gleam), so each match is a `.beam` file.
-%% Discovery skips stale compiled modules that no longer have a
-%% corresponding .gleam file under ./test/, and modules without tests/0.
+%% What discovery finds for a `.beam` file: `{true, {ok, Name}}`,
+%% `{true, {error, Text}}` when the module does not load, or `false`. The
+%% glob always ends in `.beam` (see `to_beam_glob` in discover.gleam), so
+%% each match is a `.beam` file. Discovery skips stale compiled modules
+%% that no longer have a corresponding .gleam file under ./test/, and
+%% modules without tests/0. A module that has a test source but does not
+%% load is an error, so a broken test module never makes a run pass.
 test_module(Path) ->
     ModuleStr = filename:basename(Path, ".beam"),
     test_module_with_source(has_matching_test_source(ModuleStr), ModuleStr).
@@ -56,11 +61,13 @@ test_module_with_source(true, ModuleStr) ->
 test_module_loaded({module, _}, Module, ModuleStr) ->
     test_module_exports_tests(erlang:function_exported(Module, tests, 0),
                               ModuleStr);
-test_module_loaded(_NotLoaded, _Module, _ModuleStr) ->
-    false.
+test_module_loaded({error, Reason}, _Module, ModuleStr) ->
+    Name = unicode:characters_to_binary(ModuleStr),
+    {true, {error, value_text(<<Name/binary, ": cannot load the module: ">>,
+                              Reason)}}.
 
 test_module_exports_tests(true, ModuleStr) ->
-    {true, list_to_binary(ModuleStr)};
+    {true, {ok, list_to_binary(ModuleStr)}};
 test_module_exports_tests(false, _ModuleStr) ->
     false.
 

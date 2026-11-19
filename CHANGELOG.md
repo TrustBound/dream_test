@@ -59,6 +59,13 @@ store. This release has breaking changes. Read
   puts each module suite in one group, and each suite keeps its own
   context. In 2.x, `discover.to_suite` gave the tests of such a suite
   `Nil` in place of their context.
+- A module discovery pattern that matches no test module is an error:
+  `<pattern>: no test module matches the pattern`. A test module whose
+  beam file does not load is an error:
+  `<module>: cannot load the module: <reason>`. `discover.to_suites` and
+  `discover.to_suite` give a failing test for each, and
+  `discover.list_modules` gives `Error`. Before, both gave no module and
+  no error, so a wrong pattern gave a run that passed.
 - `types.AssertionResult` has the new variant `AssertionPending`, for
   `unit.pending`. A `case` on an `AssertionResult` needs a branch for it.
 - The typed `parallel` functions take a `types.Root(context)`. Build one
@@ -210,6 +217,8 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
 - Step text and patterns split into words only at spaces.
 - A `discover.features` pattern that matches no files fails the run.
+- A module discovery pattern that matches no test module fails the run,
+  and so does a test module that does not load.
 - `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `TestResult` and `TestInfo` hold `groups` in place of `full_name`.

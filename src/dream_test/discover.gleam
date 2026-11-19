@@ -44,6 +44,7 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{None}
+import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -215,7 +216,8 @@ pub fn tests(pattern pattern: String) -> TestDiscovery {
 /// List module names discovered for the configured pattern.
 ///
 /// This returns the discovered module names (as strings) or an aggregated error
-/// message if discovery failed.
+/// message if discovery failed. A pattern that matches no test module, and a
+/// test module that does not load, are errors (see `load` for the texts).
 ///
 /// ## Parameters
 ///
@@ -249,13 +251,19 @@ pub fn list_modules(
 /// Load discovered suites and return both suites and errors.
 ///
 /// This never panics; discovery errors are returned in `LoadResult.errors`.
-/// Each error starts with the pattern or the module name, then the cause:
-/// `tests() crashed: <class>:<reason>` when `tests()` crashes,
-/// `tests() did not return a test suite: <value>` or
-/// `tests() returned a node that is not a test, a group or a hook: <node>`
-/// when its value has another shape, and
-/// `cannot search for test modules: <class>:<reason>` for a pattern that
-/// cannot be searched.
+/// Each error starts with the pattern or the module name and `: `, then
+/// the cause:
+///
+/// - `<pattern>: no test module matches the pattern` when no test module
+///   matches a pattern, so a wrong pattern never gives a run that passes
+///   with no tests;
+/// - `<pattern>: cannot search for test modules: <class>:<reason>` for a
+///   pattern that cannot be searched;
+/// - `<module>: cannot load the module: <reason>` for a test module whose
+///   beam file does not load;
+/// - `<module>: tests() crashed: <class>:<reason>` when `tests()` crashes;
+/// - `<module>: tests() did not return a test suite: <value>` when its
+///   value is not a test suite.
 ///
 /// ## Parameters
 ///
@@ -502,15 +510,35 @@ fn discover_all_modules_loop_next(
 ) -> #(List(String), List(String)) {
   let beam_glob = to_beam_glob(pattern)
   case discover_test_modules(beam_glob) {
-    Ok(mods) -> {
-      let #(seen2, acc2) = add_unique_modules(mods, seen, acc_rev)
-      discover_all_modules_loop(rest, seen2, acc2, errors_rev)
+    Ok([]) ->
+      discover_all_modules_loop(rest, seen, acc_rev, [
+        format_discover_error(pattern, "no test module matches the pattern"),
+        ..errors_rev
+      ])
+    Ok(found) -> {
+      let #(seen2, acc2) =
+        add_unique_modules(result.values(found), seen, acc_rev)
+      discover_all_modules_loop(
+        rest,
+        seen2,
+        acc2,
+        list.append(list.reverse(unloaded_modules(found)), errors_rev),
+      )
     }
     Error(message) ->
       discover_all_modules_loop(rest, seen, acc_rev, [
         format_discover_error(pattern, message),
         ..errors_rev
       ])
+  }
+}
+
+/// The error of each found module that does not load.
+fn unloaded_modules(found: List(Result(String, String))) -> List(String) {
+  case found {
+    [] -> []
+    [Ok(_module_name), ..rest] -> unloaded_modules(rest)
+    [Error(message), ..rest] -> [message, ..unloaded_modules(rest)]
   }
 }
 
@@ -585,7 +613,9 @@ fn discovery_error_assertion() -> AssertionResult {
 // ============================================================================
 
 @external(erlang, "dream_test_test_discovery_ffi", "discover_test_modules")
-fn discover_test_modules(beam_glob: String) -> Result(List(String), String)
+fn discover_test_modules(
+  beam_glob: String,
+) -> Result(List(Result(String, String)), String)
 
 @external(erlang, "dream_test_test_discovery_ffi", "call_tests")
 fn call_tests(module_name: String) -> Result(TestSuite, String)
