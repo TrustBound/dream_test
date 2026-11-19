@@ -146,8 +146,11 @@ pub type RunRootParallelWithReporterConfig(context) {
 ///   Each test result, each `TestInfo` that a runner hook gets and each
 ///   progress line has them in front of the names of the tree. Give `[]`
 ///   for a tree that is not inside a group.
-/// - `name`, `tags`, `children`, `seed`: the fields of the `types.Root` of
-///   the tree.
+/// - `name`, `tags`, `children`: the name, the tags and the children of the
+///   top-level group of the tree.
+/// - `context`: where the tests get their context, a
+///   `types.FixedContext(value)` or a `types.ContextFromSetUp(set_up,
+///   tear_down)` (see `types.SuiteContext`).
 pub type RunSuiteConfig(context) {
   RunSuiteConfig(
     config: ParallelConfig,
@@ -740,8 +743,8 @@ pub fn run_root_parallel_with_reporter(
 ///   groups: ["all"],
 ///   name: "suite",
 ///   tags: [],
-///   children: [unit.it("passes", fn() { Ok(succeed()) })],
-///   seed: Nil,
+///   children: [unit.it("passes", passes)],
+///   context: types.FixedContext(Nil),
 ///   progress_reporter: None,
 ///   write: ignore,
 ///   total: 1,
