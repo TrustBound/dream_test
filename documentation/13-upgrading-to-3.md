@@ -23,7 +23,7 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 Do the steps in this order. The first steps affect the most projects.
 
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
-2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. See [The runner and the run report](#the-runner-and-the-run-report).
+2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
@@ -536,7 +536,7 @@ pub fn main() {
 
 #### `runner.has_failures` is now `types.failed`
 
-`types.failed` is also `True` when a tear-down hook failed and every test passed.
+`types.failed` is also `True` when a tear-down hook failed and every test passed, when a set-up stopped, and when a `reporter_types.Custom` reporter crashed.
 
 ##### 2.x: check a run with `runner.has_failures` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/has_failures.gleam#L1-L30"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -606,6 +606,21 @@ fn failing_suite() {
   ])
 }
 ```
+
+#### `exit_on_failure` exits with status 1 in more cases
+
+In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it also gives exit status 1 in these cases, also when every test passed:
+
+- a tear-down hook failed
+- a set-up stopped (`SetupStopped`)
+- the `render` function of a `reporter_types.Custom` reporter crashed
+- coverage failed
+
+[Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists every case.
+
+#### `runner.silent` still writes errors
+
+In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops normal output only. Errors still go to the standard error stream, for example a crashed results reporter or a coverage error.
 
 #### Runner test hooks: only the `TestInfo`, with `groups`
 
@@ -954,7 +969,7 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 3.0.0 has one rule for every hook failure:
 
 - A failed set-up hook gives `SetupFailed` to each test that it serves.
-- A failed tear-down hook does not change the status of a test. The other tear-down hooks still run. The failure goes into the tear-down list of the run report, and the run fails.
+- A failed tear-down hook does not change the status of a test. The other tear-down hooks still run. The failure goes into the tear-down list of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
 
 A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that a whole suite shares, use `unit_context.describe_with_set_up`, or `steps.new_with_set_up` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
 

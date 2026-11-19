@@ -108,10 +108,10 @@ jobs:
   coverage-badge:
     name: Publish coverage badge
     # Only a push to main in this repository publishes. Pull requests and
-    # forks never do. The job publishes whenever the test run measured
-    # coverage and wrote the JSON, also when tests failed or the total is
-    # below the minimum. A test run that wrote no coverage JSON publishes
-    # nothing.
+    # forks never do. The job publishes whenever the test run wrote the
+    # coverage JSON and the read step produced a badge text, also when tests
+    # failed or the total is below the minimum. A test run that wrote no
+    # coverage JSON publishes nothing.
     if: ${{ !cancelled() && needs.test.outputs.coverage_message != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'TrustBound/dream_test' }}
     needs: test
     runs-on: ubuntu-latest

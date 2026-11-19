@@ -20,7 +20,10 @@ store. This release has breaking changes. Read
 - `runner.run` returns `types.RunReport`, not `List(TestResult)`. A
   `RunReport` holds the test results and the tear-down hooks that failed.
 - `runner.has_failures` is removed. Use `types.failed(report)`, which is
-  also `True` for a tear-down failure.
+  also `True` for a tear-down failure and for a crashed results reporter.
+- `runner.silent()` drops normal output only. Errors still go to the
+  standard error stream, for example a crashed results reporter or a
+  coverage error. In 2.x, a silent run dropped errors too.
 - `parallel.run_root_parallel` returns `types.RunReport`, not
   `List(TestResult)`.
 - `parallel.RunRootParallelWithReporterConfig` has a new field
@@ -97,6 +100,12 @@ store. This release has breaking changes. Read
   test runs in one process: its `before_each_test` hooks, `before_each`
   hooks, body, `after_each` hooks and `after_each_test` hooks.
 - A test body that runs past its timeout is always `TimedOut`.
+- A step can finish after its deadline, before the kill reaches its
+  process. The test is still `TimedOut` for that step. Its report can then
+  also hold what the process did after the deadline: the context and the
+  tear-down failures of the steps that finished then. No test can put a
+  message in this window, so this path is checked by reading the code, not
+  by a test.
 
 #### Sandbox
 
@@ -593,9 +602,16 @@ the guide labels them.
     Gherkin report (`reporter_types.Custom(gherkin.format)`) prints, and the
     exit status is 1 when the run fails or coverage is below a minimum
   - A `render` function that crashes does not stop the run. The runner
-    writes a `Results reporter failed` error to the error output, with the
-    position of the reporter and the crash, and goes on with the next
-    reporter and with coverage. With `runner.exit_on_failure()`, the exit
+    writes a `Results reporter failed` error to the error output and goes
+    on with the next reporter and with coverage. The error names the
+    position of the reporter: the first reporter in the list is at
+    position 1, and every reporter counts, `bdd` and `json` included. It
+    shows the crash on one line, cut at 200 characters
+  - The report that `runner.run` returns has each crash, so
+    `types.failed(report)` is `True`. `types.report_reporter_crashes`
+    gives a `types.ReporterCrash(position:, reason:)` with the full reason
+    of each crash, and `types.add_reporter_crashes` adds crashes to a
+    report in a custom runner. With `runner.exit_on_failure()`, the exit
     status is 1
 
 ### Changed

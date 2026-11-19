@@ -123,10 +123,17 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   in the order skipped, pending, timed out, setup failed, tear-down failed,
   set-up stopped, before ` in <duration>`. Each count shows only when it is
   not 0. `tear-down failed` and `set-up stopped` are new.
-- `runner.exit_on_failure` stops the BEAM with `init:stop(1)`. It stops the
-  run when a test fails, times out or has a failed set-up, when a tear-down
-  hook fails, when a set-up stops (`SetupStopped`), when a
-  `reporter_types.Custom` reporter crashes, and when coverage fails.
+- `runner.exit_on_failure` stops the BEAM with `init:stop(1)`. Every test
+  runs, and the runner writes all its output first. Then it ends the
+  program with status 1 when a test fails, times out or has a failed
+  set-up, when a tear-down hook fails, when a set-up stops
+  (`SetupStopped`), when a `reporter_types.Custom` reporter crashes, and
+  when coverage fails.
+- A crashed `reporter_types.Custom` reporter is in the run report, so
+  `types.failed(report)` is `True`. `types.report_reporter_crashes` gives
+  its position and the full reason.
+- `runner.silent()` drops normal output only. Errors still go to the
+  standard error stream.
 - `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
   A `case` on a `ResultsReporter` needs a branch for it.
 - `sandbox.run_isolated` takes the function and its input as two parameters.

@@ -210,7 +210,9 @@ The run fails when one of these is true:
 - the `render` function of a `reporter_types.Custom` results reporter crashed
 - coverage failed, for example a total below `coverage.minimum_percent`
 
-The first three make `types.failed` return `True`.
+The first four make `types.failed` return `True` for the report that `runner.run` returns. `types.report_reporter_crashes` gives the position and the full reason of each crashed results reporter. Use it when your code picks its own exit status from the report.
+
+A silent run (`runner.silent`) drops normal output only. It still writes errors to the standard error stream, for example the error of a crashed results reporter.
 
 `exit_on_failure` does not stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1. `runner.run` does not return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
 

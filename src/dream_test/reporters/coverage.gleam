@@ -124,7 +124,9 @@ import gleam/string
 /// - `failed`: tests with status `Failed`, `SetupFailed` or `TimedOut`
 /// - `teardown_failed`: tear-down hooks that failed
 /// - `setup_stopped`: set-ups whose process stopped while their tests ran
-/// - `reporters_crashed`: results reporters whose render function crashed
+/// - `reporters_crashed`: results reporters whose render function crashed.
+///   The exit line says `a results reporter crashed` for one, and
+///   `<count> results reporters crashed` for more.
 /// - `exit_on_failure`: whether the runner exits with status 1 on failure
 pub type RunOutcome {
   RunOutcome(
@@ -693,6 +695,7 @@ fn render_inexact_line_warning(source_paths: List(String)) -> String {
 ///     failed: 0,
 ///     teardown_failed: 0,
 ///     setup_stopped: 0,
+///     reporters_crashed: 0,
 ///     exit_on_failure: True,
 ///   ),
 /// )

@@ -411,8 +411,16 @@ pub fn default_timeout_ms(
 
 /// Exit the BEAM with status 1 if the run fails.
 ///
-/// The run fails when a test is `Failed`, `SetupFailed` or `TimedOut`, when
-/// a tear-down hook fails (see `types.failed`), or when coverage fails.
+/// The run fails in five cases (see "Exit status" in
+/// `documentation/07-runner-and-execution.md`):
+///
+/// 1. A test is `Failed`, `TimedOut` or `SetupFailed`.
+/// 2. A tear-down hook failed, also when every test passed.
+/// 3. A set-up stopped (`types.SetupStopped`).
+/// 4. The `render` function of a `reporter_types.Custom` reporter crashed.
+/// 5. Coverage failed.
+///
+/// `types.failed` is `True` in the first four cases.
 ///
 /// Useful for CI pipelines.
 ///
@@ -617,6 +625,10 @@ pub fn coverage_from_environment(
 }
 
 /// Disable all reporter output (still returns results from `runner.run()`).
+///
+/// A silent run drops normal output only. Errors still go to the standard
+/// error stream, for example a `Results reporter failed` error or a coverage
+/// error.
 pub fn silent(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, output: Some(silent_output()))
 }
@@ -835,8 +847,12 @@ pub fn after_all_suites(
 ///
 /// If the `render` function of a `reporter_types.Custom` reporter crashes,
 /// the runner writes a `Results reporter failed` error to the error output
-/// and goes on with the next reporter and with coverage. With
-/// `exit_on_failure`, the crash also ends the program with exit status 1.
+/// and goes on with the next reporter and with coverage. The error names
+/// the position of the reporter in the list of `results_reporters`. The
+/// first reporter is at position 1, and every reporter in the list counts.
+/// The returned report has the crash (see `types.report_reporter_crashes`),
+/// so `types.failed` is `True` for it. With `exit_on_failure`, the crash
+/// also ends the program with exit status 1.
 ///
 /// ## Example
 ///
@@ -2326,7 +2342,7 @@ fn shown_crash_reason(reason: String) -> String {
       string.slice(reason, 0, shown_crash_reason_length)
       <> " ... (cut at "
       <> int.to_string(shown_crash_reason_length)
-      <> " characters; types.report_reporter_crashes has the full reason)"
+      <> " characters, and types.report_reporter_crashes has the full reason)"
     False -> reason
   }
 }

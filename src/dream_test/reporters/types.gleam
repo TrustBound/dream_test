@@ -49,10 +49,15 @@ pub type ResultsReporter {
   /// returns. The runner adds no newline, so end the text with `"\n"`.
   ///
   /// If `render` crashes, the runner writes a `Results reporter failed`
-  /// error to the error output. The error names the position of the
-  /// reporter in the list and the crash. The runner then goes on with the
-  /// next reporter and with coverage. With `runner.exit_on_failure()`, a
-  /// crash ends the run with exit status 1.
+  /// error to the error output, also in a silent run. The error names the
+  /// position of the reporter in the list and the crash, on one line and
+  /// cut at 200 characters. The first reporter in the list is at position
+  /// 1, and every reporter counts, `Bdd` and `Json` included. The runner
+  /// then goes on with the next reporter and with coverage. The report that
+  /// `runner.run` returns has the crash (see
+  /// `types.report_reporter_crashes`), so `types.failed` is `True`. With
+  /// `runner.exit_on_failure()`, the program ends with exit status 1 after
+  /// all the output is written.
   ///
   /// ```gleam
   /// import dream_test/reporters/types as reporter_types

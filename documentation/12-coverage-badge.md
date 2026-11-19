@@ -8,7 +8,7 @@ Dream Test uses the same setup for its own badge.
 
 - **The test job measures.** `gleam test` writes a JSON summary of the coverage.
 - **The test job reads the total.** A shell step turns the total into a badge text (`80.0%`) and a colour.
-- **A second job publishes.** It runs only on a push to `main`. It publishes whenever `gleam test` measured the coverage and wrote the JSON, also when tests failed or the total is below the minimum. It commits `coverage.json` to the `badges` branch. It runs no project code, so it is the only job with write access.
+- **A second job publishes.** It runs only on a push to `main`. It publishes whenever `gleam test` wrote the JSON and the read step produced a badge text, also when tests failed or the total is below the minimum. It commits `coverage.json` to the `badges` branch. It runs no project code, so it is the only job with write access.
 - **shields.io draws.** The README image asks shields.io for a badge. shields.io reads `coverage.json` from the `badges` branch.
 
 The `badges` branch has no shared history with your code. It holds only `coverage.json`, and each changed total adds one commit.
@@ -35,13 +35,13 @@ pub fn main() {
 }
 ```
 
-The minimum is optional. It sets the badge colour (see below). With `runner.exit_on_failure`, a total below the minimum makes `gleam test` end with exit status 1, so the `test` job fails. The workflow below still reads the total and publishes it, in red. It also publishes when tests fail: the badge shows the coverage that the run measured. If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written and the badge step fails.
+The minimum is optional. It sets the badge colour (see below). With `runner.exit_on_failure`, a total below the minimum makes `gleam test` end with exit status 1, so the `test` job fails. The workflow below still reads the total and publishes it, in red. It also publishes when tests fail: the badge shows the coverage that the run measured. If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written. Then the badge step fails when the tests passed. When the tests failed, it writes no badge text, and nothing is published.
 
 ### 2. Add the workflow
 
-Save this file as `.github/workflows/coverage.yml`, or copy the two parts into your existing workflow:
+Save this file as `.github/workflows/coverage.yml`, or copy these three parts into your existing workflow:
 
-- the `outputs` and the last step of the `test` job
+- the `outputs` and the last step of the `test` job. The job must have the id `test`, because the `coverage-badge` job reads it with `needs: test` and `needs.test.outputs`
 - `id: tests` on your `gleam test` step, because the last step reads its result
 - the whole `coverage-badge` job
 
@@ -178,7 +178,7 @@ What each part does:
 |---|---|
 | `id: tests` | The read step gets the result of `gleam test` from it. |
 | `Read coverage for the badge` | Runs on every event, so a pull request also shows that the JSON is readable. `!cancelled()` makes it run also when `gleam test` failed. It fails when the tests passed and the file is missing, or when the file has no executable lines. When `gleam test` failed and wrote no file, it writes no badge text. |
-| `if:` on `coverage-badge` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. `!cancelled()` makes it run also when the `test` job failed, so it publishes whenever coverage was measured, also when tests failed. `coverage_message != ''` skips it when no badge text was read. |
+| `if:` on `coverage-badge` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. `!cancelled()` makes it run also when the `test` job failed, so it publishes whenever `gleam test` wrote the JSON and the read step produced a badge text, also when tests failed. `coverage_message != ''` skips it when no badge text was read. |
 | `needs: test` | The job starts after the `test` job and reads its badge text. |
 | `permissions: contents: write` | The push needs it. Only this job gets it, and this job runs no project code. |
 | `concurrency` | Two quick pushes to `main` publish one after the other, not at the same time. |

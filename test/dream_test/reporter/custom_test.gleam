@@ -147,7 +147,7 @@ pub fn tests() {
           "\nResults reporter failed\n"
             <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: "
             <> string.slice(one_line(long_crash_reason()), 0, 200)
-            <> " ... (cut at 200 characters; types.report_reporter_crashes has the full reason)\n"
+            <> " ... (cut at 200 characters, and types.report_reporter_crashes has the full reason)\n"
             <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
             <> "  Fix: make the render function return a String for every RunReport.\n"
             <> "\n",

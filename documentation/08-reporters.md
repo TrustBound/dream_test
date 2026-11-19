@@ -252,19 +252,11 @@ fn example_suite() {
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
 write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the set-up and tear-down failures with `types.report_teardown_failures`, or get all the counts with `summary.count`. It counts the tear-down hooks that failed (`teardown_failed`) apart from the set-ups whose process stopped (`setup_stopped`).
 
-##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L1-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+The formatter needs these imports: `dream_test/reporters/summary`, `dream_test/types.{type RunReport}`, `gleam/int` and `gleam/string`.
+
+##### A post-run report formatter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L11-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/reporters/summary
-import dream_test/reporters/types as reporter_types
-import dream_test/runner
-import dream_test/types.{type RunReport}
-import dream_test/unit.{describe, it}
-import gleam/erlang/process.{type Subject}
-import gleam/int
-import gleam/string
-
 pub fn render_my_report(report: RunReport) -> String {
   // `summary.count` counts the tests by status. It counts the tear-down
   // hooks that failed apart from the set-ups whose process stopped.
@@ -290,7 +282,7 @@ Then give the formatter to the runner as `reporter_types.Custom(render_my_report
 
 The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists when the run fails.
 
-If the formatter crashes, the runner writes a `Results reporter failed` error to the error output, with the position of the reporter in the list and the crash. Then it goes on with the next reporter and with coverage. The crash makes the run fail.
+If the formatter crashes, the runner writes a `Results reporter failed` error to the error output, with the position of the reporter in the list and the crash. The first reporter in the list is at position 1, and every reporter counts, `bdd` and `json` included. The error shows the crash on one line, cut at 200 characters. Then the runner goes on with the next reporter and with coverage. The crash makes the run fail: the report that `runner.run` returns has the crash, so `types.failed` is `True`. `types.report_reporter_crashes` gives the position and the full reason of each crash. A silent run still writes this error to the standard error stream.
 
 ##### Give the formatter to the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam#L31-L36"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -303,7 +295,7 @@ pub fn main() {
 }
 ```
 
-The three tests of this snippet pass, so this `main` prints `MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped`, and the exit status is 0. If a test fails, the line counts it in `failed`, and the program ends with exit status 1.
+This `main` runs the three tests of `tests()` in the snippet file, which this page does not show. They pass, so this `main` prints `MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped`, and the exit status is 0. If a test fails, the line counts it in `failed`, and the program ends with exit status 1.
 
 #### Driving the progress reporter manually (advanced)
 
