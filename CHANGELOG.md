@@ -22,9 +22,12 @@ store. This release has breaking changes. Read
   the results reporters that crashed.
 - `runner.has_failures` is removed. Use `types.failed(report)`, which is
   also `True` for a tear-down failure and for a crashed results reporter.
-- `runner.silent()` drops normal output only. Errors still go to the
-  standard error stream, for example a crashed results reporter or a
-  coverage error. In 2.x, a silent run dropped errors too.
+- `runner.silent()` drops the normal output only: progress, results
+  reports and the coverage report. It still writes two kinds of error to
+  the standard error stream: the `Results reporter failed` error of a
+  `reporter_types.Custom` reporter that crashed or did not return in time,
+  and a coverage error, for example a total below
+  `coverage.minimum_percent`. In 2.x, a silent run dropped all output.
 - `parallel.run_root_parallel` returns `types.RunReport`, not
   `List(TestResult)`.
 - `parallel.RunRootParallelWithReporterConfig` has a new field

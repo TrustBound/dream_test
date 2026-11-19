@@ -23,7 +23,7 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 Do the steps in this order. The first steps affect the most projects.
 
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
-2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. See [The runner and the run report](#the-runner-and-the-run-report).
+2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
@@ -620,7 +620,7 @@ In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it a
 
 #### `runner.silent` still writes errors
 
-In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops normal output only. Errors still go to the standard error stream, for example a crashed results reporter or a coverage error.
+In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops the normal output only: progress, results reports and the coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed or did not return in time, and a coverage error, for example a total below `coverage.minimum_percent`.
 
 #### Runner test hooks: only the `TestInfo`, with `groups`
 

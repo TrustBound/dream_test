@@ -201,7 +201,7 @@ pub fn tests() {
       |> or_fail_with("expected the time-out as the crash at position 1")
     }),
 
-    it("writes the crash error of a silent run to the error output", fn() {
+    it("drops the normal output of a silent run and writes the crash", fn() {
       run_main_in_new_vm(
         "dream_test@coverage_runner_mains",
         "silent_run_with_crashing_custom_reporter",
@@ -210,12 +210,14 @@ pub fn tests() {
       |> be_equal(#(
         0,
         "\nResults reporter failed\n"
-          <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: error:custom_render_crashed\n"
+          <> "  The Custom results reporter at position 3 in runner.results_reporters crashed: error:custom_render_crashed\n"
           <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
           <> "  Fix: make the render function return a String for every RunReport.\n"
           <> "\n",
       ))
-      |> or_fail_with("expected only the crash error and exit status 0")
+      |> or_fail_with(
+        "expected no BDD or custom report, only the crash error, and exit status 0",
+      )
     })
       |> with_child_timeout,
 

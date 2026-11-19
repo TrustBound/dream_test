@@ -10,6 +10,7 @@ import dream_test/coverage
 import dream_test/coverage_fixture_server
 import dream_test/file
 import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/bdd
 import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/runner
@@ -360,12 +361,17 @@ pub fn crashing_custom_reporter_below_minimum_with_exit_on_failure() -> Nil {
   Nil
 }
 
-/// A silent run where every test passes, with a custom results reporter
-/// that crashes. Without `exit_on_failure`, the exit status stays 0.
+/// A silent run where every test passes, with a BDD reporter, a custom
+/// results reporter that writes text, and a custom results reporter that
+/// crashes. Without `exit_on_failure`, the exit status stays 0.
 pub fn silent_run_with_crashing_custom_reporter() -> Nil {
   let _ =
     runner.new([fixture_tests()])
-    |> runner.results_reporters([reporter_types.Custom(crash_render)])
+    |> runner.results_reporters([
+      bdd.new(),
+      reporter_types.Custom(custom_report),
+      reporter_types.Custom(crash_render),
+    ])
     |> runner.silent()
     |> runner.run()
   Nil

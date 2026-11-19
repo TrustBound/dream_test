@@ -153,8 +153,10 @@ type SuiteRun {
 
 /// Output sinks used by `runner.run()`.
 ///
-/// Reporters write to `out`. Runner-internal errors (not test failures) may be
-/// written to `error` as well.
+/// Reporters write to `out`. The runner writes two kinds of error to
+/// `error`: the `Results reporter failed` error of a
+/// `reporter_types.Custom` reporter that crashed or did not return in time,
+/// and a coverage error. A test failure is not an error of the runner.
 pub type Output {
   Output(out: fn(String) -> Nil, error: fn(String) -> Nil)
 }
@@ -627,11 +629,19 @@ pub fn coverage_from_environment(
   RunBuilder(..builder, coverage: CoverageFromEnvironment(config))
 }
 
-/// Disable all reporter output (still returns results from `runner.run()`).
+/// Drop the normal output of the run, but keep the errors.
 ///
-/// A silent run drops normal output only. Errors still go to the standard
-/// error stream, for example a `Results reporter failed` error or a coverage
-/// error.
+/// A silent run writes nothing to the standard output: no progress, no
+/// results reports and no coverage report. `runner.run()` still returns the
+/// report.
+///
+/// A silent run still writes two kinds of error to the standard error
+/// stream:
+///
+/// - the `Results reporter failed` error of a `reporter_types.Custom`
+///   reporter that crashed or did not return in time
+/// - a coverage error, for example a total below
+///   `coverage.minimum_percent`, or coverage that did not complete
 pub fn silent(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, output: Some(silent_output()))
 }
