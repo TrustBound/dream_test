@@ -8,7 +8,7 @@ At a high level, you describe behavior using a small vocabulary:
 
 - **Feature**: a capability you’re describing (a suite of scenarios)
 - **Scenario**: one concrete example (a test)
-- **Background**: steps that should run before every scenario (shared setup)
+- **Background**: steps that run before each scenario of the Feature. They run again for every scenario. For a resource that starts one time for all scenarios, see [A set-up for all scenarios](#a-set-up-for-all-scenarios-for-example-a-server).
 - **Given / When / Then**: a convention for structuring steps:
   - **Given**: starting state / setup
   - **When**: the action
@@ -55,8 +55,8 @@ If your tests are mostly “function input → output”, the unit DSL (`describ
 
 Each step function gets two arguments: the scenario state and a `StepContext` record.
 
-- `run`: `run(state, context)` returns `Ok(new_state)`, or `Error(message)` to fail the scenario.
-- `run`: `run(state, context)` returns an assertion result, like a unit test body. The next step gets the same state.
+- A `given` or `when` step (an action) returns `Ok(new_state)`, or `Error(message)` to fail the scenario.
+- A `then` step (a check) returns an assertion result, like a unit test body. The next step gets the same state.
 
 The `StepContext` fields:
 
@@ -247,7 +247,7 @@ Rules for the first step:
 - The Background steps get the initial state first. The scenario steps then get the state that the last Background step gave.
 
 A `.feature` file that breaks these rules does not parse. The error names the file and the line.
-An inline feature that breaks these rules fails each scenario with the same message, before any step runs.
+An inline feature that breaks these rules fails each scenario before any step runs. The failure message is the text of the parse problem, for example `"And a base" has no step before it. ...`.
 
 Each pattern can have one step definition in each phase.
 A second definition of the same pattern in the same phase is a duplicate.
@@ -665,6 +665,7 @@ Some features need a resource that lives for all their scenarios, for example a 
 - Each scenario starts from the value of the set-up. A change that one scenario makes to its state does not reach the next scenario.
 - The tear-down gets the same value after the last scenario.
 - The set-up and the tear-down run in one process that lives while the scenarios run. A process that the set-up starts stays alive.
+- When the process of the set-up stops while the scenarios run, each scenario that did not start yet is `SetupFailed`. The run report gets a `types.SetupStopped` for the hook `suite set-up`, and its `not_run` lists those scenarios. The tear-down still runs.
 - When the set-up returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `suite set-up`, and the tear-down does not run. A crash reads `the suite set-up crashed in Server: <reason>`. When the tear-down fails, the run report gets a tear-down failure for the hook `suite tear-down`, for example `suite tear-down in Server` then `the suite tear-down crashed in Server: <reason>`.
 
 With `discover.to_suite`, the set-up runs one time for the scenarios of all the files. A parse error test does not need the set-up, so it runs without it.
@@ -679,25 +680,25 @@ pub type Request {
   Stop
 }
 
-pub type World {
-  World(server: Subject(Request), reply: String)
+pub type ServerState {
+  ServerState(server: Subject(Request), reply: String)
 }
 
-fn start_server() -> Result(World, String) {
+fn start_server() -> Result(ServerState, String) {
   let started = process.new_subject()
   process.spawn(fn() { serve(started) })
   process.receive(started, 1000)
   |> result.replace_error("the server did not start")
-  |> result.map(new_world)
+  |> result.map(new_server_state)
 }
 
-fn stop_server(world: World) -> Result(Nil, String) {
-  process.send(world.server, Stop)
+fn stop_server(state: ServerState) -> Result(Nil, String) {
+  process.send(state.server, Stop)
   Ok(Nil)
 }
 
-fn new_world(server: Subject(Request)) -> World {
-  World(server: server, reply: "")
+fn new_server_state(server: Subject(Request)) -> ServerState {
+  ServerState(server: server, reply: "")
 }
 
 fn serve(started: Subject(Subject(Request))) -> Nil {
@@ -717,39 +718,42 @@ fn answer(requests: Subject(Request)) -> Nil {
 }
 ```
 
-#### The steps with a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L57-L83"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The steps with a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L57-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // The steps. The set-up starts the server once, before the first scenario.
 // Each scenario starts from its value. The tear-down stops the server after
 // the last scenario.
 
-fn server_steps() -> StepRegistry(World) {
+fn server_steps() -> StepRegistry(ServerState) {
   steps.new_with_set_up(set_up: start_server, tear_down: stop_server)
   |> steps.given("the server is running", server_is_running)
   |> steps.when("I ping the server", ping)
   |> steps.then("the reply is {string}", reply_is)
 }
 
-fn server_is_running(world: World, _context: StepContext) {
-  Ok(world)
+fn server_is_running(state: ServerState, _context: StepContext) {
+  Ok(state)
 }
 
-fn ping(world: World, _context: StepContext) -> Result(World, String) {
-  let reply = process.call(world.server, 1000, Ping)
-  Ok(World(..world, reply: reply))
+fn ping(
+  state: ServerState,
+  _context: StepContext,
+) -> Result(ServerState, String) {
+  let reply = process.call(state.server, 1000, Ping)
+  Ok(ServerState(..state, reply: reply))
 }
 
-fn reply_is(world: World, context: StepContext) {
+fn reply_is(state: ServerState, context: StepContext) {
   use expected <- result.try(steps.get_string(context.captures, 0))
-  world.reply
+  state.reply
   |> should
   |> be_equal(expected)
   |> or_fail_with("the server should answer")
 }
 ```
 
-#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L85-L98"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L88-L101"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn server_feature() -> TestSuite {
@@ -770,7 +774,7 @@ pub fn server_feature() -> TestSuite {
 
 Each suite keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
 
-#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L100-L129"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L103-L132"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // Suites with other contexts run in the same `runner.new`.
@@ -805,28 +809,28 @@ pub fn main() {
 }
 ```
 
-The run gives:
+The run gives this output. The times change from run to run, and a test that takes less than 1ms shows no time:
 
 ```text
 Feature: Server
-  ✓ Scenario: Ping the server
-  ✓ Scenario: Ping it again
+  ✓ Scenario: Ping the server (1ms)
+  ✓ Scenario: Ping it again (1ms)
 Math
   ✓ adds
 Counter
   ✓ starts at 41
 
-Summary: 4 run, 0 failed, 4 passed
+Summary: 4 run, 0 failed, 4 passed in 2ms
 ```
 
 #### Several Features with one set-up
 
-`discover.to_suite` runs one set-up for all its files. To do the same with Features that you parse yourself, give each Feature to `steps.to_suite` as a `steps.Feature` child. The suite starts as the registry says, so the set-up runs one time for the scenarios of all its Features, and every scenario runs with the steps of that registry.
+`discover.to_suite` runs one set-up for all its files. To do the same with Features that you parse yourself, give each Feature to `steps.to_suite` as a `steps.Feature` child. Every scenario starts from the start of the registry: the initial state of `steps.new`, or the value of the set-up of `steps.new_with_set_up`. The set-up runs one time for the scenarios of all its Features, and every scenario runs with the steps of that registry.
 
 `steps.to_suite` takes these children (`steps.SuiteChild`):
 
 - `Feature(feature)`: a group named after the Feature, with a test for each scenario.
-- `Scenarios(feature)`: the tests of the scenarios, with no group for the Feature.
+- `Scenarios(feature)`: the tests of the scenarios, with no group for the Feature. The tags of the Feature do not reach the scenarios. The Gherkin reporter takes the name of the nearest group, for example the suite name, as the `Feature:` heading.
 - `Group(name:, tags:, children:)`: a group of your own, for example with a tag, that holds more children.
 - `Node(node)`: a test, a hook or a group that you make, for example with `unit_context.it` or `unit_context.before_each`. It gets the same start as the scenarios.
 
@@ -848,6 +852,8 @@ fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
   ])
 }
 ```
+
+In this example, `types` is `dream_test/gherkin/types`. `parser.parse_file` and `parser.parse_string` give a `types.Feature`.
 
 ### What's Next?
 

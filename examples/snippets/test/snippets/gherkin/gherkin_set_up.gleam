@@ -17,25 +17,25 @@ pub type Request {
   Stop
 }
 
-pub type World {
-  World(server: Subject(Request), reply: String)
+pub type ServerState {
+  ServerState(server: Subject(Request), reply: String)
 }
 
-fn start_server() -> Result(World, String) {
+fn start_server() -> Result(ServerState, String) {
   let started = process.new_subject()
   process.spawn(fn() { serve(started) })
   process.receive(started, 1000)
   |> result.replace_error("the server did not start")
-  |> result.map(new_world)
+  |> result.map(new_server_state)
 }
 
-fn stop_server(world: World) -> Result(Nil, String) {
-  process.send(world.server, Stop)
+fn stop_server(state: ServerState) -> Result(Nil, String) {
+  process.send(state.server, Stop)
   Ok(Nil)
 }
 
-fn new_world(server: Subject(Request)) -> World {
-  World(server: server, reply: "")
+fn new_server_state(server: Subject(Request)) -> ServerState {
+  ServerState(server: server, reply: "")
 }
 
 fn serve(started: Subject(Subject(Request))) -> Nil {
@@ -58,25 +58,28 @@ fn answer(requests: Subject(Request)) -> Nil {
 // Each scenario starts from its value. The tear-down stops the server after
 // the last scenario.
 
-fn server_steps() -> StepRegistry(World) {
+fn server_steps() -> StepRegistry(ServerState) {
   steps.new_with_set_up(set_up: start_server, tear_down: stop_server)
   |> steps.given("the server is running", server_is_running)
   |> steps.when("I ping the server", ping)
   |> steps.then("the reply is {string}", reply_is)
 }
 
-fn server_is_running(world: World, _context: StepContext) {
-  Ok(world)
+fn server_is_running(state: ServerState, _context: StepContext) {
+  Ok(state)
 }
 
-fn ping(world: World, _context: StepContext) -> Result(World, String) {
-  let reply = process.call(world.server, 1000, Ping)
-  Ok(World(..world, reply: reply))
+fn ping(
+  state: ServerState,
+  _context: StepContext,
+) -> Result(ServerState, String) {
+  let reply = process.call(state.server, 1000, Ping)
+  Ok(ServerState(..state, reply: reply))
 }
 
-fn reply_is(world: World, context: StepContext) {
+fn reply_is(state: ServerState, context: StepContext) {
   use expected <- result.try(steps.get_string(context.captures, 0))
-  world.reply
+  state.reply
   |> should
   |> be_equal(expected)
   |> or_fail_with("the server should answer")
