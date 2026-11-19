@@ -4,7 +4,8 @@
     without_terminal/1,
     with_columns_variable/2,
     without_gleam_stdlib_application/1,
-    crash_render/1
+    crash_render/1,
+    crash_render_with_long_reason/1
 ]).
 
 %% Helpers for the reporter tests. They change only the state that the
@@ -104,3 +105,8 @@ without_gleam_stdlib_application(Function) ->
 %% reason, so a test can check the exact error text.
 crash_render(_Report) ->
     erlang:error(custom_render_crashed).
+
+%% A render function for reporter_types.Custom that crashes with a reason
+%% whose text is longer than one line: `~p` breaks it over many lines.
+crash_render_with_long_reason(_Report) ->
+    erlang:error({long_reason, lists:seq(1, 120)}).

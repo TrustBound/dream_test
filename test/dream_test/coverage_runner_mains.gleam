@@ -360,6 +360,17 @@ pub fn crashing_custom_reporter_below_minimum_with_exit_on_failure() -> Nil {
   Nil
 }
 
+/// A silent run where every test passes, with a custom results reporter
+/// that crashes. Without `exit_on_failure`, the exit status stays 0.
+pub fn silent_run_with_crashing_custom_reporter() -> Nil {
+  let _ =
+    runner.new([fixture_tests()])
+    |> runner.results_reporters([reporter_types.Custom(crash_render)])
+    |> runner.silent()
+    |> runner.run()
+  Nil
+}
+
 /// A render function for `reporter_types.Custom` that crashes with
 /// `erlang:error(custom_render_crashed)`.
 @external(erlang, "dream_test_reporter_test_ffi", "crash_render")

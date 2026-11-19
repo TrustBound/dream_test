@@ -999,20 +999,26 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
       )
   }
 
-  let reporters_crashed =
-    write_results_reporters(builder.results_reporters, report, output)
+  let report =
+    types.add_reporter_crashes(
+      report: report,
+      crashes: write_results_reporters(
+        builder.results_reporters,
+        report,
+        output,
+      ),
+    )
 
   let coverage_succeeded =
     finish_coverage(
       coverage_state,
       output,
-      run_outcome(report, reporters_crashed, builder.should_exit_on_failure),
+      run_outcome(report, builder.should_exit_on_failure),
     )
 
   maybe_exit_on_failure(
     builder.should_exit_on_failure,
     report,
-    reporters_crashed,
     coverage_succeeded,
   )
 
@@ -1954,8 +1960,10 @@ fn default_output() -> Output {
   Output(out: io.print, error: io.print_error)
 }
 
+/// The output of a silent run: normal output is dropped, and errors still
+/// go to the standard error stream.
 fn silent_output() -> Output {
-  Output(out: discard_output, error: discard_output)
+  Output(out: discard_output, error: io.print_error)
 }
 
 fn discard_output(_text: String) -> Nil {
@@ -1965,12 +1973,10 @@ fn discard_output(_text: String) -> Nil {
 fn maybe_exit_on_failure(
   should_exit: Bool,
   report: RunReport,
-  reporters_crashed: Int,
   coverage_succeeded: Bool,
 ) -> Nil {
   let should_stop =
-    should_exit
-    && { types.failed(report) || reporters_crashed > 0 || !coverage_succeeded }
+    should_exit && { types.failed(report) || !coverage_succeeded }
   case should_stop {
     // Gleam 1.13 and older halt the BEAM with status 0 at once when `main`
     // returns. `end_program` does not return, so `main` does not return, no
@@ -2177,7 +2183,6 @@ fn write_coverage_error(
 
 fn run_outcome(
   report: RunReport,
-  reporters_crashed: Int,
   exit_on_failure: Bool,
 ) -> coverage_reporter.RunOutcome {
   let tests = types.report_tests(report)
@@ -2187,7 +2192,7 @@ fn run_outcome(
     failed: list.count(tests, is_failure),
     teardown_failed: counts.teardown_failed,
     setup_stopped: counts.setup_stopped,
-    reporters_crashed: reporters_crashed,
+    reporters_crashed: list.length(types.report_reporter_crashes(report)),
     exit_on_failure: exit_on_failure,
   )
 }
@@ -2209,14 +2214,15 @@ fn write_progress_event(
 }
 
 /// Write the report of each results reporter in list order, and return
-/// how many crashed. A crash does not stop the run: the runner writes a
-/// named error to the error output and goes on with the next reporter.
+/// the reporters that crashed. A crash does not stop the run: the runner
+/// writes a named error to the error output and goes on with the next
+/// reporter. Positions start at 1 and count every reporter in the list.
 fn write_results_reporters(
   reporters: List(reporter_types.ResultsReporter),
   report: RunReport,
   output: Output,
-) -> Int {
-  write_results_reporters_loop(reporters, report, output, 1, 0)
+) -> List(types.ReporterCrash) {
+  write_results_reporters_loop(reporters, report, output, 1, [])
 }
 
 fn write_results_reporters_loop(
@@ -2224,38 +2230,41 @@ fn write_results_reporters_loop(
   report: RunReport,
   output: Output,
   position: Int,
-  crashed: Int,
-) -> Int {
+  crashes_rev: List(types.ReporterCrash),
+) -> List(types.ReporterCrash) {
   case reporters {
-    [] -> crashed
+    [] -> list.reverse(crashes_rev)
     [reporter, ..rest] ->
       write_results_reporters_loop(
         rest,
         report,
         output,
         position + 1,
-        crashed + write_results_reporter(reporter, report, output, position),
+        list.append(
+          write_results_reporter(reporter, report, output, position),
+          crashes_rev,
+        ),
       )
   }
 }
 
-/// Write the report of one results reporter, and return 1 when its
-/// render function crashed, else 0.
+/// Write the report of one results reporter, and return its crash when
+/// its render function crashed, else `[]`.
 fn write_results_reporter(
   reporter: reporter_types.ResultsReporter,
   report: RunReport,
   output: Output,
   position: Int,
-) -> Int {
+) -> List(types.ReporterCrash) {
   let Output(out: write_out, error: write_error) = output
   case reporter {
     reporter_types.Bdd(config) -> {
       write_out(bdd.render(config, report))
-      0
+      []
     }
     reporter_types.Json(config) -> {
       write_out(json.render(config, report))
-      0
+      []
     }
     reporter_types.Custom(render) ->
       write_custom_report(
@@ -2272,29 +2281,54 @@ fn write_custom_report(
   write_out: fn(String) -> Nil,
   write_error: fn(String) -> Nil,
   position: Int,
-) -> Int {
+) -> List(types.ReporterCrash) {
   case rendered {
     Ok(text) -> {
       write_out(text)
-      0
+      []
     }
     Error(crash) -> {
       write_error(custom_reporter_crash(position, crash))
-      1
+      [types.ReporterCrash(position: position, reason: crash)]
     }
   }
 }
+
+/// The most characters of a crash reason that the error output shows.
+const shown_crash_reason_length = 200
 
 fn custom_reporter_crash(position: Int, crash: String) -> String {
   "\nResults reporter failed\n"
   <> "  The Custom results reporter at position "
   <> int.to_string(position)
   <> " in runner.results_reporters crashed: "
-  <> crash
+  <> shown_crash_reason(one_line(crash))
   <> "\n"
   <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
   <> "  Fix: make the render function return a String for every RunReport.\n"
   <> "\n"
+}
+
+/// The lines of `text`, each without the spaces at its start, joined with
+/// one space.
+fn one_line(text: String) -> String {
+  text
+  |> string.split("\n")
+  |> list.map(string.trim_start)
+  |> string.join(" ")
+}
+
+/// `reason`, or its first `shown_crash_reason_length` characters and a
+/// note that says where the full reason is.
+fn shown_crash_reason(reason: String) -> String {
+  case string.length(reason) > shown_crash_reason_length {
+    True ->
+      string.slice(reason, 0, shown_crash_reason_length)
+      <> " ... (cut at "
+      <> int.to_string(shown_crash_reason_length)
+      <> " characters; types.report_reporter_crashes has the full reason)"
+    False -> reason
+  }
 }
 
 fn output_out(output: Output) -> fn(String) -> Nil {

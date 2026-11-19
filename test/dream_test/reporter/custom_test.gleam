@@ -8,6 +8,7 @@ import dream_test/reporters/bdd
 import dream_test/reporters/json
 import dream_test/reporters/types as reporter_types
 import dream_test/runner
+import dream_test/sandbox
 import dream_test/suite
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
@@ -17,6 +18,9 @@ import gleam/string
 
 @external(erlang, "dream_test_coverage_test_ffi", "run_main_in_new_vm")
 fn run_main_in_new_vm(module: String, function: String) -> #(Int, String)
+
+@external(erlang, "dream_test_reporter_test_ffi", "crash_render_with_long_reason")
+fn crash_render_with_long_reason(report: types.RunReport) -> String
 
 pub fn tests() {
   describe("dream_test/reporters/types Custom", [
@@ -95,6 +99,81 @@ pub fn tests() {
       )
     }),
 
+    it("fails the run report when a reporter crashes", fn() {
+      run_without_output([passing_suite()], [
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+      ])
+      |> types.failed
+      |> should
+      |> be_equal(True)
+      |> or_fail_with("a crashed reporter should fail the run")
+    }),
+
+    it("keeps the position and the reason of each crash in the report", fn() {
+      run_without_output([passing_suite()], [
+        reporter_types.Custom(first_report),
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+        reporter_types.Custom(coverage_runner_mains.crash_render),
+      ])
+      |> types.report_reporter_crashes
+      |> should
+      |> be_equal([
+        types.ReporterCrash(position: 2, reason: "error:custom_render_crashed"),
+        types.ReporterCrash(position: 3, reason: "error:custom_render_crashed"),
+      ])
+      |> or_fail_with("expected the crashes at positions 2 and 3")
+    }),
+
+    it("keeps the full reason of a long crash in the report", fn() {
+      run_without_output([passing_suite()], [
+        reporter_types.Custom(crash_render_with_long_reason),
+      ])
+      |> types.report_reporter_crashes
+      |> should
+      |> be_equal([
+        types.ReporterCrash(position: 1, reason: long_crash_reason()),
+      ])
+      |> or_fail_with("expected the full reason of the crash")
+    }),
+
+    it("writes a long crash reason on one line, cut at 200 characters", fn() {
+      run_and_record_streams([passing_suite()], [
+        reporter_types.Custom(crash_render_with_long_reason),
+      ])
+      |> should
+      |> be_equal([
+        #(
+          "error",
+          "\nResults reporter failed\n"
+            <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: "
+            <> string.slice(one_line(long_crash_reason()), 0, 200)
+            <> " ... (cut at 200 characters; types.report_reporter_crashes has the full reason)\n"
+            <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+            <> "  Fix: make the render function return a String for every RunReport.\n"
+            <> "\n",
+        ),
+      ])
+      |> or_fail_with("expected the reason on one line, cut at 200 characters")
+    }),
+
+    it("writes the crash error of a silent run to the error output", fn() {
+      run_main_in_new_vm(
+        "dream_test@coverage_runner_mains",
+        "silent_run_with_crashing_custom_reporter",
+      )
+      |> should
+      |> be_equal(#(
+        0,
+        "\nResults reporter failed\n"
+          <> "  The Custom results reporter at position 1 in runner.results_reporters crashed: error:custom_render_crashed\n"
+          <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+          <> "  Fix: make the render function return a String for every RunReport.\n"
+          <> "\n",
+      ))
+      |> or_fail_with("expected only the crash error and exit status 0")
+    })
+      |> with_child_timeout,
+
     it("prints the custom report, then exits 1, for a failed run", fn() {
       run_main_in_new_vm(
         "dream_test@coverage_runner_mains",
@@ -106,6 +185,44 @@ pub fn tests() {
     })
       |> with_child_timeout,
   ])
+}
+
+/// The full reason of `crash_render_with_long_reason`, as
+/// `sandbox.run_catching` gives it.
+fn long_crash_reason() -> String {
+  case sandbox.run_catching(crash_render_with_long_reason, empty_report()) {
+    Error(reason) -> reason
+    Ok(text) -> "the render function did not crash: " <> text
+  }
+}
+
+fn empty_report() -> types.RunReport {
+  types.run_report(tests: [], teardown_failures: [])
+}
+
+/// The lines of `text`, each without the spaces at its start, joined with
+/// one space.
+fn one_line(text: String) -> String {
+  text
+  |> string.split("\n")
+  |> list.map(string.trim_start)
+  |> string.join(" ")
+}
+
+/// Run `suites` with `reporters` and an output that keeps nothing, and
+/// return the run report.
+fn run_without_output(
+  suites: List(suite.TestSuite),
+  reporters: List(reporter_types.ResultsReporter),
+) -> types.RunReport {
+  runner.new(suites)
+  |> runner.results_reporters(reporters)
+  |> runner.output(runner.Output(out: discard, error: discard))
+  |> runner.run()
+}
+
+fn discard(_text: String) -> Nil {
+  Nil
 }
 
 fn first_report(_report: types.RunReport) -> String {

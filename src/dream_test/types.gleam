@@ -769,14 +769,41 @@ pub type TeardownFailure {
   )
 }
 
-/// The result of a run: the result of each test, and the tear-down hooks
-/// that failed.
+/// A results reporter whose render function crashed.
+///
+/// `runner.run` records one for each `reporter_types.Custom` reporter whose
+/// render function crashed. Read them with `report_reporter_crashes`.
+///
+/// - `position`: the place of the reporter in the list that
+///   `runner.results_reporters` got. The first reporter is at position 1,
+///   and every reporter in the list counts, the BDD and JSON reporters
+///   included.
+/// - `reason`: the crash, as `class:reason`, for example
+///   `error:badarith`. This is the full text, which can be longer than one
+///   line. The error output shows it on one line, cut at 200 characters.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.ReporterCrash(position: 2, reason: "error:badarith")
+/// ```
+pub type ReporterCrash {
+  ReporterCrash(position: Int, reason: String)
+}
+
+/// The result of a run: the result of each test, the tear-down hooks that
+/// failed, and the results reporters that crashed.
 ///
 /// `runner.run` and `parallel.run_root_parallel` give a `RunReport`, and the
-/// reporters take one. Use `run_report` to make one, `report_tests` and
-/// `report_teardown_failures` to read it, and `failed` to check it.
+/// reporters take one. Use `run_report` to make one, `report_tests`,
+/// `report_teardown_failures` and `report_reporter_crashes` to read it, and
+/// `failed` to check it.
 pub opaque type RunReport {
-  RunReport(tests: List(TestResult), teardown_failures: List(TeardownFailure))
+  RunReport(
+    tests: List(TestResult),
+    teardown_failures: List(TeardownFailure),
+    reporter_crashes: List(ReporterCrash),
+  )
 }
 
 /// Make a `RunReport`.
@@ -792,7 +819,8 @@ pub opaque type RunReport {
 ///
 /// ## Returns
 ///
-/// A `RunReport` with these tests and tear-down failures.
+/// A `RunReport` with these tests and tear-down failures, and no crashed
+/// results reporter.
 ///
 /// ## Example
 ///
@@ -807,7 +835,11 @@ pub fn run_report(
   tests tests: List(TestResult),
   teardown_failures teardown_failures: List(TeardownFailure),
 ) -> RunReport {
-  RunReport(tests: tests, teardown_failures: teardown_failures)
+  RunReport(
+    tests: tests,
+    teardown_failures: teardown_failures,
+    reporter_crashes: [],
+  )
 }
 
 /// The result of each test of a run, in the order of the run.
@@ -858,8 +890,74 @@ pub fn report_teardown_failures(
   report.teardown_failures
 }
 
-/// Whether a run failed: a test has a failure status (see `is_failure`), or
-/// a tear-down hook failed.
+/// Add the results reporters that crashed to a report.
+///
+/// `runner.run` calls this after the results reporters ran, so the report
+/// that it returns has the crashes. Call it yourself in a custom runner
+/// that runs reporters.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+/// - `crashes`: the crashed reporters, in list order
+///
+/// ## Returns
+///
+/// The report with `crashes` after the crashes that it already has.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [])
+/// |> types.add_reporter_crashes([
+///   types.ReporterCrash(position: 1, reason: "error:badarith"),
+/// ])
+/// |> types.failed
+/// |> should
+/// |> be_equal(True)
+/// |> or_fail_with("a crashed reporter should fail the run")
+/// ```
+pub fn add_reporter_crashes(
+  report report: RunReport,
+  crashes crashes: List(ReporterCrash),
+) -> RunReport {
+  RunReport(
+    ..report,
+    reporter_crashes: list.append(report.reporter_crashes, crashes),
+  )
+}
+
+/// The results reporters whose render function crashed in a run, in list
+/// order.
+///
+/// Use it when your code picks its own exit status from the report, or
+/// writes the crash somewhere else.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// The crashes, or `[]` when no results reporter crashed.
+///
+/// ## Example
+///
+/// ```gleam
+/// types.run_report(tests: [], teardown_failures: [])
+/// |> types.report_reporter_crashes
+/// |> should
+/// |> be_equal([])
+/// |> or_fail_with("an empty run should have no crashed reporters")
+/// ```
+pub fn report_reporter_crashes(
+  report report: RunReport,
+) -> List(ReporterCrash) {
+  report.reporter_crashes
+}
+
+/// Whether a run failed: a test has a failure status (see `is_failure`), a
+/// tear-down hook failed, or a results reporter crashed.
 ///
 /// `runner.exit_on_failure` ends the program with status 1 when this is
 /// `True`.
@@ -870,8 +968,9 @@ pub fn report_teardown_failures(
 ///
 /// ## Returns
 ///
-/// `True` when a test is `Failed`, `SetupFailed` or `TimedOut`, or when the
-/// report has a tear-down failure.
+/// `True` when a test is `Failed`, `SetupFailed` or `TimedOut`, when the
+/// report has a tear-down failure, or when it has a crashed results
+/// reporter.
 ///
 /// ## Example
 ///
@@ -890,6 +989,7 @@ pub fn report_teardown_failures(
 /// ```
 pub fn failed(report report: RunReport) -> Bool {
   !list.is_empty(report.teardown_failures)
+  || !list.is_empty(report.reporter_crashes)
   || list.any(report.tests, has_failure_status)
 }
 

@@ -1323,13 +1323,33 @@ pub fn tests() {
           |> list.last
           |> should
           |> be_equal(Ok(
-            "Tests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed, a results reporter crashed and coverage did not complete.\n",
+            "Tests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed, 2 results reporters crashed and coverage did not complete.\n",
           ))
           |> or_fail_with(
             "expected the tear-down failure and the crashed reporter",
           )
         },
       ),
+      it("names one crashed results reporter with a", fn() {
+        coverage_reporter.render_failure(
+          error: NoSourceFiles("lib"),
+          outcome: RunOutcome(
+            passed: 3,
+            failed: 0,
+            teardown_failed: 0,
+            setup_stopped: 0,
+            reporters_crashed: 1,
+            exit_on_failure: True,
+          ),
+        )
+        |> string.split("\n\n")
+        |> list.last
+        |> should
+        |> be_equal(Ok(
+          "Tests: 3 passed. Exit status 1, because a results reporter crashed and coverage did not complete.\n",
+        ))
+        |> or_fail_with("expected a results reporter crashed")
+      }),
       it("says the exit status is unchanged without exit_on_failure", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),

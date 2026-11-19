@@ -771,8 +771,18 @@ fn other_causes(outcome: RunOutcome) -> List(String) {
   list.flatten([
     cause_when(outcome.teardown_failed, "a tear-down hook failed"),
     cause_when(outcome.setup_stopped, "a set-up stopped"),
-    cause_when(outcome.reporters_crashed, "a results reporter crashed"),
+    reporters_crashed_cause(outcome.reporters_crashed),
   ])
+}
+
+/// `a results reporter crashed` for one crash, and
+/// `<count> results reporters crashed` for more.
+fn reporters_crashed_cause(count: Int) -> List(String) {
+  case count {
+    0 -> []
+    1 -> ["a results reporter crashed"]
+    _ -> [int.to_string(count) <> " results reporters crashed"]
+  }
 }
 
 fn cause_when(count: Int, cause: String) -> List(String) {

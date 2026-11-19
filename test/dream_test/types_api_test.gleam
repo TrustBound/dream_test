@@ -118,6 +118,42 @@ pub fn tests() {
       |> or_fail_with("a timed-out test should fail the run")
     }),
 
+    it("run_report has no crashed reporter", fn() {
+      types.run_report(tests: [passed_result()], teardown_failures: [])
+      |> types.report_reporter_crashes
+      |> should
+      |> be_equal([])
+      |> or_fail_with("a new report should have no crashed reporter")
+    }),
+
+    it("add_reporter_crashes adds after the crashes already there", fn() {
+      types.run_report(tests: [passed_result()], teardown_failures: [])
+      |> types.add_reporter_crashes([
+        types.ReporterCrash(position: 1, reason: "error:first"),
+      ])
+      |> types.add_reporter_crashes([
+        types.ReporterCrash(position: 3, reason: "error:second"),
+      ])
+      |> types.report_reporter_crashes
+      |> should
+      |> be_equal([
+        types.ReporterCrash(position: 1, reason: "error:first"),
+        types.ReporterCrash(position: 3, reason: "error:second"),
+      ])
+      |> or_fail_with("expected both crashes, in the order that they came")
+    }),
+
+    it("failed is True for a crashed reporter only", fn() {
+      types.run_report(tests: [passed_result()], teardown_failures: [])
+      |> types.add_reporter_crashes([
+        types.ReporterCrash(position: 1, reason: "error:badarith"),
+      ])
+      |> types.failed
+      |> should
+      |> be_equal(True)
+      |> or_fail_with("a crashed reporter should fail the run")
+    }),
+
     it("is_failure is True for Failed, SetupFailed and TimedOut", fn() {
       [
         types.Passed,
