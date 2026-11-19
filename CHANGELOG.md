@@ -294,7 +294,7 @@ the guide labels them.
 - Module discovery runs a suite with a context with its own context.
 - `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
 - `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
-- A failed set-up hook gives `SetupFailed`. A timeout gives `TimedOut`.
+- A failed set-up hook gives `SetupFailed`. A body timeout gives `TimedOut`.
 - A failed tear-down hook goes into the run report, not into the results.
 - Hooks run in one setup process of their scope.
 - Reporter functions that format a whole run take a `RunReport`.
