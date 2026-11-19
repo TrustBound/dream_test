@@ -50,10 +50,11 @@ import dream_test/types.{
   type TeardownFailure, type TeardownHook, type TestInfo, type TestKind,
   type TestResult, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
   AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
-  AssertionSkipped, BeforeAll, BeforeAllHook, BeforeAllSuitesHook, BeforeEach,
-  BeforeEachSuiteHook, ContextFromSetUp, Failed, FixedContext, Group, Passed,
-  Root, SetupFailed, Skipped, SuiteSetUpHook, SuiteTearDownHook, TeardownFailure,
-  Test, TestResult, TimedOut, WithInput,
+  AssertionPending, AssertionSkipped, BeforeAll, BeforeAllHook,
+  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetUp, Failed,
+  FixedContext, Group, Passed, Pending, Root, SetupFailed, Skipped,
+  SuiteSetUpHook, SuiteTearDownHook, TeardownFailure, Test, TestResult, TimedOut,
+  WithInput,
 }
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
@@ -2679,6 +2680,7 @@ fn body_result(
     Ok(AssertionOk) -> state
     Ok(AssertionFailed(failure)) -> body_ended(state, Failed, failure)
     Ok(AssertionSkipped) -> TestState(..state, status: Skipped)
+    Ok(AssertionPending) -> TestState(..state, status: Pending)
     Error(reason) -> body_ended(state, Failed, hook_failure("crash", reason))
   }
 }

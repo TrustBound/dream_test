@@ -1,4 +1,4 @@
-## Writing unit tests (`describe`, `it`, `group`, `skip`, tags)
+## Writing unit tests (`describe`, `it`, `group`, `skip`, `pending`, tags)
 
 Most of the time, you want tests that read like a conversation with the code:
 
@@ -119,6 +119,36 @@ Why `skip` exists (beyond “turn it off”):
 - It keeps intent close to the code (“we know this should exist, but it’s not ready”).
 - It avoids deleting tests (which often deletes context and makes regressions easier).
 - It’s explicit: you still see it in the suite structure and output.
+
+### `pending` (write the skeleton first)
+
+Use `pending` when you know which tests a suite needs, but you have not written them yet. A pending test has a name and no body. Write the skeleton of the suite first, then replace each `pending` with an `it` when you write the test.
+
+- A pending test has the status `Pending`.
+- The reporters show it with `~` and count it as pending.
+- The run still passes, as with a skipped test.
+
+`unit_context.pending` does the same in a context-aware suite.
+
+#### A suite skeleton <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/pending_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/unit.{describe, it, pending}
+
+pub fn tests() {
+  describe("Cart", [
+    it("starts empty", fn() {
+      []
+      |> should
+      |> be_equal([])
+      |> or_fail_with("a new cart should be empty")
+    }),
+    pending("adds an item"),
+    pending("removes an item"),
+  ])
+}
+```
 
 ### `group` (structure inside a `describe`)
 

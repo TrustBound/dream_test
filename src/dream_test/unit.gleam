@@ -57,8 +57,8 @@
 
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, AfterAll, AfterEach, AssertionSkipped,
-  BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
 }
 import gleam/option.{None}
 
@@ -764,4 +764,43 @@ pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
       )
     other -> other
   }
+}
+
+/// Define a pending test: a test with a name and no body yet.
+///
+/// Use it to write the skeleton of a suite first and fill in the tests
+/// later. A pending test has the status `Pending`. The reporters show it
+/// with `~` and count it as pending, and the run still passes, as with a
+/// skipped test.
+///
+/// ## Parameters
+///
+/// - `name`: the test name
+///
+/// ## Returns
+///
+/// A test whose status is `Pending` (`AssertionPending`).
+///
+/// ## Example
+///
+/// ```gleam
+/// describe("Cart", [
+///   it("adds an item", adds_an_item),
+///   pending("removes an item"),
+///   pending("empties the cart"),
+/// ])
+/// ```
+pub fn pending(name name: String) -> UnitNode {
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: NoInput(pending_test_run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn pending_test_run() -> Result(AssertionResult, String) {
+  Ok(AssertionPending)
 }

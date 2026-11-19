@@ -196,12 +196,15 @@ pub type AssertionFailure {
 /// In typical usage, you don’t construct `AssertionResult` directly:
 /// - assertion chains produce it
 /// - `skip(...)` produces `AssertionSkipped`
+/// - `pending(...)` produces `AssertionPending`
 ///
 /// ## Variants
 ///
 /// - `AssertionOk` - The assertion chain passed
 /// - `AssertionFailed(failure)` - The assertion chain failed with details
 /// - `AssertionSkipped` - The test was skipped (used by `skip` function)
+/// - `AssertionPending` - The test has no body yet (used by `pending`). Its
+///   status is `Pending`, and the run still passes.
 ///
 /// ## Example
 ///
@@ -218,6 +221,7 @@ pub type AssertionResult {
   AssertionOk
   AssertionFailed(AssertionFailure)
   AssertionSkipped
+  AssertionPending
 }
 
 /// Intermediate result during assertion chaining.

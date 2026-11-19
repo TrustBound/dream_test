@@ -59,6 +59,8 @@ store. This release has breaking changes. Read
   puts each module suite in one group, and each suite keeps its own
   context. In 2.x, `discover.to_suite` gave the tests of such a suite
   `Nil` in place of their context.
+- `types.AssertionResult` has the new variant `AssertionPending`, for
+  `unit.pending`. A `case` on an `AssertionResult` needs a branch for it.
 - The typed `parallel` functions take a `types.Root(context)`. Build one
   with `types.root`, not with `unit.describe`.
 
@@ -244,6 +246,13 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
     `parallel.run_suite` runs a typed tree inside groups
   - Module discovery loads suites with a context, and `discover.to_suite`
     keeps the context of each module suite
+
+- **Pending tests for writing test skeletons**
+
+  - `unit.pending(name)` and `unit_context.pending(name)` make a test with
+    a name and no body. Its status is `Pending`: the reporters show it with
+    `~` and count it as pending, and the run still passes
+  - `types.AssertionResult` has the new variant `AssertionPending`
 
 - **A context from a set-up**
 

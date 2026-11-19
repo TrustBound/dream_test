@@ -891,6 +891,10 @@ pub fn tests() -> TestSuite {
 }
 ```
 
+#### `AssertionResult` has `AssertionPending`
+
+This change affects only code that has a `case` on a `types.AssertionResult`. The new variant `AssertionPending` is the result of a pending test (`unit.pending`). Add a branch for it. Its test status is `Pending`.
+
 #### Discovery errors
 
 `discover.load` and `discover.to_suites` give a new error text for a test module that does not load. Code that compares the text must change:
