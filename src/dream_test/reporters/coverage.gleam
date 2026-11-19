@@ -122,11 +122,17 @@ import gleam/string
 ///
 /// - `passed`: tests with status `Passed`
 /// - `failed`: tests with status `Failed`, `SetupFailed` or `TimedOut`
-/// - `teardown_failed`: tear-down hooks that failed
-/// - `setup_stopped`: set-ups whose process stopped while their tests ran
+/// - `teardown_failed`: tear-down hooks that failed. The `Tests:` line
+///   says `, <count> tear-down failed`. When no test failed, the exit line
+///   says `a tear-down hook failed` for one, and
+///   `<count> tear-down hooks failed` for more.
+/// - `setup_stopped`: set-ups whose process stopped while their tests ran.
+///   The `Tests:` line says `, <count> set-up stopped`. When no test
+///   failed, the exit line says `a set-up stopped` for one, and
+///   `<count> set-ups stopped` for more.
 /// - `reporters_crashed`: results reporters whose render function crashed.
-///   The exit line says `a results reporter crashed` for one, and
-///   `<count> results reporters crashed` for more.
+///   When no test failed, the exit line says `a results reporter crashed`
+///   for one, and `<count> results reporters crashed` for more.
 /// - `exit_on_failure`: whether the runner exits with status 1 on failure
 pub type RunOutcome {
   RunOutcome(
