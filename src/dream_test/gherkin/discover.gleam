@@ -235,12 +235,20 @@ pub fn to_suite(
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes =
     list.map(missing_files_errors(discovery.pattern, files), missing_files_node)
-  suite.from_root(Root(
-    seed: Nil,
-    name: suite_name,
-    tags: [],
-    children: list.flatten([children, error_nodes, missing_nodes]),
-  ))
+  suite.join(name: suite_name, suites: [
+    suite.from_root(Root(
+      seed: Nil,
+      name: suite_name,
+      tags: [],
+      children: list.append(error_nodes, missing_nodes),
+    )),
+    suite.new(
+      name: suite_name,
+      tags: [],
+      children: children,
+      context: steps.suite_context(discovery.registry),
+    ),
+  ])
 }
 
 /// Load features and return detailed results.
@@ -418,8 +426,8 @@ fn parse_error_assertion() -> AssertionResult {
 fn features_to_groups(
   features: List(gherkin_types.Feature),
   registry: StepRegistry(state),
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
+  acc_rev: List(Node(state)),
+) -> List(Node(state)) {
   case features {
     [] -> list.reverse(acc_rev)
     [feature, ..rest] -> {
@@ -432,7 +440,7 @@ fn features_to_groups(
 fn feature_to_group(
   feature: gherkin_types.Feature,
   registry: StepRegistry(state),
-) -> Node(Nil) {
+) -> Node(state) {
   feature.to_group(FeatureConfig(feature: feature, step_registry: registry))
 }
 

@@ -92,14 +92,6 @@ pub fn tests() {
       }
     }),
 
-    it("initial_state gives the state that new got", fn() {
-      steps.new(initial: 7)
-      |> steps.initial_state
-      |> should
-      |> be_equal(7)
-      |> or_fail_with("the registry should keep the initial state")
-    }),
-
     it("find_step returns Error for undefined steps", fn() {
       let registry = steps.new(initial: Nil)
       case steps.find_step(registry, gtypes.GivenPhase, "I do not exist") {

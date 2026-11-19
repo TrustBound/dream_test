@@ -66,7 +66,7 @@ import dream_test/gherkin/types as gherkin_types
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AssertionFailed, AssertionFailure,
-  AssertionOk, GherkinScenario, Group, NoInput, Root, Test,
+  AssertionOk, GherkinScenario, Group, Test, WithInput,
 }
 import gleam/int
 import gleam/list
@@ -170,31 +170,37 @@ pub type InlineStep {
 /// ```
 pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
   let feature = config.feature
-  suite.from_root(Root(
-    seed: Nil,
+  suite.new(
     name: feature.name,
     tags: feature.tags,
     children: feature_children(config),
-  ))
+    context: steps.suite_context(config.step_registry),
+  )
 }
 
 /// Convert a Feature to one group node, named after the Feature, with a
 /// test for each scenario.
 ///
-/// Use it to put several Features in one tree, for example with
-/// `types.root` and `suite.from_root`. `gherkin/discover.to_suite` does this
-/// for the Features of all its files. The group holds the same tests, tags
-/// and Rule groups as the suite of `to_test_suite`.
+/// Use it to put several Features in one suite that shares one start, for
+/// example one set-up (see `steps.new_with_set_up`). `gherkin/discover.to_suite`
+/// does this for the Features of all its files. The group holds the same
+/// tests, tags and Rule groups as the suite of `to_test_suite`. Each test
+/// gets the starting state of its scenario as its context.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// suite.from_root(types.root("all features", Nil, [
-///   to_group(FeatureConfig(feature: cart_feature, step_registry: steps)),
-///   to_group(FeatureConfig(feature: stock_feature, step_registry: steps)),
-/// ]))
+/// suite.new(
+///   name: "all features",
+///   tags: [],
+///   children: [
+///     to_group(FeatureConfig(feature: cart_feature, step_registry: steps)),
+///     to_group(FeatureConfig(feature: stock_feature, step_registry: steps)),
+///   ],
+///   context: steps.suite_context(steps),
+/// )
 /// ```
-pub fn to_group(config config: FeatureConfig(state)) -> Node(Nil) {
+pub fn to_group(config config: FeatureConfig(state)) -> Node(state) {
   Group(
     name: config.feature.name,
     tags: config.feature.tags,
@@ -202,7 +208,7 @@ pub fn to_group(config config: FeatureConfig(state)) -> Node(Nil) {
   )
 }
 
-fn feature_children(config: FeatureConfig(state)) -> List(Node(Nil)) {
+fn feature_children(config: FeatureConfig(state)) -> List(Node(state)) {
   let feature = config.feature
   let scope =
     ScenarioScope(
@@ -242,8 +248,8 @@ fn background_steps(
 fn rules_to_nodes(
   scope: ScenarioScope(state),
   rules: List(gherkin_types.Rule),
-  nodes_newest_first: List(Node(Nil)),
-) -> List(Node(Nil)) {
+  nodes_newest_first: List(Node(state)),
+) -> List(Node(state)) {
   case rules {
     [] -> list.reverse(nodes_newest_first)
     [rule, ..rest] ->
@@ -257,7 +263,7 @@ fn rules_to_nodes(
 fn rule_to_node(
   scope: ScenarioScope(state),
   rule: gherkin_types.Rule,
-) -> Node(Nil) {
+) -> Node(state) {
   let group_name = string.trim_end("Rule: " <> rule.name)
   let rule_scope =
     ScenarioScope(
@@ -278,8 +284,8 @@ fn rule_to_node(
 fn scenarios_to_nodes(
   scope: ScenarioScope(state),
   scenarios: List(gherkin_types.Scenario),
-  nodes_newest_first: List(Node(Nil)),
-) -> List(Node(Nil)) {
+  nodes_newest_first: List(Node(state)),
+) -> List(Node(state)) {
   case scenarios {
     [] -> list.reverse(nodes_newest_first)
     [scenario, ..rest] ->
@@ -301,7 +307,7 @@ fn reverse_append(items: List(a), acc: List(a)) -> List(a) {
 fn scenario_to_nodes(
   scope: ScenarioScope(state),
   scenario: gherkin_types.Scenario,
-) -> List(Node(Nil)) {
+) -> List(Node(state)) {
   case scenario.examples {
     [] -> [
       scenario_node(
@@ -339,7 +345,7 @@ type ScenarioRun {
   ScenarioRun(name: String, tags: List(String), steps: List(gherkin_types.Step))
 }
 
-fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
+fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(state) {
   let full_name =
     list.flatten([
       [scope.feature_name],
@@ -354,7 +360,9 @@ fn scenario_node(scope: ScenarioScope(state), run: ScenarioRun) -> Node(Nil) {
     name: run.name,
     tags: run.tags,
     kind: GherkinScenario(scenario_id: scenario_id, rule: scope.rule_group),
-    run: NoInput(fn() { execute_scenario(scenario_id, all_steps, registry) }),
+    run: WithInput(fn(start) {
+      execute_scenario(scenario_id, all_steps, registry, start)
+    }),
     timeout_ms: None,
     source: scope.source,
   )
@@ -380,8 +388,8 @@ fn examples_to_nodes(
   scenario: gherkin_types.Scenario,
   examples: List(gherkin_types.Examples),
   index: Int,
-  nodes_newest_first: List(Node(Nil)),
-) -> List(Node(Nil)) {
+  nodes_newest_first: List(Node(state)),
+) -> List(Node(state)) {
   case examples {
     [] -> list.reverse(nodes_newest_first)
     [gherkin_types.Examples(table: None, ..), ..rest] ->
@@ -414,8 +422,8 @@ fn rows_to_nodes(
   rows: ExampleRows,
   values: List(List(String)),
   index: Int,
-  nodes_newest_first: List(Node(Nil)),
-) -> #(Int, List(Node(Nil))) {
+  nodes_newest_first: List(Node(state)),
+) -> #(Int, List(Node(state))) {
   case values {
     [] -> #(index, nodes_newest_first)
     [row, ..rest] -> {
@@ -571,9 +579,10 @@ fn execute_scenario(
   scenario_id: String,
   steps: List(gherkin_types.Step),
   registry: StepRegistry(state),
+  start: state,
 ) -> Result(AssertionResult, String) {
   case steps.validate(registry) {
-    Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry))
+    Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry, start))
     Error(message) -> Ok(step_failure(message))
   }
 }
@@ -582,13 +591,14 @@ fn resolve_and_execute(
   scenario_id: String,
   steps: List(gherkin_types.Step),
   registry: StepRegistry(state),
+  start: state,
 ) -> AssertionResult {
   case resolve_phases(steps, None, []) {
     Ok(phased_steps) ->
       execute_steps(
         ScenarioExecution(scenario_id: scenario_id, registry: registry),
         phased_steps,
-        steps.initial_state(registry),
+        start,
       )
     Error(message) -> step_failure(message)
   }

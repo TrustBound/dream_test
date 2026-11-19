@@ -194,16 +194,17 @@ type StepCheck(state) =
 
 /// Step registry backed by radix trie.
 ///
-/// Stores the initial scenario state and the step definitions, and provides
-/// fast lookup.
+/// Stores where each scenario gets its starting state and the step
+/// definitions, and provides fast lookup.
 ///
 /// “Fast” here means lookup cost grows with the **length of the step text**,
 /// not with how many step definitions you’ve registered.
 ///
 pub opaque type StepRegistry(state) {
   StepRegistry(
-    /// The state that each scenario starts from.
-    initial: state,
+    /// Where each scenario gets its starting state: a fixed value
+    /// (`new`) or a set-up (`new_with_set_up`), never both.
+    start: dream_types.SuiteContext(state),
     /// The `given` and `when` definitions.
     actions: StepTrie(StepAction(state)),
     /// The `then` definitions.
@@ -233,27 +234,70 @@ pub opaque type StepRegistry(state) {
 ///
 pub fn new(initial initial: state) -> StepRegistry(state) {
   StepRegistry(
-    initial: initial,
+    start: dream_types.FixedContext(initial),
     actions: step_trie.new(),
     checks: step_trie.new(),
     errors_newest_first: [],
   )
 }
 
-/// Get the state that each scenario starts from.
+/// Create an empty step registry whose scenarios start from the value of
+/// a set-up.
+///
+/// `set_up` runs once for each feature suite, before the first scenario,
+/// and only when at least one scenario of the suite runs. For
+/// `gherkin/discover.to_suite`, it runs once for the scenarios of all the
+/// files. Each scenario starts from its value, so a change that one
+/// scenario makes to its state does not reach the next one. `tear_down`
+/// gets the same value after the last scenario.
+///
+/// The set-up and the tear-down run in one process that lives while the
+/// scenarios run, so a server that the set-up starts and links stays
+/// alive. When `set_up` returns `Error`, crashes or times out, each
+/// scenario is `SetupFailed` with the operator `set_up` and `tear_down`
+/// does not run. See `unit_context.describe_with_set_up` for the other
+/// cases.
 ///
 /// ## Example
 ///
 /// ```gleam
-///       new(initial: 7)
-///       |> initial_state
-///       |> should
-///       |> be_equal(7)
-///       |> or_fail_with("the registry should keep the initial state")
+/// let steps =
+///   new_with_set_up(set_up: start_server, tear_down: stop_server)
+///   |> given("the server is running", step_server_running)
+///   |> when("I ping the server", step_ping)
+///   |> then("the reply is {string}", step_reply_is)
 /// ```
 ///
-pub fn initial_state(registry registry: StepRegistry(state)) -> state {
-  registry.initial
+pub fn new_with_set_up(
+  set_up set_up: fn() -> Result(state, String),
+  tear_down tear_down: fn(state) -> Result(Nil, String),
+) -> StepRegistry(state) {
+  StepRegistry(
+    start: dream_types.ContextFromSetUp(set_up: set_up, tear_down: tear_down),
+    actions: step_trie.new(),
+    checks: step_trie.new(),
+    errors_newest_first: [],
+  )
+}
+
+/// Where each scenario of the registry gets its starting state.
+///
+/// `FixedContext(value)` for a registry from `new`, and
+/// `ContextFromSetUp(set_up, tear_down)` for a registry from
+/// `new_with_set_up`. `gherkin/feature` uses it to make the suite of a
+/// feature (see `suite.new`).
+///
+/// ## Example
+///
+/// ```gleam
+/// steps.suite_context(new(initial: 7))
+/// // -> types.FixedContext(7)
+/// ```
+///
+pub fn suite_context(
+  registry registry: StepRegistry(state),
+) -> dream_types.SuiteContext(state) {
+  registry.start
 }
 
 /// Register a Given step definition.
