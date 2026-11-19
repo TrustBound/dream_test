@@ -112,7 +112,32 @@ pub fn main() {
 
 `runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
 
-To make a suite from a `types.Root` that you build yourself, use `suite.from_root`. To put suites in one group, use `suite.group`.
+To make a suite from a `types.Root` that you build yourself, use `suite.from_root`.
+
+To make one suite from several suites, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
+
+- `suite.group(name:, suites:)` puts each suite in a group named `name`. The group name is the first name of each test: `["Shop", "Cart", "starts empty"]`.
+- `suite.join(name:, suites:)` adds no group. Each test keeps its own names: `["Cart", "starts empty"]`. The runner sees one suite named `name`, so `before_each_suite` runs one time for all of them.
+
+`discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
+
+#### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// Each suite becomes a group inside "Shop".
+pub fn grouped() -> TestSuite {
+  suite.group(name: "Shop", suites: [cart_suite(), stock_suite()])
+}
+```
+
+#### Join suites in one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L29-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// One suite named "Shop" that holds both suites as they are.
+pub fn joined() -> TestSuite {
+  suite.join(name: "Shop", suites: [cart_suite(), stock_suite()])
+}
+```
 
 ### Mixed execution policies (per-suite concurrency/timeout)
 
