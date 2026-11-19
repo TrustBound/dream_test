@@ -44,12 +44,11 @@ pub fn main() {
     outer_setups: _outer_setups,
   ) = parallel_result
 
+  let report =
+    types.run_report(tests: results, teardown_failures: teardown_failures)
+
   // Count failed tear-down hooks and stopped set-ups apart.
-  let counts =
-    summary.count(types.run_report(
-      tests: results,
-      teardown_failures: teardown_failures,
-    ))
+  let counts = summary.count(report)
 
   progress.line(
     reporter,
@@ -62,7 +61,7 @@ pub fn main() {
   )
   |> write
 
-  results
+  report
 }
 
 pub fn tests() {
@@ -72,14 +71,17 @@ pub fn tests() {
 }
 
 fn run_suite() -> Result(types.AssertionResult, String) {
-  types.run_report(tests: main(), teardown_failures: [])
-  |> summary.count
-  |> passed
+  main()
+  |> passed_and_failed
   |> matchers.should
-  |> matchers.be_equal(1)
-  |> matchers.or_fail_with("expected the one test of the suite to pass")
+  |> matchers.be_equal(#(1, False))
+  |> matchers.or_fail_with(
+    "expected the one test of the suite to pass, and no failed tear-down",
+  )
 }
 
-fn passed(counts: summary.Counts) -> Int {
-  counts.passed
+/// The passed tests of the report, and whether the run failed, also by a
+/// failed tear-down hook.
+fn passed_and_failed(report: types.RunReport) -> #(Int, Bool) {
+  #(summary.count(report).passed, types.failed(report))
 }
