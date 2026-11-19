@@ -66,6 +66,11 @@ hook starts now lives for the tests of its group. A test runs its
   when at least one of its tests runs: `unit_context.describe_with_set_up`
   for unit tests, and `steps.new_with_set_up` for Gherkin scenarios, for
   example to start one server for all the scenarios of a feature.
+- `steps.to_suite` makes one suite from several Features with one
+  registry, so one set-up serves all of them. Its children
+  (`steps.SuiteChild`) are `Feature`, `Scenarios`, `Group` and `Node`.
+- `suite.from_tree` turns a suite tree that you build by hand
+  (`types.Root`) into a `TestSuite`.
 - Pending tests: `unit.pending(name)` and `unit_context.pending(name)` make
   a test with a name and no body, for a test skeleton. The reporters show
   it as pending, and the run still passes.
@@ -132,6 +137,21 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   keyword.
 - A `discover.features` pattern that matches no files is an error, and so
   is a module discovery pattern that matches no test module.
+- Gherkin: `steps.given` and `steps.when` take the step function with the
+  label `action:`, and `steps.then` with the label `check:`. In 2.x the
+  label was `handler:`.
+- Gherkin: `types.GherkinScenario` is
+  `GherkinScenario(scenario_id:, rule:)`. In 2.x it held only the id.
+- Gherkin: `{float}` matches a number as Cucumber reads it, such as `20`,
+  `.5` or `1e5`. In 2.x it needed a `.`. With `total {word}` and
+  `total {float}`, the text `total 20` now runs the `{float}` step.
+- Gherkin: step text and step patterns are split into words in the same
+  way, at spaces, with a double-quoted run kept in one word. In 2.x the
+  step text was also split where digits meet other characters.
+- Gherkin: `parser.parse_file` returns `Result(Feature, FeatureFileError)`.
+  In 2.x it returned `Result(Feature, String)`. `discover.list_files`
+  returns a `Result`.
+- A `types.Root` is no longer a `TestSuite`. Pass it to `suite.from_tree`.
 
 ## Requirements
 
