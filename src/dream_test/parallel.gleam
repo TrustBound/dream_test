@@ -367,19 +367,15 @@ type RunningWorker(context) {
 }
 
 /// The step that ran when the loop killed a test process at its deadline,
-/// the steps after it, and the state when it started. This step is the
-/// step that timed out, also when the process started a later step before
-/// the kill reached it.
+/// and the steps after it. This step is the step that timed out, also when
+/// the process started a later step before the kill reached it.
 type KilledStep(context) {
-  KilledStep(
-    step: TestStep(context),
-    later_steps: List(TestStep(context)),
-    state: TestState(context),
-  )
+  KilledStep(step: TestStep(context), later_steps: List(TestStep(context)))
 }
 
 /// A step that did not finish in its test process: the step, the state
-/// when it started, the steps after it, and why it did not finish.
+/// that the tear-down steps start from, the steps after it that did not
+/// finish, and why it did not finish.
 type EndedStep(context) {
   EndedStep(
     step: TestStep(context),
@@ -2536,6 +2532,13 @@ fn remove_down_worker(
 /// The step in which a process stopped. After a kill at a deadline, it is
 /// the step that ran at the kill, and it timed out. Else it is the current
 /// step, and the exit reason says why it stopped.
+///
+/// After a kill, the state is the newest state that the process sent. When
+/// no step started after the kill, it is the state when the killed step
+/// started. When the killed step finished and a later step started before
+/// the kill reached the process, it holds the context and the tear-down
+/// failures of the steps that finished, so the tear-down steps that run
+/// again get that context.
 fn ended_step(
   worker: RunningWorker(context),
   down: Down,
@@ -2544,10 +2547,7 @@ fn ended_step(
     Some(killed) ->
       EndedStep(
         step: killed.step,
-        state: TestState(
-          ..killed.state,
-          teardown_failures_rev: worker.state.teardown_failures_rev,
-        ),
+        state: worker.state,
         later_steps: steps_after_kill(killed, worker),
         end: StepTimedOut,
       )
@@ -2561,19 +2561,28 @@ fn ended_step(
   }
 }
 
-/// The steps that did not finish after a kill. With no step started after
-/// the kill, they are the steps after the killed step. When the process
-/// started a later step before the kill reached it, that step did not
-/// finish, so it is the first of them: a tear-down step that the killed
-/// process started runs again in a new process. The tear-down failures of
-/// the steps that finished stay in the state.
+/// The steps that did not finish after a kill: the steps after the killed
+/// step, without those that finished.
+///
+/// The killed step timed out, so it is never in the list. Each step that
+/// the process started after the kill means that the step before it
+/// finished. Thus, when no step or one step started after the kill, no
+/// step after the killed step finished, and all of them remain. When the
+/// process started a later step before the kill reached it, that step did
+/// not finish, so it is the first of the steps: a tear-down step that the
+/// killed process started runs again in a new process.
+///
+/// This uses counts and not a `case` on "did a step start after the kill",
+/// because no test can put a message between the deadline and the kill.
+/// A `case` arm for that race would be a line that no test runs.
 fn steps_after_kill(
   killed: KilledStep(context),
   worker: RunningWorker(context),
 ) -> List(TestStep(context)) {
-  let finished_after_kill =
+  let steps_started_after_kill =
     list.length(killed.later_steps) - list.length(worker.later_steps)
-  list.drop([worker.step, ..worker.later_steps], 1 - finished_after_kill)
+  let later_steps_finished = int.max(steps_started_after_kill - 1, 0)
+  list.drop(killed.later_steps, later_steps_finished)
 }
 
 /// Kill each process whose step is past its deadline, and keep the step
@@ -2598,11 +2607,7 @@ fn expire_workers(
           ..worker,
           killed: option.or(
             worker.killed,
-            Some(KilledStep(
-              step: worker.step,
-              later_steps: worker.later_steps,
-              state: worker.state,
-            )),
+            Some(KilledStep(step: worker.step, later_steps: worker.later_steps)),
           ),
           deadline_ms: now + worker.job.default_timeout_ms,
         ),
