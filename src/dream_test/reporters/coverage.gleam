@@ -120,8 +120,9 @@ import gleam/string
 
 /// How the test run ended, for the last line of a coverage failure.
 ///
-/// That line starts with `Tests: <passed> passed`, then a part for each
-/// count below that is not 0, then a period. With `exit_on_failure` on,
+/// That line starts with `Tests: <passed> passed`, then a part for each of
+/// `failed`, `teardown_failed` and `setup_stopped` that is not 0, then a
+/// period. With `exit_on_failure` on,
 /// the same line then says `Exit status 1, because <causes>.`. With
 /// `exit_on_failure` off, it then says `The exit status is not changed,
 /// because exit_on_failure is off.`, and it shows no causes.
