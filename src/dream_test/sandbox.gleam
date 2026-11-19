@@ -16,9 +16,10 @@
 //// `run_isolated` runs the function in a separate BEAM process, so the caller
 //// stays healthy even if the function crashes.
 ////
-//// `run_in_owner` runs functions one after another in an owner process that
+//// `run_in_setup_process` runs functions one after another in a setup process that
 //// stays alive between them, so a resource that one function starts lives
-//// for the next one. The runner uses one owner for the hooks of each scope.
+//// for the next one. The runner uses one setup process for the set-up and tear-down hooks of
+//// each group, each suite and the whole run.
 ////
 //// ## Selective crash reports
 ////
@@ -538,85 +539,89 @@ pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
 }
 
 // =============================================================================
-// Owner processes
+// Setup processes
 // =============================================================================
 
 /// A process that runs functions one after another and stays alive between
-/// them, so that what a function starts lives until the owner stops.
+/// them, so that what a function starts lives until the setup process stops.
 ///
-/// An owner is the process of one scope: for example, the `before_all`
-/// hook of a group starts a pool in the owner, the tests of the group use
-/// the pool, and the `after_all` hook stops the pool in the same owner. A
+/// A setup process is the process of one group, one suite or the whole run:
+/// for example, the `before_all`
+/// hook of a group starts a pool in the setup process, the tests of the group use
+/// the pool, and the `after_all` hook stops the pool in the same setup process. A
 /// process that a function links to, and an ETS table that it makes, live
-/// as long as the owner.
+/// as long as the setup process.
 ///
-/// Get an owner from `run_in_owner`, and stop it with `stop_owner`. The
-/// value is opaque, so only an owner that answered can be used again.
+/// Get a setup process from `run_in_setup_process`, and stop it with `stop_setup_process`. The
+/// value is opaque, so only a setup process that answered can be used again.
 ///
-/// Any process can use an owner value, and it can use the same value
-/// again after the owner stopped: each call watches the owner process
-/// itself, so a call never waits for an owner that is gone. The exit
-/// reason of an owner that stopped is known only once, and only in the
-/// process that started the owner. A later call, or a call in another
+/// Any process can use a setup process value, and it can use the same value
+/// again after the setup process stopped: each call watches the setup process
+/// itself, so a call never waits for a setup process that is gone. The exit
+/// reason of a setup process that stopped is known only once, and only in the
+/// process that started the setup process. A later call, or a call in another
 /// process, gives the reason `"the process had already stopped"`.
-pub opaque type Owner(input, output) {
-  Owner(
+pub opaque type SetupProcess(input, output) {
+  SetupProcess(
     pid: Pid,
     monitor: Monitor,
-    requests: Subject(OwnerRequest(input, output)),
+    requests: Subject(SetupProcessRequest(input, output)),
   )
 }
 
-/// The result of `run_in_owner`.
+/// The result of `run_in_setup_process`.
 ///
 /// ## Variants
 ///
-/// - `OwnerReturned(owner, value)`: the function returned `value`. The
-///   owner is alive and can run the next function.
-/// - `OwnerCaught(owner, reason)`: the function crashed (`panic`,
-///   `erlang:error`, `throw` or `exit` in the owner) and the owner caught
+/// - `SetupProcessReturned(setup_process, value)`: the function returned `value`. The
+///   setup process is alive and can run the next function.
+/// - `SetupProcessCaught(setup_process, reason)`: the function crashed (`panic`,
+///   `erlang:error`, `throw` or `exit` in the setup process) and the setup process caught
 ///   the crash. `reason` is `"class:reason"`, as from `run_catching`. The
-///   owner is alive and can run the next function.
-/// - `OwnerTimedOut`: the function did not return in time. The owner was
+///   setup process is alive and can run the next function.
+/// - `SetupProcessTimedOut`: the function did not return in time. The setup process was
 ///   killed, so a process that links to it stops too.
-/// - `OwnerExited(reason)`: the owner stopped after the function started
+/// - `SetupProcessExited(reason)`: the setup process stopped after the function started
 ///   and before it returned, for example because a process that links to
 ///   it crashed. `reason` is the exit reason as text, from
 ///   `format_exit_reason`.
-/// - `OwnerLost(reason)`: the owner had stopped before it started the
+/// - `SetupProcessLost(reason)`: the setup process had stopped before it started the
 ///   function, so the function did not run. This comes only for
-///   `Some(owner)`: the owner stopped after the function before, for
+///   `Some(setup_process)`: the setup process stopped after the function before, for
 ///   example because a process that links to it crashed. Run the function
-///   again with `None` to run it in a new owner. `reason` is the exit
+///   again with `None` to run it in a new setup process. `reason` is the exit
 ///   reason as text, or `"the process had already stopped"` when the exit
-///   was told before (see `Owner`).
-pub type OwnerResult(input, output) {
-  OwnerReturned(owner: Owner(input, output), value: output)
-  OwnerCaught(owner: Owner(input, output), reason: String)
-  OwnerTimedOut
-  OwnerExited(reason: String)
-  OwnerLost(reason: String)
+///   was told before (see `SetupProcess`).
+pub type SetupProcessResult(input, output) {
+  SetupProcessReturned(
+    setup_process: SetupProcess(input, output),
+    value: output,
+  )
+  SetupProcessCaught(setup_process: SetupProcess(input, output), reason: String)
+  SetupProcessTimedOut
+  SetupProcessExited(reason: String)
+  SetupProcessLost(reason: String)
 }
 
-/// A message to an owner: run a function, or stop.
+/// A message to a setup process: run a function, or stop.
 ///
-/// Before the owner runs the function, it sends the subject for later
+/// Before the setup process runs the function, it sends the subject for later
 /// requests to `started`. When the function returns or crashes, it sends
 /// the result to `reply`. The caller then knows if the function started.
-type OwnerRequest(input, output) {
+type SetupProcessRequest(input, output) {
   RunRequest(
     run: fn(input) -> output,
     input: input,
-    started: Subject(Subject(OwnerRequest(input, output))),
+    started: Subject(Subject(SetupProcessRequest(input, output))),
     reply: Subject(Result(output, String)),
   )
   StopRequest
 }
 
-/// What the caller gets while it waits for the owner to start the
+/// What the caller gets while it waits for the setup process to start the
 /// function.
 type StartEvent(input, output) {
-  FunctionStarted(requests: Subject(OwnerRequest(input, output)))
+  FunctionStarted(requests: Subject(SetupProcessRequest(input, output)))
   StoppedBeforeStart(reason: String)
 }
 
@@ -626,19 +631,19 @@ type FinishEvent(output) {
   StoppedDuringFunction(reason: String)
 }
 
-/// Run a function with its input in an owner process, and wait for it with
+/// Run a function with its input in a setup process, and wait for it with
 /// a timeout.
 ///
-/// With `None`, a new owner starts and runs the function. With
-/// `Some(owner)`, that owner runs the function, so the function sees what
-/// earlier functions started there. The caller monitors the owner, so a
-/// crash of the owner never stops the caller.
+/// With `None`, a new setup process starts and runs the function. With
+/// `Some(setup_process)`, that setup process runs the function, so the function sees what
+/// earlier functions started there. The caller monitors the setup process, so a
+/// crash of the setup process never stops the caller.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/sandbox.{SetupProcessReturned}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -646,10 +651,10 @@ type FinishEvent(output) {
 ///   number * 2
 /// }
 ///
-/// fn value(result: sandbox.OwnerResult(Int, Int)) -> Result(Int, Nil) {
+/// fn value(result: sandbox.SetupProcessResult(Int, Int)) -> Result(Int, Nil) {
 ///   case result {
-///     OwnerReturned(owner: owner, value: value) -> {
-///       sandbox.stop_owner(owner)
+///     SetupProcessReturned(setup_process: setup_process, value: value) -> {
+///       sandbox.stop_setup_process(setup_process)
 ///       Ok(value)
 ///     }
 ///     _ -> Error(Nil)
@@ -657,9 +662,9 @@ type FinishEvent(output) {
 /// }
 ///
 /// pub fn tests() {
-///   describe("Owner processes", [
-///     it("run_in_owner returns the value of the function", fn() {
-///       sandbox.run_in_owner(None, 100, double, 21)
+///   describe("Setup processes", [
+///     it("run_in_setup_process returns the value of the function", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
 ///       |> value
 ///       |> should
 ///       |> be_equal(Ok(42))
@@ -671,26 +676,26 @@ type FinishEvent(output) {
 ///
 /// ## Parameters
 ///
-/// - `owner`: the owner that runs the function, or `None` for a new owner
-/// - `timeout_ms`: how long to wait before the owner is killed
-/// - `run`: the function to run in the owner
+/// - `setup_process`: the setup process that runs the function, or `None` for a new setup process
+/// - `timeout_ms`: how long to wait before the setup process is killed
+/// - `run`: the function to run in the setup process
 /// - `input`: the argument that `run` gets
 ///
 /// ## Returns
 ///
-/// An `OwnerResult`: the value or caught crash with the owner that is still
-/// alive, or the timeout or exit of the owner.
-pub fn run_in_owner(
-  owner owner: Option(Owner(input, output)),
+/// An `SetupProcessResult`: the value or caught crash with the setup process that is still
+/// alive, or the timeout or exit of the setup process.
+pub fn run_in_setup_process(
+  setup_process setup_process: Option(SetupProcess(input, output)),
   timeout_ms timeout_ms: Int,
   run run: fn(input) -> output,
   input input: input,
-) -> OwnerResult(input, output) {
+) -> SetupProcessResult(input, output) {
   let started = new_subject()
   let reply = new_subject()
   let request =
     RunRequest(run: run, input: input, started: started, reply: reply)
-  let watch = send_owner_request(owner, request)
+  let watch = send_setup_process_request(setup_process, request)
   let selector =
     new_selector()
     |> select_map(started, FunctionStarted)
@@ -699,19 +704,19 @@ pub fn run_in_owner(
     Ok(FunctionStarted(requests: requests)) ->
       wait_for_function(watch, requests, reply, timeout_ms)
     Ok(StoppedBeforeStart(reason: reason)) -> {
-      forget_owner(watch)
-      OwnerLost(reason: reason)
+      forget_setup_process(watch)
+      SetupProcessLost(reason: reason)
     }
-    Error(Nil) -> time_out_owner(watch)
+    Error(Nil) -> time_out_setup_process(watch)
   }
 }
 
-/// The monitors of one call to an owner. `owner_monitor` is the monitor
-/// that the process which started the owner made, and only that process
+/// The monitors of one call to a setup process. `setup_process_monitor` is the monitor
+/// that the process which started the setup process made, and only that process
 /// gets its down message. `call_monitor` is new for this call, so the
-/// calling process always gets a down message when the owner is gone.
+/// calling process always gets a down message when the setup process is gone.
 type Watch {
-  Watch(pid: Pid, owner_monitor: Monitor, call_monitor: Monitor)
+  Watch(pid: Pid, setup_process_monitor: Monitor, call_monitor: Monitor)
 }
 
 /// Select the down message of both monitors of a call.
@@ -721,29 +726,29 @@ fn select_watch(
   mapping: fn(process.Down) -> message,
 ) -> Selector(message) {
   selector
-  |> select_specific_monitor(watch.owner_monitor, mapping)
+  |> select_specific_monitor(watch.setup_process_monitor, mapping)
   |> select_specific_monitor(watch.call_monitor, mapping)
 }
 
-/// Remove the monitor of a call to an owner that is still alive.
+/// Remove the monitor of a call to a setup process that is still alive.
 fn end_call(watch: Watch) -> Nil {
   demonitor_process(watch.call_monitor)
 }
 
-/// Remove both monitors of a call to an owner that is gone, with their
+/// Remove both monitors of a call to a setup process that is gone, with their
 /// down messages.
-fn forget_owner(watch: Watch) -> Nil {
-  demonitor_process(watch.owner_monitor)
+fn forget_setup_process(watch: Watch) -> Nil {
+  demonitor_process(watch.setup_process_monitor)
   demonitor_process(watch.call_monitor)
 }
 
-/// Wait for the function that the owner started, until `timeout_ms`.
+/// Wait for the function that the setup process started, until `timeout_ms`.
 fn wait_for_function(
   watch: Watch,
-  requests: Subject(OwnerRequest(input, output)),
+  requests: Subject(SetupProcessRequest(input, output)),
   reply: Subject(Result(output, String)),
   timeout_ms: Int,
-) -> OwnerResult(input, output) {
+) -> SetupProcessResult(input, output) {
   let selector =
     new_selector()
     |> select_map(reply, FunctionFinished)
@@ -752,53 +757,71 @@ fn wait_for_function(
     Ok(FunctionFinished(result: result)) -> {
       end_call(watch)
       finished(
-        Owner(pid: watch.pid, monitor: watch.owner_monitor, requests: requests),
+        SetupProcess(
+          pid: watch.pid,
+          monitor: watch.setup_process_monitor,
+          requests: requests,
+        ),
         result,
       )
     }
     Ok(StoppedDuringFunction(reason: reason)) -> {
-      forget_owner(watch)
-      OwnerExited(reason: reason)
+      forget_setup_process(watch)
+      SetupProcessExited(reason: reason)
     }
-    Error(Nil) -> time_out_owner(watch)
+    Error(Nil) -> time_out_setup_process(watch)
   }
 }
 
-/// The result of a function that returned or crashed in an owner that is
+/// The result of a function that returned or crashed in a setup process that is
 /// still alive.
 fn finished(
-  owner: Owner(input, output),
+  setup_process: SetupProcess(input, output),
   result: Result(output, String),
-) -> OwnerResult(input, output) {
+) -> SetupProcessResult(input, output) {
   case result {
-    Ok(value) -> OwnerReturned(owner: owner, value: value)
-    Error(reason) -> OwnerCaught(owner: owner, reason: reason)
+    Ok(value) ->
+      SetupProcessReturned(setup_process: setup_process, value: value)
+    Error(reason) ->
+      SetupProcessCaught(setup_process: setup_process, reason: reason)
   }
 }
 
-/// Kill an owner that did not answer in time, and wait until it has
+/// Kill a setup process that did not answer in time, and wait until it has
 /// exited, so that what it held is free before the caller goes on.
-fn time_out_owner(watch: Watch) -> OwnerResult(input, output) {
+fn time_out_setup_process(watch: Watch) -> SetupProcessResult(input, output) {
   kill_and_wait(watch.pid)
-  forget_owner(watch)
-  OwnerTimedOut
+  forget_setup_process(watch)
+  SetupProcessTimedOut
 }
 
-/// Give the request to the owner, or start a new owner with it. Gives the
+/// Give the request to the setup process, or start a new setup process with it. Gives the
 /// monitors of the call.
-fn send_owner_request(
-  owner: Option(Owner(input, output)),
-  request: OwnerRequest(input, output),
+fn send_setup_process_request(
+  setup_process: Option(SetupProcess(input, output)),
+  request: SetupProcessRequest(input, output),
 ) -> Watch {
-  case owner {
-    Some(Owner(pid: pid, monitor: owner_monitor, requests: requests)) -> {
+  case setup_process {
+    Some(SetupProcess(
+      pid: pid,
+      monitor: setup_process_monitor,
+      requests: requests,
+    )) -> {
       let call_monitor = monitor(pid)
       send(requests, request)
-      Watch(pid: pid, owner_monitor: owner_monitor, call_monitor: call_monitor)
+      Watch(
+        pid: pid,
+        setup_process_monitor: setup_process_monitor,
+        call_monitor: call_monitor,
+      )
     }
     None -> {
-      let pid = spawn_unlinked(fn() { start_owner(request) })
-      Watch(pid: pid, owner_monitor: monitor(pid), call_monitor: monitor(pid))
+      let pid = spawn_unlinked(fn() { start_setup_process(request) })
+      Watch(
+        pid: pid,
+        setup_process_monitor: monitor(pid),
+        call_monitor: monitor(pid),
+      )
     }
   }
 }
@@ -811,41 +834,41 @@ fn stopped_during_function(down: process.Down) -> FinishEvent(output) {
   StoppedDuringFunction(reason: format_exit_reason(down.reason))
 }
 
-/// The body of an owner process: make the subject for later requests, then
+/// The body of a setup process: make the subject for later requests, then
 /// serve the first request.
-fn start_owner(first: OwnerRequest(input, output)) -> Nil {
-  serve_owner(new_subject(), first)
+fn start_setup_process(first: SetupProcessRequest(input, output)) -> Nil {
+  serve_setup_process(new_subject(), first)
 }
 
-/// Run each request in the owner process until a `StopRequest`. A crash of
-/// a function is caught, so the owner stays alive.
-fn serve_owner(
-  requests: Subject(OwnerRequest(input, output)),
-  request: OwnerRequest(input, output),
+/// Run each request in the setup process until a `StopRequest`. A crash of
+/// a function is caught, so the setup process stays alive.
+fn serve_setup_process(
+  requests: Subject(SetupProcessRequest(input, output)),
+  request: SetupProcessRequest(input, output),
 ) -> Nil {
   case request {
     RunRequest(run: run, input: input, started: started, reply: reply) -> {
       send(started, requests)
       send(reply, run_catching(run, input))
-      serve_owner(requests, receive_forever(requests))
+      serve_setup_process(requests, receive_forever(requests))
     }
     StopRequest -> Nil
   }
 }
 
-/// Check that an owner is still alive before the caller gives it more
+/// Check that a setup process is still alive before the caller gives it more
 /// work.
 ///
-/// An owner can stop between two functions, for example when a process
-/// that links to it crashes while the tests of its scope run. Use this
-/// function before the tear-down of a scope, to report that exit and to
-/// run the tear-down in a new owner.
+/// A setup process can stop between two functions, for example when a process
+/// that links to it crashes while its tests run. Use this
+/// function before the tear-down hooks run, to report that exit and to
+/// run the tear-down in a new setup process.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/sandbox.{SetupProcessReturned}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -853,14 +876,14 @@ fn serve_owner(
 ///   number * 2
 /// }
 ///
-/// fn still_alive(result: sandbox.OwnerResult(Int, Int)) -> Bool {
+/// fn still_alive(result: sandbox.SetupProcessResult(Int, Int)) -> Bool {
 ///   case result {
-///     OwnerReturned(owner: owner, value: _) -> {
-///       let alive = case sandbox.check_owner(owner) {
-///         Ok(_owner) -> True
+///     SetupProcessReturned(setup_process: setup_process, value: _) -> {
+///       let alive = case sandbox.check_setup_process(setup_process) {
+///         Ok(_setup_process) -> True
 ///         Error(_reason) -> False
 ///       }
-///       sandbox.stop_owner(owner)
+///       sandbox.stop_setup_process(setup_process)
 ///       alive
 ///     }
 ///     _ -> False
@@ -868,13 +891,13 @@ fn serve_owner(
 /// }
 ///
 /// pub fn tests() {
-///   describe("Owner processes", [
-///     it("check_owner gives back an owner that is alive", fn() {
-///       sandbox.run_in_owner(None, 100, double, 21)
+///   describe("Setup processes", [
+///     it("check_setup_process gives back a setup process that is alive", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
 ///       |> still_alive
 ///       |> should
 ///       |> be_equal(True)
-///       |> or_fail_with("expected the owner to be alive")
+///       |> or_fail_with("expected the setup process to be alive")
 ///     }),
 ///   ])
 /// }
@@ -882,38 +905,38 @@ fn serve_owner(
 ///
 /// ## Parameters
 ///
-/// - `owner`: an owner from `run_in_owner`
+/// - `setup_process`: a setup process from `run_in_setup_process`
 ///
 /// ## Returns
 ///
-/// `Ok(owner)` when the owner is alive, or `Error(reason)` with the exit
+/// `Ok(setup_process)` when the setup process is alive, or `Error(reason)` with the exit
 /// reason as text when it stopped. The reason is
 /// `"the process had already stopped"` when the exit
 /// was told before or the caller is not the process that started the
-/// owner (see `Owner`). After `Error`, `run_in_owner` with the owner gives
-/// `OwnerLost`, and `stop_owner` returns at once.
-pub fn check_owner(
-  owner owner: Owner(input, output),
-) -> Result(Owner(input, output), String) {
-  case process.is_alive(owner.pid) {
-    True -> Ok(owner)
-    False -> Error(wait_for_exit(owner))
+/// setup process (see `SetupProcess`). After `Error`, `run_in_setup_process` with the setup process gives
+/// `SetupProcessLost`, and `stop_setup_process` returns at once.
+pub fn check_setup_process(
+  setup_process setup_process: SetupProcess(input, output),
+) -> Result(SetupProcess(input, output), String) {
+  case process.is_alive(setup_process.pid) {
+    True -> Ok(setup_process)
+    False -> Error(wait_for_exit(setup_process))
   }
 }
 
-/// Wait until an owner has exited, and give its exit reason as text.
-fn wait_for_exit(owner: Owner(input, output)) -> String {
+/// Wait until a setup process has exited, and give its exit reason as text.
+fn wait_for_exit(setup_process: SetupProcess(input, output)) -> String {
   let watch =
     Watch(
-      pid: owner.pid,
-      owner_monitor: owner.monitor,
-      call_monitor: monitor(owner.pid),
+      pid: setup_process.pid,
+      setup_process_monitor: setup_process.monitor,
+      call_monitor: monitor(setup_process.pid),
     )
   let reason =
     new_selector()
     |> select_watch(watch, format_down_reason)
     |> selector_receive_forever
-  forget_owner(watch)
+  forget_setup_process(watch)
   reason
 }
 
@@ -921,20 +944,20 @@ fn format_down_reason(down: process.Down) -> String {
   format_exit_reason(down.reason)
 }
 
-/// Stop an owner and wait until it has exited.
+/// Stop a setup process and wait until it has exited.
 ///
-/// The owner exits with reason `normal`. An ETS table that it made is
+/// The setup process exits with reason `normal`. An ETS table that it made is
 /// deleted, and a process that links to it and traps exits, such as a
-/// supervisor, gets the exit signal and stops. When `stop_owner` returns,
-/// the owner has exited, so a later scope can make a table with the same
-/// name. An owner that stopped already is not an error, and any process can
-/// stop an owner.
+/// supervisor, gets the exit signal and stops. When `stop_setup_process` returns,
+/// the setup process has exited, so a later set-up can make a table with the same
+/// name. A setup process that stopped already is not an error, and any process can
+/// stop a setup process.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/sandbox.{OwnerReturned}
+/// import dream_test/sandbox.{SetupProcessReturned}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -942,10 +965,10 @@ fn format_down_reason(down: process.Down) -> String {
 ///   number * 2
 /// }
 ///
-/// fn stop(result: sandbox.OwnerResult(Int, Int)) -> Bool {
+/// fn stop(result: sandbox.SetupProcessResult(Int, Int)) -> Bool {
 ///   case result {
-///     OwnerReturned(owner: owner, value: _) -> {
-///       sandbox.stop_owner(owner)
+///     SetupProcessReturned(setup_process: setup_process, value: _) -> {
+///       sandbox.stop_setup_process(setup_process)
 ///       True
 ///     }
 ///     _ -> False
@@ -953,13 +976,13 @@ fn format_down_reason(down: process.Down) -> String {
 /// }
 ///
 /// pub fn tests() {
-///   describe("Owner processes", [
-///     it("stop_owner stops an owner", fn() {
-///       sandbox.run_in_owner(None, 100, double, 21)
+///   describe("Setup processes", [
+///     it("stop_setup_process stops a setup process", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
 ///       |> stop
 ///       |> should
 ///       |> be_equal(True)
-///       |> or_fail_with("expected the owner to stop")
+///       |> or_fail_with("expected the setup process to stop")
 ///     }),
 ///   ])
 /// }
@@ -967,13 +990,15 @@ fn format_down_reason(down: process.Down) -> String {
 ///
 /// ## Parameters
 ///
-/// - `owner`: an owner from `run_in_owner`
+/// - `setup_process`: a setup process from `run_in_setup_process`
 ///
 /// ## Returns
 ///
-/// `Nil`, after the owner has exited.
-pub fn stop_owner(owner owner: Owner(input, output)) -> Nil {
-  send(owner.requests, StopRequest)
-  let _reason = wait_for_exit(owner)
+/// `Nil`, after the setup process has exited.
+pub fn stop_setup_process(
+  setup_process setup_process: SetupProcess(input, output),
+) -> Nil {
+  send(setup_process.requests, StopRequest)
+  let _reason = wait_for_exit(setup_process)
   Nil
 }

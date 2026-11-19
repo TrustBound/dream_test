@@ -328,7 +328,7 @@ pub fn skip(
 
 /// Run once before any tests and produce/transform the context.
 ///
-/// It runs in the owner process of the group, so a resource that it starts
+/// It runs in the setup process of the group, so a resource that it starts
 /// lives for all the tests of the scope. It gets the default timeout. If it
 /// returns `Error`, times out or crashes, all tests under this scope become
 /// `SetupFailed`.
@@ -360,7 +360,7 @@ pub fn after_each(
 
 /// Run once after all tests for cleanup.
 ///
-/// It runs in the owner process of the group, with the default timeout.
+/// It runs in the setup process of the group, with the default timeout.
 /// Every `after_all` hook
 /// runs, also after one fails. A failure goes into the tear-down failures of
 /// the run report, and the run fails.

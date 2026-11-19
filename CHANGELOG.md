@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.0.0] - 2026-11-18
 
 Dream Test 3.0.0 adds built-in line coverage. It also gives the hooks of
-each scope one owner process, follows the official Gherkin grammar, and
+each scope one setup process, follows the official Gherkin grammar, and
 gives each Gherkin scenario one typed state value in place of the `world`
 store. This release has breaking changes. Read
 [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) before you update.
@@ -72,7 +72,7 @@ store. This release has breaking changes. Read
   into the tear-down list of the run report, and the run fails.
 - When a `before_all` hook fails, times out or crashes, the tests of its
   group and of every group inside it are `SetupFailed`, not `Failed`.
-- The hooks of each scope run in one owner process of that scope, and a
+- The hooks of each scope run in one setup process of that scope, and a
   test runs in one process: its `before_each_test` hooks, `before_each`
   hooks, body, `after_each` hooks and `after_each_test` hooks.
 - A test body that runs past its timeout is always `TimedOut`.
@@ -220,7 +220,7 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 - `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
 - A failed set-up hook gives `SetupFailed`. A timeout is always `TimedOut`.
 - A failed tear-down hook goes into the run report, not into the results.
-- Hooks run in one owner process of their scope.
+- Hooks run in one setup process of their scope.
 - Reporter functions that format a whole run take a `RunReport`.
 - The JSON report has schema version `2.0`.
 - The summary line lists skipped, pending, timed out, setup failed.
@@ -399,22 +399,22 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
   - `parallel.OuterSetup`: a set-up around the suite that keeps its
     resources alive in a process, for example the `before_all_suites` or
     `before_each_suite` set-up. It is
-    `SetupRunning(set_up:, groups:, check_owner:)` or
+    `SetupRunning(set_up:, groups:, check_setup_process:)` or
     `SetupStopped(set_up:, groups:, reason:, not_run:)`. The executor checks
     each one before each test and each group starts
 
 - **Sandbox** (`dream_test/sandbox`)
 
-  - `sandbox.run_in_owner`, `sandbox.check_owner` and `sandbox.stop_owner`
-    with the types `sandbox.Owner` and `sandbox.OwnerResult`. An owner
+  - `sandbox.run_in_setup_process`, `sandbox.check_setup_process` and `sandbox.stop_setup_process`
+    with the types `sandbox.SetupProcess` and `sandbox.SetupProcessResult`. A setup process
     process runs functions one after another with a timeout for each, and
     stays alive between them, so a pool or an ETS table that one function
-    starts lives for the next function. `sandbox.OwnerLost(reason)` says
-    that the owner stopped before it started the function. Any process can
-    use an owner, and an owner that stopped is never waited for: after
-    `check_owner` gives `Error`, `run_in_owner` gives `OwnerLost` and
-    `stop_owner` returns at once. When a function times out, the owner is
-    killed and `run_in_owner` returns only after the owner has exited
+    starts lives for the next function. `sandbox.SetupProcessLost(reason)` says
+    that the setup process stopped before it started the function. Any process can
+    use a setup process, and a setup process that stopped is never waited for: after
+    `check_setup_process` gives `Error`, `run_in_setup_process` gives `SetupProcessLost` and
+    `stop_setup_process` returns at once. When a function times out, the setup process is
+    killed and `run_in_setup_process` returns only after the setup process has exited
   - `sandbox.kill_and_wait(pid)` kills a process and returns when it has
     exited, so its ETS tables and its registered name are free. The runner
     uses it for each process that times out, so a tear-down hook never
@@ -506,19 +506,19 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
   - Each hook still gets the default timeout, and the messages are
     `hook timed out in <scope>` and `hook crashed in <scope>: ...`
-  - A hook that kills its owner process does not stop the run. The runner
-    monitors the owner. A tear-down hook that kills its owner is recorded
+  - A hook that kills its setup process does not stop the run. The runner
+    monitors the setup process. A tear-down hook that kills its setup process is recorded
     as `hook crashed in <scope>: <reason>`, and the next hook of the scope
-    runs in a new owner process. A tear-down hook always runs, also when
-    the owner of its scope stops just before the hook starts
-  - When the owner process of a set-up exits, during or after its set-up
+    runs in a new setup process. A tear-down hook always runs, also when
+    the setup process of its scope stops just before the hook starts
+  - When the setup process of a set-up exits, during or after its set-up
     hooks, the set-up stopped. It is reported once as `types.SetupStopped`,
     no other set-up hook of the scope runs, and each test of the scope that
     did not start is `SetupFailed` with
     `not run: the set-up from before_all in "<group>" stopped (<reason>)`,
     `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)`
     or `not run: the set-up from before_all_suites stopped (<reason>)`. The
-    tear-down hooks of the scope run in a new owner process
+    tear-down hooks of the scope run in a new setup process
   - The `after_each` and `after_each_test` hooks run when the test process
     stops, for example when a linked process crashes. They run in a new
     process with their own timeouts and get the context after the last

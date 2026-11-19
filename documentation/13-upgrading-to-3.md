@@ -1015,7 +1015,7 @@ fn count_broken(report: RunReport) -> Int {
 
 #### Hooks share a process with their scope
 
-In 2.x, each hook and each test body ran in its own process. A process, a subject or an ETS table that a hook made stopped before the test body ran. In 3.0.0, a test runs its hooks and its body in one process. The `before_all` and `after_all` hooks of a group run in one owner process of that group. You do not have to change code for this. But a hook can now make a subject, and the test body can receive from it. The same code compiled in 2.x, but the test failed.
+In 2.x, each hook and each test body ran in its own process. A process, a subject or an ETS table that a hook made stopped before the test body ran. In 3.0.0, a test runs its hooks and its body in one process. The `before_all` and `after_all` hooks of a group run in one setup process of that group. You do not have to change code for this. But a hook can now make a subject, and the test body can receive from it. The same code compiled in 2.x, but the test failed.
 
 ##### 3.0.0: a test receives a message that its hook sent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_process.gleam#L9-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

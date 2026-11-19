@@ -538,7 +538,7 @@ type Watch {
 /// process that started it or of the process that it watches.
 type WatchEvent {
   FromTest(Watch)
-  OwnerGone
+  SetupProcessGone
   WatchedGone
 }
 
@@ -547,14 +547,14 @@ type WatchEvent {
 /// process stops when the process that started it exits, so it never
 /// outlives its test.
 fn start_watch() -> Name(Watch) {
-  let owner = process.self()
+  let setup_process = process.self()
   let name = process.new_name("dream_test_watch")
   let pid =
     process.spawn_unlinked(fn() {
-      let monitor = process.monitor(owner)
+      let monitor = process.monitor(setup_process)
       process.new_selector()
       |> process.select_map(process.named_subject(name), FromTest)
-      |> process.select_specific_monitor(monitor, fn(_down) { OwnerGone })
+      |> process.select_specific_monitor(monitor, fn(_down) { SetupProcessGone })
       |> watch(None, None)
     })
   let assert Ok(Nil) = process.register(pid, name)
@@ -579,20 +579,20 @@ fn watch(
       case process.selector_receive_forever(selector) {
         FromTest(Started(pid)) -> watch(selector, Some(pid), waiting)
         FromTest(WaitUntilGone(reply)) -> watch(selector, started, Some(reply))
-        OwnerGone | WatchedGone -> Nil
+        SetupProcessGone | WatchedGone -> Nil
       }
   }
 }
 
 /// Answer `reply` when the watched process exits. Stop without an answer
-/// when the owner exits first.
+/// when the setup process exits first.
 fn wait_until_gone(
   selector: process.Selector(WatchEvent),
   reply: Subject(Nil),
 ) -> Nil {
   case process.selector_receive_forever(selector) {
     WatchedGone -> process.send(reply, Nil)
-    OwnerGone -> Nil
+    SetupProcessGone -> Nil
     FromTest(_) -> wait_until_gone(selector, reply)
   }
 }

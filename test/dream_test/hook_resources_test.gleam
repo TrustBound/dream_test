@@ -3,7 +3,7 @@
 //// A hook that starts a resource the way a user does, for example a pool
 //// that links to the caller or an ETS table that the caller owns, must find
 //// that resource alive in the tests that it serves. Each scope has one
-//// owner process for its hooks, and each test has one process for its
+//// setup process for its hooks, and each test has one process for its
 //// hooks and its body. The runner waits for each hook with a timeout, so a
 //// hook that never returns or kills its process does not stop the run.
 
@@ -447,7 +447,7 @@ pub fn tests() {
           Ok(Nil)
         }),
         it("a", fn() {
-          crash_owner(crash)
+          crash_setup_process(crash)
           Ok(AssertionOk)
         }),
         unit.after_all(fn() {
@@ -482,7 +482,7 @@ pub fn tests() {
           Ok(Nil)
         }),
         it("a", fn() {
-          crash_owner(crash)
+          crash_setup_process(crash)
           Ok(AssertionOk)
         }),
       ])
@@ -515,7 +515,7 @@ pub fn tests() {
               Ok(Nil)
             }),
             it("a", fn() {
-              crash_owner(crash)
+              crash_setup_process(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -569,7 +569,7 @@ pub fn tests() {
             Ok(Nil)
           }),
           it("a", fn() {
-            crash_owner(crash)
+            crash_setup_process(crash)
             Ok(AssertionOk)
           }),
           unit.group("first", [it("c", passing_test)]),
@@ -620,7 +620,7 @@ pub fn tests() {
             Ok(Nil)
           }),
           it("a", fn() {
-            crash_owner(crash)
+            crash_setup_process(crash)
             Ok(AssertionOk)
           }),
           unit.group("inner", [
@@ -876,7 +876,7 @@ pub fn tests() {
       runner.new([
         describe("suite", [
           it("a", fn() {
-            crash_owner(crash)
+            crash_setup_process(crash)
             Ok(AssertionOk)
           }),
         ]),
@@ -912,7 +912,7 @@ pub fn tests() {
         runner.new([
           describe("first", [
             it("a", fn() {
-              crash_owner(crash)
+              crash_setup_process(crash)
               Ok(AssertionOk)
             }),
           ]),
@@ -969,7 +969,7 @@ pub fn tests() {
       runner.new([
         describe("suite", [
           it("a", fn() {
-            crash_owner(crash)
+            crash_setup_process(crash)
             Ok(AssertionOk)
           }),
         ]),
@@ -1001,7 +1001,7 @@ pub fn tests() {
       runner.new([
         describe("suite", [
           it("a", fn() {
-            crash_owner(crash)
+            crash_setup_process(crash)
             Ok(AssertionOk)
           }),
         ]),
@@ -1041,7 +1041,7 @@ pub fn tests() {
         runner.new([
           describe("suite", [
             it("a", fn() {
-              crash_owner(crash)
+              crash_setup_process(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -1094,7 +1094,7 @@ pub fn tests() {
         runner.new([
           describe("suite", [
             it("a", fn() {
-              crash_owner(crash)
+              crash_setup_process(crash)
               Ok(AssertionOk)
             }),
             unit.group("inner", [
@@ -1151,7 +1151,7 @@ pub fn tests() {
         runner.new([
           describe("suite", [
             it("a", fn() {
-              crash_owner(crash)
+              crash_setup_process(crash)
               Ok(AssertionOk)
             }),
             it("b", fn() {
@@ -1202,8 +1202,8 @@ pub fn tests() {
       runner.new([
         describe("suite", [
           it("a", fn() {
-            crash_owner(suite_crash)
-            crash_owner(run_crash)
+            crash_setup_process(suite_crash)
+            crash_setup_process(run_crash)
             Ok(AssertionOk)
           }),
           it("b", passing_test),
@@ -1383,10 +1383,10 @@ fn remove_table(name: Atom) -> Result(Nil, String) {
 /// The table exists and the process that owns it is alive, so the table
 /// lives on; the check needs no wait.
 fn table_in_context_exists(name: Atom) -> Result(AssertionResult, String) {
-  table_owner_alive(name)
+  table_setup_process_alive(name)
   |> should
   |> be_equal(True)
-  |> or_fail_with("the ETS table and its owner should exist")
+  |> or_fail_with("the ETS table and its setup process should exist")
 }
 
 /// True when the process is alive, it links to at least one process, and
@@ -1395,8 +1395,8 @@ fn table_in_context_exists(name: Atom) -> Result(AssertionResult, String) {
 fn links_alive(pid: Pid) -> Bool
 
 /// True when the named table exists and the process that owns it is alive.
-@external(erlang, "dream_test_hook_resource_test_ffi", "table_owner_alive")
-fn table_owner_alive(name: Atom) -> Bool
+@external(erlang, "dream_test_hook_resource_test_ffi", "table_setup_process_alive")
+fn table_setup_process_alive(name: Atom) -> Bool
 
 /// The tests and tear-down failures of a run, in a form that a sandbox
 /// can return.
@@ -1418,7 +1418,7 @@ fn kill_self() -> a {
 }
 
 /// The name of a process that `start_linked_crash` starts. It gets no
-/// Gleam messages: `crash_owner` talks to it.
+/// Gleam messages: `crash_setup_process` talks to it.
 type Crash
 
 fn new_crash() -> Name(Crash) {
@@ -1426,17 +1426,17 @@ fn new_crash() -> Name(Crash) {
 }
 
 /// Start a process that links to the caller and waits under `name`. The
-/// caller is the owner of a set-up, so the set-up stops when the process
+/// caller is the setup process of a set-up, so the set-up stops when the process
 /// exits.
 @external(erlang, "dream_test_hook_resource_test_ffi", "start_linked_crash")
 fn start_linked_crash(name: Name(Crash)) -> Nil
 
 /// Make the process under `name` exit with reason `boom`, then wait until
-/// the owner that started it has exited. A test calls this while it runs,
+/// the setup process that started it has exited. A test calls this while it runs,
 /// so the set-up stops during that test, after the test started and before
 /// the test ends.
-@external(erlang, "dream_test_hook_resource_test_ffi", "crash_owner")
-fn crash_owner(name: Name(Crash)) -> Nil
+@external(erlang, "dream_test_hook_resource_test_ffi", "crash_setup_process")
+fn crash_setup_process(name: Name(Crash)) -> Nil
 
 /// Run a builder with a 50ms default timeout in a sandbox of 2 seconds, so
 /// a hook that never returns fails the test instead of the whole run.

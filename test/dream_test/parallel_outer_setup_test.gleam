@@ -74,7 +74,7 @@ pub fn tests() {
         SetupRunning(
           set_up: BeforeEachSuiteHook,
           groups: ["suite"],
-          check_owner: fn() { Error("Boom") },
+          check_setup_process: fn() { Error("Boom") },
         ),
       ])
       |> summary
@@ -98,9 +98,11 @@ pub fn tests() {
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
       types.root("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
-        SetupRunning(set_up: BeforeAllSuitesHook, groups: [], check_owner: fn() {
-          Ok(Nil)
-        }),
+        SetupRunning(
+          set_up: BeforeAllSuitesHook,
+          groups: [],
+          check_setup_process: fn() { Ok(Nil) },
+        ),
       ])
       |> summary
       |> should
@@ -152,11 +154,12 @@ pub fn tests() {
     it(
       "a set-up that stops while the tests run stops the tests not started",
       fn() {
-        let owner = process.spawn_unlinked(fn() { process.sleep_forever() })
-        let monitor = process.monitor(owner)
+        let setup_process =
+          process.spawn_unlinked(fn() { process.sleep_forever() })
+        let monitor = process.monitor(setup_process)
         types.root("suite", Nil, [
           it("a", fn() {
-            kill_and_wait(owner)
+            kill_and_wait(setup_process)
             Ok(AssertionOk)
           }),
           it("b", passing_test),
@@ -165,7 +168,7 @@ pub fn tests() {
           SetupRunning(
             set_up: BeforeAllSuitesHook,
             groups: [],
-            check_owner: fn() { check_process(monitor) },
+            check_setup_process: fn() { check_process(monitor) },
           ),
         ])
         |> summary
@@ -264,7 +267,7 @@ fn test_summary(
 
 fn setup_summary(setup: OuterSetup) -> #(types.SetUpHook, SetupState) {
   case setup {
-    SetupRunning(set_up: set_up, groups: _, check_owner: _) -> #(
+    SetupRunning(set_up: set_up, groups: _, check_setup_process: _) -> #(
       set_up,
       Running,
     )

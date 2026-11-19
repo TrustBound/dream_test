@@ -238,10 +238,10 @@ pub fn tests() {
           unit_context.describe_with_set_up(
             "server",
             set_up: fn() { Ok(process.self()) },
-            tear_down: fn(_owner: Pid) { send_ok(events, "tear_down") },
+            tear_down: fn(_setup_process: Pid) { send_ok(events, "tear_down") },
             children: [
               unit_context.it("stops the set-up", kill_and_wait),
-              unit_context.it("never runs", fn(_owner) { Ok(succeed()) }),
+              unit_context.it("never runs", fn(_setup_process) { Ok(succeed()) }),
             ],
           ),
         ])
@@ -276,17 +276,20 @@ pub fn tests() {
 
     it("an outer set-up that stopped skips the set-up", fn() {
       let events = process.new_subject()
-      let owners = process.new_name("suite_owner")
+      let setup_processes = process.new_name("suite_setup_process")
       let report =
         runner.new([
           suite.join(name: "all", suites: [
-            unit_context.describe("first", owners, [
-              unit_context.it("stops the suite set-up", kill_suite_owner),
+            unit_context.describe("first", setup_processes, [
+              unit_context.it(
+                "stops the suite set-up",
+                kill_suite_setup_process,
+              ),
             ]),
             counted_suite(events),
           ]),
         ])
-        |> runner.before_each_suite(fn(_info) { register_self(owners) })
+        |> runner.before_each_suite(fn(_info) { register_self(setup_processes) })
         |> runner.silent()
         |> runner.run()
       #(
@@ -398,17 +401,17 @@ fn kill_self() -> Result(Int, String) {
 }
 
 /// Kill the process of the set-up and wait until it is gone.
-fn kill_and_wait(owner: Pid) {
-  kill_and_wait_for(owner)
+fn kill_and_wait(setup_process: Pid) {
+  kill_and_wait_for(setup_process)
   Ok(succeed())
 }
 
 /// Kill the process of the `before_each_suite` hook and wait until it is
 /// gone.
-fn kill_suite_owner(name: Name(Nil)) {
+fn kill_suite_setup_process(name: Name(Nil)) {
   case process.named(name) {
-    Ok(owner) -> {
-      kill_and_wait_for(owner)
+    Ok(setup_process) -> {
+      kill_and_wait_for(setup_process)
       Ok(succeed())
     }
     Error(Nil) -> Error("the suite set-up has no process")
