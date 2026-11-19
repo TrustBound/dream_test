@@ -347,6 +347,24 @@ pub fn tests() {
       |> or_fail_with("1.2.3 is not a float")
     }),
 
+    it("lookup does not match {float} against a number with a comma", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "total {float}", "h")
+      |> result.map(lookup_comma_numbers)
+      |> should
+      |> be_equal(Ok([None, None]))
+      |> or_fail_with("1,000 and 1,5 are not floats")
+    }),
+
+    it("lookup does not match {int} against a number with a comma", fn() {
+      step_trie.new()
+      |> step_trie.insert(GivenPhase, "total {int}", "h")
+      |> result.map(step_trie.lookup(_, GivenPhase, "total 1,000"))
+      |> should
+      |> be_equal(Ok(None))
+      |> or_fail_with("1,000 is not an int")
+    }),
+
     it("lookup captures a quoted string without its quotes", fn() {
       step_trie.new()
       |> step_trie.insert(GivenPhase, "the message is {string}", "h")
@@ -525,4 +543,13 @@ pub fn tests() {
       |> or_fail_with("{float} should win over {}")
     }),
   ])
+}
+
+fn lookup_comma_numbers(
+  trie: step_trie.StepTrie(String),
+) -> List(option.Option(step_trie.StepMatch(String))) {
+  [
+    step_trie.lookup(trie, GivenPhase, "total 1,000"),
+    step_trie.lookup(trie, GivenPhase, "total 1,5"),
+  ]
 }

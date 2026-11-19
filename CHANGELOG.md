@@ -596,6 +596,9 @@ Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows real
 
 ### Fixed
 
+- A number with a comma, such as `1,000` or `1,5`, does not match
+  `{float}`. Before, `total 1,000` matched `total {float}` with the value
+  `1.0`, and `1,5` gave `1.5`.
 - The progress line of a run with no tests shows `0/0` and `100%`.
   Before, it showed `0/1` and `0%`.
 - Pretty JSON keeps a string that starts with a combining mark, such as

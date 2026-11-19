@@ -840,10 +840,13 @@ fn capture_int(text: String) -> Result(CapturedValue, Nil) {
   }
 }
 
+/// A float as `float.parse` reads it. The Erlang parser under it also
+/// reads a comma as the decimal point, so text with a comma, such as
+/// `1,000`, is not a float.
 fn capture_float(text: String) -> Result(CapturedValue, Nil) {
-  case float.parse(text) {
-    Ok(value) -> Ok(CapturedFloat(value))
-    Error(Nil) -> Error(Nil)
+  case string.contains(text, ","), float.parse(text) {
+    False, Ok(value) -> Ok(CapturedFloat(value))
+    _, _ -> Error(Nil)
   }
 }
 
