@@ -18,10 +18,11 @@ store. This release has breaking changes. Read
 #### Runner and run report
 
 - `runner.run` returns `types.RunReport`, not `List(TestResult)`. A
-  `RunReport` holds the test results, the teardown hooks that failed and
-  the results reporters that crashed.
+  `RunReport` holds the test results, the hook failures (failed teardown
+  hooks and stopped setups) and the results reporters that crashed.
 - `runner.has_failures` is removed. Use `types.failed(report)`, which is
-  also `True` for a teardown failure and for a crashed results reporter.
+  also `True` for a teardown failure, for a stopped setup and for a
+  crashed results reporter.
 - `runner.silent()` drops the normal output only: progress, results
   reports and the coverage report. It still writes two kinds of error to
   the standard error stream: the `Results reporter failed` error of a
@@ -51,7 +52,7 @@ store. This release has breaking changes. Read
 - The start value has the label `initial` in place of `seed`:
   `unit_context.describe(name:, initial:, children:)`,
   `types.tree(name:, initial:, children:)` and the field
-  `types.Tree.initial`. `steps.new(initial:)` already used it. A call
+  `types.Tree.initial`, the same label as `steps.new(initial:)`. A call
   without labels does not change.
 - `types.TestResult` and `types.TestInfo` hold `groups: List(String)` (the
   names of the groups around the test) in place of
@@ -68,8 +69,8 @@ store. This release has breaking changes. Read
 - The module `dream_test/context` (`TestContext`, `new`, `failures`,
   `add_failure`) is removed. Nothing in Dream Test used it.
 - `TestSuite` has no type parameter and moves to the new module
-  `dream_test/suite`. `types.TestSuite(context)` is removed. A suite keeps
-  its context inside it, so one `runner.new` takes a `unit` suite, a
+  `dream_test/suite`. `types.TestSuite(context)` is removed. Each tree of
+  a suite keeps its context inside the suite, so one `runner.new` takes a `unit` suite, a
   `unit_context` suite and a Gherkin feature together. `unit.describe`,
   `unit_context.describe`, the Gherkin suite functions and module
   discovery give a `suite.TestSuite`. To run a tree that you build
@@ -113,7 +114,7 @@ store. This release has breaking changes. Read
 - One rule for every hook failure. A failed setup hook gives `SetupFailed`
   to each test that it serves. A failed teardown hook does not change a
   test status, the remaining teardown hooks still run, the failure goes
-  into the teardown list of the run report, and the run fails.
+  into the hook failures of the run report, and the run fails.
 - When a `before_all` hook fails, times out or crashes, the tests of its
   group and of every group inside it are `SetupFailed`, not `Failed`.
 - The hooks of each scope run in one setup process of that scope, and a
@@ -140,7 +141,10 @@ store. This release has breaking changes. Read
   functions return the report.
 - The JSON schema version is `2.0`. Its `summary` adds the counts
   `teardown_failed` (teardown hooks that failed) and `setup_stopped`
-  (setups whose process stopped).
+  (setups whose process stopped). The new list `hook_failures` holds an
+  object for each hook failure, with `kind`, `hook`, `path`, `message`
+  and, for a stopped setup, `not_run`. A failed `after_all` hook is no
+  longer a fake `<after_all>` test in `tests`.
 - The `system` object of the JSON report has `gleam_stdlib_version` in
   place of `gleam_version`. The value did not change: it is the version of
   the `gleam_stdlib` package. The compiled code does not record the version
@@ -507,8 +511,8 @@ the guide labels them.
 
 - **Run report** (`dream_test/types`)
 
-  - `types.RunReport`, the result of a run: the test results, the
-    teardown hooks that failed and the results reporters that crashed.
+  - `types.RunReport`, the result of a run: the test results, the hook
+    failures and the results reporters that crashed.
     Make one with
     `types.run_report(tests:, hook_failures:, reporter_crashes:)`, read
     it with `types.report_tests`, `types.report_hook_failures` and

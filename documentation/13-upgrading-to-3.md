@@ -10,6 +10,7 @@ Read this page if your project uses Dream Test 2.x. Most projects need only the 
 - filter predicates and other code that reads `full_name` of a `TestInfo` or a `TestResult`
 - `runner.has_failures`
 - code that uses the result of `runner.run` as a list
+- the label `seed:` of `unit_context.describe`, which is now `initial:`
 
 Each 2.x example has one of two labels:
 
@@ -23,13 +24,14 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 Do the steps in this order. The first steps affect the most projects.
 
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` is now `feature.to_suite`. See [Gherkin step definitions](#gherkin-step-definitions).
-2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. See [The runner and the run report](#the-runner-and-the-run-report).
+2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. See [Hooks](#hooks).
-4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
+4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
 6. **The Gherkin parser and syntax tree.** The parser follows the official Gherkin grammar, and parse errors are typed. See [The Gherkin parser and syntax tree](#the-gherkin-parser-and-syntax-tree).
 7. **The sandbox.** `sandbox.run_isolated` takes the function and its input. See [The sandbox](#the-sandbox).
-8. **Removed items.** See [Removed items](#removed-items).
+8. **Polling helpers.** No code change. `process.await_ready` and `process.await_some` can time out sooner. See [Polling helpers](#polling-helpers).
+9. **Removed items.** See [Removed items](#removed-items).
 
 ### Gherkin step definitions
 
@@ -508,11 +510,11 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 
 ### The runner and the run report
 
-`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results, the teardown hooks that failed and the results reporters that crashed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
+`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results, the hook failures and the results reporters that crashed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
 
 #### Suites have one type, whatever their context
 
-`types.TestSuite(context)` is removed. A suite now has the type `TestSuite` from the new module `dream_test/suite`, with no type parameter. The suite keeps its context inside it, so one `runner.new` takes suites with different contexts: `unit` suites, `unit_context` suites and Gherkin features. `runner.RunBuilder` has no type parameter too. Change each `TestSuite(Nil)` or `TestSuite(context)` annotation to `TestSuite`, and import it from `dream_test/suite`.
+`types.TestSuite(context)` is removed. A suite now has the type `TestSuite` from the new module `dream_test/suite`, with no type parameter. Each tree of a suite keeps its context inside the suite, so one `runner.new` takes suites with different contexts: `unit` suites, `unit_context` suites and Gherkin features. `runner.RunBuilder` has no type parameter too. Change each `TestSuite(Nil)` or `TestSuite(context)` annotation to `TestSuite`, and import it from `dream_test/suite`.
 
 ##### 2.x: a suite with the type `TestSuite(Nil)` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L5-L13"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1094,6 +1096,44 @@ pub fn tests() -> TestSuite {
 
 This change affects only code that has a `case` on a `types.AssertionResult`. The new variant `AssertionPending` is the result of a pending test (`unit.pending`). Add a branch for it. Its test status is `Pending`.
 
+##### 2.x: a `case` on `AssertionResult` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L2092-L2111"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+fn assertion_to_status_and_failures(
+  result: AssertionResult,
+  inherited_failures_rev: List(AssertionFailure),
+  setup_failures_rev: List(AssertionFailure),
+) -> #(Status, List(AssertionFailure)) {
+  case result {
+    AssertionOk -> #(
+      Passed,
+      list.append(setup_failures_rev, inherited_failures_rev),
+    )
+    AssertionFailed(failure) -> #(Failed, [
+      failure,
+      ..list.append(setup_failures_rev, inherited_failures_rev)
+    ])
+    AssertionSkipped -> #(
+      Skipped,
+      list.append(setup_failures_rev, inherited_failures_rev),
+    )
+  }
+}
+```
+
+##### 3.0.0: a `case` with a branch for `AssertionPending` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/assertion_pending.gleam#L9-L16"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn status_of(result: AssertionResult) -> Status {
+  case result {
+    AssertionOk -> Passed
+    AssertionFailed(_) -> Failed
+    AssertionSkipped -> Skipped
+    AssertionPending -> Pending
+  }
+}
+```
+
 #### Discovery errors
 
 `discover.load` and `discover.to_suites` give a new error text for a test module that does not load. Code that compares the text must change:
@@ -1113,9 +1153,9 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 3.0.0 has one rule for every hook failure:
 
 - A failed setup hook gives `SetupFailed` to each test that it serves.
-- A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the teardown list of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
+- A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the hook failures of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
 
-A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that a whole suite shares, use `unit_context.describe_with_setup`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
+A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that all the tests of a tree share, use `unit_context.describe_with_setup`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
 
 #### A setup whose process stops
 
@@ -1491,6 +1531,32 @@ In 2.x, `runner.results_reporters` took only the built-in reporters. A custom re
 
 `reporters/types.ResultsReporter` has a new variant: `Custom(render:)`. In 2.x it had only `Bdd` and `Json`. A `case` on a `ResultsReporter` needs a branch for `Custom`, or the code does not compile. Code that only builds reporters with `bdd.new()` and `json.new()` needs no change.
 
+##### 2.x: a `case` on `ResultsReporter` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/runner.gleam#L1494-L1502"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+fn render_results_reporter(
+  reporter: reporter_types.ResultsReporter,
+  results: List(TestResult),
+) -> String {
+  case reporter {
+    reporter_types.Bdd(config) -> bdd.render(config, results)
+    reporter_types.Json(config) -> json.render(config, results)
+  }
+}
+```
+
+##### 3.0.0: a `case` with a branch for `Custom` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/results_reporter_case.gleam#L7-L13"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn reporter_name(reporter: reporter_types.ResultsReporter) -> String {
+  case reporter {
+    reporter_types.Bdd(_) -> "bdd"
+    reporter_types.Json(_) -> "json"
+    reporter_types.Custom(render: _) -> "custom"
+  }
+}
+```
+
 ### The JSON report
 
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
@@ -1499,7 +1565,7 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 - The object has the list `hook_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
 - A failed teardown hook is an object with `"kind": "teardown_failed"`, `hook`, `path` and `message`.
 - A setup that stopped is an object with `"kind": "setup_stopped"`, `hook`, `path`, `message` and `not_run`, the full names of the tests that did not run.
-- A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
+- A Gherkin test object has `feature` and `rule` after `kind`. `feature` is the name of the Feature, or `null` for a scenario of `steps.Scenarios`. `rule` is the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `feature` or `rule`.
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
 - The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.
 

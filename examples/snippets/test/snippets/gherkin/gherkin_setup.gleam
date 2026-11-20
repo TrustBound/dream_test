@@ -100,7 +100,7 @@ pub fn server_feature() -> TestSuite {
   ])
 }
 
-// Suites with other contexts run in the same `runner.new`.
+// Suites whose trees have other contexts run in the same `runner.new`.
 
 pub fn math_suite() -> TestSuite {
   unit.describe("Math", [

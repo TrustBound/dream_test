@@ -55,7 +55,7 @@ hook starts now lives for the tests of its group. A test runs its
   the run.
 - A test body past its timeout is `TimedOut`, not `Failed`.
 
-### 🧺 One suite type, and setups for a whole suite
+### 🧺 One suite type, and setups for a whole tree
 
 - Every suite has one type, `suite.TestSuite` in the new module
   `dream_test/suite`, whatever context its tests get. One `runner.new`
@@ -155,6 +155,16 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   and `RunRootParallelWithReporterResult` are now
   `RunTreeParallelWithReporterConfig` and
   `RunTreeParallelWithReporterResult`.
+- `RunTreeParallelWithReporterConfig` has the new required field
+  `outer_setups`. `RunTreeParallelWithReporterResult` has the new fields
+  `hook_failures` and `outer_setups`.
+- The `run` field of `types.Test` and of the hook nodes (`BeforeAll`,
+  `BeforeEach`, `AfterEach` and `AfterAll`) is a `types.Callback`:
+  `NoInput(run:)` or `WithInput(run:)`. In 2.x it was a function.
+- Gherkin: `feature.InlineStep.keyword` is a `gherkin/types.StepKeyword` in
+  place of a `String`. `discover.with_registry` returns the new type
+  `discover.RunnableDiscovery(state)`, and `discover.to_suite` takes only
+  that type.
 - `types.Tree`, `types.TestResult` and `types.TestInfo` changed shape, and
   `types.ModuleCoverage` and `types.CoverageSummary` are removed.
 - `TestSuite` has no type parameter and is in `dream_test/suite`, and

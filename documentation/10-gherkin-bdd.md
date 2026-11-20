@@ -775,12 +775,12 @@ pub fn server_feature() -> TestSuite {
 }
 ```
 
-Each suite keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
+Each tree keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
 
 #### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L103-L132"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-// Suites with other contexts run in the same `runner.new`.
+// Suites whose trees have other contexts run in the same `runner.new`.
 
 pub fn math_suite() -> TestSuite {
   unit.describe("Math", [
