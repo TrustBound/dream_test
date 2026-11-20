@@ -349,6 +349,7 @@ A hook can start a resource that its tests use, for example a pool or an ETS tab
 |---|---|---|
 | `before_all_suites`, `after_all_suites` | one setup process for the whole run | the default timeout, for each hook |
 | `before_each_suite`, `after_each_suite` | one setup process for each suite | the default timeout of the suite, for each hook |
+| the suite set-up and tear-down (`unit_context.describe_with_set_up`, `steps.new_with_set_up`) | one setup process for each suite that has them, started after `before_each_suite` | the default timeout of the suite, for each |
 | `before_all`, `after_all` | one setup process for each group | the default timeout, for each hook |
 | `before_each_test`, `before_each`, the body, `after_each`, `after_each_test` | one process for each test | the default timeout for each hook, the test timeout for the body |
 

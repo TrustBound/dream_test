@@ -10,7 +10,8 @@
 ////
 //// ## What does the runner do?
 ////
-//// - Runs groups sequentially, tests in parallel (bounded by `max_concurrency`)
+//// - Runs the groups one after the other. Only the direct tests of one
+////   group run in parallel, at most `max_concurrency` at a time
 //// - Sandboxes tests and hooks (timeouts + crash isolation)
 //// - Optionally drives an event-based reporter
 ////
@@ -281,10 +282,16 @@ pub fn add_suites_with_config(
   RunBuilder(..builder, suite_runs: appended)
 }
 
-/// Set the maximum number of concurrently running tests.
+/// Set the maximum number of tests that run at the same time.
 ///
-/// - `1` gives fully sequential test execution.
-/// - Higher values increase parallelism.
+/// Only the direct tests of one group run in parallel. The groups run one
+/// after the other: first the direct tests of a group, then each child
+/// group in the written order. The suites also run one after the other.
+///
+/// - `1` runs one test at a time.
+/// - A higher value lets more direct tests of one group run at the same
+///   time.
+/// - A value below 1 counts as 1.
 ///
 /// ## Example
 ///
@@ -329,7 +336,8 @@ pub fn add_suites_with_config(
 /// ## Parameters
 ///
 /// - `builder`: the runner builder you’re configuring
-/// - `max`: maximum number of concurrently running tests (use `1` for fully sequential)
+/// - `max`: the most direct tests of one group that run at the same time
+///   (use `1` to run one test at a time)
 ///
 /// ## Returns
 ///

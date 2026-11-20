@@ -75,7 +75,7 @@ import gleam/option.{type Option}
 /// | `Failed`      | One or more assertions failed                     |
 /// | `Skipped`     | Test was marked to skip (not yet implemented)     |
 /// | `Pending`     | Test is a placeholder (not yet implemented)       |
-/// | `TimedOut`    | Test exceeded its timeout and was killed          |
+/// | `TimedOut`    | The test body ran past its timeout and was killed |
 /// | `SetupFailed` | A lifecycle hook failed; test never ran           |
 ///
 /// ## SetupFailed Explained
@@ -84,8 +84,18 @@ import gleam/option.{type Option}
 /// failed first.
 ///
 /// In Dream Test, hooks and test bodies can short-circuit with `Error("message")`.
-/// When `before_all` fails, *all* tests in that suite become `SetupFailed`.
+/// When `before_all` fails, each test of that group becomes `SetupFailed`,
+/// also the tests of its child groups.
 /// When `before_each` fails, only that test becomes `SetupFailed`.
+///
+/// ## TimedOut Explained
+///
+/// `TimedOut` is only for the test body. A hook that runs past its timeout
+/// does not give `TimedOut`. A set-up hook (`before_each`,
+/// `before_each_test`, `before_all` and the suite-level set-up hooks) gives
+/// `SetupFailed`. A tear-down hook (`after_each`, `after_each_test`,
+/// `after_all` and the suite-level tear-down hooks) gives a
+/// `TeardownFailure` in the run report, and the test keeps its status.
 ///
 /// ```gleam
 /// describe("Handles failures", [
@@ -117,7 +127,9 @@ pub type Status {
 ///
 /// Used to distinguish between different testing styles:
 ///
-/// - `Unit` - Standard unit tests from `describe`/`it`
+/// - `Unit` - every test that is not a Gherkin scenario: the tests of
+///   `dream_test/unit` and `dream_test/unit_context`, and the failing tests
+///   that discovery makes for its errors
 /// - `GherkinScenario(scenario_id:, rule:)` - Tests from Gherkin features
 ///   (inline DSL or `.feature` files)
 ///
@@ -586,7 +598,10 @@ pub fn status_from_failures(
 /// Whether a status means that the test failed: `Failed`, `SetupFailed` or
 /// `TimedOut`.
 ///
-/// The runner, the reporters and `failed` use this one check.
+/// `failed` and the failure lists of the BDD reporter use this check.
+/// The summary line counts each status apart: its `<count> failed` is the
+/// status `Failed` only. `failed` also counts tear-down failures, stopped
+/// set-ups and crashed results reporters.
 ///
 /// ## Parameters
 ///

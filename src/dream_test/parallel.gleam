@@ -74,13 +74,16 @@ import gleam/string
 /// Most users should configure execution via `dream_test/runner` instead of
 /// calling `dream_test/parallel` directly.
 ///
-/// - `max_concurrency`: how many tests may run at once
+/// - `max_concurrency`: how many direct tests of one group may run at once
 /// - `default_timeout_ms`: default per-test timeout (used when a test doesn’t
 ///   specify its own timeout)
 ///
 /// ## Fields
 ///
-/// - `max_concurrency`: maximum number of tests to run concurrently within a group
+/// - `max_concurrency`: the most direct tests of one group that run at the
+///   same time. The groups run one after the other: first the direct tests
+///   of a group, then each child group in the written order. A value below
+///   1 counts as 1.
 /// - `default_timeout_ms`: timeout used when a test does not set its own timeout
 ///
 /// ## Example

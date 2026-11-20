@@ -159,7 +159,11 @@ pub fn name(suite suite: TestSuite) -> String {
   suite.name
 }
 
-/// The `TestInfo` of each test of the suite, in the order of the run.
+/// The `TestInfo` of each test of the suite, in the written order: each
+/// group gives its tests and child groups in the order that they are
+/// written. The run order can be different. In a run, the direct tests of
+/// a group run first, and then each child group, whatever the written
+/// order.
 ///
 /// ## Example
 ///
@@ -174,9 +178,11 @@ pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
 
 /// Put suites in one group with the name `name`.
 ///
-/// Each suite becomes a group inside the new suite, and keeps its own
-/// context. The suites run one after the other. The group name is the
-/// first group of each test, also in the progress output.
+/// The suites run one after the other, and each keeps its own context.
+/// `group` adds `name` to the start of the path of each test, so `name` is
+/// the first item of `groups` of each test, also in the progress output.
+/// It makes no `types.Group` value, so it gives the tests no tags and no
+/// hooks.
 ///
 /// ## Example
 ///

@@ -31,6 +31,7 @@ Dream Test’s runner makes those constraints visible and configurable.
 
 Use `max_concurrency` and `default_timeout_ms` to tune execution:
 
+- **`max_concurrency` is the most tests that run at the same time.** Only the direct tests of one group run in parallel. The groups run one after the other: first the direct tests of a group, then each child group in the written order. The suites also run one after the other. A value below 1 counts as 1.
 - **Higher concurrency** speeds up independent tests.
 - **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
 - **`default_timeout_ms` must be at least 1.** With 0, the tests and hooks that use it get no time, so they almost always time out, and the result is not dependable. A value below 0 almost always stops the run with the Erlang error `timeout_value` when the run waits for a hook in a set-up process, for example a `before_all` hook.
@@ -201,7 +202,7 @@ pub fn configured_runner() -> runner.RunBuilder {
 
 ### Exit status (`exit_on_failure`)
 
-CI reads the exit status of `gleam test`. Without `runner.exit_on_failure`, the exit status is 0, also when tests fail. `runner.run` returns the report, `main` returns, and the CI step passes.
+CI reads the exit status of `gleam test`. Without `runner.exit_on_failure`, the exit status is 0, also when the run fails. `runner.run` returns the report, `main` returns, and the CI step passes.
 
 The run fails when one of these is true:
 

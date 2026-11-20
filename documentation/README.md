@@ -12,7 +12,7 @@ Dream Test targets the **BEAM (Erlang)**.
 
 Dream Test tries to keep three ideas explicit:
 
-- **Suites are data**: you build a nested set of suites/groups/tests (unit suites or Gherkin features) rather than relying on hidden global test discovery.
+- **Suites are data**: you build each suite as a tree of groups and tests (unit suites or Gherkin features) rather than relying on hidden global test discovery.
 - **The runner is a policy decision**: your `main()` chooses output style, concurrency, timeouts, and CI behavior.
 - **Assertions are pipelines**: you start from a value, run matchers, then end with a failure message you’ll want to read at 2am.
 

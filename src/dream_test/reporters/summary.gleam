@@ -11,7 +11,8 @@
 //// // -> "Summary: 3 run, 1 failed, 2 passed in 12ms\n"
 //// ```
 ////
-//// The line always has the run, failed and passed counts. It adds the
+//// The line always has the run, failed and passed counts. The failed count
+//// is the tests with the status `Failed` only. It adds the
 //// skipped, pending, timed out, setup failed, tear-down failed and set-up
 //// stopped counts, in that order, only when they are not zero.
 

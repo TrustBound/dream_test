@@ -96,7 +96,9 @@ pub fn summary_only(
   }
 }
 
-/// Print only repeated failures and the summary line at the end of the run.
+/// Print only the failed tests and the summary line at the end of the run.
+/// A failed test here is one with the status `Failed`, `TimedOut` or
+/// `SetupFailed` (see `types.is_failure`).
 pub fn failures_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
