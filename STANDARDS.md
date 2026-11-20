@@ -103,19 +103,30 @@ Do not write a closure only to change the shape of a user function. A hook or a 
 
 ```gleam
 spawn_unlinked(fn() {
-  let result = run_test(config, test_case)
-  send(subject, Finished(index: index, result: result))
+  case show_crash_reports {
+    True -> send(result_subject, TestCompleted(run(input)))
+    False -> send(result_subject, caught_message(run_catching(run, input)))
+  }
 })
 ```
 
 ✅ **Do**
 
 ```gleam
-spawn_unlinked(fn() { run_test_worker(input, index, test_case) })
+spawn_unlinked(fn() {
+  run_worker(result_subject, run, input, show_crash_reports)
+})
 
-fn run_test_worker(input: WorkerInput, index: Int, test_case: TestCase) -> Nil {
-  let result = run_test(input.config, test_case)
-  send(input.subject, Finished(index: index, result: result))
+fn run_worker(
+  result_subject: Subject(WorkerMessage(a)),
+  run: fn(input) -> a,
+  input: input,
+  show_crash_reports: Bool,
+) -> Nil {
+  case show_crash_reports {
+    True -> send(result_subject, TestCompleted(run(input)))
+    False -> send(result_subject, caught_message(run_catching(run, input)))
+  }
 }
 ```
 
@@ -133,21 +144,29 @@ Erlang FFI follows the same rule: use a list comprehension or `fun name/arity`, 
 
 ```gleam
 describe("math", [
-  it("adds numbers", fn() { 1 + 2 }),
+  it("adds numbers", fn() {
+    1 + 2
+    |> should
+    |> be_equal(3)
+    |> or_fail_with("1 + 2 should be 3")
+  }),
 ])
 ```
 
 ✅ **Do**
 
 ```gleam
-pub fn math_tests() {
+pub fn math_tests() -> TestSuite {
   describe("math", [
     it("adds numbers", adds_numbers_test),
   ])
 }
 
-fn adds_numbers_test() {
+fn adds_numbers_test() -> Result(AssertionResult, String) {
   1 + 2
+  |> should
+  |> be_equal(3)
+  |> or_fail_with("1 + 2 should be 3")
 }
 ```
 
@@ -173,16 +192,24 @@ fn adds_numbers_test() {
 ❌ **Don't**
 
 ```gleam
-pub fn add_failure(ctx, f) {
-  TestContext(failures: [f, ..ctx.failures])
+pub fn status_from_failures(fs: List(AssertionFailure)) -> Status {
+  case fs {
+    [] -> Passed
+    _ -> Failed
+  }
 }
 ```
 
 ✅ **Do**
 
 ```gleam
-pub fn add_failure(context, failure) {
-  TestContext(failures: [failure, ..context.failures])
+pub fn status_from_failures(
+  failures failures: List(AssertionFailure),
+) -> Status {
+  case failures {
+    [] -> Passed
+    _ -> Failed
+  }
 }
 ```
 
@@ -367,21 +394,16 @@ let tree =
 ❌ **Don't**
 
 ```gleam
-run_single_test("passing test", full_name, tags, types.Unit, passing_test)
+// Two Ints side by side: a caller can swap them and still compile
+run_tree_parallel(4, 5000, tree)
 ```
 
 ✅ **Do**
 
 ```gleam
-let config = SingleTestConfig(
-  name: "passing test",
-  full_name: ["bootstrap", "runner_core"],
-  tags: ["bootstrap", "runner"],
-  kind: types.Unit,
-  run: passing_test,
-)
+let config = ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 
-run_single_test(config)
+run_tree_parallel(config: config, tree: tree)
 ```
 
 **Threshold**: If a function has 3+ parameters, or 2+ parameters of the same type, consider a config record.
@@ -396,13 +418,14 @@ In `case` expressions, multi-expression branches need curly braces:
 
 ```gleam
 case node {
-  ItTest(name, run) ->
-    build_it_test_case(...)
+  Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-  DescribeGroup(name, children) -> {
+  Group(name: name, children: children, ..) -> {
     let new_prefix = list.append(name_prefix, [name])
-    to_test_cases_from_list(module_name, new_prefix, children, accumulated)
+    collect_test_names(new_prefix, children, [])
   }
+
+  _ -> []
 }
 ```
 

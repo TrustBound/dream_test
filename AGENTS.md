@@ -11,15 +11,9 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 - For complex, multi-parameter APIs in this project, we prefer **config records** with named fields rather than long positional argument lists.
   - Example (preferred):
     ```gleam
-    let config = SingleTestConfig(
-      name: "passing test",
-      full_name: ["bootstrap", "runner_core"],
-      tags: ["bootstrap", "runner"],
-      kind: types.Unit,
-      run: passing_test,
-    )
+    let config = ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 
-    run_single_test(config)
+    run_tree_parallel(config: config, tree: tree)
     ```
 
 ## 2. Imports & Namespaces
