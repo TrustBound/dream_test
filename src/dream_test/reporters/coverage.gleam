@@ -132,14 +132,14 @@ import gleam/string
 ///   The line says `, <count> failed`. With `exit_on_failure` on, the
 ///   causes are then `tests failed` and the coverage cause, and no other
 ///   cause shows.
-/// - `teardown_failed`: tear-down hooks that failed. The line says
-///   `, <count> tear-down failed`. With `exit_on_failure` on and no failed
-///   test, the causes say `a tear-down hook failed` for one, and
-///   `<count> tear-down hooks failed` for more.
-/// - `setup_stopped`: set-ups whose process stopped while their tests ran.
-///   The line says `, <count> set-up stopped`. With `exit_on_failure` on
-///   and no failed test, the causes say `a set-up stopped` for one, and
-///   `<count> set-ups stopped` for more.
+/// - `teardown_failed`: teardown hooks that failed. The line says
+///   `, <count> teardown failed`. With `exit_on_failure` on and no failed
+///   test, the causes say `a teardown hook failed` for one, and
+///   `<count> teardown hooks failed` for more.
+/// - `setup_stopped`: setups whose process stopped while their tests ran.
+///   The line says `, <count> setup stopped`. With `exit_on_failure` on
+///   and no failed test, the causes say `a setup stopped` for one, and
+///   `<count> setups stopped` for more.
 /// - `reporters_crashed`: results reporters whose render function crashed.
 ///   The `Tests:` part does not show this count. With `exit_on_failure` on
 ///   and no failed test, the causes say `a results reporter crashed` for
@@ -777,7 +777,7 @@ fn outcome_line(outcome: RunOutcome, reason: ExitReason) -> String {
 }
 
 /// The causes of the exit status 1, in a sentence. Failed tests come
-/// first and alone; else each failed tear-down hook, stopped set-up and
+/// first and alone; else each failed teardown hook, stopped setup and
 /// crashed results reporter.
 fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
   case outcome.failed, other_causes(outcome) {
@@ -791,10 +791,10 @@ fn other_causes(outcome: RunOutcome) -> List(String) {
   list.flatten([
     counted_cause(
       outcome.teardown_failed,
-      "a tear-down hook failed",
-      "tear-down hooks failed",
+      "a teardown hook failed",
+      "teardown hooks failed",
     ),
-    counted_cause(outcome.setup_stopped, "a set-up stopped", "set-ups stopped"),
+    counted_cause(outcome.setup_stopped, "a setup stopped", "setups stopped"),
     counted_cause(
       outcome.reporters_crashed,
       "a results reporter crashed",
@@ -804,7 +804,7 @@ fn other_causes(outcome: RunOutcome) -> List(String) {
 }
 
 /// No cause for a count of 0, `one` for 1, and `<count> <more>` for more,
-/// for example `a set-up stopped` and `2 set-ups stopped`.
+/// for example `a setup stopped` and `2 setups stopped`.
 fn counted_cause(count: Int, one: String, more: String) -> List(String) {
   case count {
     0 -> []
@@ -818,8 +818,8 @@ fn tests_line(outcome: RunOutcome) -> String {
   <> int.to_string(outcome.passed)
   <> " passed"
   <> count_part(outcome.failed, " failed")
-  <> count_part(outcome.teardown_failed, " tear-down failed")
-  <> count_part(outcome.setup_stopped, " set-up stopped")
+  <> count_part(outcome.teardown_failed, " teardown failed")
+  <> count_part(outcome.setup_stopped, " setup stopped")
   <> "."
 }
 

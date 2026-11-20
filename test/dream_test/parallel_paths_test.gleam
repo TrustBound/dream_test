@@ -148,7 +148,7 @@ pub fn tests() {
       |> or_fail_with("a failing after_each should not change the status")
     }),
 
-    it("an after_each failure is a tear-down failure of the test", fn() {
+    it("an after_each failure is a teardown failure of the test", fn() {
       describe("root", [
         after_each(fn() { Error("no teardown") }),
         it("a", fn() { Ok(AssertionOk) }),
@@ -162,7 +162,7 @@ pub fn tests() {
           message: "no teardown",
         ),
       ])
-      |> or_fail_with("a failing after_each should be a tear-down failure")
+      |> or_fail_with("a failing after_each should be a teardown failure")
     }),
 
     it("an after_each failure keeps the TimedOut status of a test", fn() {
@@ -189,7 +189,7 @@ pub fn tests() {
       |> or_fail_with("a failing after_all should add no test result")
     }),
 
-    it("an after_all failure is a tear-down failure of the group", fn() {
+    it("an after_all failure is a teardown failure of the group", fn() {
       describe("root", [
         after_all(fn() { Error("no cleanup") }),
         it("a", fn() { Ok(AssertionOk) }),
@@ -203,7 +203,7 @@ pub fn tests() {
           message: "no cleanup",
         ),
       ])
-      |> or_fail_with("a failing after_all should be a tear-down failure")
+      |> or_fail_with("a failing after_all should be a teardown failure")
     }),
 
     it("an after_all failure does not stop the next after_all", fn() {
@@ -221,7 +221,7 @@ pub fn tests() {
       |> or_fail_with("every after_all should run")
     }),
 
-    it("run_tree_parallel gives the tear-down failures", fn() {
+    it("run_tree_parallel gives the teardown failures", fn() {
       parallel.run_tree_parallel(
         parallel.default_config(),
         types.tree("root", Nil, [
@@ -238,7 +238,7 @@ pub fn tests() {
           message: "no cleanup",
         ),
       ])
-      |> or_fail_with("run_tree_parallel should give the tear-down failures")
+      |> or_fail_with("run_tree_parallel should give the teardown failures")
     }),
 
     it("a before_all that crashes gives SetupFailed", fn() {
@@ -257,7 +257,7 @@ pub fn tests() {
       |> or_fail_with("a crashing before_all should give SetupFailed")
     }),
 
-    it("an after_each that runs too long is a tear-down failure", fn() {
+    it("an after_each that runs too long is a teardown failure", fn() {
       describe("root", [
         after_each(fn() {
           process.sleep_forever()
@@ -274,10 +274,10 @@ pub fn tests() {
           message: "hook timed out in root",
         ),
       ])
-      |> or_fail_with("a slow after_each should be a tear-down failure")
+      |> or_fail_with("a slow after_each should be a teardown failure")
     }),
 
-    it("an after_each that crashes is a tear-down failure", fn() {
+    it("an after_each that crashes is a teardown failure", fn() {
       describe("root", [
         after_each(fn() { erlang_error(atom.create("boom")) }),
         it("a", fn() { Ok(AssertionOk) }),
@@ -291,7 +291,7 @@ pub fn tests() {
           message: "hook crashed in root: error:boom",
         ),
       ])
-      |> or_fail_with("a crashing after_each should be a tear-down failure")
+      |> or_fail_with("a crashing after_each should be a teardown failure")
     }),
 
     it("a runner before_each_test that runs too long gives SetupFailed", fn() {
@@ -352,7 +352,7 @@ pub fn tests() {
     }),
 
     it(
-      "a runner after_each_test that runs too long is a tear-down failure",
+      "a runner after_each_test that runs too long is a teardown failure",
       fn() {
         runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
         |> runner.max_concurrency(1)
@@ -372,11 +372,11 @@ pub fn tests() {
             message: "hook timed out in root",
           ),
         ])
-        |> or_fail_with("a slow after_each_test should be a tear-down failure")
+        |> or_fail_with("a slow after_each_test should be a teardown failure")
       },
     ),
 
-    it("a runner after_each_test that crashes is a tear-down failure", fn() {
+    it("a runner after_each_test that crashes is a teardown failure", fn() {
       runner.new([describe("root", [it("a", fn() { Ok(AssertionOk) })])])
       |> runner.after_each_test(fn(_info) { erlang_error(atom.create("boom")) })
       |> runner.silent()
@@ -390,9 +390,7 @@ pub fn tests() {
           message: "hook crashed in root: error:boom",
         ),
       ])
-      |> or_fail_with(
-        "a crashing after_each_test should be a tear-down failure",
-      )
+      |> or_fail_with("a crashing after_each_test should be a teardown failure")
     }),
 
     it("a timed-out test process has exited before its after_each runs", fn() {
@@ -421,7 +419,7 @@ pub fn tests() {
       // The body never returns and times out after 20ms. The hooks get the
       // default timeout of 60s, so after_each always finishes. The test is
       // TimedOut, and after_each runs exactly once: the loop reads every
-      // message of the killed process before it starts the tear-down.
+      // message of the killed process before it starts the teardown.
       let calls = process.new_subject()
       runner.new([
         describe("root", [

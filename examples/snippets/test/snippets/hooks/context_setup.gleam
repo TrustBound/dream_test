@@ -1,5 +1,5 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/unit_context.{describe_with_set_up, it}
+import dream_test/unit_context.{describe_with_setup, it}
 import gleam/erlang/process.{type Subject}
 
 pub type Request {
@@ -7,8 +7,8 @@ pub type Request {
   Stop
 }
 
-// The set-up starts a process that holds a number. It lives while the tests
-// run, because it runs in the process of the set-up.
+// The setup starts a process that holds a number. It lives while the tests
+// run, because it runs in the process of the setup.
 
 fn start_store() -> Result(Subject(Request), String) {
   let started = process.new_subject()
@@ -41,10 +41,10 @@ fn answer(requests: Subject(Request)) -> Nil {
 }
 
 pub fn tests() {
-  describe_with_set_up(
+  describe_with_setup(
     "Store",
-    set_up: start_store,
-    tear_down: stop_store,
+    setup: start_store,
+    teardown: stop_store,
     children: [
       it("gives the number", fn(store: Subject(Request)) {
         process.call(store, 1000, Get)

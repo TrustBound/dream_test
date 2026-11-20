@@ -85,7 +85,7 @@ pub fn tests() {
       |> or_fail_with("report_tests should give the tests")
     }),
 
-    it("run_report keeps the tear-down failures", fn() {
+    it("run_report keeps the teardown failures", fn() {
       types.run_report(
         tests: [],
         teardown_failures: [cleanup_failure()],
@@ -97,7 +97,7 @@ pub fn tests() {
       |> or_fail_with("report_teardown_failures should give the failures")
     }),
 
-    it("failed is False when every test passed and no tear-down failed", fn() {
+    it("failed is False when every test passed and no teardown failed", fn() {
       types.run_report(
         tests: [passed_result()],
         teardown_failures: [],
@@ -109,7 +109,7 @@ pub fn tests() {
       |> or_fail_with("a clean run should not fail")
     }),
 
-    it("failed is True for a tear-down failure only", fn() {
+    it("failed is True for a teardown failure only", fn() {
       types.run_report(
         tests: [passed_result()],
         teardown_failures: [
@@ -120,7 +120,7 @@ pub fn tests() {
       |> types.failed
       |> should
       |> be_equal(True)
-      |> or_fail_with("a tear-down failure should fail the run")
+      |> or_fail_with("a teardown failure should fail the run")
     }),
 
     it("failed is True for a test that failed", fn() {
@@ -182,37 +182,37 @@ pub fn tests() {
       |> or_fail_with("only the three failure statuses should be failures")
     }),
 
-    it("teardown_hook_name gives the name of each tear-down hook", fn() {
+    it("teardown_hook_name gives the name of each teardown hook", fn() {
       [
         types.AfterEachTestHook,
         types.AfterEachHook,
         types.AfterAllHook,
         types.AfterEachSuiteHook,
         types.AfterAllSuitesHook,
-        types.SuiteTearDownHook,
+        types.SuiteTeardownHook,
       ]
       |> list.map(types.teardown_hook_name)
       |> should
       |> be_equal([
         "after_each_test", "after_each", "after_all", "after_each_suite",
-        "after_all_suites", "suite tear-down",
+        "after_all_suites", "suite teardown",
       ])
       |> or_fail_with("each hook should have its builder name")
     }),
 
-    it("set_up_hook_name gives the name of each set-up hook of a scope", fn() {
+    it("setup_hook_name gives the name of each setup hook of a scope", fn() {
       [
         types.BeforeAllHook,
         types.BeforeEachSuiteHook,
         types.BeforeAllSuitesHook,
-        types.SuiteSetUpHook,
+        types.SuiteSetupHook,
       ]
-      |> list.map(types.set_up_hook_name)
+      |> list.map(types.setup_hook_name)
       |> should
       |> be_equal([
-        "before_all", "before_each_suite", "before_all_suites", "suite set-up",
+        "before_all", "before_each_suite", "before_all_suites", "suite setup",
       ])
-      |> or_fail_with("each set-up hook should have its builder name")
+      |> or_fail_with("each setup hook should have its builder name")
     }),
   ])
 }

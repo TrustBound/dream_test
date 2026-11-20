@@ -1,6 +1,6 @@
-//// Black-box tests of the rule that a set-up runs only for tests that run.
+//// Black-box tests of the rule that a setup runs only for tests that run.
 ////
-//// A set-up hook, and its tear-down hook, runs only when at least one of
+//// A setup hook, and its teardown hook, runs only when at least one of
 //// the tests that it serves runs. The rule is the same with and without
 //// `runner.filter_tests`.
 
@@ -13,7 +13,7 @@ import gleam/erlang/process.{type Subject}
 import gleam/list
 
 pub fn tests() {
-  describe("a set-up runs only for tests that run", [
+  describe("a setup runs only for tests that run", [
     it("a suite with no test runs no before_all or after_all", fn() {
       let calls = process.new_subject()
       describe("empty", [

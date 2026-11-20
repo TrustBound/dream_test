@@ -47,14 +47,14 @@ import dream_test/sandbox.{
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type RunReport, type SetUpHook, type Status, type SuiteContext,
+  type RunReport, type SetupHook, type Status, type SuiteContext,
   type TeardownFailure, type TeardownHook, type TestInfo, type TestKind,
   type TestResult, type Tree, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
   AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
   AssertionPending, AssertionSkipped, BeforeAll, BeforeAllHook,
-  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetUp, Failed,
-  FixedContext, Group, Passed, Pending, SetupFailed, Skipped, SuiteSetUpHook,
-  SuiteTearDownHook, TeardownFailure, Test, TestResult, TimedOut, Tree,
+  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetup, Failed,
+  FixedContext, Group, Passed, Pending, SetupFailed, Skipped, SuiteSetupHook,
+  SuiteTeardownHook, TeardownFailure, Test, TestResult, TimedOut, Tree,
   WithInput,
 }
 import gleam/erlang/atom.{type Atom}
@@ -122,10 +122,10 @@ pub type ParallelConfig {
 /// This is an advanced API intended for building custom runners that want to
 /// drive a reporter while executing a single tree.
 ///
-/// `outer_setups` are the set-ups around the suite that keep their
+/// `outer_setups` are the setups around the suite that keep their
 /// resources alive in a process, outermost first: for example the
-/// `before_all_suites` set-up of the whole run and the `before_each_suite`
-/// set-up of the suite. Give `[]` when the suite has no such set-up.
+/// `before_all_suites` setup of the whole run and the `before_each_suite`
+/// setup of the suite. Give `[]` when the suite has no such setup.
 pub type RunTreeParallelWithReporterConfig(context) {
   RunTreeParallelWithReporterConfig(
     config: ParallelConfig,
@@ -152,8 +152,8 @@ pub type RunTreeParallelWithReporterConfig(context) {
 /// - `name`, `tags`, `children`: the name, the tags and the children of the
 ///   top-level group of the tree.
 /// - `context`: where the tests get their context, a
-///   `types.FixedContext(value)` or a `types.ContextFromSetUp(set_up,
-///   tear_down)` (see `types.SuiteContext`).
+///   `types.FixedContext(value)` or a `types.ContextFromSetup(setup,
+///   teardown)` (see `types.SuiteContext`).
 pub type RunTreeConfig(context) {
   RunTreeConfig(
     config: ParallelConfig,
@@ -172,45 +172,45 @@ pub type RunTreeConfig(context) {
   )
 }
 
-/// A set-up around a suite that keeps its resources alive in a process,
+/// A setup around a suite that keeps its resources alive in a process,
 /// for `run_tree_parallel_with_reporter`.
 ///
-/// The executor checks each outer set-up before each test and each group
-/// starts. After the process of a set-up stopped, no test or hook of the
+/// The executor checks each outer setup before each test and each group
+/// starts. After the process of a setup stopped, no test or hook of the
 /// suite starts: each test that did not start is `SetupFailed` with the
-/// failure `not run: the set-up from <set-up hook> in "<groups>" stopped
+/// failure `not run: the setup from <setup hook> in "<groups>" stopped
 /// (<reason>)`, for example
-/// `not run: the set-up from before_each_suite in "suite" stopped (<reason>)`,
-/// with the operator `<set-up hook>`. The executor records the full name of
-/// each of these tests in the `not_run` of the outermost stopped set-up,
+/// `not run: the setup from before_each_suite in "suite" stopped (<reason>)`,
+/// with the operator `<setup hook>`. The executor records the full name of
+/// each of these tests in the `not_run` of the outermost stopped setup,
 /// after the names that it had already. Tests that started finish, and the
 /// `after_all` hooks of the groups that started still run. The executor
-/// does not report the stopped set-up as a tear-down failure: the caller
-/// owns the set-up, so the caller reports it once, for example as
-/// `types.SetupStopped`, and runs its tear-down hooks.
+/// does not report the stopped setup as a teardown failure: the caller
+/// owns the setup, so the caller reports it once, for example as
+/// `types.SetupStopped`, and runs its teardown hooks.
 ///
 /// ## Variants
 ///
-/// - `SetupRunning(set_up, groups, check_setup_process)`: the process of the set-up
+/// - `SetupRunning(setup, groups, check_setup_process)`: the process of the setup
 ///   was alive at the last check. `check_setup_process` checks it again and gives
 ///   `Ok(Nil)` while it is alive, or `Error(reason)` after it stopped. The
 ///   executor does not call `check_setup_process` again after it gave `Error`.
 ///   With `sandbox.SetupProcess`, use `sandbox.check_setup_process`.
-/// - `SetupStopped(set_up, groups, reason, not_run)`: the process of the
-///   set-up exited with `reason`. `not_run` is the full name of each test
+/// - `SetupStopped(setup, groups, reason, not_run)`: the process of the
+///   setup exited with `reason`. `not_run` is the full name of each test
 ///   that was not run because of it (see `types.full_name`), in the order
-///   of the run. Give `[]` for a set-up that no test was skipped for yet.
+///   of the run. Give `[]` for a setup that no test was skipped for yet.
 ///
-/// `set_up` is the set-up hook. `groups` is `[]` for the whole run, or the
-/// names of the groups that the set-up serves, for example `[suite name]`.
+/// `setup` is the setup hook. `groups` is `[]` for the whole run, or the
+/// names of the groups that the setup serves, for example `[suite name]`.
 pub type OuterSetup {
   SetupRunning(
-    set_up: SetUpHook,
+    setup: SetupHook,
     groups: List(String),
     check_setup_process: fn() -> Result(Nil, String),
   )
   SetupStopped(
-    set_up: SetUpHook,
+    setup: SetupHook,
     groups: List(String),
     reason: String,
     not_run: List(List(String)),
@@ -220,13 +220,13 @@ pub type OuterSetup {
 /// Result of `run_tree_parallel_with_reporter`.
 ///
 /// This is returned as a semantic type (not a tuple) so callers can use named
-/// fields and avoid positional destructuring. A tear-down failure is not a
+/// fields and avoid positional destructuring. A teardown failure is not a
 /// test result, so it is in `teardown_failures`, not in `results`.
 ///
-/// `outer_setups` are the set-ups of the config in the same order, as the
-/// executor saw them last. A set-up whose process stopped during the run
+/// `outer_setups` are the setups of the config in the same order, as the
+/// executor saw them last. A setup whose process stopped during the run
 /// is `SetupStopped`, and its `check_setup_process` will not tell again: use this
-/// list, not `check_setup_process`, to learn that the set-up stopped.
+/// list, not `check_setup_process`, to learn that the setup stopped.
 pub type RunTreeParallelWithReporterResult {
   RunTreeParallelWithReporterResult(
     results: List(TestResult),
@@ -258,7 +258,7 @@ type ExecuteNodeConfig(context) {
 }
 
 /// What a run has collected so far, newest first: the test results and the
-/// tear-down failures.
+/// teardown failures.
 type Collected {
   Collected(
     results_rev: List(TestResult),
@@ -318,10 +318,10 @@ type TestStep(context) {
 
 /// What is known about one test when a step starts.
 ///
-/// `status` is `Passed` until a set-up step or the body fails. While it is
-/// `Passed`, set-up steps and the body run; tear-down steps always run.
-/// `context` is the context after the last set-up step that returned, so
-/// a tear-down step gets the context that it would get after a body that
+/// `status` is `Passed` until a setup step or the body fails. While it is
+/// `Passed`, setup steps and the body run; teardown steps always run.
+/// `context` is the context after the last setup step that returned, so
+/// a teardown step gets the context that it would get after a body that
 /// finished.
 type TestState(context) {
   TestState(
@@ -377,7 +377,7 @@ type KilledStep(context) {
 }
 
 /// A step that did not finish in its test process: the step, the state
-/// that the tear-down steps start from, the steps after it that did not
+/// that the teardown steps start from, the steps after it that did not
 /// finish, and why it did not finish.
 type EndedStep(context) {
   EndedStep(
@@ -449,11 +449,11 @@ type LoopState(context) {
 /// A group hook with the context that it gets, so that the setup process
 /// of the group can run it.
 type GroupHookCall(context) {
-  /// The set-up of a suite (see `types.ContextFromSetUp`). Its value is
+  /// The setup of a suite (see `types.ContextFromSetup`). Its value is
   /// the context of the suite.
-  StartCall(set_up: fn() -> Result(context, String))
-  SetUpCall(hook: Callback(context, Result(context, String)), context: context)
-  TearDownCall(hook: Callback(context, Result(Nil, String)), context: context)
+  StartCall(setup: fn() -> Result(context, String))
+  SetupCall(hook: Callback(context, Result(context, String)), context: context)
+  TeardownCall(hook: Callback(context, Result(Nil, String)), context: context)
 }
 
 /// The setup process of a group, for its `before_all` and `after_all`
@@ -468,7 +468,7 @@ type ScopeSetupProcess(context) {
   SetupProcessAlive(
     scope: List(String),
     setup_process: GroupSetupProcess(context),
-    set_up: SetUpHook,
+    setup: SetupHook,
   )
   /// The setup process stopped with `reason`. The tests of the scope that have not
   /// started do not run, and its `after_all` hooks run in a new setup process.
@@ -478,45 +478,45 @@ type ScopeSetupProcess(context) {
     scope: List(String),
     reason: String,
     not_run: List(List(String)),
-    set_up: SetUpHook,
+    setup: SetupHook,
   )
 }
 
-/// The names that the reports give to the set-up and the tear-down of a
+/// The names that the reports give to the setup and the teardown of a
 /// group scope: the `before_all` and `after_all` hooks of a group, or the
-/// set-up and the tear-down of a suite (see `types.ContextFromSetUp`).
-/// `set_up_text` and `tear_down_text` start the text of a crash or a
+/// setup and the teardown of a suite (see `types.ContextFromSetup`).
+/// `setup_text` and `teardown_text` start the text of a crash or a
 /// timeout, for example `hook crashed in <groups>: <reason>`.
 type ScopeHooks {
   ScopeHooks(
-    set_up: SetUpHook,
-    tear_down: TeardownHook,
-    set_up_text: String,
-    tear_down_text: String,
+    setup: SetupHook,
+    teardown: TeardownHook,
+    setup_text: String,
+    teardown_text: String,
   )
 }
 
-/// The names for the scope whose set-up is `set_up`.
-fn scope_hooks(set_up: SetUpHook) -> ScopeHooks {
-  case set_up {
-    SuiteSetUpHook ->
+/// The names for the scope whose setup is `setup`.
+fn scope_hooks(setup: SetupHook) -> ScopeHooks {
+  case setup {
+    SuiteSetupHook ->
       ScopeHooks(
-        set_up: SuiteSetUpHook,
-        tear_down: SuiteTearDownHook,
-        set_up_text: "the suite set-up",
-        tear_down_text: "the suite tear-down",
+        setup: SuiteSetupHook,
+        teardown: SuiteTeardownHook,
+        setup_text: "the suite setup",
+        teardown_text: "the suite teardown",
       )
     BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
       ScopeHooks(
-        set_up: BeforeAllHook,
-        tear_down: AfterAllHook,
-        set_up_text: "hook",
-        tear_down_text: "hook",
+        setup: BeforeAllHook,
+        teardown: AfterAllHook,
+        setup_text: "hook",
+        teardown_text: "hook",
       )
   }
 }
 
-/// The setup processes of the scopes around a test: the outer set-ups of the
+/// The setup processes of the scopes around a test: the outer setups of the
 /// suite, then the group scopes, each list outermost first.
 type SetupProcesses(context) {
   SetupProcesses(
@@ -705,7 +705,7 @@ pub fn run_tree_parallel(
 /// - `runner_before_each_test` and `runner_after_each_test`: hooks that run
 ///   around each test, outside its `before_each` and `after_each` hooks.
 ///   They get the `TestInfo` of the test, not its context
-/// - `outer_setups`: the set-ups around the suite that keep their
+/// - `outer_setups`: the setups around the suite that keep their
 ///   resources alive in a process, outermost first. After the process of
 ///   one stopped, no test or hook of the suite starts (see `OuterSetup`)
 ///
@@ -717,8 +717,8 @@ pub fn run_tree_parallel(
 ///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
-/// - `outer_setups`: the outer set-ups as the executor saw them last; a
-///   set-up whose process stopped is `SetupStopped`
+/// - `outer_setups`: the outer setups as the executor saw them last; a
+///   setup whose process stopped is `SetupStopped`
 pub fn run_tree_parallel_with_reporter(
   config config: RunTreeParallelWithReporterConfig(context),
 ) -> RunTreeParallelWithReporterResult {
@@ -789,7 +789,7 @@ pub fn run_tree(
         config,
         execute_or_fail_group(tree_input(config, value, setup_processes)),
       )
-    ContextFromSetUp(..), Some(stopped) ->
+    ContextFromSetup(..), Some(stopped) ->
       tree_result(
         config,
         fail_after_stop(
@@ -803,8 +803,8 @@ pub fn run_tree(
           empty_collected(),
         ),
       )
-    ContextFromSetUp(set_up: set_up, tear_down: tear_down), None ->
-      start_set_up(config, setup_processes, set_up, tear_down)
+    ContextFromSetup(setup: setup, teardown: teardown), None ->
+      start_setup(config, setup_processes, setup, teardown)
   }
 }
 
@@ -851,13 +851,13 @@ fn tree_result(
   )
 }
 
-/// Run the set-up of a suite in a new setup process, then the tests with
-/// its value, then the tear-down in the same setup process.
-fn start_set_up(
+/// Run the setup of a suite in a new setup process, then the tests with
+/// its value, then the teardown in the same setup process.
+fn start_setup(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
-  set_up: fn() -> Result(context, String),
-  tear_down: fn(context) -> Result(Nil, String),
+  setup: fn() -> Result(context, String),
+  teardown: fn(context) -> Result(Nil, String),
 ) -> RunTreeParallelWithReporterResult {
   let scope = list.append(config.groups, [config.name])
   case
@@ -865,62 +865,62 @@ fn start_set_up(
       None,
       config.config.default_timeout_ms,
       run_group_hook,
-      StartCall(set_up: set_up),
+      StartCall(setup: setup),
     )
   {
     SetupProcessReturned(setup_process: setup_process, value: Ok(context)) ->
-      run_after_set_up(
+      run_after_setup(
         config,
         setup_processes,
         SetupProcessAlive(
           scope: scope,
           setup_process: setup_process,
-          set_up: SuiteSetUpHook,
+          setup: SuiteSetupHook,
         ),
         context,
-        tear_down,
+        teardown,
       )
     SetupProcessReturned(setup_process: setup_process, value: Error(message)) -> {
       sandbox.stop_setup_process(setup_process)
-      suite_set_up_failed(config, setup_processes, failed_set_up(message))
+      suite_setup_failed(config, setup_processes, failed_setup(message))
     }
     SetupProcessCaught(setup_process: setup_process, reason: reason) -> {
       sandbox.stop_setup_process(setup_process)
-      suite_set_up_failed(
+      suite_setup_failed(
         config,
         setup_processes,
-        failed_set_up(scope_crash_message(
-          scope_hooks(SuiteSetUpHook).set_up_text,
+        failed_setup(scope_crash_message(
+          scope_hooks(SuiteSetupHook).setup_text,
           scope,
           reason,
         )),
       )
     }
     SetupProcessTimedOut ->
-      suite_set_up_failed(
+      suite_setup_failed(
         config,
         setup_processes,
-        failed_set_up(scope_timeout_message(
-          scope_hooks(SuiteSetUpHook).set_up_text,
+        failed_setup(scope_timeout_message(
+          scope_hooks(SuiteSetupHook).setup_text,
           scope,
         )),
       )
     SetupProcessExited(reason: reason) | SetupProcessLost(reason: reason) ->
-      suite_set_up_stopped(config, setup_processes, scope, reason)
+      suite_setup_stopped(config, setup_processes, scope, reason)
   }
 }
 
-/// The failure of each test of a suite whose set-up failed.
-fn failed_set_up(message: String) -> AssertionFailure {
-  hook_failure(types.set_up_hook_name(SuiteSetUpHook), message)
+/// The failure of each test of a suite whose setup failed.
+fn failed_setup(message: String) -> AssertionFailure {
+  hook_failure(types.setup_hook_name(SuiteSetupHook), message)
 }
 
-fn run_after_set_up(
+fn run_after_setup(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   own: ScopeSetupProcess(context),
   context: context,
-  tear_down: fn(context) -> Result(Nil, String),
+  teardown: fn(context) -> Result(Nil, String),
 ) -> RunTreeParallelWithReporterResult {
   let #(collected, completed, setup_processes_after) =
     execute_or_fail_group(tree_input(
@@ -931,10 +931,10 @@ fn run_after_set_up(
   let teardown_failures_rev =
     finish_group_scope(
       config.config,
-      GroupScope(groups: own.scope, hooks: scope_hooks(SuiteSetUpHook)),
+      GroupScope(groups: own.scope, hooks: scope_hooks(SuiteSetupHook)),
       option.from_result(list.first(setup_processes_after.groups)),
       context,
-      [WithInput(tear_down)],
+      [WithInput(teardown)],
     )
   tree_result(config, #(
     add_collected(
@@ -946,9 +946,9 @@ fn run_after_set_up(
   ))
 }
 
-/// Each test of a suite whose set-up failed is `SetupFailed` with
-/// `failure`. The tear-down does not run.
-fn suite_set_up_failed(
+/// Each test of a suite whose setup failed is `SetupFailed` with
+/// `failure`. The teardown does not run.
+fn suite_setup_failed(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   failure: AssertionFailure,
@@ -967,18 +967,18 @@ fn suite_set_up_failed(
   ))
 }
 
-/// The process of the set-up of a suite stopped before the set-up
+/// The process of the setup of a suite stopped before the setup
 /// returned. No test runs, the run report gets a `SetupStopped` with each
-/// test in `not_run`, and the tear-down does not run: there is no value
+/// test in `not_run`, and the teardown does not run: there is no value
 /// to give it.
-fn suite_set_up_stopped(
+fn suite_setup_stopped(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   scope: List(String),
   reason: String,
 ) -> RunTreeParallelWithReporterResult {
   let stop =
-    Stop(set_up: SuiteSetUpHook, scope: scope, reason: reason, not_run: [])
+    Stop(setup: SuiteSetupHook, scope: scope, reason: reason, not_run: [])
   let results_rev =
     fail_group_nodes(
       config.groups,
@@ -991,7 +991,7 @@ fn suite_set_up_stopped(
   tree_result(config, #(
     Collected(results_rev: results_rev, teardown_failures_rev: [
       types.SetupStopped(
-        set_up: SuiteSetUpHook,
+        setup: SuiteSetupHook,
         groups: scope,
         reason: reason,
         not_run: full_names(results),
@@ -1210,7 +1210,7 @@ fn alive_setup_process(
       Some(SetupProcessAlive(
         scope: scope,
         setup_process: setup_process,
-        set_up: BeforeAllHook,
+        setup: BeforeAllHook,
       ))
     None -> None
   }
@@ -1230,22 +1230,22 @@ fn refresh_setup_processes(
 
 fn refresh_outer_setup(scope: OuterSetup) -> OuterSetup {
   case scope {
-    SetupRunning(set_up: set_up, groups: names, check_setup_process: check) ->
-      checked_outer_setup(scope, set_up, names, check())
+    SetupRunning(setup: setup, groups: names, check_setup_process: check) ->
+      checked_outer_setup(scope, setup, names, check())
     SetupStopped(..) -> scope
   }
 }
 
 fn checked_outer_setup(
   scope: OuterSetup,
-  set_up: SetUpHook,
+  setup: SetupHook,
   names: List(String),
   checked: Result(Nil, String),
 ) -> OuterSetup {
   case checked {
     Ok(Nil) -> scope
     Error(reason) ->
-      SetupStopped(set_up: set_up, groups: names, reason: reason, not_run: [])
+      SetupStopped(setup: setup, groups: names, reason: reason, not_run: [])
   }
 }
 
@@ -1253,11 +1253,11 @@ fn refresh_setup_process(
   setup_process: ScopeSetupProcess(context),
 ) -> ScopeSetupProcess(context) {
   case setup_process {
-    SetupProcessAlive(scope: scope, setup_process: alive, set_up: set_up) ->
+    SetupProcessAlive(scope: scope, setup_process: alive, setup: setup) ->
       checked_setup_process(
         scope,
         alive,
-        set_up,
+        setup,
         sandbox.check_setup_process(alive),
       )
     SetupProcessGone(..) -> setup_process
@@ -1267,7 +1267,7 @@ fn refresh_setup_process(
 fn checked_setup_process(
   scope: List(String),
   setup_process: GroupSetupProcess(context),
-  set_up: SetUpHook,
+  setup: SetupHook,
   checked: Result(GroupSetupProcess(context), String),
 ) -> ScopeSetupProcess(context) {
   case checked {
@@ -1275,31 +1275,26 @@ fn checked_setup_process(
       SetupProcessAlive(
         scope: scope,
         setup_process: setup_process,
-        set_up: set_up,
+        setup: setup,
       )
     Error(reason) ->
-      SetupProcessGone(
-        scope: scope,
-        reason: reason,
-        not_run: [],
-        set_up: set_up,
-      )
+      SetupProcessGone(scope: scope, reason: reason, not_run: [], setup: setup)
   }
 }
 
-/// A set-up whose process stopped, as the tests that it skips see it.
+/// A setup whose process stopped, as the tests that it skips see it.
 type Stop {
   Stop(
-    set_up: SetUpHook,
+    setup: SetupHook,
     scope: List(String),
     reason: String,
     not_run: List(List(String)),
   )
 }
 
-/// The outermost set-up whose process stopped: the failure of each test
+/// The outermost setup whose process stopped: the failure of each test
 /// that does not run because of it, and where it is in the setup processes, so
-/// `record_not_run` can record those tests in it. The outer set-ups are
+/// `record_not_run` can record those tests in it. The outer setups are
 /// outside the group scopes.
 type StoppedSetup(context) {
   StoppedSetup(
@@ -1309,7 +1304,7 @@ type StoppedSetup(context) {
   )
 }
 
-/// Where a stopped set-up is: in the outer set-ups or in the group scopes.
+/// Where a stopped setup is: in the outer setups or in the group scopes.
 type StopPlace(context) {
   OuterStopPlace(found: Found(OuterSetup, Stop))
   GroupStopPlace(found: Found(ScopeSetupProcess(context), Stop))
@@ -1344,7 +1339,7 @@ fn stopped_setup(
   }
 }
 
-/// The setup processes with `names` added to the tests that the stopped set-up did
+/// The setup processes with `names` added to the tests that the stopped setup did
 /// not run.
 fn record_not_run(
   stopped: StoppedSetup(context),
@@ -1357,7 +1352,7 @@ fn record_not_run(
         outer: rebuild(
           found,
           SetupStopped(
-            set_up: found.value.set_up,
+            setup: found.value.setup,
             groups: found.value.scope,
             reason: found.value.reason,
             not_run: list.append(found.value.not_run, names),
@@ -1373,7 +1368,7 @@ fn record_not_run(
             scope: found.value.scope,
             reason: found.value.reason,
             not_run: list.append(found.value.not_run, names),
-            set_up: found.value.set_up,
+            setup: found.value.setup,
           ),
         ),
       )
@@ -1412,13 +1407,8 @@ fn rebuild(found: Found(item, value), replacement: item) -> List(item) {
 
 fn outer_stop(setup: OuterSetup) -> Result(Stop, Nil) {
   case setup {
-    SetupStopped(
-      set_up: set_up,
-      groups: scope,
-      reason: reason,
-      not_run: not_run,
-    ) ->
-      Ok(Stop(set_up: set_up, scope: scope, reason: reason, not_run: not_run))
+    SetupStopped(setup: setup, groups: scope, reason: reason, not_run: not_run) ->
+      Ok(Stop(setup: setup, scope: scope, reason: reason, not_run: not_run))
     SetupRunning(..) -> Error(Nil)
   }
 }
@@ -1429,23 +1419,22 @@ fn group_stop(setup_process: ScopeSetupProcess(context)) -> Result(Stop, Nil) {
       scope: scope,
       reason: reason,
       not_run: not_run,
-      set_up: set_up,
-    ) ->
-      Ok(Stop(set_up: set_up, scope: scope, reason: reason, not_run: not_run))
+      setup: setup,
+    ) -> Ok(Stop(setup: setup, scope: scope, reason: reason, not_run: not_run))
     SetupProcessAlive(..) -> Error(Nil)
   }
 }
 
 /// The failure of a test that was not run because `stop` stopped:
-/// `not run: the set-up from <set-up hook> in "<groups>" stopped (<reason>)`,
+/// `not run: the setup from <setup hook> in "<groups>" stopped (<reason>)`,
 /// without `in "<groups>"` for the whole run, or
-/// `not run: the suite set-up of "<suite>" stopped (<reason>)` for the
-/// set-up of a suite. The operator is the name of the set-up hook.
+/// `not run: the suite setup of "<suite>" stopped (<reason>)` for the
+/// setup of a suite. The operator is the name of the setup hook.
 fn not_run_failure(stop: Stop) -> AssertionFailure {
   AssertionFailure(
-    operator: types.set_up_hook_name(stop.set_up),
+    operator: types.setup_hook_name(stop.setup),
     message: "not run: "
-      <> stopped_set_up_text(stop)
+      <> stopped_setup_text(stop)
       <> " ("
       <> stop.reason
       <> ")",
@@ -1453,15 +1442,15 @@ fn not_run_failure(stop: Stop) -> AssertionFailure {
   )
 }
 
-/// `the suite set-up of "<suite>" stopped` for the set-up of a suite, and
-/// `the set-up from <set-up hook> in "<groups>" stopped` for a hook.
-fn stopped_set_up_text(stop: Stop) -> String {
-  case stop.set_up {
-    SuiteSetUpHook ->
-      "the suite set-up of \"" <> string.join(stop.scope, " > ") <> "\" stopped"
+/// `the suite setup of "<suite>" stopped` for the setup of a suite, and
+/// `the setup from <setup hook> in "<groups>" stopped` for a hook.
+fn stopped_setup_text(stop: Stop) -> String {
+  case stop.setup {
+    SuiteSetupHook ->
+      "the suite setup of \"" <> string.join(stop.scope, " > ") <> "\" stopped"
     BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
-      "the set-up from "
-      <> types.set_up_hook_name(stop.set_up)
+      "the setup from "
+      <> types.setup_hook_name(stop.setup)
       <> quoted_scope(stop.scope)
       <> " stopped"
   }
@@ -1500,7 +1489,7 @@ fn add_collected(newer: Collected, older: Collected) -> Collected {
   )
 }
 
-/// The results and tear-down failures of test outcomes that are newest
+/// The results and teardown failures of test outcomes that are newest
 /// first.
 fn collected_from_outcomes_rev(outcomes_rev: List(TestOutcome)) -> Collected {
   Collected(
@@ -1670,14 +1659,14 @@ fn collect_children(
 // The setup process of a group
 // =============================================================================
 
-/// Run a group hook in the setup process of the group. A tear-down hook
+/// Run a group hook in the setup process of the group. A teardown hook
 /// gives back the context that it got, so both kinds of hook have one
 /// result type.
 fn run_group_hook(call: GroupHookCall(context)) -> Result(context, String) {
   case call {
-    StartCall(set_up: set_up) -> set_up()
-    SetUpCall(hook: hook, context: context) -> types.call(hook, context)
-    TearDownCall(hook: hook, context: context) ->
+    StartCall(setup: setup) -> setup()
+    SetupCall(hook: hook, context: context) -> types.call(hook, context)
+    TeardownCall(hook: hook, context: context) ->
       types.call(hook, context)
       |> result.replace(context)
   }
@@ -1686,7 +1675,7 @@ fn run_group_hook(call: GroupHookCall(context)) -> Result(context, String) {
 /// The result of the `before_all` hooks of a group, by cause.
 type BeforeAllResult(context) {
   /// Every hook returned `Ok`, or the setup process exited. `setup_process` is
-  /// `SetupProcessGone` when the setup process exited: the set-up stopped, so the tests
+  /// `SetupProcessGone` when the setup process exited: the setup stopped, so the tests
   /// of the group are not run, and its `after_all` hooks run in a new
   /// setup process. `setup_process` is `None` when the group has no `before_all` hook.
   BeforeAllRan(
@@ -1708,7 +1697,7 @@ type BeforeAllResult(context) {
 ///
 /// A hook that returns `Error`, crashes or times out is a failure of the
 /// hook. A setup process that exits, while a hook runs or between two
-/// hooks, stops the set-up. The context is the context after the last
+/// hooks, stops the setup. The context is the context after the last
 /// hook that returned.
 fn run_before_all_chain(
   config: ParallelConfig,
@@ -1733,7 +1722,7 @@ fn run_before_all_chain(
           setup_process,
           config.default_timeout_ms,
           run_group_hook,
-          SetUpCall(hook: hook, context: context),
+          SetupCall(hook: hook, context: context),
         ),
       )
   }
@@ -1776,7 +1765,7 @@ fn before_all_result(
           scope: scope,
           reason: reason,
           not_run: [],
-          set_up: BeforeAllHook,
+          setup: BeforeAllHook,
         )),
         context: context,
       )
@@ -1785,7 +1774,7 @@ fn before_all_result(
 
 /// End the scope of a group: report a setup process that stopped while the tests
 /// ran, run every `after_all` hook (in the setup process while it is alive, else
-/// in a new setup process), then stop the setup process. Gives the tear-down failures
+/// in a new setup process), then stop the setup process. Gives the teardown failures
 /// newest first.
 fn finish_group_scope(
   config: ParallelConfig,
@@ -1860,7 +1849,7 @@ fn group_setup_stopped(
   not_run: List(List(String)),
 ) -> TeardownFailure {
   types.SetupStopped(
-    set_up: scope.hooks.set_up,
+    setup: scope.hooks.setup,
     groups: scope.groups,
     reason: reason,
     not_run: not_run,
@@ -1894,7 +1883,7 @@ fn run_after_all_chain(
           setup_process,
           config.default_timeout_ms,
           run_group_hook,
-          TearDownCall(hook: hook, context: context),
+          TeardownCall(hook: hook, context: context),
         ),
         failures_rev,
       )
@@ -1913,7 +1902,7 @@ type AfterAllStep(context) {
 }
 
 /// Record the result of an `after_all` hook and run the hooks after it.
-/// A setup process that stopped before the hook started means that the set-up
+/// A setup process that stopped before the hook started means that the setup
 /// stopped: the hook runs again in a new setup process, so it never stays not run.
 fn after_all_result(
   step: AfterAllStep(context),
@@ -1958,7 +1947,7 @@ fn after_all_result(
         rest,
         add_teardown_failure(
           scope,
-          scope_crash_message(scope.hooks.tear_down_text, scope.groups, reason),
+          scope_crash_message(scope.hooks.teardown_text, scope.groups, reason),
           failures_rev,
         ),
       )
@@ -1971,7 +1960,7 @@ fn after_all_result(
         rest,
         add_teardown_failure(
           scope,
-          scope_timeout_message(scope.hooks.tear_down_text, scope.groups),
+          scope_timeout_message(scope.hooks.teardown_text, scope.groups),
           failures_rev,
         ),
       )
@@ -1984,7 +1973,7 @@ fn after_all_result(
         rest,
         add_teardown_failure(
           scope,
-          scope_crash_message(scope.hooks.tear_down_text, scope.groups, reason),
+          scope_crash_message(scope.hooks.teardown_text, scope.groups, reason),
           failures_rev,
         ),
       )
@@ -1996,7 +1985,7 @@ fn after_all_result(
   }
 }
 
-/// Put a failure of the tear-down of a group scope in front of
+/// Put a failure of the teardown of a group scope in front of
 /// `failures_rev`.
 fn add_teardown_failure(
   scope: GroupScope,
@@ -2005,7 +1994,7 @@ fn add_teardown_failure(
 ) -> List(TeardownFailure) {
   [
     TeardownFailure(
-      hook: scope.hooks.tear_down,
+      hook: scope.hooks.teardown,
       groups: scope.groups,
       message: message,
     ),
@@ -2071,9 +2060,9 @@ fn run_child_groups_sequentially(
   }
 }
 
-/// Run a child group while the process of each set-up around it is alive.
+/// Run a child group while the process of each setup around it is alive.
 /// After one stopped, the group does not start: no hook of it runs, each
-/// of its tests is `SetupFailed`, and the outermost stopped set-up records
+/// of its tests is `SetupFailed`, and the outermost stopped setup records
 /// them as not run.
 fn execute_or_fail_group(
   node_config: ExecuteNodeConfig(context),
@@ -2094,8 +2083,8 @@ fn execute_or_fail_group(
   }
 }
 
-/// Each test of `node` is `SetupFailed` because the set-up `stopped`
-/// stopped, and that set-up records them as not run. No hook of `node`
+/// Each test of `node` is `SetupFailed` because the setup `stopped`
+/// stopped, and that setup records them as not run. No hook of `node`
 /// runs.
 fn fail_after_stop(
   scope: List(String),
@@ -2235,7 +2224,7 @@ fn start_tests_up_to_limit(
 
 /// Start the next test while the setup process of each scope is alive. After an
 /// setup process stopped, no test that waits starts: each one is `SetupFailed`,
-/// and the outermost stopped set-up records it as not run.
+/// and the outermost stopped setup records it as not run.
 fn start_or_fail_next(
   group: GroupRun(context),
   state: LoopState(context),
@@ -2318,21 +2307,21 @@ fn new_test_job(
       kind: test_case.kind,
       source: test_case.source,
     )
-  let set_up_steps =
+  let setup_steps =
     list.append(
       list.map(group.runner_before_each_test, RunnerBeforeEachStep),
       list.map(group.before_each_hooks, BeforeEachStep),
     )
-  let tear_down_steps =
+  let teardown_steps =
     list.append(
       list.map(group.after_each_hooks, AfterEachStep),
       list.map(group.runner_after_each_test, RunnerAfterEachStep),
     )
-  let #(first_step, later_steps) = case set_up_steps {
-    [] -> #(BodyStep, tear_down_steps)
+  let #(first_step, later_steps) = case setup_steps {
+    [] -> #(BodyStep, teardown_steps)
     [first, ..rest] -> #(
       first,
-      list.flatten([rest, [BodyStep], tear_down_steps]),
+      list.flatten([rest, [BodyStep], teardown_steps]),
     )
   }
   TestJob(
@@ -2539,8 +2528,8 @@ fn remove_down_worker(
 /// After a kill, the state is the newest state that the process sent. When
 /// no step started after the kill, it is the state when the killed step
 /// started. When the killed step finished and a later step started before
-/// the kill reached the process, it holds the context and the tear-down
-/// failures of the steps that finished, so the tear-down steps that run
+/// the kill reached the process, it holds the context and the teardown
+/// failures of the steps that finished, so the teardown steps that run
 /// again get that context.
 fn ended_step(
   worker: RunningWorker(context),
@@ -2572,7 +2561,7 @@ fn ended_step(
 /// finished. Thus, when no step or one step started after the kill, no
 /// step after the killed step finished, and all of them remain. When the
 /// process started a later step before the kill reached it, that step did
-/// not finish, so it is the first of the steps: a tear-down step that the
+/// not finish, so it is the first of the steps: a teardown step that the
 /// killed process started runs again in a new process.
 ///
 /// This uses counts and not a `case` on "did a step start after the kill",
@@ -2593,7 +2582,7 @@ fn steps_after_kill(
 /// the list until the loop reads its down message. The messages that it
 /// sent before the kill come before that down message, so the loop reads
 /// each of them first: a process that sent its outcome just before the
-/// kill keeps that outcome. Its tear-down steps start after the down
+/// kill keeps that outcome. Its teardown steps start after the down
 /// message, when what it held is free. A process that does not stop by
 /// its new deadline is killed again, and the first kill stays.
 fn expire_workers(
@@ -2622,7 +2611,7 @@ fn expire_workers(
 }
 
 /// After a step did not finish: record the failure of the step, then run
-/// the tear-down steps that did not finish yet in a new process, with the
+/// the teardown steps that did not finish yet in a new process, with the
 /// context that they would get after the body. With no such step, the
 /// test has its outcome.
 fn after_step_end(
@@ -2752,7 +2741,7 @@ fn run_steps(
   }
 }
 
-/// Run a step when it is due: a tear-down step always, a set-up step and
+/// Run a step when it is due: a teardown step always, a setup step and
 /// the body only while nothing failed.
 fn run_step_when_due(
   job: TestJob(context),
@@ -2793,7 +2782,7 @@ fn run_step(
 ) -> TestState(context) {
   case step {
     RunnerBeforeEachStep(hook: hook) ->
-      runner_set_up_step_result(
+      runner_setup_step_result(
         job,
         state,
         sandbox.run_catching(
@@ -2802,7 +2791,7 @@ fn run_step(
         ),
       )
     BeforeEachStep(hook: hook) ->
-      set_up_step_result(
+      setup_step_result(
         job,
         state,
         "before_each",
@@ -2820,7 +2809,7 @@ fn run_step(
         ),
       )
     AfterEachStep(hook: hook) ->
-      tear_down_step_result(
+      teardown_step_result(
         job,
         state,
         AfterEachHook,
@@ -2830,7 +2819,7 @@ fn run_step(
         ),
       )
     RunnerAfterEachStep(hook: hook) ->
-      tear_down_step_result(
+      teardown_step_result(
         job,
         state,
         AfterEachTestHook,
@@ -2842,7 +2831,7 @@ fn run_step(
   }
 }
 
-fn set_up_step_result(
+fn setup_step_result(
   job: TestJob(context),
   state: TestState(context),
   operator: String,
@@ -2850,24 +2839,24 @@ fn set_up_step_result(
 ) -> TestState(context) {
   case caught {
     Ok(Ok(next)) -> TestState(..state, context: next)
-    Ok(Error(message)) -> set_up_failed(state, operator, message)
+    Ok(Error(message)) -> setup_failed(state, operator, message)
     Error(reason) ->
-      set_up_failed(state, operator, hook_crash_message(job.scope, reason))
+      setup_failed(state, operator, hook_crash_message(job.scope, reason))
   }
 }
 
 /// The result of a runner `before_each_test` hook. It gets only the
 /// `TestInfo`, so the context stays as it is.
-fn runner_set_up_step_result(
+fn runner_setup_step_result(
   job: TestJob(context),
   state: TestState(context),
   caught: Result(Result(Nil, String), String),
 ) -> TestState(context) {
   case caught {
     Ok(Ok(Nil)) -> state
-    Ok(Error(message)) -> set_up_failed(state, "before_each_test", message)
+    Ok(Error(message)) -> setup_failed(state, "before_each_test", message)
     Error(reason) ->
-      set_up_failed(
+      setup_failed(
         state,
         "before_each_test",
         hook_crash_message(job.scope, reason),
@@ -2888,7 +2877,7 @@ fn body_result(
   }
 }
 
-fn tear_down_step_result(
+fn teardown_step_result(
   job: TestJob(context),
   state: TestState(context),
   hook: TeardownHook,
@@ -2896,9 +2885,9 @@ fn tear_down_step_result(
 ) -> TestState(context) {
   case caught {
     Ok(Ok(Nil)) -> state
-    Ok(Error(message)) -> tear_down_failed(job, state, hook, message)
+    Ok(Error(message)) -> teardown_failed(job, state, hook, message)
     Error(reason) ->
-      tear_down_failed(job, state, hook, hook_crash_message(job.scope, reason))
+      teardown_failed(job, state, hook, hook_crash_message(job.scope, reason))
   }
 }
 
@@ -2912,9 +2901,9 @@ fn fail_step(
 ) -> TestState(context) {
   case step, end {
     RunnerBeforeEachStep(_), _ ->
-      set_up_failed(state, "before_each_test", step_end_message(job, end))
+      setup_failed(state, "before_each_test", step_end_message(job, end))
     BeforeEachStep(_), _ ->
-      set_up_failed(state, "before_each", step_end_message(job, end))
+      setup_failed(state, "before_each", step_end_message(job, end))
     BodyStep, StepTimedOut ->
       body_ended(state, TimedOut, hook_failure("timeout", "test timed out"))
     BodyStep, StepExited(reason: reason) ->
@@ -2930,14 +2919,9 @@ fn fail_step(
         ),
       )
     AfterEachStep(_), _ ->
-      tear_down_failed(job, state, AfterEachHook, step_end_message(job, end))
+      teardown_failed(job, state, AfterEachHook, step_end_message(job, end))
     RunnerAfterEachStep(_), _ ->
-      tear_down_failed(
-        job,
-        state,
-        AfterEachTestHook,
-        step_end_message(job, end),
-      )
+      teardown_failed(job, state, AfterEachTestHook, step_end_message(job, end))
   }
 }
 
@@ -2950,7 +2934,7 @@ fn step_end_message(job: TestJob(context), end: StepEnd) -> String {
   }
 }
 
-fn set_up_failed(
+fn setup_failed(
   state: TestState(context),
   operator: String,
   message: String,
@@ -2972,7 +2956,7 @@ fn body_ended(
   ])
 }
 
-fn tear_down_failed(
+fn teardown_failed(
   job: TestJob(context),
   state: TestState(context),
   hook: TeardownHook,
@@ -3040,7 +3024,7 @@ fn hook_timeout_message(scope: List(String)) -> String {
 }
 
 /// `<text> crashed in <groups>: <reason>`, for example
-/// `the suite set-up crashed in Server: error:boom`.
+/// `the suite setup crashed in Server: error:boom`.
 fn scope_crash_message(
   text: String,
   scope: List(String),

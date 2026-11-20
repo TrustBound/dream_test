@@ -58,7 +58,7 @@
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
-  AssertionSkipped, BeforeAll, BeforeEach, ContextFromSetUp, Group, NoInput,
+  AssertionSkipped, BeforeAll, BeforeEach, ContextFromSetup, Group, NoInput,
   Test, Tree, Unit, WithInput,
 }
 import gleam/option.{None}
@@ -363,7 +363,7 @@ pub fn after_each(
 ///
 /// It runs in the setup process of the group, with the default timeout.
 /// Every `after_all` hook
-/// runs, also after one fails. A failure goes into the tear-down failures of
+/// runs, also after one fails. A failure goes into the teardown failures of
 /// the run report, and the run fails. It does not run for a group that has
 /// no test after filtering.
 pub fn after_all(
@@ -444,28 +444,28 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
 }
 
-/// Create a suite whose context comes from a set-up.
+/// Create a suite whose context comes from a setup.
 ///
-/// `set_up` runs once, before the first test of the suite, and only when
+/// `setup` runs once, before the first test of the suite, and only when
 /// at least one test of the suite runs. Its value is the context of every
-/// hook and test. `tear_down` gets the same value after the last test. The
-/// set-up and the tear-down run in one process that lives while the tests
-/// run, so a process that the set-up starts and links stays alive.
+/// hook and test. `teardown` gets the same value after the last test. The
+/// setup and the teardown run in one process that lives while the tests
+/// run, so a process that the setup starts and links stays alive.
 ///
-/// - When `set_up` returns `Error`, crashes or times out, each test is
-///   `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run.
-/// - When the process of the set-up stops, the tests that did not start
+/// - When `setup` returns `Error`, crashes or times out, each test is
+///   `SetupFailed` with the operator `suite setup`, and `teardown` does not run.
+/// - When the process of the setup stops, the tests that did not start
 ///   are `SetupFailed`, and the run report gets a `types.SetupStopped` with
-///   the set-up `types.SuiteSetUpHook`. `tear_down` still runs when the
-///   set-up returned.
-/// - When `tear_down` returns `Error`, crashes or times out, the run report
-///   gets a `types.TeardownFailure` with the hook `types.SuiteTearDownHook`.
+///   the setup `types.SuiteSetupHook`. `teardown` still runs when the
+///   setup returned.
+/// - When `teardown` returns `Error`, crashes or times out, the run report
+///   gets a `types.TeardownFailure` with the hook `types.SuiteTeardownHook`.
 ///
 /// ## Parameters
 ///
 /// - `name`: the suite name (shown in reports)
-/// - `set_up`: gives the context, or `Error` with a message
-/// - `tear_down`: gets the context after the last test
+/// - `setup`: gives the context, or `Error` with a message
+/// - `teardown`: gets the context after the last test
 /// - `children`: tests, groups and hooks that get the context
 ///
 /// ## Returns
@@ -475,24 +475,24 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
 /// ## Example
 ///
 /// ```gleam
-/// describe_with_set_up(
+/// describe_with_setup(
 ///   "Server",
-///   set_up: start_server,
-///   tear_down: stop_server,
+///   setup: start_server,
+///   teardown: stop_server,
 ///   children: [it("answers a ping", answers_a_ping)],
 /// )
 /// ```
-pub fn describe_with_set_up(
+pub fn describe_with_setup(
   name name: String,
-  set_up set_up: fn() -> Result(context, String),
-  tear_down tear_down: fn(context) -> Result(Nil, String),
+  setup setup: fn() -> Result(context, String),
+  teardown teardown: fn(context) -> Result(Nil, String),
   children children: List(ContextNode(context)),
 ) -> TestSuite {
   suite.new(
     name: name,
     tags: [],
     children: children,
-    context: ContextFromSetUp(set_up: set_up, tear_down: tear_down),
+    context: ContextFromSetup(setup: setup, teardown: teardown),
   )
 }
 

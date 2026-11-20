@@ -92,10 +92,10 @@ import gleam/option.{type Option}
 /// ## TimedOut Explained
 ///
 /// `TimedOut` is only for the test body. A hook that runs past its timeout
-/// does not give `TimedOut`. A set-up hook (`before_each`,
-/// `before_each_test`, `before_all` and the suite-level set-up hooks) gives
-/// `SetupFailed`. A tear-down hook (`after_each`, `after_each_test`,
-/// `after_all` and the suite-level tear-down hooks) gives a
+/// does not give `TimedOut`. A setup hook (`before_each`,
+/// `before_each_test`, `before_all` and the suite-level setup hooks) gives
+/// `SetupFailed`. A teardown hook (`after_each`, `after_each_test`,
+/// `after_all` and the suite-level teardown hooks) gives a
 /// `TeardownFailure` in the run report, and the test keeps its status.
 ///
 /// ```gleam
@@ -490,21 +490,21 @@ pub fn call(
 ///
 /// - `FixedContext(value)`: every test starts from `value`, as the `seed`
 ///   of a `Tree`.
-/// - `ContextFromSetUp(set_up, tear_down)`: `set_up` runs once, before the
+/// - `ContextFromSetup(setup, teardown)`: `setup` runs once, before the
 ///   first test of the suite, and only when at least one test of the suite
-///   runs. Its value is the context of every hook and test. `tear_down`
+///   runs. Its value is the context of every hook and test. `teardown`
 ///   gets the same value after the last test. Both run in one process that
-///   lives while the tests run, so a process that the set-up starts and
-///   links stays alive. When the set-up returns `Error`, crashes or times
-///   out, each test is `SetupFailed` and the tear-down does not run.
+///   lives while the tests run, so a process that the setup starts and
+///   links stays alive. When the setup returns `Error`, crashes or times
+///   out, each test is `SetupFailed` and the teardown does not run.
 ///
-/// `unit_context.describe_with_set_up` and `steps.new_with_set_up` make a
-/// `ContextFromSetUp`.
+/// `unit_context.describe_with_setup` and `steps.new_with_setup` make a
+/// `ContextFromSetup`.
 pub type SuiteContext(context) {
   FixedContext(value: context)
-  ContextFromSetUp(
-    set_up: fn() -> Result(context, String),
-    tear_down: fn(context) -> Result(Nil, String),
+  ContextFromSetup(
+    setup: fn() -> Result(context, String),
+    teardown: fn(context) -> Result(Nil, String),
   )
 }
 
@@ -603,8 +603,8 @@ pub fn status_from_failures(
 /// `failed`, the failure lists of the BDD reporter and the `failed` count
 /// that the runner gives the coverage reporter use this check.
 /// The summary line counts each status apart: its `<count> failed` is the
-/// status `Failed` only. `failed` also counts tear-down failures, stopped
-/// set-ups and crashed results reporters.
+/// status `Failed` only. `failed` also counts teardown failures, stopped
+/// setups and crashed results reporters.
 ///
 /// ## Parameters
 ///
@@ -634,7 +634,7 @@ pub fn is_failure(status status: Status) -> Bool {
   }
 }
 
-/// A tear-down hook. A `TeardownFailure` names the hook that failed.
+/// A teardown hook. A `TeardownFailure` names the hook that failed.
 ///
 /// Each variant is the hook of the builder function with the same name:
 ///
@@ -643,23 +643,23 @@ pub fn is_failure(status status: Status) -> Bool {
 /// - `AfterAllHook`: `unit.after_all` (and the same hook of the other DSLs)
 /// - `AfterEachSuiteHook`: `runner.after_each_suite`
 /// - `AfterAllSuitesHook`: `runner.after_all_suites`
-/// - `SuiteTearDownHook`: the tear-down of a suite whose context comes from
-///   a set-up (`unit_context.describe_with_set_up`,
-///   `steps.new_with_set_up`). Its name is `"suite tear-down"`.
+/// - `SuiteTeardownHook`: the teardown of a suite whose context comes from
+///   a setup (`unit_context.describe_with_setup`,
+///   `steps.new_with_setup`). Its name is `"suite teardown"`.
 pub type TeardownHook {
   AfterEachTestHook
   AfterEachHook
   AfterAllHook
   AfterEachSuiteHook
   AfterAllSuitesHook
-  SuiteTearDownHook
+  SuiteTeardownHook
 }
 
-/// The name of a tear-down hook, as reporters show it.
+/// The name of a teardown hook, as reporters show it.
 ///
 /// ## Parameters
 ///
-/// - `hook`: the tear-down hook
+/// - `hook`: the teardown hook
 ///
 /// ## Returns
 ///
@@ -681,11 +681,11 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
     AfterAllHook -> "after_all"
     AfterEachSuiteHook -> "after_each_suite"
     AfterAllSuitesHook -> "after_all_suites"
-    SuiteTearDownHook -> "suite tear-down"
+    SuiteTeardownHook -> "suite teardown"
   }
 }
 
-/// The set-up hook whose resources a process keeps alive. A `SetupStopped`
+/// The setup hook whose resources a process keeps alive. A `SetupStopped`
 /// failure names it.
 ///
 /// Each variant is the hook of the builder function with the same name:
@@ -696,21 +696,21 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 ///   of one suite.
 /// - `BeforeAllSuitesHook`: `runner.before_all_suites`. It serves every
 ///   test of the run.
-/// - `SuiteSetUpHook`: the set-up of a suite whose context comes from a
-///   set-up (`unit_context.describe_with_set_up`, `steps.new_with_set_up`).
-///   It serves the tests of that suite. Its name is `"suite set-up"`.
-pub type SetUpHook {
+/// - `SuiteSetupHook`: the setup of a suite whose context comes from a
+///   setup (`unit_context.describe_with_setup`, `steps.new_with_setup`).
+///   It serves the tests of that suite. Its name is `"suite setup"`.
+pub type SetupHook {
   BeforeAllHook
   BeforeEachSuiteHook
   BeforeAllSuitesHook
-  SuiteSetUpHook
+  SuiteSetupHook
 }
 
-/// The name of a set-up hook, as reporters show it.
+/// The name of a setup hook, as reporters show it.
 ///
 /// ## Parameters
 ///
-/// - `hook`: the set-up hook
+/// - `hook`: the setup hook
 ///
 /// ## Returns
 ///
@@ -720,53 +720,53 @@ pub type SetUpHook {
 /// ## Example
 ///
 /// ```gleam
-/// types.set_up_hook_name(types.BeforeAllSuitesHook)
+/// types.setup_hook_name(types.BeforeAllSuitesHook)
 /// |> should
 /// |> be_equal("before_all_suites")
 /// |> or_fail_with("expected the builder name")
 /// ```
-pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
+pub fn setup_hook_name(hook hook: SetupHook) -> String {
   case hook {
     BeforeAllHook -> "before_all"
     BeforeEachSuiteHook -> "before_each_suite"
     BeforeAllSuitesHook -> "before_all_suites"
-    SuiteSetUpHook -> "suite set-up"
+    SuiteSetupHook -> "suite setup"
   }
 }
 
-/// A failure at the end of a scope: a tear-down hook that returned `Error`
-/// or crashed, or a set-up that stopped.
+/// A failure at the end of a scope: a teardown hook that returned `Error`
+/// or crashed, or a setup that stopped.
 ///
-/// A tear-down failure does not change the status of a test. The run keeps
+/// A teardown failure does not change the status of a test. The run keeps
 /// it in its own list, and the run fails.
 ///
 /// ## Variants
 ///
-/// - `TeardownFailure(hook, groups, message)`: a tear-down hook failed.
+/// - `TeardownFailure(hook, groups, message)`: a teardown hook failed.
 ///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
 ///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
-///   the group path. For `SuiteTearDownHook` (the tear-down of a suite
-///   set-up), the group path of the suite: the groups around it and its
+///   the group path. For `SuiteTeardownHook` (the teardown of a suite
+///   setup), the group path of the suite: the groups around it and its
 ///   name. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
-/// - `SetupStopped(set_up, groups, reason, not_run)`: a set-up stopped.
-///   The process that keeps its set-up alive exited while or after its
-///   set-up hooks ran, for example because a `before_all` hook killed it,
-///   or a process that the hook linked to it crashed. `set_up` is the
-///   set-up hook. `groups` is the group path for `BeforeAllHook`, the group
-///   path of the suite for `SuiteSetUpHook` (a suite set-up), the suite
+/// - `SetupStopped(setup, groups, reason, not_run)`: a setup stopped.
+///   The process that keeps its setup alive exited while or after its
+///   setup hooks ran, for example because a `before_all` hook killed it,
+///   or a process that the hook linked to it crashed. `setup` is the
+///   setup hook. `groups` is the group path for `BeforeAllHook`, the group
+///   path of the suite for `SuiteSetupHook` (a suite setup), the suite
 ///   name for `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`.
 ///   `reason` is the exit reason of the process. The tests of the scope
 ///   that had not started are not run: each one is `SetupFailed` with the
-///   failure `not run: the set-up from <set-up hook> in "<groups>" stopped
+///   failure `not run: the setup from <setup hook> in "<groups>" stopped
 ///   (<reason>)`, without `in "<groups>"` for `BeforeAllSuitesHook`, or
-///   `not run: the suite set-up of "<suite>" stopped (<reason>)` for
-///   `SuiteSetUpHook`, where `<suite>` is the group path joined with
+///   `not run: the suite setup of "<suite>" stopped (<reason>)` for
+///   `SuiteSetupHook`, where `<suite>` is the group path joined with
 ///   ` > `. `not_run` is the full name of each of these tests (see
 ///   `full_name`), in the order of the run. The runner records each test
 ///   when it skips it. When a test is in the scope of more than one
-///   stopped set-up, the outermost one records it. The tear-down hooks of
+///   stopped setup, the outermost one records it. The teardown hooks of
 ///   the scope run in a new process.
 ///
 /// ## Example
@@ -781,7 +781,7 @@ pub fn set_up_hook_name(hook hook: SetUpHook) -> String {
 pub type TeardownFailure {
   TeardownFailure(hook: TeardownHook, groups: List(String), message: String)
   SetupStopped(
-    set_up: SetUpHook,
+    setup: SetupHook,
     groups: List(String),
     reason: String,
     not_run: List(List(String)),
@@ -815,7 +815,7 @@ pub type ReporterCrash {
   ReporterCrash(position: Int, reason: String)
 }
 
-/// The result of a run: the result of each test, the tear-down hooks that
+/// The result of a run: the result of each test, the teardown hooks that
 /// failed, and the results reporters that crashed.
 ///
 /// `runner.run` and `parallel.run_tree_parallel` give a `RunReport`, and the
@@ -838,14 +838,14 @@ pub opaque type RunReport {
 /// ## Parameters
 ///
 /// - `tests`: the result of each test, in the order of the run
-/// - `teardown_failures`: the tear-down hooks that failed, in the order
+/// - `teardown_failures`: the teardown hooks that failed, in the order
 ///   that they ran
 /// - `reporter_crashes`: the results reporters that crashed, in list order.
 ///   Give `[]` when no reporter crashed, or when no reporter ran yet.
 ///
 /// ## Returns
 ///
-/// A `RunReport` with these tests, tear-down failures and crashed results
+/// A `RunReport` with these tests, teardown failures and crashed results
 /// reporters.
 ///
 /// ## Example
@@ -877,7 +877,7 @@ pub fn run_report(
 ///
 /// ## Returns
 ///
-/// The test results. Tear-down failures are not test results.
+/// The test results. Teardown failures are not test results.
 ///
 /// ## Example
 ///
@@ -892,7 +892,7 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
   report.tests
 }
 
-/// The tear-down hooks that failed in a run, in the order that they ran.
+/// The teardown hooks that failed in a run, in the order that they ran.
 ///
 /// ## Parameters
 ///
@@ -900,7 +900,7 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 ///
 /// ## Returns
 ///
-/// The tear-down failures, or `[]` when every tear-down hook succeeded.
+/// The teardown failures, or `[]` when every teardown hook succeeded.
 ///
 /// ## Example
 ///
@@ -909,7 +909,7 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 /// |> types.report_teardown_failures
 /// |> should
 /// |> be_equal([])
-/// |> or_fail_with("an empty run should have no tear-down failures")
+/// |> or_fail_with("an empty run should have no teardown failures")
 /// ```
 pub fn report_teardown_failures(
   report report: RunReport,
@@ -951,7 +951,7 @@ pub fn report_reporter_crashes(
 }
 
 /// Whether a run failed: a test has a failure status (see `is_failure`), a
-/// tear-down hook failed, or a results reporter crashed.
+/// teardown hook failed, or a results reporter crashed.
 ///
 /// `runner.exit_on_failure` ends the program with status 1 when this is
 /// `True`.
@@ -963,7 +963,7 @@ pub fn report_reporter_crashes(
 /// ## Returns
 ///
 /// `True` when a test is `Failed`, `SetupFailed` or `TimedOut`, when the
-/// report has a tear-down failure, or when it has a crashed results
+/// report has a teardown failure, or when it has a crashed results
 /// reporter.
 ///
 /// ## Example
@@ -983,7 +983,7 @@ pub fn report_reporter_crashes(
 /// |> types.failed
 /// |> should
 /// |> be_equal(True)
-/// |> or_fail_with("a tear-down failure should fail the run")
+/// |> or_fail_with("a teardown failure should fail the run")
 /// ```
 pub fn failed(report report: RunReport) -> Bool {
   !list.is_empty(report.teardown_failures)

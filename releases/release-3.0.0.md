@@ -43,31 +43,31 @@ that lives while the tests of the group run. A pool, a supervisor or an ETS tabl
 hook starts now lives for the tests of its group. A test runs its
 `before_each` hooks, its body and its `after_each` hooks in one process.
 
-- One rule for every hook failure: a failed set-up hook gives `SetupFailed`
-  to each test that it serves. A failed tear-down hook keeps the test status,
-  the other tear-down hooks still run, and the run fails.
+- One rule for every hook failure: a failed setup hook gives `SetupFailed`
+  to each test that it serves. A failed teardown hook keeps the test status,
+  the other teardown hooks still run, and the run fails.
 - `runner.run` returns a `types.RunReport` with the test results, the
-  tear-down failures and the crashed `reporter_types.Custom` reporters. The BDD and Gherkin reporters show a
-  `Set-up and tear-down failures:` section.
-- When the process that keeps a set-up alive stops, the runner reports the
-  stopped set-up one time and names each test that it did not run.
+  teardown failures and the crashed `reporter_types.Custom` reporters. The BDD and Gherkin reporters show a
+  `Setup and teardown failures:` section.
+- When the process that keeps a setup alive stops, the runner reports the
+  stopped setup one time and names each test that it did not run.
 - A hook that crashes, never returns, or kills its own process does not stop
   the run.
 - A test body past its timeout is `TimedOut`, not `Failed`.
 
-### 🧺 One suite type, and set-ups for a whole suite
+### 🧺 One suite type, and setups for a whole suite
 
 - Every suite has one type, `suite.TestSuite` in the new module
   `dream_test/suite`, whatever context its tests get. One `runner.new`
   takes `unit` suites, `unit_context` suites and Gherkin features together.
   `suite.group` and `suite.join` put suites together, and each keeps its
   own context.
-- A suite set-up gives the context of a whole suite and runs once, only
-  when at least one of its tests runs: `unit_context.describe_with_set_up`
-  for unit tests, and `steps.new_with_set_up` for Gherkin scenarios, for
+- A suite setup gives the context of a whole suite and runs once, only
+  when at least one of its tests runs: `unit_context.describe_with_setup`
+  for unit tests, and `steps.new_with_setup` for Gherkin scenarios, for
   example to start one server for all the scenarios of a feature.
 - `steps.to_suite` makes one suite from several Features with one
-  registry, so one set-up serves all of them. Its children
+  registry, so one setup serves all of them. Its children
   (`steps.SuiteChild`) are `SuiteFeature`, `SuiteScenarios`, `SuiteGroup`
   and `SuiteNode`.
 - `suite.from_tree` turns a tree that you build by hand (`types.Tree`)
@@ -114,20 +114,20 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - Gherkin syntax tree and parser: `Scenario Outline` is a `Scenario` with
   `Examples`, `Step` has `doc_string` and `data_table`, parse errors are
   typed, and lines that the grammar does not permit are errors.
-- Hook failures: set-up failures give `SetupFailed`, and tear-down failures
+- Hook failures: setup failures give `SetupFailed`, and teardown failures
   go into the run report in place of fake `<after_all>` tests.
 - The JSON report schema is `2.0`. Its `system` object has
   `gleam_stdlib_version` in place of `gleam_version`, with the same value:
   the version of the `gleam_stdlib` package. The JSON report ends with a
   newline.
 - The summary line of the BDD and Gherkin reporters lists the extra counts
-  in the order skipped, pending, timed out, setup failed, tear-down failed,
-  set-up stopped, before ` in <duration>`. Each count shows only when it is
-  not 0. `tear-down failed` and `set-up stopped` are new.
+  in the order skipped, pending, timed out, setup failed, teardown failed,
+  setup stopped, before ` in <duration>`. Each count shows only when it is
+  not 0. `teardown failed` and `setup stopped` are new.
 - `runner.exit_on_failure` stops the BEAM with `init:stop(1)`. Every test
   runs, and the runner writes all its output first. Then it ends the
   program with status 1 when a test fails, times out or has a failed
-  set-up, when a tear-down hook fails, when a set-up stops
+  setup, when a teardown hook fails, when a setup stops
   (`SetupStopped`), when a `reporter_types.Custom` reporter crashes, and
   when coverage fails.
 - A crashed `reporter_types.Custom` reporter is in the run report, so

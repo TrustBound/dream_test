@@ -1,7 +1,7 @@
-//// The section of a report that lists the tear-down hooks that failed and
-//// the set-ups that stopped.
+//// The section of a report that lists the teardown hooks that failed and
+//// the setups that stopped.
 ////
-//// A tear-down failure is not a test result, so the BDD and Gherkin
+//// A teardown failure is not a test result, so the BDD and Gherkin
 //// reporters show it in its own section, after the test results and before
 //// the summary line. Use this module in a custom reporter to show the same
 //// section.
@@ -10,7 +10,7 @@
 //// import dream_test/reporters/teardown
 ////
 //// teardown.format(types.report_teardown_failures(report))
-//// // -> "Set-up and tear-down failures:\n  after_all in Database\n    could not drop the schema\n"
+//// // -> "Setup and teardown failures:\n  after_all in Database\n    could not drop the schema\n"
 //// ```
 
 import dream_test/reporters/ansi
@@ -18,20 +18,20 @@ import dream_test/types.{type TeardownFailure, SetupStopped, TeardownFailure}
 import gleam/list
 import gleam/string
 
-/// Format the set-up and tear-down failures of a run without colour.
+/// Format the setup and teardown failures of a run without colour.
 ///
-/// A failed tear-down hook has a line with the hook name and its groups
+/// A failed teardown hook has a line with the hook name and its groups
 /// (left out for a hook of the whole run), and a line with the message. A
-/// set-up that stopped (`SetupStopped`) has the line
-/// `<set-up hook> in "<groups>" stopped: the process that keeps its set-up
+/// setup that stopped (`SetupStopped`) has the line
+/// `<setup hook> in "<groups>" stopped: the process that keeps its setup
 /// alive exited with <reason>.` For the whole run, `in "<groups>"` is left
-/// out. When the set-up did not run some tests, the line
+/// out. When the setup did not run some tests, the line
 /// `These tests had not started and were not run:` follows, then the full
 /// name of each test, with its names joined by ` > `.
 ///
 /// ## Parameters
 ///
-/// - `failures`: the tear-down failures of the run, for example from
+/// - `failures`: the teardown failures of the run, for example from
 ///   `types.report_teardown_failures`
 ///
 /// ## Returns
@@ -44,26 +44,26 @@ import gleam/string
 /// ```gleam
 /// teardown.format([
 ///   types.SetupStopped(
-///     set_up: types.BeforeAllHook,
+///     setup: types.BeforeAllHook,
 ///     groups: ["root"],
 ///     reason: "Boom",
 ///     not_run: [["root", "b"], ["root", "c"]],
 ///   ),
 /// ])
-/// // -> "Set-up and tear-down failures:\n  before_all in \"root\" stopped: the process that keeps its set-up alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
+/// // -> "Setup and teardown failures:\n  before_all in \"root\" stopped: the process that keeps its setup alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
 /// ```
 pub fn format(failures failures: List(TeardownFailure)) -> String {
   format_section(failures, False)
 }
 
-/// Format the set-up and tear-down failures of a run with ANSI colour codes.
+/// Format the setup and teardown failures of a run with ANSI colour codes.
 ///
 /// The header is bold red, and the first line of each failure is red. The
 /// text is the same as the text of `format`.
 ///
 /// ## Parameters
 ///
-/// - `failures`: the tear-down failures of the run
+/// - `failures`: the teardown failures of the run
 ///
 /// ## Returns
 ///
@@ -87,7 +87,7 @@ fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
         ansi.apply_if(
           color,
           ansi.bold,
-          ansi.apply_if(color, ansi.red, "Set-up and tear-down failures:"),
+          ansi.apply_if(color, ansi.red, "Setup and teardown failures:"),
         ),
         "\n",
         ..format_failures(color, failures)
@@ -115,17 +115,12 @@ fn format_failure(color: Bool, failure: TeardownFailure) -> String {
       failure_lines(color, with_groups(types.teardown_hook_name(hook), groups), [
         message,
       ])
-    SetupStopped(
-      set_up: set_up,
-      groups: groups,
-      reason: reason,
-      not_run: not_run,
-    ) ->
+    SetupStopped(setup: setup, groups: groups, reason: reason, not_run: not_run) ->
       failure_lines(
         color,
-        types.set_up_hook_name(set_up)
+        types.setup_hook_name(setup)
           <> quoted_groups(groups)
-          <> " stopped: the process that keeps its set-up alive exited with "
+          <> " stopped: the process that keeps its setup alive exited with "
           <> reason
           <> ".",
         not_run_lines(not_run),
@@ -148,7 +143,7 @@ fn detail_line(detail: String) -> String {
   "    " <> detail <> "\n"
 }
 
-/// The lines that name the tests that a stopped set-up did not run, or no
+/// The lines that name the tests that a stopped setup did not run, or no
 /// line when it did not skip a test.
 fn not_run_lines(not_run: List(List(String))) -> List(String) {
   case not_run {

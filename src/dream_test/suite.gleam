@@ -66,7 +66,7 @@ type Place {
 /// - `before_each_test`, `after_each_test`: the runner hooks around each
 ///   test (see `runner.before_each_test`). They get the `TestInfo` of the
 ///   test, not its context.
-/// - `outer_setups`: the set-ups around the suite (see
+/// - `outer_setups`: the setups around the suite (see
 ///   `parallel.OuterSetup`).
 pub type RunInput {
   RunInput(
@@ -113,11 +113,11 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 /// their context.
 ///
 /// With `types.FixedContext(value)`, each test starts from `value`, as
-/// with `from_tree`. With `types.ContextFromSetUp(set_up, tear_down)`, the
-/// set-up runs once, before the first test, and only when at least one
+/// with `from_tree`. With `types.ContextFromSetup(setup, teardown)`, the
+/// setup runs once, before the first test, and only when at least one
 /// test of the suite runs. Its value is the context of every hook and test,
-/// and the tear-down gets it after the last test (see
-/// `types.SuiteContext`). `unit_context.describe_with_set_up` calls this.
+/// and the teardown gets it after the last test (see
+/// `types.SuiteContext`). `unit_context.describe_with_setup` calls this.
 ///
 /// ## Parameters
 ///
@@ -133,7 +133,7 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 ///   name: "server",
 ///   tags: [],
 ///   children: [unit_context.it("answers", answers)],
-///   context: types.ContextFromSetUp(set_up: start_server, tear_down: stop_server),
+///   context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
 /// )
 /// ```
 pub fn new(
@@ -237,8 +237,8 @@ pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
 ///
 /// ## Returns
 ///
-/// The results and the tear-down failures of the suite, in the order that
-/// they ran, the new count of completed tests, and the outer set-ups as
+/// The results and the teardown failures of the suite, in the order that
+/// they ran, the new count of completed tests, and the outer setups as
 /// the executor saw them last.
 pub fn run(
   suite suite: TestSuite,

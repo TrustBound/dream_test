@@ -15,8 +15,8 @@
 ////   compiled code does not record it.
 //// - `summary`: counts by status (`total`, `passed`, `failed`, `skipped`,
 ////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
-////   number of tear-down hooks that failed, and `setup_stopped`, the number
-////   of set-ups whose process stopped
+////   number of teardown hooks that failed, and `setup_stopped`, the number
+////   of setups whose process stopped
 //// - `tests`: per-test details (name, full_name, status, duration_ms, tags,
 ////   kind, failures). `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
 ////   scenario id ends with a number that is unique in the run and changes
@@ -24,29 +24,29 @@
 ////   runs: use `full_name`. Only a Gherkin test has `rule`, after
 ////   `kind`: the name of its Rule group, for example `"Rule: Stock"`, or
 ////   `null` for a scenario outside a Rule.
-//// - `teardown_failures`: one object for each tear-down hook that failed
-////   and each set-up that stopped, in the order that they happened. Each object
+//// - `teardown_failures`: one object for each teardown hook that failed
+////   and each setup that stopped, in the order that they happened. Each object
 ////   has `kind`, `hook`, `groups` and `message`:
-////   - `kind` `"hook_failed"`: a tear-down hook failed. `hook` is
+////   - `kind` `"hook_failed"`: a teardown hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
-////     `"after_each_suite"`, `"after_all_suites"` or `"suite tear-down"`
-////     (the tear-down of a suite with a set-up). `groups` is a list of
+////     `"after_each_suite"`, `"after_all_suites"` or `"suite teardown"`
+////     (the teardown of a suite with a setup). `groups` is a list of
 ////     names: the full test name for `after_each` and `after_each_test`,
 ////     the group path for `after_all`, the suite name for
 ////     `after_each_suite`, the group path of the suite for
-////     `suite tear-down`, `[]` for `after_all_suites`. `message` is the error message or the crash text.
-////   - `kind` `"setup_stopped"`: the process that keeps a set-up alive
-////     exited while its tests ran. `hook` is the set-up hook:
+////     `suite teardown`, `[]` for `after_all_suites`. `message` is the error message or the crash text.
+////   - `kind` `"setup_stopped"`: the process that keeps a setup alive
+////     exited while its tests ran. `hook` is the setup hook:
 ////     `"before_all"`, `"before_each_suite"`, `"before_all_suites"` or
-////     `"suite set-up"`. `groups` is the group path for `before_all`, the
+////     `"suite setup"`. `groups` is the group path for `before_all`, the
 ////     suite name for `before_each_suite`, the group path of the suite for
-////     `suite set-up`, `[]` for `before_all_suites`. `message` is the
+////     `suite setup`, `[]` for `before_all_suites`. `message` is the
 ////     exit reason of the process. Only this kind has `not_run`: the
-////     tests that had not started when the set-up stopped, so they were
+////     tests that had not started when the setup stopped, so they were
 ////     not run. Each one is its `full_name` list, as in `tests`.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
-//// or `setup_stopped` count and no `teardown_failures` list: a failed tear-down hook was a
+//// or `setup_stopped` count and no `teardown_failures` list: a failed teardown hook was a
 //// test with a name such as `<after_all>` in `tests`.
 ////
 //// ## Usage
@@ -344,17 +344,12 @@ fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
         groups,
         message,
       ))
-    SetupStopped(
-      set_up: set_up,
-      groups: groups,
-      reason: reason,
-      not_run: not_run,
-    ) ->
+    SetupStopped(setup: setup, groups: groups, reason: reason, not_run: not_run) ->
       json.object(
         list.append(
           teardown_failure_fields(
             "setup_stopped",
-            types.set_up_hook_name(set_up),
+            types.setup_hook_name(setup),
             groups,
             reason,
           ),

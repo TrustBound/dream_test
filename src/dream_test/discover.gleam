@@ -11,7 +11,7 @@
 //// - It calls `tests/0` to get `TestSuite` values.
 //// - A module can return any suite: from `unit`, from `unit_context` with
 ////   its own context, or a Gherkin feature. Each suite keeps its own
-////   context and set-up.
+////   context and setup.
 ////
 //// ## Example
 ////
@@ -353,7 +353,7 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite) {
 ///
 /// A single `TestSuite` containing:
 /// - each discovered suite as a group inside it, with its own context and
-///   set-up, and
+///   setup, and
 /// - any errors as failing tests tagged `"discovery-error"`.
 ///
 /// ## Example

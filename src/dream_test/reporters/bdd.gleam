@@ -81,8 +81,8 @@ pub fn color(
 }
 
 /// Print only the summary line at the end of the run, after the
-/// `Set-up and tear-down failures:` section when a tear-down hook failed or
-/// a set-up stopped.
+/// `Setup and teardown failures:` section when a teardown hook failed or
+/// a setup stopped.
 pub fn summary_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -96,7 +96,7 @@ pub fn summary_only(
   }
 }
 
-/// Print only the failed tests, the set-up and tear-down failures section
+/// Print only the failed tests, the setup and teardown failures section
 /// (when there is one), and the summary line at the end of the run.
 /// A failed test here is one with the status `Failed`, `TimedOut` or
 /// `SetupFailed` (see `types.is_failure`).
@@ -116,8 +116,8 @@ pub fn failures_only(
 /// Render the end-of-run BDD output for a run report.
 ///
 /// The output has the test results, then the failures (full mode), then a
-/// `Set-up and tear-down failures:` section when a tear-down hook failed or
-/// a set-up stopped (all modes), then the summary line.
+/// `Setup and teardown failures:` section when a teardown hook failed or
+/// a setup stopped (all modes), then the summary line.
 pub fn render(
   config config: reporter_types.BddReporterConfig,
   report report: RunReport,
@@ -159,7 +159,7 @@ fn render_bdd_sections(
   }
 }
 
-/// The summary line, after the tear-down section when it has text.
+/// The summary line, after the teardown section when it has text.
 fn summary_with_teardown(teardown_text: String, summary: String) -> String {
   case teardown_text {
     "" -> summary
@@ -189,8 +189,8 @@ fn format_summary(color: Bool, report: RunReport) -> String {
   }
 }
 
-/// The tear-down section with a blank line before it, or `""` when no
-/// tear-down hook failed.
+/// The teardown section with a blank line before it, or `""` when no
+/// teardown hook failed.
 fn format_teardown_section(color: Bool, report: RunReport) -> String {
   case types.report_teardown_failures(report), color {
     [], _ -> ""
@@ -219,7 +219,7 @@ fn format_failures_header(color: Bool) -> String {
 /// ## Parameters
 ///
 /// - `report`: The run report to format: the test results and the
-///   tear-down failures
+///   teardown failures
 ///
 /// ## Returns
 ///

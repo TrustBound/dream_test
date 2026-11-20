@@ -54,12 +54,12 @@ fn answer(requests: Subject(Request)) -> Nil {
   }
 }
 
-// The steps. The set-up starts the server once, before the first scenario.
-// Each scenario starts from its value. The tear-down stops the server after
+// The steps. The setup starts the server once, before the first scenario.
+// Each scenario starts from its value. The teardown stops the server after
 // the last scenario.
 
 fn server_steps() -> StepRegistry(ServerState) {
-  steps.new_with_set_up(set_up: start_server, tear_down: stop_server)
+  steps.new_with_setup(setup: start_server, teardown: stop_server)
   |> steps.given("the server is running", server_is_running)
   |> steps.when("I ping the server", ping)
   |> steps.then("the reply is {string}", reply_is)

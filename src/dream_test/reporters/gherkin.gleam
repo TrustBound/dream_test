@@ -49,7 +49,7 @@ import gleam/string
 /// ## Parameters
 ///
 /// - `report`: The run report to format: the test results and the
-///   tear-down failures
+///   teardown failures
 ///
 /// ## Returns
 ///

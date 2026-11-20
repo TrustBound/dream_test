@@ -255,8 +255,8 @@ pub fn main() {
 
 A hook fails when it returns `Error(message)` or crashes. What happens next depends on the kind of hook:
 
-- **Set-up hook** (`before_all`, `before_each`, `before_each_test`, `before_each_suite`, `before_all_suites`): each test that it serves gets the status `SetupFailed`, and its body does not run. The tear-down hooks of the levels that started still run.
-- **Tear-down hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining tear-down hooks still run. The run report keeps the failure in its own list (`types.report_teardown_failures`), the reporters show it, and the run fails. With `runner.exit_on_failure`, a failed run ends with exit status 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
+- **Setup hook** (`before_all`, `before_each`, `before_each_test`, `before_each_suite`, `before_all_suites`): each test that it serves gets the status `SetupFailed`, and its body does not run. The teardown hooks of the levels that started still run.
+- **Teardown hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining teardown hooks still run. The run report keeps the failure in its own list (`types.report_teardown_failures`), the reporters show it, and the run fails. With `runner.exit_on_failure`, a failed run ends with exit status 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
 
 #### Report a setup error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -294,7 +294,7 @@ pub fn main() {
 }
 ```
 
-#### Report a tear-down error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/teardown_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Report a teardown error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/teardown_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -311,7 +311,7 @@ pub fn cleanup_failure_tests() {
 }
 
 pub fn tests() {
-  describe("Tear-down failure example", [
+  describe("Teardown failure example", [
     it("keeps the status of the test", fn() {
       runner.new([cleanup_failure_tests()])
       |> runner.run()
@@ -321,7 +321,7 @@ pub fn tests() {
       |> be_equal([Passed])
       |> or_fail_with("expected the test to stay Passed")
     }),
-    it("puts the failure in the tear-down list of the report", fn() {
+    it("puts the failure in the teardown list of the report", fn() {
       runner.new([cleanup_failure_tests()])
       |> runner.run()
       |> types.report_teardown_failures
@@ -333,13 +333,13 @@ pub fn tests() {
           message: "could not drop the test schema",
         ),
       ])
-      |> or_fail_with("expected one tear-down failure")
+      |> or_fail_with("expected one teardown failure")
     }),
   ])
 }
 ```
 
-The BDD and Gherkin reporters show the failure in a `Set-up and tear-down failures:` section after the test results. The summary line counts it, for example `1 tear-down failed`. The JSON reporter writes it in `teardown_failures`.
+The BDD and Gherkin reporters show the failure in a `Setup and teardown failures:` section after the test results. The summary line counts it, for example `1 teardown failed`. The JSON reporter writes it in `teardown_failures`.
 
 ### Where hooks run
 
@@ -349,24 +349,24 @@ A hook can start a resource that its tests use, for example a pool or an ETS tab
 |---|---|---|
 | `before_all_suites`, `after_all_suites` | one setup process for the whole run | the default timeout, for each hook |
 | `before_each_suite`, `after_each_suite` | one setup process for each suite | the default timeout of the suite, for each hook |
-| the suite set-up and tear-down (`unit_context.describe_with_set_up`, `steps.new_with_set_up`) | one setup process for each suite that has them, started after `before_each_suite` | the default timeout of the suite, for each |
+| the suite setup and teardown (`unit_context.describe_with_setup`, `steps.new_with_setup`) | one setup process for each suite that has them, started after `before_each_suite` | the default timeout of the suite, for each |
 | `before_all`, `after_all` | one setup process for each group | the default timeout, for each hook |
 | `before_each_test`, `before_each`, the body, `after_each`, `after_each_test` | one process for each test | the default timeout for each hook, the test timeout for the body |
 
 The default timeout is `runner.default_timeout_ms` (5000 ms when you do not set it), or the `default_timeout_ms` of `runner.add_suites_with_config` for the suites that it adds. The test timeout is the `timeout_ms` of the test when it has one, else the default timeout. `unit.it` and `unit_context.it` give no `timeout_ms`. Only a test that you build with `types.Test(..., timeout_ms: Some(ms), ...)` has its own.
 
-- A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs, with or without `runner.filter_tests`. A group with no test runs no `before_all` or `after_all`, a suite with no test runs no `before_each_suite` or `after_each_suite`, and a run with no test runs no `before_all_suites` or `after_all_suites`.
+- A setup hook and its teardown hook run only when at least one of the tests that they serve runs, with or without `runner.filter_tests`. A group with no test runs no `before_all` or `after_all`, a suite with no test runs no `before_each_suite` or `after_each_suite`, and a run with no test runs no `before_all_suites` or `after_all_suites`.
 - A pool that `before_all` starts lives until `after_all` stops it. A pool that `before_each` starts lives for the body and the `after_each` hooks of that test.
-- The runner waits for each hook with its timeout. A set-up hook that never returns gives `SetupFailed`, and a tear-down hook that never returns is a tear-down failure. The run goes on. The message names the hook level:
+- The runner waits for each hook with its timeout. A setup hook that never returns gives `SetupFailed`, and a teardown hook that never returns is a teardown failure. The run goes on. The message names the hook level:
   - `before_all`, `after_all`, `before_each`, `after_each`, `before_each_test` and `after_each_test`: `hook timed out in <groups>`, with the group names joined by ` > `
   - `before_each_suite` and `after_each_suite`: `hook timed out in <suite>`
   - `before_all_suites` and `after_all_suites`: `hook timed out`
-  - a suite set-up or tear-down: `the suite set-up timed out in <groups>` or `the suite tear-down timed out in <groups>`
-- A crash in a hook, or a crash of the process that runs it, does not stop the run. A hook that returns `Error` or crashes inside the hook is a failure of that hook (`hook crashed in <scope>: <reason>`). When the process that runs a set-up hook (`before_all`, `before_each_suite`, `before_all_suites`) exits, the set-up stopped, as described below: no other set-up hook of the scope runs. When the process that runs a tear-down hook exits, the runner records a failure of that hook.
+  - a suite setup or teardown: `the suite setup timed out in <groups>` or `the suite teardown timed out in <groups>`
+- A crash in a hook, or a crash of the process that runs it, does not stop the run. A hook that returns `Error` or crashes inside the hook is a failure of that hook (`hook crashed in <scope>: <reason>`). When the process that runs a setup hook (`before_all`, `before_each_suite`, `before_all_suites`) exits, the setup stopped, as described below: no other setup hook of the scope runs. When the process that runs a teardown hook exits, the runner records a failure of that hook.
 - After a timeout or a crash of its setup process, the next hook of the scope runs in a new setup process.
-- If the process that keeps a set-up alive exits while or after its set-up hooks run, for example because a `before_all` hook killed it or a process that the hook linked to it crashed, the set-up stopped. The run report gets a `types.SetupStopped(set_up:, groups:, reason:, not_run:)` failure. `not_run` is the full name of each test that the runner did not run because of it, recorded when the runner skipped the test. The reporters show it as `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`, then, when tests were not run, the line `These tests had not started and were not run:` and the full name of each test, for example `root > b`. The JSON reporter writes `not_run` as a list of `full_name` lists. The tests of the scope that did not start yet are not run: each one is `SetupFailed` with `not run: the set-up from before_all in "<groups>" stopped (<reason>)`, `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)` or `not run: the set-up from before_all_suites stopped (<reason>)`. No hook of a group or suite under the stopped set-up starts. The tests that started keep their results. The tear-down hooks of the scope run in a new setup process. The runner checks the process of each set-up around a test (the whole run, the suite and the groups) before each test and each group starts.
+- If the process that keeps a setup alive exits while or after its setup hooks run, for example because a `before_all` hook killed it or a process that the hook linked to it crashed, the setup stopped. The run report gets a `types.SetupStopped(setup:, groups:, reason:, not_run:)` failure. `not_run` is the full name of each test that the runner did not run because of it, recorded when the runner skipped the test. The reporters show it as `before_all in "<groups>" stopped: the process that keeps its setup alive exited with <reason>.`, then, when tests were not run, the line `These tests had not started and were not run:` and the full name of each test, for example `root > b`. The JSON reporter writes `not_run` as a list of `full_name` lists. The tests of the scope that did not start yet are not run: each one is `SetupFailed` with `not run: the setup from before_all in "<groups>" stopped (<reason>)`, `not run: the setup from before_each_suite in "<suite>" stopped (<reason>)` or `not run: the setup from before_all_suites stopped (<reason>)`. No hook of a group or suite under the stopped setup starts. The tests that started keep their results. The teardown hooks of the scope run in a new setup process. The runner checks the process of each setup around a test (the whole run, the suite and the groups) before each test and each group starts.
 - If the body of a test times out, or the test process stops, the `after_each` and `after_each_test` hooks that did not run yet still run, in a new process with their own timeouts. They get the context after the last `before_each` hook that returned. The test keeps its status, for example `TimedOut`.
-- When the tests that a set-up serves end, its setup process exits with reason `shutdown`. An ETS table that the setup process made is deleted, and every linked process stops, for example an actor that `before_all` started.
+- When the tests that a setup serves end, its setup process exits with reason `shutdown`. An ETS table that the setup process made is deleted, and every linked process stops, for example an actor that `before_all` started.
 - When a test ends, its process exits with reason `shutdown`, or is killed on a timeout. An ETS table that the test made is deleted, and every linked process that does not trap exits stops, for example an actor from `process.start_actor`.
 
 ### Hooks and parallelism (the source of most flaky tests)

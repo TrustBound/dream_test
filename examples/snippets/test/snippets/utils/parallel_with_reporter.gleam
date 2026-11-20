@@ -44,7 +44,7 @@ pub fn main() {
     outer_setups: _outer_setups,
   ) = parallel_result
 
-  // Count failed tear-down hooks and stopped set-ups apart.
+  // Count failed teardown hooks and stopped setups apart.
   let counts =
     summary.count(
       types.run_report(

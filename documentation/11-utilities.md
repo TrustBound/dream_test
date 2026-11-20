@@ -268,7 +268,7 @@ The module has more functions. See [`dream_test/sandbox` on HexDocs](https://hex
 
 - `run_catching`: run a function in the calling process, and give a crash as an `Error`
 - `default_config` and `with_crash_reports`: a `SandboxConfig` with the default timeout, and one that shows crash reports
-- `run_in_setup_process`, `check_setup_process` and `stop_setup_process`: run functions one after another in a process that stays alive, as the runner does for a set-up and its tear-down
+- `run_in_setup_process`, `check_setup_process` and `stop_setup_process`: run functions one after another in a process that stays alive, as the runner does for a setup and its teardown
 - `kill_and_wait` and `format_exit_reason`: stop a process and wait for its exit, and give an exit reason as text
 
 ### What's Next?

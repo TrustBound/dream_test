@@ -244,22 +244,22 @@ pub fn tests() {
         |> or_fail_with("the schema version should be 2.0")
       }),
 
-      it("counts the tear-down failures in the summary", fn() {
+      it("counts the teardown failures in the summary", fn() {
         json.format(report_with_cleanup_failure([]))
         |> between("\"summary\":", ",\"tests\"")
         |> should
         |> be_equal(
           "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":1,\"setup_stopped\":0}",
         )
-        |> or_fail_with("the summary should count the tear-down failures")
+        |> or_fail_with("the summary should count the teardown failures")
       }),
 
-      it("counts stopped set-ups apart from failed tear-down hooks", fn() {
+      it("counts stopped setups apart from failed teardown hooks", fn() {
         types.run_report(
           tests: [],
           teardown_failures: [
             types.SetupStopped(
-              set_up: types.BeforeAllHook,
+              setup: types.BeforeAllHook,
               groups: ["root"],
               reason: "Boom",
               not_run: [],
@@ -273,10 +273,10 @@ pub fn tests() {
         |> be_equal(
           "{\"total\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":1}",
         )
-        |> or_fail_with("a stopped set-up should have its own count")
+        |> or_fail_with("a stopped setup should have its own count")
       }),
 
-      it("writes every tear-down failure after the tests", fn() {
+      it("writes every teardown failure after the tests", fn() {
         json.format(report_with_cleanup_failure([]))
         |> after("\"tests\":")
         |> should
@@ -284,16 +284,16 @@ pub fn tests() {
           "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
         )
         |> or_fail_with(
-          "each tear-down failure should have its kind, hook, scope and message",
+          "each teardown failure should have its kind, hook, scope and message",
         )
       }),
 
-      it("writes a stopped set-up with its set-up hook and reason", fn() {
+      it("writes a stopped setup with its setup hook and reason", fn() {
         types.run_report(
           tests: [],
           teardown_failures: [
             types.SetupStopped(
-              set_up: types.BeforeAllHook,
+              setup: types.BeforeAllHook,
               groups: ["root"],
               reason: "Boom",
               not_run: [["root", "b"], ["root", "c"]],
@@ -307,7 +307,7 @@ pub fn tests() {
         |> be_equal(
           "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
         )
-        |> or_fail_with("a stopped set-up should have its own kind")
+        |> or_fail_with("a stopped setup should have its own kind")
       }),
 
       it("counts every status in the summary", fn() {

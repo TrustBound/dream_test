@@ -51,7 +51,7 @@ fn count_broken(report: RunReport) -> Int {
 
 pub fn tests() {
   describe("Hook failures", [
-    it("a failed after_all hook is in the tear-down list", fn() {
+    it("a failed after_all hook is in the teardown list", fn() {
       let report =
         runner.new([database_suite()])
         |> runner.silent()

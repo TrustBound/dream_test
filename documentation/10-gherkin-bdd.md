@@ -8,7 +8,7 @@ At a high level, you describe behavior using a small vocabulary:
 
 - **Feature**: a capability you’re describing (a suite of scenarios)
 - **Scenario**: one concrete example (a test)
-- **Background**: steps that run before each scenario of the Feature. They run again for every scenario. For a resource that starts one time for all scenarios, see [A set-up for all scenarios](#a-set-up-for-all-scenarios-for-example-a-server).
+- **Background**: steps that run before each scenario of the Feature. They run again for every scenario. For a resource that starts one time for all scenarios, see [A setup for all scenarios](#a-setup-for-all-scenarios-for-example-a-server).
 - **Given / When / Then**: a convention for structuring steps:
   - **Given**: starting state / setup
   - **When**: the action
@@ -657,20 +657,20 @@ When the pattern finds no `.feature` file, the suite has no scenarios, so `to_su
 
 `discover.load` gives the same problems as the errors `NoMatchingFeatureFiles(pattern)` and `InvalidFeatureFilePattern(pattern, reason)`.
 
-### A set-up for all scenarios (for example a server)
+### A setup for all scenarios (for example a server)
 
-Some features need a resource that lives for all their scenarios, for example a server. Make the registry with `steps.new_with_set_up` in place of `steps.new`:
+Some features need a resource that lives for all their scenarios, for example a server. Make the registry with `steps.new_with_setup` in place of `steps.new`:
 
-- The set-up runs one time, before the first scenario, and only when at least one scenario runs. A filter that keeps no scenario does not start the server.
-- Each scenario starts from the value of the set-up. A change that one scenario makes to its state does not reach the next scenario.
-- The tear-down gets the same value after the last scenario.
-- The set-up and the tear-down run in one process that lives while the scenarios run. A process that the set-up starts stays alive.
-- When the process of the set-up stops while the scenarios run, each scenario that did not start yet is `SetupFailed`. The run report gets a `types.SetupStopped` for the hook `suite set-up`, and its `not_run` lists those scenarios. The tear-down still runs.
-- When the set-up returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `suite set-up`, and the tear-down does not run. A crash reads `the suite set-up crashed in Server: <reason>`. When the tear-down fails, the run report gets a tear-down failure for the hook `suite tear-down`, for example `suite tear-down in Server` then `the suite tear-down crashed in Server: <reason>`.
+- The setup runs one time, before the first scenario, and only when at least one scenario runs. A filter that keeps no scenario does not start the server.
+- Each scenario starts from the value of the setup. A change that one scenario makes to its state does not reach the next scenario.
+- The teardown gets the same value after the last scenario.
+- The setup and the teardown run in one process that lives while the scenarios run. A process that the setup starts stays alive.
+- When the process of the setup stops while the scenarios run, each scenario that did not start yet is `SetupFailed`. The run report gets a `types.SetupStopped` for the hook `suite setup`, and its `not_run` lists those scenarios. The teardown still runs.
+- When the setup returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `suite setup`, and the teardown does not run. A crash reads `the suite setup crashed in Server: <reason>`. When the teardown fails, the run report gets a teardown failure for the hook `suite teardown`, for example `suite teardown in Server` then `the suite teardown crashed in Server: <reason>`.
 
-With `discover.to_suite`, the set-up runs one time for the scenarios of all the files. A parse error test does not need the set-up, so it runs without it.
+With `discover.to_suite`, the setup runs one time for the scenarios of all the files. A parse error test does not need the setup, so it runs without it.
 
-#### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L13-L55"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L13-L55"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // A small server: a process that answers each ping with "pong".
@@ -718,15 +718,15 @@ fn answer(requests: Subject(Request)) -> Nil {
 }
 ```
 
-#### The steps with a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L57-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The steps with a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L57-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-// The steps. The set-up starts the server once, before the first scenario.
-// Each scenario starts from its value. The tear-down stops the server after
+// The steps. The setup starts the server once, before the first scenario.
+// Each scenario starts from its value. The teardown stops the server after
 // the last scenario.
 
 fn server_steps() -> StepRegistry(ServerState) {
-  steps.new_with_set_up(set_up: start_server, tear_down: stop_server)
+  steps.new_with_setup(setup: start_server, teardown: stop_server)
   |> steps.given("the server is running", server_is_running)
   |> steps.when("I ping the server", ping)
   |> steps.then("the reply is {string}", reply_is)
@@ -753,7 +753,7 @@ fn reply_is(state: ServerState, context: StepContext) {
 }
 ```
 
-#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L88-L101"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L88-L101"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn server_feature() -> TestSuite {
@@ -774,7 +774,7 @@ pub fn server_feature() -> TestSuite {
 
 Each suite keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
 
-#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_set_up.gleam#L103-L132"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L103-L132"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // Suites with other contexts run in the same `runner.new`.
@@ -823,9 +823,9 @@ Counter
 Summary: 4 run, 0 failed, 4 passed in 2ms
 ```
 
-#### Several Features with one set-up
+#### Several Features with one setup
 
-`discover.to_suite` runs one set-up for all its files. To do the same with Features that you parse yourself, give each Feature to `steps.to_suite` as a `steps.SuiteFeature` child. Every scenario starts from the start of the registry: the initial state of `steps.new`, or the value of the set-up of `steps.new_with_set_up`. The set-up runs one time for the scenarios of all its Features, and every scenario runs with the steps of that registry.
+`discover.to_suite` runs one setup for all its files. To do the same with Features that you parse yourself, give each Feature to `steps.to_suite` as a `steps.SuiteFeature` child. Every scenario starts from the start of the registry: the initial state of `steps.new`, or the value of the setup of `steps.new_with_setup`. The setup runs one time for the scenarios of all its Features, and every scenario runs with the steps of that registry.
 
 `steps.to_suite` takes these children (`steps.SuiteChild`):
 
@@ -834,17 +834,17 @@ Summary: 4 run, 0 failed, 4 passed in 2ms
 - `SuiteGroup(name:, tags:, children:)`: a group of your own, for example with a tag, that holds more children.
 - `SuiteNode(node)`: a test, a hook or a group that you make, for example with `unit_context.it` or `unit_context.before_each`. It gets the same start as the scenarios.
 
-A Feature gets its tests only from the registry of its suite, so it cannot run with the steps of one registry and the set-up of another. To use two registries, make two suites, for example with `suite.join`: each set-up runs one time for its own Features.
+A Feature gets its tests only from the registry of its suite, so it cannot run with the steps of one registry and the setup of another. To use two registries, make two suites, for example with `suite.join`: each setup runs one time for its own Features.
 
-##### Two Features, one set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_shared_set_up.gleam#L39-L52"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### Two Features, one setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_shared_setup.gleam#L39-L52"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn shop_steps() -> StepRegistry(Int) {
-  steps.new_with_set_up(set_up: open_shop, tear_down: close_shop)
+  steps.new_with_setup(setup: open_shop, teardown: close_shop)
   |> steps.then("the shop has {int} items", has_items)
 }
 
-/// Two Features in one suite: the set-up runs one time for both.
+/// Two Features in one suite: the setup runs one time for both.
 fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
   steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
     SuiteFeature(cart),

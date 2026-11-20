@@ -1238,7 +1238,7 @@ pub fn tests() {
         )
         |> or_fail_with("expected the block with failed tests")
       }),
-      it("names tear-down failures together with a coverage error", fn() {
+      it("names teardown failures together with a coverage error", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
           outcome: RunOutcome(
@@ -1256,11 +1256,11 @@ pub fn tests() {
           <> "  Found no .gleam or .erl files in the source directory \"lib\".\n"
           <> "  Reason: the directory exists, but coverage has nothing in it to measure.\n"
           <> "  Fix: set the directory that holds your code with coverage.source_directory(...).\n"
-          <> "\nTests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed and coverage did not complete.\n",
+          <> "\nTests: 3 passed, 1 teardown failed. Exit status 1, because a teardown hook failed and coverage did not complete.\n",
         )
-        |> or_fail_with("expected the block with a tear-down failure")
+        |> or_fail_with("expected the block with a teardown failure")
       }),
-      it("names failed tests and tear-down failures together", fn() {
+      it("names failed tests and teardown failures together", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
           outcome: RunOutcome(
@@ -1276,19 +1276,19 @@ pub fn tests() {
         |> list.last
         |> should
         |> be_equal(Ok(
-          "Tests: 3 passed, 2 failed, 1 tear-down failed. Exit status 1, because tests failed and coverage did not complete.\n",
+          "Tests: 3 passed, 2 failed, 1 teardown failed. Exit status 1, because tests failed and coverage did not complete.\n",
         ))
-        |> or_fail_with("expected the failed tests and the tear-down failures")
+        |> or_fail_with("expected the failed tests and the teardown failures")
       }),
-      it("names a stopped set-up together with a coverage error", fn() {
+      it("names a stopped setup together with a coverage error", fn() {
         last_line(NoSourceFiles("lib"), 0, 1)
         |> should
         |> be_equal(Ok(
-          "Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.\n",
+          "Tests: 3 passed, 1 setup stopped. Exit status 1, because a setup stopped and coverage did not complete.\n",
         ))
-        |> or_fail_with("expected the stopped set-up")
+        |> or_fail_with("expected the stopped setup")
       }),
-      it("names a failed tear-down hook and a stopped set-up together", fn() {
+      it("names a failed teardown hook and a stopped setup together", fn() {
         last_line(
           BelowMinimumPercent(
             hit: 2,
@@ -1301,11 +1301,11 @@ pub fn tests() {
         )
         |> should
         |> be_equal(Ok(
-          "Tests: 3 passed, 1 tear-down failed, 2 set-up stopped. Exit status 1, because a tear-down hook failed, 2 set-ups stopped and coverage is below the minimum.\n",
+          "Tests: 3 passed, 1 teardown failed, 2 setup stopped. Exit status 1, because a teardown hook failed, 2 setups stopped and coverage is below the minimum.\n",
         ))
         |> or_fail_with("expected both counts and both causes")
       }),
-      it("counts more than one failed tear-down hook in the cause", fn() {
+      it("counts more than one failed teardown hook in the cause", fn() {
         last_line(
           BelowMinimumPercent(
             hit: 2,
@@ -1318,9 +1318,9 @@ pub fn tests() {
         )
         |> should
         |> be_equal(Ok(
-          "Tests: 3 passed, 3 tear-down failed, 1 set-up stopped. Exit status 1, because 3 tear-down hooks failed, a set-up stopped and coverage is below the minimum.\n",
+          "Tests: 3 passed, 3 teardown failed, 1 setup stopped. Exit status 1, because 3 teardown hooks failed, a setup stopped and coverage is below the minimum.\n",
         ))
-        |> or_fail_with("expected 3 tear-down hooks and a set-up in the cause")
+        |> or_fail_with("expected 3 teardown hooks and a setup in the cause")
       }),
       it(
         "names a crashed results reporter together with a coverage error",
@@ -1340,10 +1340,10 @@ pub fn tests() {
           |> list.last
           |> should
           |> be_equal(Ok(
-            "Tests: 3 passed, 1 tear-down failed. Exit status 1, because a tear-down hook failed, 2 results reporters crashed and coverage did not complete.\n",
+            "Tests: 3 passed, 1 teardown failed. Exit status 1, because a teardown hook failed, 2 results reporters crashed and coverage did not complete.\n",
           ))
           |> or_fail_with(
-            "expected the tear-down failure and the two crashed reporters",
+            "expected the teardown failure and the two crashed reporters",
           )
         },
       ),
@@ -1461,7 +1461,7 @@ pub fn tests() {
 }
 
 /// The last line of the failure block for 3 passed tests and the given
-/// tear-down failures and stopped set-ups.
+/// teardown failures and stopped setups.
 fn last_line(
   error: CoverageError,
   teardown_failed: Int,

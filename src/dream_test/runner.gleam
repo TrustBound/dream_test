@@ -66,7 +66,7 @@ import dream_test/sandbox.{
 }
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionFailure, type RunReport, type SetUpHook, type TeardownFailure,
+  type AssertionFailure, type RunReport, type SetupHook, type TeardownFailure,
   type TeardownHook, type TestResult, AfterAllSuitesHook, AfterEachSuiteHook,
   BeforeAllSuitesHook, BeforeEachSuiteHook, Passed, SetupFailed, SetupStopped,
   TeardownFailure,
@@ -402,7 +402,7 @@ pub fn max_concurrency(
 ///   and to each hook. Give a value of at least 1. With 0, the tests and
 ///   hooks get no time, so they almost always time out, and the result is
 ///   not dependable. A value below 0 almost always stops the run with the
-///   Erlang error `timeout_value` when the run waits for a hook in a set-up
+///   Erlang error `timeout_value` when the run waits for a hook in a setup
 ///   process, for example a `before_all` hook.
 ///
 /// ## Returns
@@ -429,8 +429,8 @@ pub fn default_timeout_ms(
 /// `documentation/07-runner-and-execution.md`):
 ///
 /// 1. A test is `Failed`, `TimedOut` or `SetupFailed`.
-/// 2. A tear-down hook failed, also when every test passed.
-/// 3. A set-up stopped (`types.SetupStopped`).
+/// 2. A teardown hook failed, also when every test passed.
+/// 3. A setup stopped (`types.SetupStopped`).
 /// 4. The `render` function of a `reporter_types.Custom` reporter crashed.
 /// 5. Coverage failed.
 ///
@@ -913,7 +913,7 @@ pub fn after_all_suites(
 /// ## Returns
 ///
 /// A `types.RunReport`: the `TestResult` of each test, in deterministic
-/// order, and the tear-down hooks that failed. Read it with
+/// order, and the teardown hooks that failed. Read it with
 /// `types.report_tests` and `types.report_teardown_failures`, and check it
 /// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
 /// when `types.failed(report)` is `True`, when a `reporter_types.Custom`
@@ -949,7 +949,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   let all_suites_timeout_ms = builder.config.default_timeout_ms
   let before_all_result =
     run_suite_level_hooks(
-      SuiteSetUp(
+      SuiteSetup(
         hooks: all_suites_hooks(selected_runs, builder.runner_before_all_suites),
         input: suite_infos,
         scope: [],
@@ -961,7 +961,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   let #(collected, completed2, all_suites_setup_process_after_run) = case
     before_all_result
   {
-    SuiteSetUpRan(setup_process: all_suites_setup_process) ->
+    SuiteSetupRan(setup_process: all_suites_setup_process) ->
       run_suites_with_hooks(
         suite_runs_with_infos,
         builder.config,
@@ -977,7 +977,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         Collected(tests: [], teardown_failures: []),
         all_suites_setup_process,
       )
-    SuiteSetUpFailed(setup_process: all_suites_setup_process, message: message) -> {
+    SuiteSetupFailed(setup_process: all_suites_setup_process, message: message) -> {
       let setup_failures =
         setup_failed_results_from_suites(
           suite_infos,
@@ -1002,13 +1002,13 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
 
   let after_all_failures =
     finish_suite_scope(
-      SuiteTearDown(
+      SuiteTeardown(
         hooks: all_suites_hooks(selected_runs, builder.runner_after_all_suites),
         input: suite_infos,
         scope: [],
         timeout_ms: all_suites_timeout_ms,
         hook_kind: AfterAllSuitesHook,
-        set_up: BeforeAllSuitesHook,
+        setup: BeforeAllSuitesHook,
       ),
       all_suites_setup_process_after_run,
     )
@@ -1065,7 +1065,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   report
 }
 
-/// The test results and the tear-down failures of the suites that ran so
+/// The test results and the teardown failures of the suites that ran so
 /// far, in the order of the run.
 type Collected {
   Collected(tests: List(TestResult), teardown_failures: List(TeardownFailure))
@@ -1168,10 +1168,10 @@ fn call_suite_hook(call: SuiteHookCall(input)) -> Result(Nil, String) {
 type SuiteSetupProcess(input) =
   SetupProcess(SuiteHookCall(input), Result(Nil, String))
 
-/// The set-up hooks of a suite-level scope. `scope` is `[]` for the whole
+/// The setup hooks of a suite-level scope. `scope` is `[]` for the whole
 /// run and `[suite name]` for one suite.
-type SuiteSetUp(input) {
-  SuiteSetUp(
+type SuiteSetup(input) {
+  SuiteSetup(
     hooks: List(fn(input) -> Result(Nil, String)),
     input: input,
     scope: List(String),
@@ -1179,26 +1179,26 @@ type SuiteSetUp(input) {
   )
 }
 
-/// The tear-down hooks of a suite-level scope, the kind of hook that they
-/// are in a `TeardownFailure`, and the set-up hook of the scope for a
+/// The teardown hooks of a suite-level scope, the kind of hook that they
+/// are in a `TeardownFailure`, and the setup hook of the scope for a
 /// `SetupStopped` failure.
-type SuiteTearDown(input) {
-  SuiteTearDown(
+type SuiteTeardown(input) {
+  SuiteTeardown(
     hooks: List(fn(input) -> Result(Nil, String)),
     input: input,
     scope: List(String),
     timeout_ms: Int,
     hook_kind: TeardownHook,
-    set_up: SetUpHook,
+    setup: SetupHook,
   )
 }
 
-/// The setup process of a suite-level scope whose set-up hooks returned.
+/// The setup process of a suite-level scope whose setup hooks returned.
 type SuiteScopeSetupProcess(input) {
   /// The setup process was alive at the last check.
   SuiteSetupProcessAlive(setup_process: SuiteSetupProcess(input))
   /// The setup process stopped with `reason`. The suites of the scope that have
-  /// not started do not run, and its tear-down hooks run in a new setup process.
+  /// not started do not run, and its teardown hooks run in a new setup process.
   /// `not_run` is the full name of each test that it did not run, in the
   /// order of the run.
   SuiteSetupProcessGone(reason: String, not_run: List(List(String)))
@@ -1235,113 +1235,113 @@ fn checked_suite_setup_process(
   }
 }
 
-/// The result of the suite-level set-up hooks of a scope, by cause.
-type SuiteSetUpResult(input) {
+/// The result of the suite-level setup hooks of a scope, by cause.
+type SuiteSetupResult(input) {
   /// Every hook returned `Ok`, or the setup process exited. `setup_process` is
-  /// `SuiteSetupProcessGone` when the setup process exited: the set-up stopped, so the
-  /// tests of the scope are not run, and its tear-down hooks run in a new
-  /// setup process. `setup_process` is `None` when the scope has no set-up hook.
-  SuiteSetUpRan(setup_process: Option(SuiteScopeSetupProcess(input)))
+  /// `SuiteSetupProcessGone` when the setup process exited: the setup stopped, so the
+  /// tests of the scope are not run, and its teardown hooks run in a new
+  /// setup process. `setup_process` is `None` when the scope has no setup hook.
+  SuiteSetupRan(setup_process: Option(SuiteScopeSetupProcess(input)))
   /// A hook returned `Error`, crashed inside the hook call, or timed out.
   /// `message` names the scope for a crash or a timeout. `setup_process` is the
   /// setup process when it is still alive.
-  SuiteSetUpFailed(
+  SuiteSetupFailed(
     setup_process: Option(SuiteSetupProcess(input)),
     message: String,
   )
 }
 
-/// Run suite-level set-up hooks in order, in the setup process of their
+/// Run suite-level setup hooks in order, in the setup process of their
 /// scope, and stop at the first failure or when the setup process exits. The
 /// first hook starts the setup process, so a resource that a hook starts lives
-/// until the setup process stops after the tear-down hooks. Each hook gets the
+/// until the setup process stops after the teardown hooks. Each hook gets the
 /// timeout of the scope.
 ///
 /// A hook that returns `Error`, crashes or times out is a failure of the
 /// hook. A setup process that exits, while a hook runs or between two
-/// hooks, stops the set-up.
+/// hooks, stops the setup.
 fn run_suite_level_hooks(
-  set_up: SuiteSetUp(input),
+  setup: SuiteSetup(input),
   setup_process: Option(SuiteSetupProcess(input)),
-) -> SuiteSetUpResult(input) {
-  case set_up.hooks {
-    [] -> SuiteSetUpRan(setup_process: alive_suite_setup_process(setup_process))
+) -> SuiteSetupResult(input) {
+  case setup.hooks {
+    [] -> SuiteSetupRan(setup_process: alive_suite_setup_process(setup_process))
     [hook, ..rest] ->
-      suite_set_up_result(
-        SuiteSetUp(..set_up, hooks: rest),
+      suite_setup_result(
+        SuiteSetup(..setup, hooks: rest),
         sandbox.run_in_setup_process(
           setup_process,
-          set_up.timeout_ms,
+          setup.timeout_ms,
           call_suite_hook,
-          SuiteHookCall(hook: hook, input: set_up.input),
+          SuiteHookCall(hook: hook, input: setup.input),
         ),
       )
   }
 }
 
-fn suite_set_up_result(
-  rest: SuiteSetUp(input),
+fn suite_setup_result(
+  rest: SuiteSetup(input),
   setup_process_result: SetupProcessResult(
     SuiteHookCall(input),
     Result(Nil, String),
   ),
-) -> SuiteSetUpResult(input) {
+) -> SuiteSetupResult(input) {
   case setup_process_result {
     SetupProcessReturned(setup_process: setup_process, value: Ok(Nil)) ->
       run_suite_level_hooks(rest, Some(setup_process))
     SetupProcessReturned(setup_process: setup_process, value: Error(message)) ->
-      SuiteSetUpFailed(setup_process: Some(setup_process), message: message)
+      SuiteSetupFailed(setup_process: Some(setup_process), message: message)
     SetupProcessCaught(setup_process: setup_process, reason: reason) ->
-      SuiteSetUpFailed(
+      SuiteSetupFailed(
         setup_process: Some(setup_process),
         message: suite_hook_crash_message(rest.scope, reason),
       )
     SetupProcessTimedOut ->
-      SuiteSetUpFailed(
+      SuiteSetupFailed(
         setup_process: None,
         message: suite_hook_timeout_message(rest.scope),
       )
     SetupProcessExited(reason: reason) | SetupProcessLost(reason: reason) ->
-      SuiteSetUpRan(
+      SuiteSetupRan(
         setup_process: Some(SuiteSetupProcessGone(reason: reason, not_run: [])),
       )
   }
 }
 
 /// End a suite-level scope: report a setup process that stopped while the suites
-/// ran, run every tear-down hook (in the setup process while it is alive, else in
+/// ran, run every teardown hook (in the setup process while it is alive, else in
 /// a new setup process), then stop the setup process. Gives the failures in the order that
 /// they happened.
 fn finish_suite_scope(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   setup_process: Option(SuiteScopeSetupProcess(input)),
 ) -> List(TeardownFailure) {
-  case setup_process, tear_down.hooks {
-    None, _ -> run_suite_teardown(tear_down, None, [])
+  case setup_process, teardown.hooks {
+    None, _ -> run_suite_teardown(teardown, None, [])
     Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)), _ ->
-      run_suite_teardown(tear_down, None, [
-        suite_setup_stopped(tear_down, reason, not_run),
+      run_suite_teardown(teardown, None, [
+        suite_setup_stopped(teardown, reason, not_run),
       ])
     Some(SuiteSetupProcessAlive(setup_process: alive)), [] ->
       stop_checked_suite_setup_process(
-        tear_down,
+        teardown,
         sandbox.check_setup_process(alive),
       )
     Some(SuiteSetupProcessAlive(setup_process: alive)), _ ->
-      run_suite_teardown(tear_down, Some(alive), [])
+      run_suite_teardown(teardown, Some(alive), [])
   }
 }
 
-/// Run the tear-down hooks, then stop the last setup process.
+/// Run the teardown hooks, then stop the last setup process.
 fn run_suite_teardown(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   setup_process: Option(SuiteSetupProcess(input)),
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
   let #(last_setup_process, next_failures_rev) =
     run_suite_teardown_hooks(
-      tear_down,
-      tear_down.hooks,
+      teardown,
+      teardown.hooks,
       setup_process,
       failures_rev,
     )
@@ -1349,10 +1349,10 @@ fn run_suite_teardown(
   list.reverse(next_failures_rev)
 }
 
-/// Stop the setup process of a scope with no tear-down hook, or report that it
+/// Stop the setup process of a scope with no teardown hook, or report that it
 /// stopped already.
 fn stop_checked_suite_setup_process(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   checked: Result(SuiteSetupProcess(input), String),
 ) -> List(TeardownFailure) {
   case checked {
@@ -1360,30 +1360,30 @@ fn stop_checked_suite_setup_process(
       sandbox.stop_setup_process(setup_process)
       []
     }
-    Error(reason) -> [suite_setup_stopped(tear_down, reason, [])]
+    Error(reason) -> [suite_setup_stopped(teardown, reason, [])]
   }
 }
 
 fn suite_setup_stopped(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   reason: String,
   not_run: List(List(String)),
 ) -> TeardownFailure {
   SetupStopped(
-    set_up: tear_down.set_up,
-    groups: tear_down.scope,
+    setup: teardown.setup,
+    groups: teardown.scope,
     reason: reason,
     not_run: not_run,
   )
 }
 
-/// Run every suite-level tear-down hook, also after one fails, and give
+/// Run every suite-level teardown hook, also after one fails, and give
 /// the failures newest first, in front of `failures_rev`. After a timeout
 /// or an exit of the setup process, the next hook runs in a new setup process. A setup process
-/// that stopped before a hook started means that the set-up stopped: the
+/// that stopped before a hook started means that the setup stopped: the
 /// hook runs again in a new setup process, so it never stays not run.
 fn run_suite_teardown_hooks(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   hooks: List(fn(input) -> Result(Nil, String)),
   setup_process: Option(SuiteSetupProcess(input)),
   failures_rev: List(TeardownFailure),
@@ -1391,23 +1391,23 @@ fn run_suite_teardown_hooks(
   case hooks {
     [] -> #(setup_process, failures_rev)
     [hook, ..rest] ->
-      suite_tear_down_result(
-        tear_down,
+      suite_teardown_result(
+        teardown,
         hook,
         rest,
         sandbox.run_in_setup_process(
           setup_process,
-          tear_down.timeout_ms,
+          teardown.timeout_ms,
           call_suite_hook,
-          SuiteHookCall(hook: hook, input: tear_down.input),
+          SuiteHookCall(hook: hook, input: teardown.input),
         ),
         failures_rev,
       )
   }
 }
 
-fn suite_tear_down_result(
-  tear_down: SuiteTearDown(input),
+fn suite_teardown_result(
+  teardown: SuiteTeardown(input),
   hook: fn(input) -> Result(Nil, String),
   rest: List(fn(input) -> Result(Nil, String)),
   setup_process_result: SetupProcessResult(
@@ -1419,69 +1419,69 @@ fn suite_tear_down_result(
   case setup_process_result {
     SetupProcessReturned(setup_process: setup_process, value: Ok(Nil)) ->
       run_suite_teardown_hooks(
-        tear_down,
+        teardown,
         rest,
         Some(setup_process),
         failures_rev,
       )
     SetupProcessReturned(setup_process: setup_process, value: Error(message)) ->
       run_suite_teardown_hooks(
-        tear_down,
+        teardown,
         rest,
         Some(setup_process),
-        add_teardown_failure(tear_down, message, failures_rev),
+        add_teardown_failure(teardown, message, failures_rev),
       )
     SetupProcessCaught(setup_process: setup_process, reason: reason) ->
       run_suite_teardown_hooks(
-        tear_down,
+        teardown,
         rest,
         Some(setup_process),
         add_teardown_failure(
-          tear_down,
-          suite_hook_crash_message(tear_down.scope, reason),
+          teardown,
+          suite_hook_crash_message(teardown.scope, reason),
           failures_rev,
         ),
       )
     SetupProcessTimedOut ->
       run_suite_teardown_hooks(
-        tear_down,
+        teardown,
         rest,
         None,
         add_teardown_failure(
-          tear_down,
-          suite_hook_timeout_message(tear_down.scope),
+          teardown,
+          suite_hook_timeout_message(teardown.scope),
           failures_rev,
         ),
       )
     SetupProcessExited(reason: reason) ->
       run_suite_teardown_hooks(
-        tear_down,
+        teardown,
         rest,
         None,
         add_teardown_failure(
-          tear_down,
-          suite_hook_crash_message(tear_down.scope, reason),
+          teardown,
+          suite_hook_crash_message(teardown.scope, reason),
           failures_rev,
         ),
       )
     SetupProcessLost(reason: reason) ->
-      run_suite_teardown_hooks(tear_down, [hook, ..rest], None, [
-        suite_setup_stopped(tear_down, reason, []),
+      run_suite_teardown_hooks(teardown, [hook, ..rest], None, [
+        suite_setup_stopped(teardown, reason, []),
         ..failures_rev
       ])
   }
 }
 
-/// Put a failure of a tear-down hook in front of `failures_rev`.
+/// Put a failure of a teardown hook in front of `failures_rev`.
 fn add_teardown_failure(
-  tear_down: SuiteTearDown(input),
+  teardown: SuiteTeardown(input),
   message: String,
   failures_rev: List(TeardownFailure),
 ) -> List(TeardownFailure) {
   [
     TeardownFailure(
-      hook: tear_down.hook_kind,
-      groups: tear_down.scope,
+      hook: teardown.hook_kind,
+      groups: teardown.scope,
       message: message,
     ),
     ..failures_rev
@@ -1659,7 +1659,7 @@ fn run_one_suite(
   let suite_scope = [suite_run.info.name]
   let before_result =
     run_suite_level_hooks(
-      SuiteSetUp(
+      SuiteSetup(
         hooks: before_each_suite_hooks,
         input: suite_run.info,
         scope: suite_scope,
@@ -1673,7 +1673,7 @@ fn run_one_suite(
     all_setup_process,
     suite_setup_process,
   ) = case before_result {
-    SuiteSetUpFailed(setup_process: setup_process, message: message) -> {
+    SuiteSetupFailed(setup_process: setup_process, message: message) -> {
       let setup_failures =
         setup_failed_results_from_tests(
           suite_run.info.tests,
@@ -1693,7 +1693,7 @@ fn run_one_suite(
         alive_suite_setup_process(setup_process),
       )
     }
-    SuiteSetUpRan(setup_process: suite_setup_process) -> {
+    SuiteSetupRan(setup_process: suite_setup_process) -> {
       let result =
         run_suite_tests(
           suite_run,
@@ -1723,13 +1723,13 @@ fn run_one_suite(
   }
   let after_each_failures =
     finish_suite_scope(
-      SuiteTearDown(
+      SuiteTeardown(
         hooks: after_each_suite_hooks,
         input: suite_run.info,
         scope: suite_scope,
         timeout_ms: suite_run.config.default_timeout_ms,
         hook_kind: AfterEachSuiteHook,
-        set_up: BeforeEachSuiteHook,
+        setup: BeforeEachSuiteHook,
       ),
       suite_setup_process,
     )
@@ -1767,10 +1767,10 @@ fn run_suite_tests(
   )
 }
 
-/// The suite-level set-up of `setup_process` as the executor sees it: no set-up
+/// The suite-level setup of `setup_process` as the executor sees it: no setup
 /// when it has no setup process.
 fn outer_setup(
-  set_up: SetUpHook,
+  setup: SetupHook,
   scope: List(String),
   setup_process: Option(SuiteScopeSetupProcess(input)),
 ) -> List(parallel.OuterSetup) {
@@ -1778,14 +1778,14 @@ fn outer_setup(
     None -> []
     Some(SuiteSetupProcessAlive(setup_process: alive)) -> [
       parallel.SetupRunning(
-        set_up: set_up,
+        setup: setup,
         groups: scope,
         check_setup_process: fn() { check_suite_setup_process(alive) },
       ),
     ]
     Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)) -> [
       parallel.SetupStopped(
-        set_up: set_up,
+        setup: setup,
         groups: scope,
         reason: reason,
         not_run: not_run,
@@ -1802,33 +1802,33 @@ fn check_suite_setup_process(
 }
 
 /// The setup process after the executor ran: gone when the executor saw the
-/// set-up `set_up` stopped. The check of the executor took the down message of
+/// setup `setup` stopped. The check of the executor took the down message of
 /// the setup process, so its reason comes from `outer_setups`, with the tests that
 /// the executor did not run because of it.
 fn stopped_suite_setup_process(
   setup_process: Option(SuiteScopeSetupProcess(input)),
-  set_up: SetUpHook,
+  setup: SetupHook,
   outer_setups: List(parallel.OuterSetup),
 ) -> Option(SuiteScopeSetupProcess(input)) {
-  case setup_process, find_stopped_setup_process(outer_setups, set_up) {
+  case setup_process, find_stopped_setup_process(outer_setups, setup) {
     Some(_), Ok(gone) -> Some(gone)
     _, _ -> setup_process
   }
 }
 
-/// The first of `outer_setups` that says the set-up `set_up` stopped, as
+/// The first of `outer_setups` that says the setup `setup` stopped, as
 /// a gone setup process.
 fn find_stopped_setup_process(
   outer_setups: List(parallel.OuterSetup),
-  set_up: SetUpHook,
+  setup: SetupHook,
 ) -> Result(SuiteScopeSetupProcess(input), Nil) {
   case outer_setups {
     [] -> Error(Nil)
     [outer_setup, ..rest] ->
       stopped_setup_process_or_next(
-        stopped_setup_process(outer_setup, set_up),
+        stopped_setup_process(outer_setup, setup),
         rest,
-        set_up,
+        setup,
       )
   }
 }
@@ -1836,26 +1836,26 @@ fn find_stopped_setup_process(
 fn stopped_setup_process_or_next(
   found: Result(SuiteScopeSetupProcess(input), Nil),
   rest: List(parallel.OuterSetup),
-  set_up: SetUpHook,
+  setup: SetupHook,
 ) -> Result(SuiteScopeSetupProcess(input), Nil) {
   case found {
     Ok(gone) -> Ok(gone)
-    Error(Nil) -> find_stopped_setup_process(rest, set_up)
+    Error(Nil) -> find_stopped_setup_process(rest, setup)
   }
 }
 
 fn stopped_setup_process(
   outer_setup: parallel.OuterSetup,
-  set_up: SetUpHook,
+  setup: SetupHook,
 ) -> Result(SuiteScopeSetupProcess(input), Nil) {
   case outer_setup {
     parallel.SetupStopped(
-      set_up: stopped,
+      setup: stopped,
       groups: _,
       reason: reason,
       not_run: not_run,
     )
-      if stopped == set_up
+      if stopped == setup
     -> Ok(SuiteSetupProcessGone(reason: reason, not_run: not_run))
     _ -> Error(Nil)
   }

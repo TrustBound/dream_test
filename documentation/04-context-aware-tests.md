@@ -59,22 +59,22 @@ That matters in Gleam because:
 
 This is the “make dependencies explicit” version of hooks: instead of setup functions writing to global state (or relying on process dictionaries), the setup returns a value, and that value is passed into the test body.
 
-### A context from a set-up (`describe_with_set_up`)
+### A context from a setup (`describe_with_setup`)
 
-Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_set_up` in place of `describe`:
+Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_setup` in place of `describe`:
 
-- `set_up` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
-- `tear_down` gets the same value after the last test.
-- Both run in one process that lives while the tests run, so a process that the set-up starts stays alive.
-- When `set_up` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite set-up`, and `tear_down` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite set-up crashed in Store: <reason>`, and a timeout reads `the suite set-up timed out in Store`.
-- When `tear_down` returns `Error`, crashes or times out, the run report gets a tear-down failure for the hook `suite tear-down`. The report shows `suite tear-down in Store`, then the message, for example `the suite tear-down crashed in Store: <reason>`.
-- When the process of the set-up stops, each test that did not start is `SetupFailed` with `not run: the suite set-up of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `suite set-up`, and `tear_down` still runs when `set_up` returned.
+- `setup` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
+- `teardown` gets the same value after the last test.
+- Both run in one process that lives while the tests run, so a process that the setup starts stays alive.
+- When `setup` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite setup`, and `teardown` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite setup crashed in Store: <reason>`, and a timeout reads `the suite setup timed out in Store`.
+- When `teardown` returns `Error`, crashes or times out, the run report gets a teardown failure for the hook `suite teardown`. The report shows `suite teardown in Store`, then the message, for example `the suite teardown crashed in Store: <reason>`.
+- When the process of the setup stops, each test that did not start is `SetupFailed` with `not run: the suite setup of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `suite setup`, and `teardown` still runs when `setup` returned.
 
-#### A suite whose context comes from a set-up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_set_up.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### A suite whose context comes from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/unit_context.{describe_with_set_up, it}
+import dream_test/unit_context.{describe_with_setup, it}
 import gleam/erlang/process.{type Subject}
 
 pub type Request {
@@ -82,8 +82,8 @@ pub type Request {
   Stop
 }
 
-// The set-up starts a process that holds a number. It lives while the tests
-// run, because it runs in the process of the set-up.
+// The setup starts a process that holds a number. It lives while the tests
+// run, because it runs in the process of the setup.
 
 fn start_store() -> Result(Subject(Request), String) {
   let started = process.new_subject()
@@ -116,10 +116,10 @@ fn answer(requests: Subject(Request)) -> Nil {
 }
 
 pub fn tests() {
-  describe_with_set_up(
+  describe_with_setup(
     "Store",
-    set_up: start_store,
-    tear_down: stop_store,
+    setup: start_store,
+    teardown: stop_store,
     children: [
       it("gives the number", fn(store: Subject(Request)) {
         process.call(store, 1000, Get)
@@ -134,7 +134,7 @@ pub fn tests() {
 
 ### Context suites run with other suites
 
-The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for a run with all three kinds.
+The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for a run with all three kinds.
 
 ### A minimal example: counter context
 

@@ -51,7 +51,7 @@ pub fn main() {
       reporter_crashes: [],
     )
 
-  // Count failed tear-down hooks and stopped set-ups apart.
+  // Count failed teardown hooks and stopped setups apart.
   let counts = summary.count(report)
 
   progress.line(
@@ -80,12 +80,12 @@ fn run_tree() -> Result(types.AssertionResult, String) {
   |> matchers.should
   |> matchers.be_equal(#(1, False))
   |> matchers.or_fail_with(
-    "expected the one test of the tree to pass, and no failed tear-down",
+    "expected the one test of the tree to pass, and no failed teardown",
   )
 }
 
 /// The passed tests of the report, and whether the run failed, also by a
-/// failed tear-down hook.
+/// failed teardown hook.
 fn passed_and_failed(report: types.RunReport) -> #(Int, Bool) {
   #(summary.count(report).passed, types.failed(report))
 }

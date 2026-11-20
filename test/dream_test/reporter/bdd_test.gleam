@@ -284,7 +284,7 @@ pub fn tests() {
     ]),
 
     group("render", [
-      it("writes the tear-down failures before the summary", fn() {
+      it("writes the teardown failures before the summary", fn() {
         bdd.render(
           config(False, reporter_types.BddFull),
           report_with_cleanup_failure([
@@ -296,16 +296,16 @@ pub fn tests() {
           "root\n"
           <> "  ✓ adds\n"
           <> "\n"
-          <> "Set-up and tear-down failures:\n"
+          <> "Setup and teardown failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
-          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("the tear-down failures should have their own section")
+        |> or_fail_with("the teardown failures should have their own section")
       }),
 
-      it("writes the tear-down failures in colour", fn() {
+      it("writes the teardown failures in colour", fn() {
         bdd.render(
           config(True, reporter_types.BddFailuresOnly),
           report_with_cleanup_failure([]),
@@ -313,16 +313,16 @@ pub fn tests() {
         |> should
         |> be_equal(
           "\n"
-          <> "\u{1b}[1m\u{1b}[31mSet-up and tear-down failures:\u{1b}[0m\u{1b}[0m\n"
+          <> "\u{1b}[1m\u{1b}[31mSetup and teardown failures:\u{1b}[0m\u{1b}[0m\n"
           <> "  \u{1b}[31mafter_all in root\u{1b}[0m\n"
           <> "    no cleanup\n"
           <> "\n"
-          <> "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m tear-down failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",
+          <> "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m teardown failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",
         )
-        |> or_fail_with("the tear-down section should have colour")
+        |> or_fail_with("the teardown section should have colour")
       }),
 
-      it("writes the tear-down failures in failures-only mode", fn() {
+      it("writes the teardown failures in failures-only mode", fn() {
         bdd.render(
           config(False, reporter_types.BddFailuresOnly),
           report_with_cleanup_failure([
@@ -332,13 +332,13 @@ pub fn tests() {
         |> should
         |> be_equal(
           "\n"
-          <> "Set-up and tear-down failures:\n"
+          <> "Setup and teardown failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
-          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("failures-only mode should show tear-down failures")
+        |> or_fail_with("failures-only mode should show teardown failures")
       }),
 
       it("writes every status without colour", fn() {
@@ -462,7 +462,7 @@ pub fn tests() {
         |> or_fail_with("only the summary line")
       }),
 
-      it("writes the tear-down failures in summary_only mode", fn() {
+      it("writes the teardown failures in summary_only mode", fn() {
         bdd.render(
           config(False, reporter_types.BddSummaryOnly),
           report_with_cleanup_failure([
@@ -472,11 +472,11 @@ pub fn tests() {
         |> should
         |> be_equal(
           "\n"
-          <> "Set-up and tear-down failures:\n"
+          <> "Setup and teardown failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
-          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
         |> or_fail_with("summary_only mode should show what failed")
       }),
@@ -512,8 +512,8 @@ pub fn tests() {
       }),
     ]),
 
-    group("format with tear-down failures", [
-      it("format writes the tear-down failures before the summary", fn() {
+    group("format with teardown failures", [
+      it("format writes the teardown failures before the summary", fn() {
         bdd.format(
           report_with_cleanup_failure([
             result_of(["root"], "adds", types.Passed, [], types.Unit),
@@ -524,13 +524,13 @@ pub fn tests() {
           "root\n"
           <> "  ✓ adds\n"
           <> "\n"
-          <> "Set-up and tear-down failures:\n"
+          <> "Setup and teardown failures:\n"
           <> "  after_all in root\n"
           <> "    no cleanup\n"
           <> "\n"
-          <> "Summary: 1 run, 0 failed, 1 passed, 1 tear-down failed in 0ms\n",
+          <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("format should show the tear-down failures")
+        |> or_fail_with("format should show the teardown failures")
       }),
     ]),
 

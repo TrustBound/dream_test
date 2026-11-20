@@ -1,5 +1,5 @@
 //// Direct black-box tests of public items that other modules use for you:
-//// `suite.new`, `types.FixedContext` and `types.ContextFromSetUp` built by
+//// `suite.new`, `types.FixedContext` and `types.ContextFromSetup` built by
 //// hand, `types.AssertionPending` from a body, `suite.run` with a
 //// `suite.RunInput`, and `parallel.run_tree` with a
 //// `parallel.RunTreeConfig`.
@@ -10,7 +10,7 @@ import dream_test/runner
 import dream_test/suite
 import dream_test/types.{
   type AssertionResult, type Status, type TestInfo, type TestResult,
-  AssertionPending, ContextFromSetUp, FixedContext, Passed, Pending,
+  AssertionPending, ContextFromSetup, FixedContext, Passed, Pending,
 }
 import dream_test/unit
 import dream_test/unit_context
@@ -49,7 +49,7 @@ pub fn tests() {
     }),
 
     unit.it(
-      "suite.new with ContextFromSetUp runs the set-up once and the tear-down",
+      "suite.new with ContextFromSetup runs the setup once and the teardown",
       fn() {
         let calls = process.new_subject()
         suite.new(
@@ -59,9 +59,9 @@ pub fn tests() {
             unit_context.it("first gets 7", is_seven),
             unit_context.it("second gets 7", is_seven),
           ],
-          context: ContextFromSetUp(
-            set_up: fn() { set_up_seven(calls) },
-            tear_down: fn(value) { tear_down(calls, value) },
+          context: ContextFromSetup(
+            setup: fn() { setup_seven(calls) },
+            teardown: fn(value) { teardown(calls, value) },
           ),
         )
         |> run_all
@@ -73,10 +73,10 @@ pub fn tests() {
               #(["set up", "first gets 7"], Passed),
               #(["set up", "second gets 7"], Passed),
             ],
-            ["set_up", "tear_down 7"],
+            ["setup", "teardown 7"],
           ),
         )
-        |> or_fail_with("the set-up should run once, then the tear-down")
+        |> or_fail_with("the setup should run once, then the teardown")
       },
     ),
 
@@ -158,13 +158,13 @@ fn is_seven(value: Int) -> Result(AssertionResult, String) {
   |> or_fail_with("the context should be 7")
 }
 
-fn set_up_seven(calls: Subject(String)) -> Result(Int, String) {
-  process.send(calls, "set_up")
+fn setup_seven(calls: Subject(String)) -> Result(Int, String) {
+  process.send(calls, "setup")
   Ok(7)
 }
 
-fn tear_down(calls: Subject(String), value: Int) -> Result(Nil, String) {
-  process.send(calls, "tear_down " <> int.to_string(value))
+fn teardown(calls: Subject(String), value: Int) -> Result(Nil, String) {
+  process.send(calls, "teardown " <> int.to_string(value))
   Ok(Nil)
 }
 

@@ -54,16 +54,16 @@ pub fn tests() {
       |> or_fail_with("each linked counter should stop with its test")
     }),
 
-    it("a linked counter that a suite set-up starts stops after the run", fn() {
-      // The set-up starts a counter that links to the setup process and
-      // does not trap exits. The tear-down leaves it alone. When the run
+    it("a linked counter that a suite setup starts stops after the run", fn() {
+      // The setup starts a counter that links to the setup process and
+      // does not trap exits. The teardown leaves it alone. When the run
       // returns, the counter must stop with the setup process.
       let counters = beam_process.new_subject()
       runner.new([
-        unit_context.describe_with_set_up(
-          "set-up",
-          set_up: fn() { start_counter_in_set_up(counters) },
-          tear_down: leave_counter,
+        unit_context.describe_with_setup(
+          "setup",
+          setup: fn() { start_counter_in_setup(counters) },
+          teardown: leave_counter,
           children: [unit_context.it("passes", counter_context_passes)],
         ),
       ])
@@ -72,7 +72,7 @@ pub fn tests() {
       |> fn(_report) { receive_down(counters) }
       |> should
       |> be_equal(Ok(Nil))
-      |> or_fail_with("the counter of the set-up should stop after the run")
+      |> or_fail_with("the counter of the setup should stop after the run")
     }),
 
     it("a linked counter that before_all starts stops after the run", fn() {
@@ -293,7 +293,7 @@ fn ignore_down(_down: beam_process.Down) -> Nil {
   Nil
 }
 
-fn start_counter_in_set_up(
+fn start_counter_in_setup(
   counters: beam_process.Subject(beam_process.Pid),
 ) -> Result(beam_process.Pid, String) {
   let counter = dt_process.start_counter()
@@ -315,7 +315,7 @@ fn counter_context_passes(
 fn start_counter_in_before_all(
   counters: beam_process.Subject(beam_process.Pid),
 ) -> Result(Nil, String) {
-  start_counter_in_set_up(counters)
+  start_counter_in_setup(counters)
   |> result.replace(Nil)
 }
 

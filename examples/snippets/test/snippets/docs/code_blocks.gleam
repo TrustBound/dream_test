@@ -76,7 +76,7 @@ const mains_with_other_end = [
   #(
     "examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam",
     EndsWithStatusZeroAndLine(
-      line: "MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped",
+      line: "MyReport: 3 total; 3 passed; 0 failed; 0 teardown failed; 0 setup stopped",
     ),
   ),
   #(

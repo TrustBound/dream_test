@@ -1,5 +1,5 @@
-//// A Gherkin registry whose scenarios start from the value of a set-up:
-//// `steps.new_with_set_up`.
+//// A Gherkin registry whose scenarios start from the value of a setup:
+//// `steps.new_with_setup`.
 
 import dream_test/file
 import dream_test/gherkin/discover
@@ -23,8 +23,8 @@ import gleam/option.{None}
 import gleam/result
 
 pub fn tests() {
-  describe("steps.new_with_set_up", [
-    it("runs the set-up once; each scenario starts from its value", fn() {
+  describe("steps.new_with_setup", [
+    it("runs the setup once; each scenario starts from its value", fn() {
       let events = process.new_subject()
       let report = run([counter_feature(counter_steps(events, Ok(10)))])
       #(statuses(report), receive_all(events, []))
@@ -35,13 +35,13 @@ pub fn tests() {
             #(["Counter", "adds one"], Passed),
             #(["Counter", "adds two"], Passed),
           ],
-          ["set_up", "tear_down got 10"],
+          ["setup", "teardown got 10"],
         ),
       )
       |> or_fail_with("each scenario should start from 10")
     }),
 
-    it("does not run the set-up when no scenario runs", fn() {
+    it("does not run the setup when no scenario runs", fn() {
       let events = process.new_subject()
       let report =
         runner.new([
@@ -54,10 +54,10 @@ pub fn tests() {
       #(statuses(report), receive_all(events, []))
       |> should
       |> be_equal(#([#(["plain", "passes"], Passed)], []))
-      |> or_fail_with("the set-up should not run")
+      |> or_fail_with("the setup should not run")
     }),
 
-    it("a set-up error gives SetupFailed to each scenario", fn() {
+    it("a setup error gives SetupFailed to each scenario", fn() {
       let events = process.new_subject()
       let report =
         run([counter_feature(counter_steps(events, Error("no counter")))])
@@ -69,10 +69,10 @@ pub fn tests() {
             #(["Counter", "adds one"], SetupFailed, [failure("no counter")]),
             #(["Counter", "adds two"], SetupFailed, [failure("no counter")]),
           ],
-          ["set_up"],
+          ["setup"],
         ),
       )
-      |> or_fail_with("no scenario should run and no tear-down")
+      |> or_fail_with("no scenario should run and no teardown")
     }),
 
     it("to_suite gives each test the state of a registry from new", fn() {
@@ -90,7 +90,7 @@ pub fn tests() {
       |> or_fail_with("the test should start from 7")
     }),
 
-    it("to_suite gives each test the value of the set-up", fn() {
+    it("to_suite gives each test the value of the setup", fn() {
       let events = process.new_subject()
       let report =
         run([
@@ -104,15 +104,15 @@ pub fn tests() {
       #(statuses(report), receive_all(events, []))
       |> should
       |> be_equal(
-        #([#(["start", "gets 7"], Passed)], ["set_up", "tear_down got 7"]),
+        #([#(["start", "gets 7"], Passed)], ["setup", "teardown got 7"]),
       )
-      |> or_fail_with("the test should start from the set-up value")
+      |> or_fail_with("the test should start from the setup value")
     }),
 
-    it("to_suite runs every kind of child under one set-up", fn() {
+    it("to_suite runs every kind of child under one setup", fn() {
       // SuiteFeature, SuiteScenarios, a SuiteGroup with a tag that holds a
       // SuiteFeature, and SuiteNode with a unit_context.it and a
-      // before_each. The set-up runs one time; before_each runs before each
+      // before_each. The setup runs one time; before_each runs before each
       // of the four tests. The tests
       // directly in the suite run before the tests of its groups.
       let events = process.new_subject()
@@ -147,16 +147,16 @@ pub fn tests() {
             #(["Shop", "Billing", "Invoice", "adds one"], Passed, ["billing"]),
           ],
           [
-            "set_up",
+            "setup",
             "before_each",
             "before_each",
             "before_each",
             "before_each",
-            "tear_down got 10",
+            "teardown got 10",
           ],
         ),
       )
-      |> or_fail_with("one set-up should serve every child")
+      |> or_fail_with("one setup should serve every child")
     }),
 
     it("two registries in two joined suites each set up their own", fn() {
@@ -191,8 +191,8 @@ pub fn tests() {
             #(["Cart suite", "Cart", "adds one"], Passed),
             #(["Stock suite", "Stock", "adds one"], Passed),
           ],
-          ["set_up", "tear_down got 10"],
-          ["set_up", "tear_down got 10"],
+          ["setup", "teardown got 10"],
+          ["setup", "teardown got 10"],
         ),
       )
       |> or_fail_with("each registry should set up once for its features")
@@ -229,13 +229,13 @@ pub fn tests() {
       },
     ),
 
-    it("discover.to_suite runs the set-up once for all files", fn() {
+    it("discover.to_suite runs the setup once for all files", fn() {
       let events = process.new_subject()
-      write_counter_file("set_up_a")
-      write_counter_file("set_up_b")
+      write_counter_file("setup_a")
+      write_counter_file("setup_b")
       let report =
         run([
-          discover.features("test/tmp/features/set_up_[ab].feature")
+          discover.features("test/tmp/features/setup_[ab].feature")
           |> discover.with_registry(counter_steps(events, Ok(10)))
           |> discover.to_suite("Features"),
         ])
@@ -244,22 +244,22 @@ pub fn tests() {
       |> be_equal(
         #(
           [
-            #(["Features", "set_up_a", "adds one"], Passed),
-            #(["Features", "set_up_b", "adds one"], Passed),
+            #(["Features", "setup_a", "adds one"], Passed),
+            #(["Features", "setup_b", "adds one"], Passed),
           ],
-          ["set_up", "tear_down got 10"],
+          ["setup", "teardown got 10"],
         ),
       )
-      |> or_fail_with("one set-up should serve both files")
+      |> or_fail_with("one setup should serve both files")
     }),
 
-    it("discover.to_suite runs a parse error test without the set-up", fn() {
+    it("discover.to_suite runs a parse error test without the setup", fn() {
       let events = process.new_subject()
-      write_counter_file("set_up_good")
-      let _ = file.write("test/tmp/features/set_up_bad.feature", "NOT\n")
+      write_counter_file("setup_good")
+      let _ = file.write("test/tmp/features/setup_bad.feature", "NOT\n")
       let report =
         runner.new([
-          discover.features("test/tmp/features/set_up_{good,bad}.feature")
+          discover.features("test/tmp/features/setup_{good,bad}.feature")
           |> discover.with_registry(counter_steps(events, Ok(10)))
           |> discover.to_suite("Features"),
         ])
@@ -269,19 +269,19 @@ pub fn tests() {
       #(list.map(statuses(report), status_of), receive_all(events, []))
       |> should
       |> be_equal(#([Failed], []))
-      |> or_fail_with("the parse error should fail without the set-up")
+      |> or_fail_with("the parse error should fail without the setup")
     }),
   ])
 }
 
-/// A registry whose set-up sends `set_up` and gives `start`.
+/// A registry whose setup sends `setup` and gives `start`.
 fn counter_steps(
   events: Subject(String),
   start: Result(Int, String),
 ) -> StepRegistry(Int) {
-  steps.new_with_set_up(
-    set_up: fn() { send_and_give(events, start) },
-    tear_down: fn(value: Int) { send_tear_down(events, value) },
+  steps.new_with_setup(
+    setup: fn() { send_and_give(events, start) },
+    teardown: fn(value: Int) { send_teardown(events, value) },
   )
   |> steps.given("the counter starts", keep)
   |> steps.when("I add {int}", add)
@@ -393,12 +393,12 @@ fn send_and_give(
   events: Subject(String),
   start: Result(Int, String),
 ) -> Result(Int, String) {
-  process.send(events, "set_up")
+  process.send(events, "setup")
   start
 }
 
-fn send_tear_down(events: Subject(String), value: Int) -> Result(Nil, String) {
-  process.send(events, "tear_down got " <> int.to_string(value))
+fn send_teardown(events: Subject(String), value: Int) -> Result(Nil, String) {
+  process.send(events, "teardown got " <> int.to_string(value))
   Ok(Nil)
 }
 
@@ -417,7 +417,7 @@ fn run(suites: List(TestSuite)) -> types.RunReport {
 }
 
 fn failure(message: String) -> AssertionFailure {
-  AssertionFailure(operator: "suite set-up", message: message, payload: None)
+  AssertionFailure(operator: "suite setup", message: message, payload: None)
 }
 
 fn statuses(report: types.RunReport) -> List(#(List(String), Status)) {

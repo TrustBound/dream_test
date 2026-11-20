@@ -110,7 +110,7 @@ pub fn tests() {
         |> or_fail_with("the line should stop at 20 columns")
       }),
 
-      it("counts the tear-down failures on the last line", fn() {
+      it("counts the teardown failures on the last line", fn() {
         progress.render(
           50,
           progress.RunFinishedProgress(
@@ -121,11 +121,11 @@ pub fn tests() {
           ),
         )
         |> should
-        |> be_equal("2/2 [█████████████] 100% done, 1 tear-down failed ")
-        |> or_fail_with("the last line should count the tear-down failures")
+        |> be_equal("2/2 [██████████████] 100% done, 1 teardown failed ")
+        |> or_fail_with("the last line should count the teardown failures")
       }),
 
-      it("counts failed tear-down hooks and stopped set-ups apart", fn() {
+      it("counts failed teardown hooks and stopped setups apart", fn() {
         progress.render(
           80,
           progress.RunFinishedProgress(
@@ -135,7 +135,7 @@ pub fn tests() {
             setup_stopped: 2,
           ),
         )
-        |> string.contains("] 100% done, 1 tear-down failed, 2 set-up stopped ")
+        |> string.contains("] 100% done, 1 teardown failed, 2 setup stopped ")
         |> should
         |> be_equal(True)
         |> or_fail_with("the last line should show both counts")
@@ -185,7 +185,7 @@ pub fn tests() {
         |> or_fail_with("the last line should end with a new line")
       }),
 
-      it("names the tear-down failures on the last line", fn() {
+      it("names the teardown failures on the last line", fn() {
         with_terminal_columns(60, fn() {
           progress.line(
             progress.new(),
@@ -199,9 +199,9 @@ pub fn tests() {
         })
         |> should
         |> be_equal(
-          "\r2/2 [███████████████████████] 100% done, 1 tear-down failed \n",
+          "\r2/2 [████████████████████████] 100% done, 1 teardown failed \n",
         )
-        |> or_fail_with("the last line should count the tear-down failures")
+        |> or_fail_with("the last line should count the teardown failures")
       }),
     ]),
 

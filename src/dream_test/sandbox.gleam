@@ -18,7 +18,7 @@
 ////
 //// `run_in_setup_process` runs functions one after another in a setup process that
 //// stays alive between them, so a resource that one function starts lives
-//// for the next one. The runner uses one setup process for the set-up and tear-down hooks of
+//// for the next one. The runner uses one setup process for the setup and teardown hooks of
 //// each group, each suite and the whole run.
 ////
 //// ## Selective crash reports
@@ -471,7 +471,7 @@ fn handle_timeout(
 /// the process is gone: its ETS tables are deleted, its registered name is
 /// free, and the processes that link to it got the exit signal. Use it
 /// before code that needs what the killed process held, for example a
-/// tear-down hook that makes a table with the same name.
+/// teardown hook that makes a table with the same name.
 ///
 /// A process that has exited already is not an error.
 ///
@@ -881,8 +881,8 @@ fn exit(reason: atom.Atom) -> Nil
 ///
 /// A setup process can stop between two functions, for example when a process
 /// that links to it crashes while its tests run. Use this
-/// function before the tear-down hooks run, to report that exit and to
-/// run the tear-down in a new setup process.
+/// function before the teardown hooks run, to report that exit and to
+/// run the teardown in a new setup process.
 ///
 /// ## Example
 ///
@@ -969,7 +969,7 @@ fn format_down_reason(down: process.Down) -> String {
 /// The setup process exits with reason `shutdown`. An ETS table that it made
 /// is deleted, and a process that links to it, such as an actor or a
 /// supervisor, gets the exit signal and stops. When `stop_setup_process` returns,
-/// the setup process has exited, so a later set-up can make a table with the same
+/// the setup process has exited, so a later setup can make a table with the same
 /// name. A setup process that stopped already is not an error, and any process can
 /// stop a setup process.
 ///

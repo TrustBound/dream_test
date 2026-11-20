@@ -24,7 +24,7 @@ Do the steps in this order. The first steps affect the most projects.
 
 1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
 2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. See [The runner and the run report](#the-runner-and-the-run-report).
-3. **Hooks.** A failed set-up hook gives `SetupFailed`. A failed tear-down hook goes into the run report, not into the test results. See [Hooks](#hooks).
+3. **Hooks.** A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
 5. **JSON.** The JSON report has schema version `2.0`. See [The JSON report](#the-json-report).
 6. **The Gherkin parser and syntax tree.** The parser follows the official Gherkin grammar, and parse errors are typed. See [The Gherkin parser and syntax tree](#the-gherkin-parser-and-syntax-tree).
@@ -161,7 +161,7 @@ Look for these in your code:
 - `steps.step`, `steps.when_` and `steps.then_`: use `steps.given`, `steps.when` or `steps.then`.
 - `result.unwrap` on a capture: use `result.try`. Then a wrong capture fails the scenario with a clear message.
 
-If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_set_up`. Its set-up runs one time, and each scenario starts from its value. To share one set-up between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server).
+If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_setup`. Its setup runs one time, and each scenario starts from its value. To share one setup between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server).
 
 #### A record for more than one value
 
@@ -482,7 +482,7 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 
 ### The runner and the run report
 
-`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results, the tear-down hooks that failed and the results reporters that crashed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
+`runner.run` returns a `types.RunReport`, not `List(TestResult)`. The report holds the test results, the teardown hooks that failed and the results reporters that crashed. Use `types.report_tests(report)` to get the test results. Use `types.failed(report)` to find out if the run failed.
 
 #### Suites have one type, whatever their context
 
@@ -536,7 +536,7 @@ pub fn main() {
 
 #### `runner.has_failures` is now `types.failed`
 
-`types.failed` is also `True` when a tear-down hook failed and every test passed, when a set-up stopped, and when a `reporter_types.Custom` reporter crashed.
+`types.failed` is also `True` when a teardown hook failed and every test passed, when a setup stopped, and when a `reporter_types.Custom` reporter crashed.
 
 ##### 2.x: check a run with `runner.has_failures` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/has_failures.gleam#L1-L30"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -611,8 +611,8 @@ fn failing_suite() {
 
 In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it also gives exit status 1 in these cases, also when every test passed:
 
-- a tear-down hook failed
-- a set-up stopped (`SetupStopped`)
+- a teardown hook failed
+- a setup stopped (`SetupStopped`)
 - the `render` function of a `reporter_types.Custom` reporter crashed
 - coverage failed
 
@@ -917,7 +917,7 @@ pub fn main() {
       reporter_crashes: [],
     )
 
-  // Count failed tear-down hooks and stopped set-ups apart.
+  // Count failed teardown hooks and stopped setups apart.
   let counts = summary.count(report)
 
   progress.line(
@@ -1055,18 +1055,18 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 
 3.0.0 has one rule for every hook failure:
 
-- A failed set-up hook gives `SetupFailed` to each test that it serves.
-- A failed tear-down hook does not change the status of a test. The other tear-down hooks still run. The failure goes into the tear-down list of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
+- A failed setup hook gives `SetupFailed` to each test that it serves.
+- A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the teardown list of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
 
-A set-up hook and its tear-down hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that a whole suite shares, use `unit_context.describe_with_set_up`, or `steps.new_with_set_up` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
+A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that a whole suite shares, use `unit_context.describe_with_setup`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
 
-#### A set-up whose process stops
+#### A setup whose process stops
 
-A `before_all`, `before_each_suite` or `before_all_suites` hook, or a suite set-up, runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(set_up, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a suite setup, runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
 
-- Each test that had not started is `SetupFailed`, with a failure such as `not run: the set-up from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
-- The tear-down hooks still run, in a new process.
-- `types.failed` is `True`, and the summary line counts it as `set-up stopped`.
+- Each test that had not started is `SetupFailed`, with a failure such as `not run: the setup from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
+- The teardown hooks still run, in a new process.
+- `types.failed` is `True`, and the summary line counts it as `setup stopped`.
 - 2.x had no such result.
 
 #### A failed `after_all` hook
@@ -1092,7 +1092,7 @@ fn after_all_failed(results: List(TestResult)) -> Bool {
 }
 ```
 
-##### 3.0.0: read the tear-down failures of the report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_failures.gleam#L10-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: read the teardown failures of the report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_failures.gleam#L10-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn stop_database() -> Result(Nil, String) {
@@ -1119,7 +1119,7 @@ fn after_all_failed(report: RunReport) -> Bool {
 
 A failed `after_each` or `after_each_test` hook also keeps the status of its test. In 2.x, the test became `Failed`, also when it was `TimedOut`, `Skipped` or `SetupFailed`. In 3.0.0, the report has `TeardownFailure(hook: AfterEachHook, ..)` with the full test name in `groups`.
 
-#### A failed set-up hook, and a timeout
+#### A failed setup hook, and a timeout
 
 In 2.x, the tests of a failed `before_all`, `before_each_suite` or `before_all_suites` hook were `Failed`. In 3.0.0, they are `SetupFailed`. A test body that runs past its timeout is `TimedOut`, with the failure `timeout: test timed out`. In 2.x, a sequential run gave `Failed` for a timeout. Code that counts or matches statuses must handle `SetupFailed` and `TimedOut`.
 
@@ -1198,7 +1198,7 @@ pub fn suite() {
 
 A test process that stops during the body gives `Failed` with `crash: worker crashed in <group>: <reason>`. In 2.x, the failure was `crash: killed`.
 
-When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook. A process that a `before_all` hook or a suite set-up starts and links stops after the last test that the hook serves: its setup process exits with reason `shutdown`.
+When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook. A process that a `before_all` hook or a suite setup starts and links stops after the last test that the hook serves: its setup process exits with reason `shutdown`.
 
 ### Reporters
 
@@ -1329,7 +1329,7 @@ fn sample_results() -> List(types.TestResult) {
 
 #### The summary line
 
-The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. The extra counts come after `N passed` and before ` in <duration>`, and each shows only when it is not 0. Two counts are new, after setup failed: `N tear-down failed` and `N set-up stopped`. For example: `Summary: 4 run, 1 failed, 2 passed, 1 skipped, 1 tear-down failed in 12ms`. Update a test or a tool that compares the exact summary text.
+The summary line of the BDD and Gherkin reporters lists the extra counts in a new order: skipped, pending, timed out, setup failed. In 2.x, the order was setup failed, timed out, pending, skipped. The extra counts come after `N passed` and before ` in <duration>`, and each shows only when it is not 0. Two counts are new, after setup failed: `N teardown failed` and `N setup stopped`. For example: `Summary: 4 run, 1 failed, 2 passed, 1 skipped, 1 teardown failed in 12ms`. Update a test or a tool that compares the exact summary text.
 
 #### Progress events
 
@@ -1427,10 +1427,10 @@ In 2.x, `runner.results_reporters` took only the built-in reporters. A custom re
 
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
 
-- `summary` has the counts `teardown_failed` (tear-down hooks that failed) and `setup_stopped` (set-ups whose process stopped).
+- `summary` has the counts `teardown_failed` (teardown hooks that failed) and `setup_stopped` (setups whose process stopped).
 - The object has the list `teardown_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
-- A failed tear-down hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
-- A set-up that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
+- A failed teardown hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
+- A setup that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
 - A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
 - The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.

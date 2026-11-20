@@ -36,14 +36,14 @@ fn status_and_marker(run: #(Int, String)) -> #(Int, Bool) {
 
 pub fn tests() {
   describe("dream_test/runner paths", [
-    it("exit_on_failure stops with status 1 for a tear-down failure only", fn() {
+    it("exit_on_failure stops with status 1 for a teardown failure only", fn() {
       run_main_in_new_vm(
         "dream_test@coverage_runner_mains",
         "teardown_failure_with_exit_on_failure",
       ).0
       |> should
       |> be_equal(1)
-      |> or_fail_with("a tear-down failure should give exit status 1")
+      |> or_fail_with("a teardown failure should give exit status 1")
     })
       |> with_child_timeout,
 

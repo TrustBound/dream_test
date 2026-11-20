@@ -56,8 +56,8 @@ pub fn new() -> ProgressReporter {
 /// - `TestFinishedProgress`: one more test finished. `completed` counts the
 ///   finished tests, this one included.
 /// - `RunFinishedProgress`: the run finished. `teardown_failures` is the
-///   number of tear-down hooks that failed, and `setup_stopped` the number
-///   of set-ups whose process stopped while their tests ran.
+///   number of teardown hooks that failed, and `setup_stopped` the number
+///   of setups whose process stopped while their tests ran.
 ///
 /// ## Example
 ///
@@ -174,12 +174,12 @@ pub fn render(columns columns: Int, event event: ProgressEvent) -> String {
   }
 }
 
-/// `done` at the end of a run, with the number of tear-down hooks that
-/// failed and of set-ups that stopped, when not zero.
+/// `done` at the end of a run, with the number of teardown hooks that
+/// failed and of setups that stopped, when not zero.
 fn done_label(teardown_failures: Int, setup_stopped: Int) -> String {
   "done"
-  <> count_label(teardown_failures, " tear-down failed")
-  <> count_label(setup_stopped, " set-up stopped")
+  <> count_label(teardown_failures, " teardown failed")
+  <> count_label(setup_stopped, " setup stopped")
 }
 
 /// `, <count><label>`, or `""` for a count of 0.

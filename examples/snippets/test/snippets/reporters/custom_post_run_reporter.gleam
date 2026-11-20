@@ -9,8 +9,8 @@ import gleam/int
 import gleam/string
 
 pub fn render_my_report(report: RunReport) -> String {
-  // `summary.count` counts the tests by status. It counts the tear-down
-  // hooks that failed apart from the set-ups whose process stopped.
+  // `summary.count` counts the tests by status. It counts the teardown
+  // hooks that failed apart from the setups whose process stopped.
   let counts = summary.count(report)
 
   string.concat([
@@ -22,9 +22,9 @@ pub fn render_my_report(report: RunReport) -> String {
     int.to_string(counts.failed + counts.timed_out + counts.setup_failed),
     " failed; ",
     int.to_string(counts.teardown_failed),
-    " tear-down failed; ",
+    " teardown failed; ",
     int.to_string(counts.setup_stopped),
-    " set-up stopped\n",
+    " setup stopped\n",
   ])
 }
 
@@ -57,7 +57,7 @@ pub fn tests() {
       process.receive(written, 0)
       |> should
       |> be_equal(Ok(
-        "MyReport: 2 total; 2 passed; 0 failed; 0 tear-down failed; 0 set-up stopped\n",
+        "MyReport: 2 total; 2 passed; 0 failed; 0 teardown failed; 0 setup stopped\n",
       ))
       |> or_fail_with("expected the runner to write the custom report")
     }),
@@ -68,11 +68,11 @@ pub fn tests() {
       |> render_my_report
       |> should
       |> be_equal(
-        "MyReport: 2 total; 2 passed; 0 failed; 0 tear-down failed; 0 set-up stopped\n",
+        "MyReport: 2 total; 2 passed; 0 failed; 0 teardown failed; 0 setup stopped\n",
       )
       |> or_fail_with("expected the report line for two passing tests")
     }),
-    it("counts stopped set-ups apart from failed tear-down hooks", fn() {
+    it("counts stopped setups apart from failed teardown hooks", fn() {
       types.run_report(
         tests: [],
         teardown_failures: [
@@ -82,7 +82,7 @@ pub fn tests() {
             message: "no cleanup",
           ),
           types.SetupStopped(
-            set_up: types.BeforeAllHook,
+            setup: types.BeforeAllHook,
             groups: ["Example Suite"],
             reason: "killed",
             not_run: [],
@@ -93,9 +93,9 @@ pub fn tests() {
       |> render_my_report
       |> should
       |> be_equal(
-        "MyReport: 0 total; 0 passed; 0 failed; 1 tear-down failed; 1 set-up stopped\n",
+        "MyReport: 0 total; 0 passed; 0 failed; 1 teardown failed; 1 setup stopped\n",
       )
-      |> or_fail_with("expected one failed hook and one stopped set-up")
+      |> or_fail_with("expected one failed hook and one stopped setup")
     }),
   ])
 }

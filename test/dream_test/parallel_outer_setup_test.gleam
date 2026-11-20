@@ -14,8 +14,8 @@ import gleam/list
 import gleam/option.{None}
 
 pub fn tests() {
-  describe("dream_test/parallel outer set-ups", [
-    it("a stopped outer set-up gives SetupFailed to each test", fn() {
+  describe("dream_test/parallel outer setups", [
+    it("a stopped outer setup gives SetupFailed to each test", fn() {
       let reports = process.new_subject()
       types.tree("suite", Nil, [
         unit.before_all(fn() {
@@ -27,7 +27,7 @@ pub fn tests() {
       ])
       |> run_in_setups([
         SetupStopped(
-          set_up: BeforeAllSuitesHook,
+          setup: BeforeAllSuitesHook,
           groups: [],
           reason: "Boom",
           not_run: [["first", "z"]],
@@ -42,13 +42,13 @@ pub fn tests() {
             #("a", SetupFailed, [
               #(
                 "before_all_suites",
-                "not run: the set-up from before_all_suites stopped (Boom)",
+                "not run: the setup from before_all_suites stopped (Boom)",
               ),
             ]),
             #("b", SetupFailed, [
               #(
                 "before_all_suites",
-                "not run: the set-up from before_all_suites stopped (Boom)",
+                "not run: the setup from before_all_suites stopped (Boom)",
               ),
             ]),
           ],
@@ -65,14 +65,14 @@ pub fn tests() {
         ),
         Error(Nil),
       ))
-      |> or_fail_with("no hook or test should run after the set-up stopped")
+      |> or_fail_with("no hook or test should run after the setup stopped")
     }),
 
-    it("a set-up whose check gives an error is stopped", fn() {
+    it("a setup whose check gives an error is stopped", fn() {
       types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(
-          set_up: BeforeEachSuiteHook,
+          setup: BeforeEachSuiteHook,
           groups: ["suite"],
           check_setup_process: fn() { Error("Boom") },
         ),
@@ -85,21 +85,21 @@ pub fn tests() {
             #("a", SetupFailed, [
               #(
                 "before_each_suite",
-                "not run: the set-up from before_each_suite in \"suite\" stopped (Boom)",
+                "not run: the setup from before_each_suite in \"suite\" stopped (Boom)",
               ),
             ]),
           ],
           setups: [#(BeforeEachSuiteHook, Stopped("Boom", [["suite", "a"]]))],
         ),
       )
-      |> or_fail_with("a failed check should make the set-up stopped")
+      |> or_fail_with("a failed check should make the setup stopped")
     }),
 
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
       types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(
-          set_up: BeforeAllSuitesHook,
+          setup: BeforeAllSuitesHook,
           groups: [],
           check_setup_process: fn() { Ok(Nil) },
         ),
@@ -114,17 +114,17 @@ pub fn tests() {
       |> or_fail_with("the test should run while the scope is alive")
     }),
 
-    it("the outermost stopped set-up is the failure of a test", fn() {
+    it("the outermost stopped setup is the failure of a test", fn() {
       types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupStopped(
-          set_up: BeforeAllSuitesHook,
+          setup: BeforeAllSuitesHook,
           groups: [],
           reason: "outer",
           not_run: [],
         ),
         SetupStopped(
-          set_up: BeforeEachSuiteHook,
+          setup: BeforeEachSuiteHook,
           groups: ["suite"],
           reason: "inner",
           not_run: [],
@@ -138,7 +138,7 @@ pub fn tests() {
             #("a", SetupFailed, [
               #(
                 "before_all_suites",
-                "not run: the set-up from before_all_suites stopped (outer)",
+                "not run: the setup from before_all_suites stopped (outer)",
               ),
             ]),
           ],
@@ -152,7 +152,7 @@ pub fn tests() {
     }),
 
     it(
-      "a set-up that stops while the tests run stops the tests not started",
+      "a setup that stops while the tests run stops the tests not started",
       fn() {
         let setup_process =
           process.spawn_unlinked(fn() { process.sleep_forever() })
@@ -166,7 +166,7 @@ pub fn tests() {
         ])
         |> run_with_concurrency_one([
           SetupRunning(
-            set_up: BeforeAllSuitesHook,
+            setup: BeforeAllSuitesHook,
             groups: [],
             check_setup_process: fn() { check_process(monitor) },
           ),
@@ -180,7 +180,7 @@ pub fn tests() {
               #("b", SetupFailed, [
                 #(
                   "before_all_suites",
-                  "not run: the set-up from before_all_suites stopped (killed)",
+                  "not run: the setup from before_all_suites stopped (killed)",
                 ),
               ]),
             ],
@@ -189,17 +189,17 @@ pub fn tests() {
             ],
           ),
         )
-        |> or_fail_with("b should not start after the set-up stopped")
+        |> or_fail_with("b should not start after the setup stopped")
       },
     ),
   ])
 }
 
-/// What a test sees of the result: each test, and each outer set-up.
+/// What a test sees of the result: each test, and each outer setup.
 type Summary {
   Summary(
     tests: List(#(String, Status, List(#(String, String)))),
-    setups: List(#(types.SetUpHook, SetupState)),
+    setups: List(#(types.SetupHook, SetupState)),
   )
 }
 
@@ -265,14 +265,14 @@ fn test_summary(
   )
 }
 
-fn setup_summary(setup: OuterSetup) -> #(types.SetUpHook, SetupState) {
+fn setup_summary(setup: OuterSetup) -> #(types.SetupHook, SetupState) {
   case setup {
-    SetupRunning(set_up: set_up, groups: _, check_setup_process: _) -> #(
-      set_up,
+    SetupRunning(setup: setup, groups: _, check_setup_process: _) -> #(
+      setup,
       Running,
     )
-    SetupStopped(set_up: set_up, groups: _, reason: reason, not_run: not_run) -> #(
-      set_up,
+    SetupStopped(setup: setup, groups: _, reason: reason, not_run: not_run) -> #(
+      setup,
       Stopped(reason, not_run),
     )
   }

@@ -13,7 +13,7 @@
 ////
 //// The line always has the run, failed and passed counts. The failed count
 //// is the tests with the status `Failed` only. It adds the
-//// skipped, pending, timed out, setup failed, tear-down failed and set-up
+//// skipped, pending, timed out, setup failed, teardown failed and setup
 //// stopped counts, in that order, only when they are not zero.
 
 import dream_test/reporters/ansi
@@ -26,8 +26,8 @@ import gleam/int
 import gleam/list
 import gleam/string
 
-/// The number of tests with each status, the number of tear-down hooks that
-/// failed, the number of set-ups that stopped, and the sum of the test
+/// The number of tests with each status, the number of teardown hooks that
+/// failed, the number of setups that stopped, and the sum of the test
 /// durations.
 ///
 /// `run` is the number of results. The six status counts add up to `run`.
@@ -60,11 +60,11 @@ pub type Counts {
     timed_out: Int,
     /// Results with status `SetupFailed`
     setup_failed: Int,
-    /// Tear-down hooks that failed: the `TeardownFailure` entries of
+    /// Teardown hooks that failed: the `TeardownFailure` entries of
     /// `types.report_teardown_failures`. They are not test results, so they
     /// are not part of `run`.
     teardown_failed: Int,
-    /// Set-ups whose process stopped while their tests ran: the
+    /// Setups whose process stopped while their tests ran: the
     /// `SetupStopped` entries of `types.report_teardown_failures`. They are
     /// not part of `run`.
     setup_stopped: Int,
@@ -73,8 +73,8 @@ pub type Counts {
   )
 }
 
-/// Count the test results by status, count the tear-down hooks that failed
-/// and the set-ups that stopped, and add up the test durations.
+/// Count the test results by status, count the teardown hooks that failed
+/// and the setups that stopped, and add up the test durations.
 ///
 /// ## Parameters
 ///
@@ -124,8 +124,8 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// The word `Summary:` is bold cyan. The run count and the duration are
 /// cyan, the failed count is red and the passed count is green. The skipped
-/// and pending counts are yellow, the timed out, setup failed, tear-down
-/// failed and set-up stopped counts are red, and their labels are dim.
+/// and pending counts are yellow, the timed out, setup failed, teardown
+/// failed and setup stopped counts are red, and their labels are dim.
 ///
 /// ## Parameters
 ///
@@ -216,8 +216,8 @@ fn format_extra_counts(counts: Counts, color: Bool) -> String {
     ExtraCount(counts.pending, " pending", ansi.yellow, color),
     ExtraCount(counts.timed_out, " timed out", ansi.red, color),
     ExtraCount(counts.setup_failed, " setup failed", ansi.red, color),
-    ExtraCount(counts.teardown_failed, " tear-down failed", ansi.red, color),
-    ExtraCount(counts.setup_stopped, " set-up stopped", ansi.red, color),
+    ExtraCount(counts.teardown_failed, " teardown failed", ansi.red, color),
+    ExtraCount(counts.setup_stopped, " setup stopped", ansi.red, color),
   ]
   |> list.filter(is_not_zero)
   |> list.map(format_extra_count)

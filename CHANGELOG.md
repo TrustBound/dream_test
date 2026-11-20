@@ -18,10 +18,10 @@ store. This release has breaking changes. Read
 #### Runner and run report
 
 - `runner.run` returns `types.RunReport`, not `List(TestResult)`. A
-  `RunReport` holds the test results, the tear-down hooks that failed and
+  `RunReport` holds the test results, the teardown hooks that failed and
   the results reporters that crashed.
 - `runner.has_failures` is removed. Use `types.failed(report)`, which is
-  also `True` for a tear-down failure and for a crashed results reporter.
+  also `True` for a teardown failure and for a crashed results reporter.
 - `runner.silent()` drops the normal output only: progress, results
   reports and the coverage report. It still writes two kinds of error to
   the standard error stream: the `Results reporter failed` error of a
@@ -38,11 +38,11 @@ store. This release has breaking changes. Read
   `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
   writes all its output, and then ends the program with status 1 inside
   `runner.run`: no code after `runner.run` runs. In 3.0.0 it also writes
-  the coverage files first. It also stops with status 1 when a tear-down
-  hook failed and every test passed, when a set-up stopped
+  the coverage files first. It also stops with status 1 when a teardown
+  hook failed and every test passed, when a setup stopped
   (`SetupStopped`), when a `reporter_types.Custom` reporter crashed, and
-  when coverage failed. 2.x had no tear-down failures in the report, no
-  stopped set-ups, no custom reporters and no coverage.
+  when coverage failed. 2.x had no teardown failures in the report, no
+  stopped setups, no custom reporters and no coverage.
 - `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`.
   A tree is one top-level group with its children and one context; a
   suite holds one or more trees. The tree holds the top-level group
@@ -105,10 +105,10 @@ store. This release has breaking changes. Read
 
 #### Hooks and processes
 
-- One rule for every hook failure. A failed set-up hook gives `SetupFailed`
-  to each test that it serves. A failed tear-down hook does not change a
-  test status, the remaining tear-down hooks still run, the failure goes
-  into the tear-down list of the run report, and the run fails.
+- One rule for every hook failure. A failed setup hook gives `SetupFailed`
+  to each test that it serves. A failed teardown hook does not change a
+  test status, the remaining teardown hooks still run, the failure goes
+  into the teardown list of the run report, and the run fails.
 - When a `before_all` hook fails, times out or crashes, the tests of its
   group and of every group inside it are `SetupFailed`, not `Failed`.
 - The hooks of each scope run in one setup process of that scope, and a
@@ -118,7 +118,7 @@ store. This release has breaking changes. Read
 - At the very moment of a deadline, the runner keeps a result that is
   already waiting for it. So a test that finished at its deadline can keep
   its result, and a test that is `TimedOut` for a step can also hold the
-  context and tear-down failures of steps that finished in that moment.
+  context and teardown failures of steps that finished in that moment.
 
 #### Sandbox
 
@@ -134,8 +134,8 @@ store. This release has breaking changes. Read
   `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report`
   functions return the report.
 - The JSON schema version is `2.0`. Its `summary` adds the counts
-  `teardown_failed` (tear-down hooks that failed) and `setup_stopped`
-  (set-ups whose process stopped).
+  `teardown_failed` (teardown hooks that failed) and `setup_stopped`
+  (setups whose process stopped).
 - The `system` object of the JSON report has `gleam_stdlib_version` in
   place of `gleam_version`. The value did not change: it is the version of
   the `gleam_stdlib` package. The compiled code does not record the version
@@ -145,7 +145,7 @@ store. This release has breaking changes. Read
   it joined its last line.
 - The summary line of the BDD and Gherkin reporters lists the extra counts
   in the order skipped, pending, timed out, setup failed, then the new
-  counts tear-down failed and set-up stopped, before ` in <duration>`.
+  counts teardown failed and setup stopped, before ` in <duration>`.
 - `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
   A `case` on a `ResultsReporter` needs a branch for it.
 - The progress event API is removed: `reporters/types.ReporterEvent`,
@@ -309,8 +309,8 @@ the guide labels them.
   its field `suite` is now `tree`.
 - `types.Root` is now `types.Tree` and holds the group fields, and hooks
   and tests hold a `Callback`.
-- A failed set-up hook gives `SetupFailed`. A body timeout gives `TimedOut`.
-- A failed tear-down hook goes into the run report, not into the results.
+- A failed setup hook gives `SetupFailed`. A body timeout gives `TimedOut`.
+- A failed teardown hook goes into the run report, not into the results.
 - Hooks run in one setup process of their scope.
 - Reporter functions that format a whole run take a `RunReport`.
 - The JSON report has schema version `2.0`.
@@ -338,7 +338,7 @@ the guide labels them.
   - `suite.name`, `suite.tests` and `suite.run` read and run a suite.
     `suite.run` takes a `suite.RunInput`: the concurrency and default
     timeout, the test filter, the progress output, the runner hooks
-    around each test and the outer set-ups
+    around each test and the outer setups
   - `suite.with_source` gives each test of a suite that has no source a
     source, for example the module name. A test that has a source, such
     as the `.feature` path of a scenario, keeps it. Module discovery uses it
@@ -356,34 +356,34 @@ the guide labels them.
     `~` and count it as pending, and the run still passes
   - `types.AssertionResult` has the new variant `AssertionPending`
 
-- **A context from a set-up**
+- **A context from a setup**
 
-  - `unit_context.describe_with_set_up(name:, set_up:, tear_down:,
-    children:)` makes a suite whose context is the value of `set_up`
-  - `steps.new_with_set_up(set_up:, tear_down:)` makes a step registry whose
-    scenarios start from the value of `set_up`. `gherkin/discover.to_suite`
-    runs the set-up one time for the scenarios of all its files.
+  - `unit_context.describe_with_setup(name:, setup:, teardown:,
+    children:)` makes a suite whose context is the value of `setup`
+  - `steps.new_with_setup(setup:, teardown:)` makes a step registry whose
+    scenarios start from the value of `setup`. `gherkin/discover.to_suite`
+    runs the setup one time for the scenarios of all its files.
     `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
     that starts as the registry says. Its children are
     `steps.SuiteChild` values: `SuiteFeature(feature)`,
     `SuiteScenarios(feature)`, `SuiteGroup(name:, tags:, children:)` and
     `SuiteNode(node)`. The scenarios of every Feature run with the steps
     of that registry, so a suite of Features cannot mix the steps of one
-    registry with the set-up of another
-  - The set-up runs one time, before the first test, and only when at
-    least one test of the suite runs. The tear-down gets its value after
+    registry with the setup of another
+  - The setup runs one time, before the first test, and only when at
+    least one test of the suite runs. The teardown gets its value after
     the last test. Both run in one process that lives while the tests run
-  - A failed set-up gives `SetupFailed` to each test, with the operator
-    `suite set-up`, and the tear-down does not run. A crash reads
-    `the suite set-up crashed in <suite>: <reason>`, and a timeout reads
-    `the suite set-up timed out in <suite>`. A failed tear-down is a
-    tear-down failure with the new hook `types.SuiteTearDownHook`, named
-    `suite tear-down` in the reports and in JSON. A set-up whose process
-    stops is a `SetupStopped` with the new hook `types.SuiteSetUpHook`,
-    named `suite set-up`, and each test that did not start gets
-    `not run: the suite set-up of "<suite>" stopped (<reason>)`
+  - A failed setup gives `SetupFailed` to each test, with the operator
+    `suite setup`, and the teardown does not run. A crash reads
+    `the suite setup crashed in <suite>: <reason>`, and a timeout reads
+    `the suite setup timed out in <suite>`. A failed teardown is a
+    teardown failure with the new hook `types.SuiteTeardownHook`, named
+    `suite teardown` in the reports and in JSON. A setup whose process
+    stops is a `SetupStopped` with the new hook `types.SuiteSetupHook`,
+    named `suite setup`, and each test that did not start gets
+    `not run: the suite setup of "<suite>" stopped (<reason>)`
   - `steps.SuiteChild` puts several Features in one suite with one
-    set-up: `SuiteFeature(feature)` is a group with the tests of a Feature
+    setup: `SuiteFeature(feature)` is a group with the tests of a Feature
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 
@@ -411,11 +411,11 @@ the guide labels them.
     for it. A function without the attribute whose body only calls an
     external is counted
   - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
-    coverage failure: the passed and failed tests, the tear-down hooks that
-    failed (`teardown_failed`), the set-ups that stopped (`setup_stopped`),
+    coverage failure: the passed and failed tests, the teardown hooks that
+    failed (`teardown_failed`), the setups that stopped (`setup_stopped`),
     the results reporters that crashed (`reporters_crashed`), and whether
     the runner exits on failure, for example
-    `Tests: 3 passed, 1 set-up stopped. Exit status 1, because a set-up stopped and coverage did not complete.`
+    `Tests: 3 passed, 1 setup stopped. Exit status 1, because a setup stopped and coverage did not complete.`
   - dream_test measures itself: its own tests cover 100% of the lines in
     `src`, with no exclusions
 
@@ -482,7 +482,7 @@ the guide labels them.
 - **Run report** (`dream_test/types`)
 
   - `types.RunReport`, the result of a run: the test results, the
-    tear-down hooks that failed and the results reporters that crashed.
+    teardown hooks that failed and the results reporters that crashed.
     Make one with
     `types.run_report(tests:, teardown_failures:, reporter_crashes:)`, read
     it with `types.report_tests`, `types.report_teardown_failures` and
@@ -491,18 +491,18 @@ the guide labels them.
   - `types.TeardownFailure(hook:, groups:, message:)` and
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
     `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
-    `SuiteTearDownHook`), with
+    `SuiteTeardownHook`), with
     `types.teardown_hook_name`
-  - `types.SetupStopped(set_up:, groups:, reason:, not_run:)`, a variant of
-    `types.TeardownFailure` for a set-up that stopped: the process that
-    keeps its set-up alive exited while or after its set-up hooks ran.
+  - `types.SetupStopped(setup:, groups:, reason:, not_run:)`, a variant of
+    `types.TeardownFailure` for a setup that stopped: the process that
+    keeps its setup alive exited while or after its setup hooks ran.
     `not_run` is the full name of each test that had not started and was
     not run. Each such test is `SetupFailed` with a failure such as
-    `not run: the set-up from before_all in "Database" stopped (killed)`,
-    the tear-down hooks still run, and `types.failed` is `True`. Also
-    `types.SetUpHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
-    `BeforeAllSuitesHook`, `SuiteSetUpHook`) with
-    `types.set_up_hook_name`
+    `not run: the setup from before_all in "Database" stopped (killed)`,
+    the teardown hooks still run, and `types.failed` is `True`. Also
+    `types.SetupHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
+    `BeforeAllSuitesHook`, `SuiteSetupHook`) with
+    `types.setup_hook_name`
   - `types.is_failure(status)`, the one check for a failure status
     (`Failed`, `SetupFailed`, `TimedOut`)
   - `types.full_name(groups, name)` gives the full name of a test
@@ -514,11 +514,11 @@ the guide labels them.
 
 - **Parallel runner** (`dream_test/parallel`)
 
-  - `parallel.OuterSetup`: a set-up around the suite that keeps its
+  - `parallel.OuterSetup`: a setup around the suite that keeps its
     resources alive in a process, for example the `before_all_suites` or
-    `before_each_suite` set-up. It is
-    `SetupRunning(set_up:, groups:, check_setup_process:)` or
-    `SetupStopped(set_up:, groups:, reason:, not_run:)`. The executor checks
+    `before_each_suite` setup. It is
+    `SetupRunning(setup:, groups:, check_setup_process:)` or
+    `SetupStopped(setup:, groups:, reason:, not_run:)`. The executor checks
     each one before each test and each group starts
 
 - **Sandbox** (`dream_test/sandbox`)
@@ -535,7 +535,7 @@ the guide labels them.
     killed and `run_in_setup_process` returns only after the setup process has exited
   - `sandbox.kill_and_wait(pid)` kills a process and returns when it has
     exited, so its ETS tables and its registered name are free. The runner
-    uses it for each process that times out, so a tear-down hook never
+    uses it for each process that times out, so a teardown hook never
     starts while the process that timed out still holds a resource
   - `sandbox.run_catching(run:, input:)` runs a function in the calling
     process and gives `Ok(value)`, or `Error("class:reason")` when the
@@ -551,7 +551,7 @@ the guide labels them.
     Gherkin reporters (`summary.format` and `summary.format_in_color`) and
     the counts behind it (`summary.count`, which gives `summary.Counts`)
   - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
-    `Set-up and tear-down failures:` section of the BDD and Gherkin
+    `Setup and teardown failures:` section of the BDD and Gherkin
     reporters, from `types.report_teardown_failures(report)`
   - `gherkin.format_scenarios` gives the feature and scenario lines of the
     Gherkin reporter without the summary line
@@ -650,9 +650,9 @@ the guide labels them.
     1.19 and the coverage self-tests check exact lines
   - CI also runs the README snippet tests in `examples/snippets`
 
-- **Hook processes and set-ups**
+- **Hook processes and setups**
 
-  - A set-up hook and its tear-down hook run only when at least one of
+  - A setup hook and its teardown hook run only when at least one of
     the tests that they serve runs, with or without a filter. A group,
     a suite or a run with no test runs no `before_all`/`after_all`,
     `before_each_suite`/`after_each_suite` or
@@ -660,18 +660,18 @@ the guide labels them.
   - Each hook still gets the default timeout, and the messages are
     `hook timed out in <scope>` and `hook crashed in <scope>: ...`
   - A hook that kills its setup process does not stop the run. The runner
-    monitors the setup process. A tear-down hook that kills its setup process is recorded
+    monitors the setup process. A teardown hook that kills its setup process is recorded
     as `hook crashed in <scope>: <reason>`, and the next hook of the scope
-    runs in a new setup process. A tear-down hook always runs, also when
+    runs in a new setup process. A teardown hook always runs, also when
     the setup process of its scope stops just before the hook starts
-  - When the setup process of a set-up exits, during or after its set-up
-    hooks, the set-up stopped. It is reported once as `types.SetupStopped`,
-    no other set-up hook of the scope runs, and each test of the scope that
+  - When the setup process of a setup exits, during or after its setup
+    hooks, the setup stopped. It is reported once as `types.SetupStopped`,
+    no other setup hook of the scope runs, and each test of the scope that
     did not start is `SetupFailed` with
-    `not run: the set-up from before_all in "<group>" stopped (<reason>)`,
-    `not run: the set-up from before_each_suite in "<suite>" stopped (<reason>)`
-    or `not run: the set-up from before_all_suites stopped (<reason>)`. The
-    tear-down hooks of the scope run in a new setup process
+    `not run: the setup from before_all in "<group>" stopped (<reason>)`,
+    `not run: the setup from before_each_suite in "<suite>" stopped (<reason>)`
+    or `not run: the setup from before_all_suites stopped (<reason>)`. The
+    teardown hooks of the scope run in a new setup process
   - The `after_each` and `after_each_test` hooks run when the test process
     stops, for example when a linked process crashes. They run in a new
     process with their own timeouts and get the context after the last
@@ -679,15 +679,15 @@ the guide labels them.
 
 - **Reporters**
 
-  - The BDD and Gherkin reporters show a `Set-up and tear-down failures:`
+  - The BDD and Gherkin reporters show a `Setup and teardown failures:`
     section before the summary, also in the BDD summary-only mode, and the summary line adds
-    `N tear-down failed` for failed tear-down hooks and `N set-up stopped`
-    for set-ups whose process stopped. A stopped set-up shows as
-    `before_all in "<groups>" stopped: the process that keeps its set-up alive exited with <reason>.`,
+    `N teardown failed` for failed teardown hooks and `N setup stopped`
+    for setups whose process stopped. A stopped setup shows as
+    `before_all in "<groups>" stopped: the process that keeps its setup alive exited with <reason>.`,
     then `These tests had not started and were not run:` and the full name
     of each test, for example `root > b`
-  - The last progress line says `done, 1 tear-down failed` when a tear-down
-    hook failed, and `done, 1 set-up stopped` when a set-up stopped
+  - The last progress line says `done, 1 teardown failed` when a teardown
+    hook failed, and `done, 1 setup stopped` when a setup stopped
     (`progress.RunFinishedProgress` has `teardown_failures` and
     `setup_stopped`)
 
@@ -735,7 +735,7 @@ the guide labels them.
   when the test ends, as the `dream_test/process` docs say. The test
   process exits with reason `shutdown`. Before, a linked process that did
   not trap exits stayed alive after a test that passed, failed or crashed.
-- A process that a suite set-up or a `before_all` hook starts and links
+- A process that a suite setup or a `before_all` hook starts and links
   to its setup process stops when the setup process stops. The setup
   process exits with reason `shutdown`. Before, it exited with reason
   `normal`, and a linked process that did not trap exits stayed alive
@@ -769,9 +769,9 @@ the guide labels them.
   runner records it as a failure of that hook, with the message
   `hook crashed: <reason>` or `hook crashed in <suite>: <reason>`.
 - A suite-level hook or a group `before_all` or `after_all` hook that never
-  returns does not stop the run. A set-up hook gives `SetupFailed` with
-  `hook timed out` or `hook timed out in <scope>`, and a tear-down hook
-  gives a tear-down failure with the same message.
+  returns does not stop the run. A setup hook gives `SetupFailed` with
+  `hook timed out` or `hook timed out in <scope>`, and a teardown hook
+  gives a teardown failure with the same message.
 - `match_snapshot` and `match_snapshot_inspect` ignore a CRLF (`\r\n`)
   line end at the end of a snapshot file, as they already did for `\n` and
   `\r`. Before, a snapshot file saved with Windows line ends did not match

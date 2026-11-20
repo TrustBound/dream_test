@@ -34,7 +34,7 @@ Use `max_concurrency` and `default_timeout_ms` to tune execution:
 - **`max_concurrency` is the most tests that run at the same time.** Only the direct tests of one group run in parallel. The groups run one after the other: first the direct tests of a group, then each child group in the written order. The suites also run one after the other. A value below 1 counts as 1.
 - **Higher concurrency** speeds up independent tests.
 - **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
-- **`default_timeout_ms` must be at least 1.** With 0, the tests and hooks that use it get no time, so they almost always time out, and the result is not dependable. A value below 0 almost always stops the run with the Erlang error `timeout_value` when the run waits for a hook in a set-up process, for example a `before_all` hook.
+- **`default_timeout_ms` must be at least 1.** With 0, the tests and hooks that use it get no time, so they almost always time out, and the result is not dependable. A value below 0 almost always stops the run with the Erlang error `timeout_value` when the run waits for a hook in a setup process, for example a `before_all` hook.
 
 #### Concurrency and timeouts <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -112,7 +112,7 @@ pub fn main() {
 
 ### Suites with different contexts in one run
 
-`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
+`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for an example.
 
 To make a suite from a `types.Tree` that you build yourself, use `suite.from_tree`.
 
@@ -207,8 +207,8 @@ CI reads the exit status of `gleam test`. Without `runner.exit_on_failure`, the 
 The run fails when one of these is true:
 
 - a test is `Failed`, `TimedOut` or `SetupFailed`
-- a tear-down hook failed
-- the process of a set-up stopped while its tests ran (`SetupStopped`)
+- a teardown hook failed
+- the process of a setup stopped while its tests ran (`SetupStopped`)
 - the `render` function of a `reporter_types.Custom` results reporter crashed
 - coverage failed, for example a total below `coverage.minimum_percent`
 
@@ -274,7 +274,7 @@ about what is running.
 **Failures and where the hooks run**:
 
 - A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
-- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining tear-down hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
+- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining teardown hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
 - The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
 
 `source` is best-effort:

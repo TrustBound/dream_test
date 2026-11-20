@@ -82,12 +82,12 @@ pub fn main() {
 
 The JSON schema version is `2.0`. The object has `version`, `timestamp_ms`, `duration_ms`, `system`, `summary`, `tests` and `teardown_failures`:
 
-- `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), `teardown_failed` counts the tear-down hooks that failed, and `setup_stopped` counts the set-ups whose process stopped.
+- `summary` counts the tests by status (`total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`), `teardown_failed` counts the teardown hooks that failed, and `setup_stopped` counts the setups whose process stopped.
 - `tests` has one object for each test, with `name`, `full_name`, `status`, `duration_ms`, `tags`, `kind` and `failures`. `kind` is `"unit"` or `"gherkin:<scenario id>"`. The scenario id ends with a number that changes on each run, so do not compare `kind` of a Gherkin test between runs. Compare `full_name`. Only a Gherkin test has `rule`, after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
-- `teardown_failures` has one object for each tear-down hook that failed and each set-up that stopped, in the order that they happened. Each object has `kind`, `hook`, `groups` and `message`:
-  - `"kind": "hook_failed"`: a tear-down hook failed. `hook` is the hook (for example `"after_all"`, or `"suite tear-down"` for the tear-down of a suite with a set-up), `groups` is the full test name for an `after_each` or `after_each_test` hook, the group path for an `after_all` hook or a `suite tear-down`, the suite name for `after_each_suite`, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
-  - `"kind": "setup_stopped"`: the process that keeps a set-up alive exited while its tests ran. `hook` is the set-up hook (`"before_all"`, `"before_each_suite"`, `"before_all_suites"` or `"suite set-up"`), `groups` is the group path, the suite name, or `[]` for the whole run, `message` is the exit reason of the process, and `not_run` is the tests that had not started and were not run, each one as its `full_name` list, for example `[["root", "b"], ["root", "c"]]`.
-- Version `1.0` put a failed tear-down hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
+- `teardown_failures` has one object for each teardown hook that failed and each setup that stopped, in the order that they happened. Each object has `kind`, `hook`, `groups` and `message`:
+  - `"kind": "hook_failed"`: a teardown hook failed. `hook` is the hook (for example `"after_all"`, or `"suite teardown"` for the teardown of a suite with a setup), `groups` is the full test name for an `after_each` or `after_each_test` hook, the group path for an `after_all` hook or a `suite teardown`, the suite name for `after_each_suite`, or `[]` for `after_all_suites`, and `message` is the error message or the crash text.
+  - `"kind": "setup_stopped"`: the process that keeps a setup alive exited while its tests ran. `hook` is the setup hook (`"before_all"`, `"before_each_suite"`, `"before_all_suites"` or `"suite setup"`), `groups` is the group path, the suite name, or `[]` for the whole run, `message` is the exit reason of the process, and `not_run` is the tests that had not started and were not run, each one as its `full_name` list, for example `[["root", "b"], ["root", "c"]]`.
+- Version `1.0` put a failed teardown hook in `tests`, as a test named `<after_all>`, `<after_each_suite>` or `<after_all_suites>`. Version `2.0` does not.
 
 ### Progress reporter (during the run)
 
@@ -254,7 +254,7 @@ fn example_suite() {
 #### Custom post-run reporter (format a `RunReport`)
 
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
-write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the set-up and tear-down failures with `types.report_teardown_failures`, or get all the counts with `summary.count`. It counts the tear-down hooks that failed (`teardown_failed`) apart from the set-ups whose process stopped (`setup_stopped`).
+write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the setup and teardown failures with `types.report_teardown_failures`, or get all the counts with `summary.count`. It counts the teardown hooks that failed (`teardown_failed`) apart from the setups whose process stopped (`setup_stopped`).
 
 The formatter needs these imports: `dream_test/reporters/summary`, `dream_test/types.{type RunReport}`, `gleam/int` and `gleam/string`.
 
@@ -262,8 +262,8 @@ The formatter needs these imports: `dream_test/reporters/summary`, `dream_test/t
 
 ```gleam
 pub fn render_my_report(report: RunReport) -> String {
-  // `summary.count` counts the tests by status. It counts the tear-down
-  // hooks that failed apart from the set-ups whose process stopped.
+  // `summary.count` counts the tests by status. It counts the teardown
+  // hooks that failed apart from the setups whose process stopped.
   let counts = summary.count(report)
 
   string.concat([
@@ -275,9 +275,9 @@ pub fn render_my_report(report: RunReport) -> String {
     int.to_string(counts.failed + counts.timed_out + counts.setup_failed),
     " failed; ",
     int.to_string(counts.teardown_failed),
-    " tear-down failed; ",
+    " teardown failed; ",
     int.to_string(counts.setup_stopped),
-    " set-up stopped\n",
+    " setup stopped\n",
   ])
 }
 ```
@@ -299,7 +299,7 @@ pub fn main() {
 }
 ```
 
-This `main` runs the three tests of `tests()` in the snippet file, which this page does not show. They pass, so this `main` prints `MyReport: 3 total; 3 passed; 0 failed; 0 tear-down failed; 0 set-up stopped`, and the exit status is 0. If a test fails, the line counts it in `failed`, and the program ends with exit status 1.
+This `main` runs the three tests of `tests()` in the snippet file, which this page does not show. They pass, so this `main` prints `MyReport: 3 total; 3 passed; 0 failed; 0 teardown failed; 0 setup stopped`, and the exit status is 0. If a test fails, the line counts it in `failed`, and the program ends with exit status 1.
 
 #### Driving the progress reporter manually (advanced)
 

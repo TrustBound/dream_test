@@ -12,7 +12,7 @@ pub fn cleanup_failure_tests() {
 }
 
 pub fn tests() {
-  describe("Tear-down failure example", [
+  describe("Teardown failure example", [
     it("keeps the status of the test", fn() {
       runner.new([cleanup_failure_tests()])
       |> runner.run()
@@ -22,7 +22,7 @@ pub fn tests() {
       |> be_equal([Passed])
       |> or_fail_with("expected the test to stay Passed")
     }),
-    it("puts the failure in the tear-down list of the report", fn() {
+    it("puts the failure in the teardown list of the report", fn() {
       runner.new([cleanup_failure_tests()])
       |> runner.run()
       |> types.report_teardown_failures
@@ -34,7 +34,7 @@ pub fn tests() {
           message: "could not drop the test schema",
         ),
       ])
-      |> or_fail_with("expected one tear-down failure")
+      |> or_fail_with("expected one teardown failure")
     }),
   ])
 }

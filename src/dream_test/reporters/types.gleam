@@ -15,10 +15,10 @@ import dream_test/types.{type RunReport}
 pub type BddOutputMode {
   /// Print the full hierarchical results, then repeat failures, then summary.
   BddFull
-  /// Print failures (repeated), the set-up and tear-down failures, and the
+  /// Print failures (repeated), the setup and teardown failures, and the
   /// summary.
   BddFailuresOnly
-  /// Print the summary, after the set-up and tear-down failures when there
+  /// Print the summary, after the setup and teardown failures when there
   /// are any.
   BddSummaryOnly
 }

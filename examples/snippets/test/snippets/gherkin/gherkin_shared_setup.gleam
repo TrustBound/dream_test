@@ -37,11 +37,11 @@ fn has_items(items: Int, context: StepContext) {
 }
 
 fn shop_steps() -> StepRegistry(Int) {
-  steps.new_with_set_up(set_up: open_shop, tear_down: close_shop)
+  steps.new_with_setup(setup: open_shop, teardown: close_shop)
   |> steps.then("the shop has {int} items", has_items)
 }
 
-/// Two Features in one suite: the set-up runs one time for both.
+/// Two Features in one suite: the setup runs one time for both.
 fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
   steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
     SuiteFeature(cart),

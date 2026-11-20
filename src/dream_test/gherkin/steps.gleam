@@ -204,7 +204,7 @@ type StepCheck(state) =
 pub opaque type StepRegistry(state) {
   StepRegistry(
     /// Where each scenario gets its starting state: a fixed value
-    /// (`new`) or a set-up (`new_with_set_up`), never both.
+    /// (`new`) or a setup (`new_with_setup`), never both.
     start: dream_types.SuiteContext(state),
     /// The `given` and `when` definitions.
     actions: StepTrie(StepAction(state)),
@@ -243,38 +243,38 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 }
 
 /// Create an empty step registry whose scenarios start from the value of
-/// a set-up.
+/// a setup.
 ///
-/// `set_up` runs once for each feature suite, before the first scenario,
+/// `setup` runs once for each feature suite, before the first scenario,
 /// and only when at least one scenario of the suite runs. For
 /// `gherkin/discover.to_suite`, it runs once for the scenarios of all the
 /// files. Each scenario starts from its value, so a change that one
-/// scenario makes to its state does not reach the next one. `tear_down`
+/// scenario makes to its state does not reach the next one. `teardown`
 /// gets the same value after the last scenario.
 ///
-/// The set-up and the tear-down run in one process that lives while the
-/// scenarios run, so a server that the set-up starts and links stays
-/// alive. When `set_up` returns `Error`, crashes or times out, each
-/// scenario is `SetupFailed` with the operator `suite set-up` and `tear_down`
-/// does not run. See `unit_context.describe_with_set_up` for the other
+/// The setup and the teardown run in one process that lives while the
+/// scenarios run, so a server that the setup starts and links stays
+/// alive. When `setup` returns `Error`, crashes or times out, each
+/// scenario is `SetupFailed` with the operator `suite setup` and `teardown`
+/// does not run. See `unit_context.describe_with_setup` for the other
 /// cases.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let steps =
-///   new_with_set_up(set_up: start_server, tear_down: stop_server)
+///   new_with_setup(setup: start_server, teardown: stop_server)
 ///   |> given("the server is running", step_server_running)
 ///   |> when("I ping the server", step_ping)
 ///   |> then("the reply is {string}", step_reply_is)
 /// ```
 ///
-pub fn new_with_set_up(
-  set_up set_up: fn() -> Result(state, String),
-  tear_down tear_down: fn(state) -> Result(Nil, String),
+pub fn new_with_setup(
+  setup setup: fn() -> Result(state, String),
+  teardown teardown: fn(state) -> Result(Nil, String),
 ) -> StepRegistry(state) {
   StepRegistry(
-    start: dream_types.ContextFromSetUp(set_up: set_up, tear_down: tear_down),
+    start: dream_types.ContextFromSetup(setup: setup, teardown: teardown),
     actions: step_trie.new(),
     checks: step_trie.new(),
     errors_newest_first: [],
@@ -313,7 +313,7 @@ pub type SuiteChild(state) {
 }
 
 /// Make a suite whose tests start as the registry says: from the state of
-/// `new`, or from the value of the set-up of `new_with_set_up`. The set-up
+/// `new`, or from the value of the setup of `new_with_setup`. The setup
 /// runs one time for all the children, and only when at least one of
 /// their tests runs.
 ///

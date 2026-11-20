@@ -69,7 +69,7 @@ pub fn tests() {
       )
       |> or_fail_with("each part should have its colour")
     }),
-    it("count gives the number of tear-down failures", fn() {
+    it("count gives the number of teardown failures", fn() {
       summary.count(report_with_cleanup_failure([result(types.Passed, 5)]))
       |> should
       |> be_equal(summary.Counts(
@@ -84,9 +84,9 @@ pub fn tests() {
         setup_stopped: 0,
         duration_ms: 5,
       ))
-      |> or_fail_with("one tear-down failure should give a count of 1")
+      |> or_fail_with("one teardown failure should give a count of 1")
     }),
-    it("format adds the tear-down failures after the status counts", fn() {
+    it("format adds the teardown failures after the status counts", fn() {
       summary.format(
         report_with_cleanup_failure([
           result(types.Passed, 5),
@@ -95,30 +95,30 @@ pub fn tests() {
       )
       |> should
       |> be_equal(
-        "Summary: 2 run, 0 failed, 1 passed, 1 setup failed, 1 tear-down failed in 12ms\n",
+        "Summary: 2 run, 0 failed, 1 passed, 1 setup failed, 1 teardown failed in 12ms\n",
       )
-      |> or_fail_with("the line should end with the tear-down failures")
+      |> or_fail_with("the line should end with the teardown failures")
     }),
-    it("format counts failed tear-down hooks and stopped set-ups apart", fn() {
+    it("format counts failed teardown hooks and stopped setups apart", fn() {
       summary.format(hook_failed_and_setup_stopped())
       |> should
       |> be_equal(
-        "Summary: 0 run, 0 failed, 0 passed, 1 tear-down failed, 1 set-up stopped in 0ms\n",
+        "Summary: 0 run, 0 failed, 0 passed, 1 teardown failed, 1 setup stopped in 0ms\n",
       )
-      |> or_fail_with("a stopped set-up should not count as a failed hook")
+      |> or_fail_with("a stopped setup should not count as a failed hook")
     }),
-    it("format_in_color shows the tear-down failures in red", fn() {
+    it("format_in_color shows the teardown failures in red", fn() {
       summary.format_in_color(report_with_cleanup_failure([]))
       |> should
       |> be_equal(
-        "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m tear-down failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",
+        "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m teardown failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",
       )
-      |> or_fail_with("the tear-down count should be red")
+      |> or_fail_with("the teardown count should be red")
     }),
   ])
 }
 
-/// A report with one failed tear-down hook and one stopped set-up.
+/// A report with one failed teardown hook and one stopped setup.
 fn hook_failed_and_setup_stopped() -> types.RunReport {
   types.run_report(
     tests: [],
@@ -129,7 +129,7 @@ fn hook_failed_and_setup_stopped() -> types.RunReport {
         message: "no cleanup",
       ),
       types.SetupStopped(
-        set_up: types.BeforeAllHook,
+        setup: types.BeforeAllHook,
         groups: ["root"],
         reason: "Boom",
         not_run: [],

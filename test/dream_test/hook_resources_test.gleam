@@ -114,7 +114,7 @@ pub fn tests() {
       |> or_fail_with("a crash in before_each_suite should fail the tests")
     }),
 
-    it("an after_each_suite hook that crashes is a tear-down failure", fn() {
+    it("an after_each_suite hook that crashes is a teardown failure", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_each_suite(fn(_suite) { erlang_error(boom()) })
       |> runner.run()
@@ -128,7 +128,7 @@ pub fn tests() {
         ),
       ])
       |> or_fail_with(
-        "a crash in after_each_suite should be a tear-down failure",
+        "a crash in after_each_suite should be a teardown failure",
       )
     }),
 
@@ -182,7 +182,7 @@ pub fn tests() {
       |> or_fail_with("a hanging before_all should time out")
     }),
 
-    it("an after_all that never returns is a tear-down failure", fn() {
+    it("an after_all that never returns is a teardown failure", fn() {
       describe("root", [
         it("a", passing_test),
         unit.after_all(hang),
@@ -200,7 +200,7 @@ pub fn tests() {
           ]),
         ),
       )
-      |> or_fail_with("a hanging after_all should be a tear-down failure")
+      |> or_fail_with("a hanging after_all should be a teardown failure")
     }),
 
     it("a before_all_suites hook that never returns gives SetupFailed", fn() {
@@ -222,7 +222,7 @@ pub fn tests() {
     }),
 
     it(
-      "an after_all_suites hook that never returns is a tear-down failure",
+      "an after_all_suites hook that never returns is a teardown failure",
       fn() {
         runner.new([describe("suite", [it("a", passing_test)])])
         |> runner.after_all_suites(fn(_suites) { hang() })
@@ -240,7 +240,7 @@ pub fn tests() {
           ),
         )
         |> or_fail_with(
-          "a hanging after_all_suites should be a tear-down failure",
+          "a hanging after_all_suites should be a teardown failure",
         )
       },
     ),
@@ -266,7 +266,7 @@ pub fn tests() {
     }),
 
     it(
-      "an after_each_suite hook that never returns is a tear-down failure",
+      "an after_each_suite hook that never returns is a teardown failure",
       fn() {
         runner.new([describe("suite", [it("a", passing_test)])])
         |> runner.after_each_suite(fn(_suite) { hang() })
@@ -284,7 +284,7 @@ pub fn tests() {
           ),
         )
         |> or_fail_with(
-          "a hanging after_each_suite should be a tear-down failure",
+          "a hanging after_each_suite should be a teardown failure",
         )
       },
     ),
@@ -360,14 +360,14 @@ pub fn tests() {
               #("a", SetupFailed, [
                 #(
                   "before_all",
-                  "not run: the set-up from before_all in \"first\" stopped (killed)",
+                  "not run: the setup from before_all in \"first\" stopped (killed)",
                 ),
               ]),
               #("b", Passed, []),
             ],
             teardown_failures: [
               SetupStopped(
-                set_up: BeforeAllHook,
+                setup: BeforeAllHook,
                 groups: ["first"],
                 reason: "killed",
                 not_run: [["first", "a"]],
@@ -376,11 +376,11 @@ pub fn tests() {
           ),
         ),
       )
-      |> or_fail_with("a killed before_all process should stop its set-up")
+      |> or_fail_with("a killed before_all process should stop its setup")
     }),
 
     it(
-      "after the first before_all kills its process, no other set-up hook runs",
+      "after the first before_all kills its process, no other setup hook runs",
       fn() {
         let reports = process.new_subject()
         describe("root", [
@@ -412,19 +412,19 @@ pub fn tests() {
                 #("a", SetupFailed, [
                   #(
                     "before_all",
-                    "not run: the set-up from before_all in \"root\" stopped (killed)",
+                    "not run: the setup from before_all in \"root\" stopped (killed)",
                   ),
                 ]),
                 #("b", SetupFailed, [
                   #(
                     "before_all",
-                    "not run: the set-up from before_all in \"root\" stopped (killed)",
+                    "not run: the setup from before_all in \"root\" stopped (killed)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllHook,
+                  setup: BeforeAllHook,
                   groups: ["root"],
                   reason: "killed",
                   not_run: [["root", "a"], ["root", "inner", "b"]],
@@ -434,7 +434,7 @@ pub fn tests() {
           ),
           Ok("after_all ran"),
         ))
-        |> or_fail_with("only after_all should run after the set-up stopped")
+        |> or_fail_with("only after_all should run after the setup stopped")
       },
     ),
 
@@ -462,7 +462,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
-              set_up: BeforeAllHook,
+              setup: BeforeAllHook,
               groups: ["root"],
               reason: "Boom",
               not_run: [],
@@ -474,7 +474,7 @@ pub fn tests() {
       |> or_fail_with("the death of the before_all process should be reported")
     }),
 
-    it("a stopped before_all set-up without after_all is reported", fn() {
+    it("a stopped before_all setup without after_all is reported", fn() {
       let crash = new_crash()
       describe("root", [
         unit.before_all(fn() {
@@ -492,7 +492,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
-              set_up: BeforeAllHook,
+              setup: BeforeAllHook,
               groups: ["root"],
               reason: "Boom",
               not_run: [],
@@ -500,11 +500,11 @@ pub fn tests() {
           ]),
         ),
       )
-      |> or_fail_with("a stopped set-up should be reported without after_all")
+      |> or_fail_with("a stopped setup should be reported without after_all")
     }),
 
     it(
-      "the tests that have not started in a group whose set-up stopped are not run",
+      "the tests that have not started in a group whose setup stopped are not run",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -540,13 +540,13 @@ pub fn tests() {
                 #("b", SetupFailed, [
                   #(
                     "before_all",
-                    "not run: the set-up from before_all in \"root\" stopped (Boom)",
+                    "not run: the setup from before_all in \"root\" stopped (Boom)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllHook,
+                  setup: BeforeAllHook,
                   groups: ["root"],
                   reason: "Boom",
                   not_run: [["root", "b"]],
@@ -556,11 +556,11 @@ pub fn tests() {
           ),
           Ok("after_all ran"),
         ))
-        |> or_fail_with("b should not run after the set-up stopped")
+        |> or_fail_with("b should not run after the setup stopped")
       },
     ),
 
-    it("every group after a stopped set-up gives SetupFailed", fn() {
+    it("every group after a stopped setup gives SetupFailed", fn() {
       let crash = new_crash()
       runner.new([
         describe("root", [
@@ -586,19 +586,19 @@ pub fn tests() {
               #("c", SetupFailed, [
                 #(
                   "before_all",
-                  "not run: the set-up from before_all in \"root\" stopped (Boom)",
+                  "not run: the setup from before_all in \"root\" stopped (Boom)",
                 ),
               ]),
               #("d", SetupFailed, [
                 #(
                   "before_all",
-                  "not run: the set-up from before_all in \"root\" stopped (Boom)",
+                  "not run: the setup from before_all in \"root\" stopped (Boom)",
                 ),
               ]),
             ],
             teardown_failures: [
               SetupStopped(
-                set_up: BeforeAllHook,
+                setup: BeforeAllHook,
                 groups: ["root"],
                 reason: "Boom",
                 not_run: [["root", "first", "c"], ["root", "second", "d"]],
@@ -607,10 +607,10 @@ pub fn tests() {
           ),
         ),
       )
-      |> or_fail_with("no group should start after the set-up stopped")
+      |> or_fail_with("no group should start after the setup stopped")
     }),
 
-    it("a group under a stopped set-up does not run its before_all", fn() {
+    it("a group under a stopped setup does not run its before_all", fn() {
       let crash = new_crash()
       let reports = process.new_subject()
       runner.new([
@@ -644,13 +644,13 @@ pub fn tests() {
               #("c", SetupFailed, [
                 #(
                   "before_all",
-                  "not run: the set-up from before_all in \"root\" stopped (Boom)",
+                  "not run: the setup from before_all in \"root\" stopped (Boom)",
                 ),
               ]),
             ],
             teardown_failures: [
               SetupStopped(
-                set_up: BeforeAllHook,
+                setup: BeforeAllHook,
                 groups: ["root"],
                 reason: "Boom",
                 not_run: [["root", "inner", "c"]],
@@ -660,7 +660,7 @@ pub fn tests() {
         ),
         Error(Nil),
       ))
-      |> or_fail_with("the inner group should not start under a stopped set-up")
+      |> or_fail_with("the inner group should not start under a stopped setup")
     }),
 
     it("a before_each that never returns gives SetupFailed", fn() {
@@ -683,7 +683,7 @@ pub fn tests() {
       |> or_fail_with("a hanging before_each should time out")
     }),
 
-    it("an after_each that kills its process is a tear-down failure", fn() {
+    it("an after_each that kills its process is a teardown failure", fn() {
       describe("root", [
         it("a", passing_test),
         unit.after_each(fn() { kill_self() }),
@@ -704,7 +704,7 @@ pub fn tests() {
       |> or_fail_with("a killed after_each process should be reported")
     }),
 
-    it("an after_all that crashes is a tear-down failure", fn() {
+    it("an after_all that crashes is a teardown failure", fn() {
       describe("root", [
         it("a", passing_test),
         unit.after_all(fn() { erlang_error(boom()) }),
@@ -722,10 +722,10 @@ pub fn tests() {
           ]),
         ),
       )
-      |> or_fail_with("a crashing after_all should be a tear-down failure")
+      |> or_fail_with("a crashing after_all should be a teardown failure")
     }),
 
-    it("an after_all that kills its process is a tear-down failure", fn() {
+    it("an after_all that kills its process is a teardown failure", fn() {
       describe("root", [
         it("a", passing_test),
         unit.after_all(fn() { kill_self() }),
@@ -746,7 +746,7 @@ pub fn tests() {
       |> or_fail_with("a killed after_all process should be reported")
     }),
 
-    it("the last progress line counts a stopped set-up as stopped", fn() {
+    it("the last progress line counts a stopped setup as stopped", fn() {
       let writes = process.new_subject()
       let _report =
         runner.new([describe("suite", [it("a", passing_test)])])
@@ -761,16 +761,16 @@ pub fn tests() {
         |> runner.run()
       let text = string.concat(drain(writes, []))
       #(
-        string.contains(text, " done, 1 set-up stopped "),
-        string.contains(text, "tear-down failed"),
+        string.contains(text, " done, 1 setup stopped "),
+        string.contains(text, "teardown failed"),
       )
       |> should
       |> be_equal(#(True, False))
-      |> or_fail_with("expected done, 1 set-up stopped")
+      |> or_fail_with("expected done, 1 setup stopped")
     }),
 
     it(
-      "a before_all_suites hook that kills its process stops the run set-up",
+      "a before_all_suites hook that kills its process stops the run setup",
       fn() {
         let reports = process.new_subject()
         runner.new([describe("suite", [it("a", passing_test)])])
@@ -789,13 +789,13 @@ pub fn tests() {
                 #("a", SetupFailed, [
                   #(
                     "before_all_suites",
-                    "not run: the set-up from before_all_suites stopped (killed)",
+                    "not run: the setup from before_all_suites stopped (killed)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllSuitesHook,
+                  setup: BeforeAllSuitesHook,
                   groups: [],
                   reason: "killed",
                   not_run: [["suite", "a"]],
@@ -810,7 +810,7 @@ pub fn tests() {
     ),
 
     it(
-      "a before_each_suite hook that kills its process stops the suite set-up",
+      "a before_each_suite hook that kills its process stops the suite setup",
       fn() {
         let reports = process.new_subject()
         runner.new([describe("suite", [it("a", passing_test)])])
@@ -829,13 +829,13 @@ pub fn tests() {
                 #("a", SetupFailed, [
                   #(
                     "before_each_suite",
-                    "not run: the set-up from before_each_suite in \"suite\" stopped (killed)",
+                    "not run: the setup from before_each_suite in \"suite\" stopped (killed)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeEachSuiteHook,
+                  setup: BeforeEachSuiteHook,
                   groups: ["suite"],
                   reason: "killed",
                   not_run: [["suite", "a"]],
@@ -850,7 +850,7 @@ pub fn tests() {
     ),
 
     it(
-      "an after_each_suite hook that kills its process is a tear-down failure",
+      "an after_each_suite hook that kills its process is a teardown failure",
       fn() {
         runner.new([describe("suite", [it("a", passing_test)])])
         |> runner.after_each_suite(fn(_suite) { kill_self() })
@@ -891,7 +891,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
-              set_up: BeforeAllSuitesHook,
+              setup: BeforeAllSuitesHook,
               groups: [],
               reason: "Boom",
               not_run: [],
@@ -905,7 +905,7 @@ pub fn tests() {
     }),
 
     it(
-      "the suites that have not started after the run set-up stopped are not run",
+      "the suites that have not started after the run setup stopped are not run",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -942,13 +942,13 @@ pub fn tests() {
                 #("b", SetupFailed, [
                   #(
                     "before_all_suites",
-                    "not run: the set-up from before_all_suites stopped (Boom)",
+                    "not run: the setup from before_all_suites stopped (Boom)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllSuitesHook,
+                  setup: BeforeAllSuitesHook,
                   groups: [],
                   reason: "Boom",
                   not_run: [["second", "b"]],
@@ -959,12 +959,12 @@ pub fn tests() {
           Ok("after_all_suites ran"),
         ))
         |> or_fail_with(
-          "the second suite should not run after the run set-up stopped",
+          "the second suite should not run after the run setup stopped",
         )
       },
     ),
 
-    it("a stopped suite set-up without after_each_suite is reported", fn() {
+    it("a stopped suite setup without after_each_suite is reported", fn() {
       let crash = new_crash()
       runner.new([
         describe("suite", [
@@ -984,7 +984,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
-              set_up: BeforeEachSuiteHook,
+              setup: BeforeEachSuiteHook,
               groups: ["suite"],
               reason: "Boom",
               not_run: [],
@@ -992,10 +992,10 @@ pub fn tests() {
           ]),
         ),
       )
-      |> or_fail_with("a stopped suite set-up should be reported")
+      |> or_fail_with("a stopped suite setup should be reported")
     }),
 
-    it("a stopped suite set-up runs after_each_suite in a new process", fn() {
+    it("a stopped suite setup runs after_each_suite in a new process", fn() {
       let crash = new_crash()
       let reports = process.new_subject()
       runner.new([
@@ -1021,7 +1021,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
             SetupStopped(
-              set_up: BeforeEachSuiteHook,
+              setup: BeforeEachSuiteHook,
               groups: ["suite"],
               reason: "Boom",
               not_run: [],
@@ -1030,11 +1030,11 @@ pub fn tests() {
         ),
         Ok("after_each_suite ran"),
       ))
-      |> or_fail_with("after_each_suite should run after the set-up stopped")
+      |> or_fail_with("after_each_suite should run after the setup stopped")
     }),
 
     it(
-      "the tests that have not started in the suite of a stopped run set-up are not run",
+      "the tests that have not started in the suite of a stopped run setup are not run",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -1066,13 +1066,13 @@ pub fn tests() {
                 #("b", SetupFailed, [
                   #(
                     "before_all_suites",
-                    "not run: the set-up from before_all_suites stopped (Boom)",
+                    "not run: the setup from before_all_suites stopped (Boom)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllSuitesHook,
+                  setup: BeforeAllSuitesHook,
                   groups: [],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
@@ -1082,12 +1082,12 @@ pub fn tests() {
           ),
           Error(Nil),
         ))
-        |> or_fail_with("b should not run after the run set-up stopped")
+        |> or_fail_with("b should not run after the run setup stopped")
       },
     ),
 
     it(
-      "a group in the suite of a stopped run set-up does not run its before_all",
+      "a group in the suite of a stopped run setup does not run its before_all",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -1121,13 +1121,13 @@ pub fn tests() {
                 #("c", SetupFailed, [
                   #(
                     "before_all_suites",
-                    "not run: the set-up from before_all_suites stopped (Boom)",
+                    "not run: the setup from before_all_suites stopped (Boom)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeAllSuitesHook,
+                  setup: BeforeAllSuitesHook,
                   groups: [],
                   reason: "Boom",
                   not_run: [["suite", "inner", "c"]],
@@ -1138,13 +1138,13 @@ pub fn tests() {
           Error(Nil),
         ))
         |> or_fail_with(
-          "the inner group should not start after the run set-up stopped",
+          "the inner group should not start after the run setup stopped",
         )
       },
     ),
 
     it(
-      "the tests that have not started after the suite set-up stopped are not run",
+      "the tests that have not started after the suite setup stopped are not run",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -1176,13 +1176,13 @@ pub fn tests() {
                 #("b", SetupFailed, [
                   #(
                     "before_each_suite",
-                    "not run: the set-up from before_each_suite in \"suite\" stopped (Boom)",
+                    "not run: the setup from before_each_suite in \"suite\" stopped (Boom)",
                   ),
                 ]),
               ],
               teardown_failures: [
                 SetupStopped(
-                  set_up: BeforeEachSuiteHook,
+                  setup: BeforeEachSuiteHook,
                   groups: ["suite"],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
@@ -1192,11 +1192,11 @@ pub fn tests() {
           ),
           Error(Nil),
         ))
-        |> or_fail_with("b should not run after the suite set-up stopped")
+        |> or_fail_with("b should not run after the suite setup stopped")
       },
     ),
 
-    it("the run set-up is the outermost stopped set-up", fn() {
+    it("the run setup is the outermost stopped setup", fn() {
       let run_crash = new_crash()
       let suite_crash = new_crash()
       runner.new([
@@ -1228,19 +1228,19 @@ pub fn tests() {
               #("b", SetupFailed, [
                 #(
                   "before_all_suites",
-                  "not run: the set-up from before_all_suites stopped (Boom)",
+                  "not run: the setup from before_all_suites stopped (Boom)",
                 ),
               ]),
             ],
             teardown_failures: [
               SetupStopped(
-                set_up: BeforeEachSuiteHook,
+                setup: BeforeEachSuiteHook,
                 groups: ["suite"],
                 reason: "Boom",
                 not_run: [],
               ),
               SetupStopped(
-                set_up: BeforeAllSuitesHook,
+                setup: BeforeAllSuitesHook,
                 groups: [],
                 reason: "Boom",
                 not_run: [["suite", "b"]],
@@ -1252,7 +1252,7 @@ pub fn tests() {
       |> or_fail_with("b should fail with the loss of the run scope")
     }),
 
-    it("an after_all_suites hook that crashes is a tear-down failure", fn() {
+    it("an after_all_suites hook that crashes is a teardown failure", fn() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_all_suites(fn(_suites) { erlang_error(boom()) })
       |> runner.run()
@@ -1266,7 +1266,7 @@ pub fn tests() {
         ),
       ])
       |> or_fail_with(
-        "a crash in after_all_suites should be a tear-down failure",
+        "a crash in after_all_suites should be a teardown failure",
       )
     }),
   ])
@@ -1398,7 +1398,7 @@ fn links_alive(pid: Pid) -> Bool
 @external(erlang, "dream_test_hook_resource_test_ffi", "table_setup_process_alive")
 fn table_setup_process_alive(name: Atom) -> Bool
 
-/// The tests and tear-down failures of a run, in a form that a sandbox
+/// The tests and teardown failures of a run, in a form that a sandbox
 /// can return.
 type RunSummary {
   RunSummary(
@@ -1426,14 +1426,14 @@ fn new_crash() -> Name(Crash) {
 }
 
 /// Start a process that links to the caller and waits under `name`. The
-/// caller is the setup process of a set-up, so the set-up stops when the process
+/// caller is the setup process of a setup, so the setup stops when the process
 /// exits.
 @external(erlang, "dream_test_hook_resource_test_ffi", "start_linked_crash")
 fn start_linked_crash(name: Name(Crash)) -> Nil
 
 /// Make the process under `name` exit with reason `boom`, then wait until
 /// the setup process that started it has exited. A test calls this while it runs,
-/// so the set-up stops during that test, after the test started and before
+/// so the setup stops during that test, after the test started and before
 /// the test ends.
 @external(erlang, "dream_test_hook_resource_test_ffi", "crash_setup_process")
 fn crash_setup_process(name: Name(Crash)) -> Nil
