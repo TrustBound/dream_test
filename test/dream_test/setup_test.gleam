@@ -45,7 +45,7 @@ pub fn tests() {
       |> or_fail_with("the setup should run once and the teardown last")
     }),
 
-    it("does not run the setup when no test of the suite runs", fn() {
+    it("does not run the setup when no test of the tree runs", fn() {
       let events = process.new_subject()
       let report =
         runner.new([plain_suite(), counted_suite(events)])
@@ -58,7 +58,7 @@ pub fn tests() {
       |> or_fail_with("the setup should not run")
     }),
 
-    it("does not run the setup of a suite with no test", fn() {
+    it("does not run the setup of a tree with no test", fn() {
       let events = process.new_subject()
       let report =
         runner.new([
@@ -342,14 +342,14 @@ pub fn tests() {
 
     it("an outer setup that stopped skips the setup", fn() {
       let events = process.new_subject()
-      let setup_processes = process.new_name("context_setup_process")
+      let setup_processes = process.new_name("before_each_suite_process")
       let report =
         runner.new([
           suite.join(name: "all", suites: [
             unit_context.describe("first", setup_processes, [
               unit_context.it(
-                "stops the context setup",
-                kill_context_setup_process,
+                "stops the before_each_suite setup",
+                kill_before_each_suite_process,
               ),
             ]),
             counted_suite(events),
@@ -367,7 +367,7 @@ pub fn tests() {
       |> be_equal(
         #(
           [
-            #(["first", "stops the context setup"], Passed),
+            #(["first", "stops the before_each_suite setup"], Passed),
             #(["server", "first"], SetupFailed),
             #(["server", "second"], SetupFailed),
           ],
@@ -474,13 +474,13 @@ fn kill_and_wait(setup_process: Pid) {
 
 /// Kill the process of the `before_each_suite` hook and wait until it is
 /// gone.
-fn kill_context_setup_process(name: Name(Nil)) {
+fn kill_before_each_suite_process(name: Name(Nil)) {
   case process.named(name) {
     Ok(setup_process) -> {
       kill_and_wait_for(setup_process)
       Ok(succeed())
     }
-    Error(Nil) -> Error("the context setup has no process")
+    Error(Nil) -> Error("the before_each_suite hook has no process")
   }
 }
 

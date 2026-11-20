@@ -490,8 +490,8 @@ pub fn call(
 ///
 /// - `FixedContext(value)`: every test starts from `value`, as the `seed`
 ///   of a `Tree`.
-/// - `ContextFromSetup(setup, teardown)`: `setup` runs once, before the
-///   first test of the suite, and only when at least one test of the suite
+/// - `ContextFromSetup(setup, teardown)`: `setup` runs once for the tree,
+///   before its first test, and only when at least one test of the tree
 ///   runs. Its value is the context of every hook and test. `teardown`
 ///   gets the same value after the last test. Both run in one process that
 ///   lives while the tests run, so a process that the setup starts and

@@ -446,8 +446,9 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
 
 /// Create a suite whose context comes from a setup.
 ///
-/// `setup` runs once, before the first test of the suite, and only when
-/// at least one test of the suite runs. Its value is the context of every
+/// `setup` runs once for the tests of this `describe_with_setup`, before
+/// the first of them, and only when at least one of them runs. A
+/// `suite.join` or `suite.group` of two such suites runs two setups. Its value is the context of every
 /// hook and test. `teardown` gets the same value after the last test. The
 /// setup and the teardown run in one process that lives while the tests
 /// run, so a process that the setup starts and links stays alive.

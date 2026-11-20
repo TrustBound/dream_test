@@ -445,8 +445,8 @@ type LoopState(context) {
 /// A group hook with the context that it gets, so that the setup process
 /// of the group can run it.
 type GroupHookCall(context) {
-  /// The setup of a suite (see `types.ContextFromSetup`). Its value is
-  /// the context of the suite.
+  /// The context setup of a tree (see `types.ContextFromSetup`). Its
+  /// value is the context of the tree.
   StartCall(setup: fn() -> Result(context, String))
   SetupCall(hook: Callback(context, Result(context, String)), context: context)
   TeardownCall(hook: Callback(context, Result(Nil, String)), context: context)
@@ -480,7 +480,7 @@ type ScopeSetupProcess(context) {
 
 /// The names that the reports give to the setup and the teardown of a
 /// group scope: the `before_all` and `after_all` hooks of a group, or the
-/// setup and the teardown of a suite (see `types.ContextFromSetup`).
+/// context setup and teardown of a tree (see `types.ContextFromSetup`).
 /// `setup_text` and `teardown_text` start the text of a crash or a
 /// timeout, for example `hook crashed in <groups>: <reason>`.
 type ScopeHooks {

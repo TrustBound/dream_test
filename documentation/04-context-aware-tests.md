@@ -63,7 +63,7 @@ This is the “make dependencies explicit” version of hooks: instead of setup 
 
 Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_setup` in place of `describe`:
 
-- `setup` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
+- `setup` runs one time for the tests of this `describe_with_setup`, before the first of them, and only when at least one of them runs. A `suite.join` or `suite.group` of two such suites runs two setups, one for each. Its value is the context of every hook and test.
 - `teardown` gets the same value after the last test.
 - Both run in one process that lives while the tests run, so a process that the setup starts stays alive.
 

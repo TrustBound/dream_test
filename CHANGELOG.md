@@ -370,16 +370,16 @@ the guide labels them.
     `SuiteNode(node)`. The scenarios of every Feature run with the steps
     of that registry, so a suite of Features cannot mix the steps of one
     registry with the setup of another
-  - The setup runs one time, before the first test, and only when at
-    least one test of the suite runs. The teardown gets its value after
-    the last test. Both run in one process that lives while the tests run
+  - The setup runs one time for each tree, before the first test of
+    that tree, and only when at least one of its tests runs. The teardown
+    gets its value after the last test of that tree. Both run in one process that lives while the tests run
   - The reports call this setup the context setup: it runs once for each
     tree that has a test to run, and its value is the context. Its
     teardown, the context teardown, runs after the last test of that tree
   - A failed setup gives `SetupFailed` to each test, with the operator
     `context setup`, and the teardown does not run. A crash reads
-    `the context setup crashed in <suite>: <reason>`, and a timeout reads
-    `the context setup timed out in <suite>`. A failed teardown is a
+    `the context setup crashed in <tree>: <reason>`, and a timeout reads
+    `the context setup timed out in <tree>`. A failed teardown is a
     teardown failure with the new hook `types.ContextTeardownHook`, named
     `context teardown` in the reports and in JSON. A setup whose process
     stops is a `SetupStopped` with the new hook `types.ContextSetupHook`,

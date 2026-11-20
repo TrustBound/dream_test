@@ -114,8 +114,9 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 ///
 /// With `types.FixedContext(value)`, each test starts from `value`, as
 /// with `from_tree`. With `types.ContextFromSetup(setup, teardown)`, the
-/// setup runs once, before the first test, and only when at least one
-/// test of the suite runs. Its value is the context of every hook and test,
+/// setup runs once for the tree of this suite, before its first test, and
+/// only when at least one of its tests runs. A `join` or `group` keeps
+/// each tree apart, so each one runs its own setup. Its value is the context of every hook and test,
 /// and the teardown gets it after the last test (see
 /// `types.SuiteContext`). `unit_context.describe_with_setup` calls this.
 ///

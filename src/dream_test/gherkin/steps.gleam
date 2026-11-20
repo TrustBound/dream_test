@@ -245,10 +245,12 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 /// Create an empty step registry whose scenarios start from the value of
 /// a setup.
 ///
-/// `setup` runs once for each feature suite, before the first scenario,
-/// and only when at least one scenario of the suite runs. For
-/// `gherkin/discover.to_suite`, it runs once for the scenarios of all the
-/// files. Each scenario starts from its value, so a change that one
+/// `setup` runs once for each tree that the registry builds, that is for
+/// each suite that `feature.to_test_suite`, `steps.to_suite` or
+/// `gherkin/discover.to_suite` makes from it. It runs before the first
+/// scenario of that tree, and only when at least one of its scenarios
+/// runs. `gherkin/discover.to_suite` makes one tree for the scenarios of
+/// all the files, so the setup runs once for all of them. Each scenario starts from its value, so a change that one
 /// scenario makes to its state does not reach the next one. `teardown`
 /// gets the same value after the last scenario.
 ///
