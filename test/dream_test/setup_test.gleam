@@ -529,7 +529,7 @@ fn full_name_status_and_failures(
   #(types.full_name(result.groups, result.name), result.status, result.failures)
 }
 
-/// The first 44 characters of the first failure message of a result.
+/// The first 45 characters of the first failure message of a result.
 fn first_message_start(
   result: #(List(String), Status, List(AssertionFailure)),
 ) -> String {
@@ -539,6 +539,7 @@ fn first_message_start(
   }
 }
 
+/// The first 48 characters of the message of a teardown failure.
 fn teardown_message_start(failure: TeardownFailure) -> String {
   case failure {
     TeardownFailure(message: message, ..) -> string.slice(message, 0, 48)

@@ -70,7 +70,7 @@ pub fn suites() {
 }
 ```
 
-### What you just setup
+### What you just set up
 
 - `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`.
 - The pattern names files under `test/`. `snippets/unit/**.gleam` is the folder of this repository's examples. In your project, use your own folder, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.

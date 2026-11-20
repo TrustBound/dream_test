@@ -53,7 +53,7 @@ pub fn tests() {
       fn() {
         let calls = process.new_subject()
         suite.new(
-          name: "set up",
+          name: "setup",
           tags: [],
           children: [
             unit_context.it("first gets 7", is_seven),
@@ -70,8 +70,8 @@ pub fn tests() {
         |> be_equal(
           #(
             [
-              #(["set up", "first gets 7"], Passed),
-              #(["set up", "second gets 7"], Passed),
+              #(["setup", "first gets 7"], Passed),
+              #(["setup", "second gets 7"], Passed),
             ],
             ["setup", "teardown 7"],
           ),
