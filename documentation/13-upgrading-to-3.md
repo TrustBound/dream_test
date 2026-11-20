@@ -773,7 +773,7 @@ import dream_test/unit.{describe, it}
 
 pub fn tests() {
   describe("Parallel executor", [
-    it("can run a tree and return a list of results", fn() {
+    it("can run a tree and return a report of the results", fn() {
       let tree =
         types.tree("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),

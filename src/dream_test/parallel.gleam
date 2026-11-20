@@ -645,7 +645,7 @@ pub fn run_tree_parallel(
 /// This is used by `dream_test/runner` internally.
 ///
 /// - `total` is the total number of tests across all suites in the run
-/// - `completed` is how many tests have already completed before this suite
+/// - `completed` is how many tests have already completed before this tree
 ///
 /// ## Example
 ///
@@ -696,12 +696,12 @@ pub fn run_tree_parallel(
 ///
 /// ## Parameters
 ///
-/// - `config`: execution settings for this suite
+/// - `config`: execution settings for this tree
 /// - `tree`: the tree to execute
 /// - `progress_reporter`: optional progress reporter state (typically `Some(progress.new())`)
 /// - `write`: output sink for any progress output (typically `io.print`)
 /// - `total`: total number of tests in the overall run (across all suites)
-/// - `completed`: number of tests already completed before this suite starts
+/// - `completed`: number of tests already completed before this tree starts
 /// - `runner_before_each_test` and `runner_after_each_test`: hooks that run
 ///   around each test, outside its `before_each` and `after_each` hooks.
 ///   They get the `TestInfo` of the test, not its context
@@ -712,8 +712,8 @@ pub fn run_tree_parallel(
 /// ## Returns
 ///
 /// A `RunTreeParallelWithReporterResult` containing:
-/// - `results`: this suite’s results, in deterministic (declaration) order
-/// - `teardown_failures`: this suite’s `after_each`, `after_each_test` and
+/// - `results`: this tree’s results, in deterministic (declaration) order
+/// - `teardown_failures`: this tree’s `after_each`, `after_each_test` and
 ///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
