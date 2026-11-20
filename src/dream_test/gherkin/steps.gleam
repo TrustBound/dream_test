@@ -246,7 +246,7 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 /// a setup.
 ///
 /// `setup` runs once for each tree that the registry builds, that is for
-/// each suite that `feature.to_test_suite`, `steps.to_suite` or
+/// each suite that `feature.to_suite`, `steps.to_suite` or
 /// `gherkin/discover.to_suite` makes from it. It runs before the first
 /// scenario of that tree, and only when at least one of its scenarios
 /// runs. `gherkin/discover.to_suite` makes one tree for the scenarios of
@@ -291,7 +291,7 @@ pub fn new_with_setup(
 /// other two names take the same prefix, so all four match.
 ///
 /// - `SuiteFeature(feature)`: a group named after the Feature, with its
-///   tags and a test for each scenario, as in `feature.to_test_suite`. The
+///   tags and a test for each scenario, as in `feature.to_suite`. The
 ///   scenarios run with the steps of the registry of `to_suite`. A Feature
 ///   gets its tests only here, so it cannot run with the steps of one
 ///   registry and the start of another.
@@ -319,7 +319,7 @@ pub type SuiteChild(state) {
 /// runs one time for all the children, and only when at least one of
 /// their tests runs.
 ///
-/// `feature.to_test_suite` and `gherkin/discover.to_suite` use it. Use it
+/// `feature.to_suite` and `gherkin/discover.to_suite` use it. Use it
 /// to run several Features with one start, for example one server for all
 /// of them. The scenarios of every `SuiteFeature` and `SuiteScenarios`
 /// child run with the steps of `registry`.

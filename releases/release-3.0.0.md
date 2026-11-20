@@ -170,6 +170,9 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   keyword.
 - A `discover.features` pattern that matches no files is an error, and so
   is a module discovery pattern that matches no test module.
+- Gherkin: `feature.to_test_suite` is now `feature.to_suite`, as
+  `steps.to_suite` and `discover.to_suite`. It still takes a
+  `FeatureConfig`.
 - Gherkin: `steps.given` and `steps.when` take the step function with the
   label `action:`, and `steps.then` with the label `check:`. In 2.x the
   label was `handler:`.

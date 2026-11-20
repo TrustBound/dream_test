@@ -167,6 +167,8 @@ store. This release has breaking changes. Read
   check, `fn(state, StepContext) -> Result(AssertionResult, String)`. A
   check cannot change the state. The `StepHandler` type is removed.
 - `steps.when_` is now `steps.when`, and `steps.then_` is now `steps.then`.
+- `feature.to_test_suite` is now `feature.to_suite`, as `steps.to_suite`
+  and `discover.to_suite`. It still takes a `FeatureConfig`.
 - `StepContext` has no `world` field. It has a `scenario_id` field.
 - `types.GherkinScenario(String)` is now
   `GherkinScenario(scenario_id: String, rule: Option(String))`. `rule` is
@@ -286,6 +288,7 @@ the guide labels them.
 - Gherkin steps get and return a typed scenario state. `world` is removed.
 - `steps.new` takes the initial state. `steps.step` is removed.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
+- `feature.to_test_suite` is now `feature.to_suite`.
 - `StepContext` has `scenario_id` in place of `world`.
 - `GherkinScenario` has the fields `scenario_id` and `rule`.
 - A pattern registered two times in one phase is an error.

@@ -1,4 +1,4 @@
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -46,7 +46,7 @@ pub fn tests() {
 
   // Convert to TestSuite and run
   let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_test_suite(config)
+  to_suite(config)
 }
 
 pub fn main() {

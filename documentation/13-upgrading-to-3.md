@@ -22,7 +22,7 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 
 Do the steps in this order. The first steps affect the most projects.
 
-1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. See [Gherkin step definitions](#gherkin-step-definitions).
+1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` is now `feature.to_suite`. See [Gherkin step definitions](#gherkin-step-definitions).
 2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
@@ -463,6 +463,32 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
       |> contain("test/cart.feature")
       |> or_fail_with("expected list_files to include test/cart.feature")
     }),
+```
+
+#### `feature.to_test_suite` is now `feature.to_suite`
+
+`feature.to_test_suite` is now `feature.to_suite`, with the same name as `steps.to_suite` and `discover.to_suite`. It still takes a `FeatureConfig`. Change the call, and the name in the import: `import dream_test/gherkin/feature.{FeatureConfig, to_suite}`.
+
+##### 2.x: a suite from `feature.to_test_suite` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L45-L50"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+  // Parse the .feature file
+  let assert Ok(feature) = parser.parse_file("test/cart.feature")
+
+  // Convert to TestSuite and run
+  let config = FeatureConfig(feature: feature, step_registry: steps)
+  to_test_suite(config)
+```
+
+##### 3.0.0: a suite from `feature.to_suite` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L44-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+  // Parse the .feature file
+  let assert Ok(feature) = parser.parse_file("test/cart.feature")
+
+  // Convert to TestSuite and run
+  let config = FeatureConfig(feature: feature, step_registry: steps)
+  to_suite(config)
 ```
 
 #### How step text matches a pattern

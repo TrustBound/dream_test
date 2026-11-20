@@ -1,4 +1,4 @@
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -30,5 +30,5 @@ pub fn tests() {
 
   let assert Ok(feature) =
     parser.parse_file("test/features/shopping_cart.feature")
-  to_test_suite(FeatureConfig(feature: feature, step_registry: steps))
+  to_suite(FeatureConfig(feature: feature, step_registry: steps))
 }

@@ -93,7 +93,7 @@ pub fn tests() {
       }
     }),
 
-    it("to_test_suite runs one test for each Examples row", fn() {
+    it("to_suite runs one test for each Examples row", fn() {
       let content =
         "Feature: F\n"
         <> "Scenario Outline: O\n"
@@ -116,7 +116,7 @@ pub fn tests() {
       |> or_fail_with("each examples row should run with its value")
     }),
 
-    it("to_test_suite puts each Rule in a group named Rule: <name>", fn() {
+    it("to_suite puts each Rule in a group named Rule: <name>", fn() {
       run_parsed(rules_feature(), rules_registry())
       |> list.map(group_and_name)
       |> should
@@ -128,7 +128,7 @@ pub fn tests() {
       |> or_fail_with("expected one group for each Rule")
     }),
 
-    it("to_test_suite gives a Rule scenario the Feature and Rule tags", fn() {
+    it("to_suite gives a Rule scenario the Feature and Rule tags", fn() {
       run_parsed(rules_feature(), rules_registry())
       |> list.map(result_tags)
       |> should
@@ -154,18 +154,15 @@ pub fn tests() {
       |> or_fail_with("every scenario should run")
     }),
 
-    it(
-      "to_test_suite runs the Feature Background, then the Rule Background",
-      fn() {
-        run_parsed(rules_feature(), rules_registry())
-        |> list.map(result_status)
-        |> should
-        |> be_equal([test_types.Passed, test_types.Passed, test_types.Passed])
-        |> or_fail_with("expected the Background steps to run in order")
-      },
-    ),
+    it("to_suite runs the Feature Background, then the Rule Background", fn() {
+      run_parsed(rules_feature(), rules_registry())
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed, test_types.Passed, test_types.Passed])
+      |> or_fail_with("expected the Background steps to run in order")
+    }),
 
-    it("to_test_suite gives the Rule scenario id the Rule group", fn() {
+    it("to_suite gives the Rule scenario id the Rule group", fn() {
       run_parsed(rules_feature(), rules_registry())
       |> list.map(scenario_name_path)
       |> should
@@ -173,7 +170,7 @@ pub fn tests() {
       |> or_fail_with("expected the Rule group in each id")
     }),
 
-    it("to_test_suite gives a scenario in a Rule the Rule in its kind", fn() {
+    it("to_suite gives a scenario in a Rule the Rule in its kind", fn() {
       run_parsed(rules_feature(), rules_registry())
       |> list.map(scenario_rule)
       |> should
@@ -220,7 +217,7 @@ pub fn tests() {
       },
     ),
 
-    it("to_test_suite names example rows after their Examples section", fn() {
+    it("to_suite names example rows after their Examples section", fn() {
       run_parsed(examples_feature(), examples_registry())
       |> list.map(result_name)
       |> should
@@ -232,7 +229,7 @@ pub fn tests() {
       |> or_fail_with("expected the Examples name and a running count")
     }),
 
-    it("to_test_suite gives example rows the Examples tags", fn() {
+    it("to_suite gives example rows the Examples tags", fn() {
       run_parsed(examples_feature(), examples_registry())
       |> list.map(result_tags)
       |> should
@@ -240,7 +237,7 @@ pub fn tests() {
       |> or_fail_with("expected the scenario tags, then the Examples tags")
     }),
 
-    it("to_test_suite runs no test for Examples without a table", fn() {
+    it("to_suite runs no test for Examples without a table", fn() {
       run_parsed(
         "Feature: F\n  Scenario Outline: O\n    Given the value is <n>\n    Examples:\n",
         examples_registry(),
@@ -250,7 +247,7 @@ pub fn tests() {
       |> or_fail_with("expected no test")
     }),
 
-    it("to_test_suite runs a scenario outline without Examples one time", fn() {
+    it("to_suite runs a scenario outline without Examples one time", fn() {
       run_parsed(
         "Feature: F\n  Scenario Outline: O\n    Given the value is 1\n",
         examples_registry(),
@@ -261,7 +258,7 @@ pub fn tests() {
       |> or_fail_with("expected one test")
     }),
 
-    it("to_test_suite gives the DataTable and DocString to the handlers", fn() {
+    it("to_suite gives the DataTable and DocString to the handlers", fn() {
       let content =
         "Feature: F\n"
         <> "Scenario: S\n"
@@ -283,7 +280,7 @@ pub fn tests() {
       |> or_fail_with("handlers should get the step arguments")
     }),
 
-    it("to_test_suite gives a step both its DataTable and its DocString", fn() {
+    it("to_suite gives a step both its DataTable and its DocString", fn() {
       let registry =
         steps.new(initial: Nil)
         |> steps.given("a step with both arguments", expect_both_arguments)
@@ -298,7 +295,7 @@ pub fn tests() {
       |> or_fail_with("expected the handler to get both arguments")
     }),
 
-    it("to_test_suite puts the example values in the scenario name", fn() {
+    it("to_suite puts the example values in the scenario name", fn() {
       run_file(
         conformance_directory <> "example_tokens_everywhere.feature",
         steps.new(initial: Nil),
@@ -309,7 +306,7 @@ pub fn tests() {
       |> or_fail_with("expected the example values in the names")
     }),
 
-    it("to_test_suite puts the example values in the DocString", fn() {
+    it("to_suite puts the example values in the DocString", fn() {
       let registry =
         steps.new(initial: Nil)
         |> steps.given("the {}", fail_with_doc_string)
@@ -325,7 +322,7 @@ pub fn tests() {
     }),
 
     it(
-      "to_test_suite puts the example values in a DocString with a media type",
+      "to_suite puts the example values in a DocString with a media type",
       fn() {
         let registry =
           steps.new(initial: Nil)
@@ -342,7 +339,7 @@ pub fn tests() {
       },
     ),
 
-    it("to_test_suite puts the example values in the DataTable cells", fn() {
+    it("to_suite puts the example values in the DataTable cells", fn() {
       let registry =
         steps.new(initial: Nil)
         |> steps.given("the {}", fail_with_table)
@@ -357,7 +354,7 @@ pub fn tests() {
       |> or_fail_with("expected the example values in the DataTable")
     }),
 
-    it("to_test_suite uses the first column of a repeated example header", fn() {
+    it("to_suite uses the first column of a repeated example header", fn() {
       run_parsed(
         "Feature: F\n  Scenario Outline: O\n    Given <x>\n    Examples:\n      | x | x |\n      | 1 | 2 |\n",
         steps.new(initial: Nil),
@@ -368,22 +365,19 @@ pub fn tests() {
       |> or_fail_with("expected the headers to replace in column order")
     }),
 
-    it(
-      "to_test_suite runs no Background steps for a scenario with no steps",
-      fn() {
-        run_parsed(
-          "Feature: F\n  Background:\n    Given missing\n  Scenario: S\n",
-          steps.new(initial: Nil),
-        )
-        |> list.map(result_status)
-        |> should
-        |> be_equal([test_types.Passed])
-        |> or_fail_with("expected the Background to be left out")
-      },
-    ),
+    it("to_suite runs no Background steps for a scenario with no steps", fn() {
+      run_parsed(
+        "Feature: F\n  Background:\n    Given missing\n  Scenario: S\n",
+        steps.new(initial: Nil),
+      )
+      |> list.map(result_status)
+      |> should
+      |> be_equal([test_types.Passed])
+      |> or_fail_with("expected the Background to be left out")
+    }),
 
     it(
-      "to_test_suite runs no Background steps for an example row with no steps",
+      "to_suite runs no Background steps for an example row with no steps",
       fn() {
         run_parsed(
           "Feature: F\n  Background:\n    Given missing\n  Scenario Outline: O\n    Examples:\n      | n |\n      | 1 |\n",
@@ -1015,7 +1009,7 @@ fn run_parsed(
   case parser.parse_string(content) {
     Ok(feature) ->
       runner.new([
-        gfeature.to_test_suite(gfeature.FeatureConfig(
+        gfeature.to_suite(gfeature.FeatureConfig(
           feature: feature,
           step_registry: registry,
         )),
@@ -1035,7 +1029,7 @@ fn run_file(
   case parser.parse_file(path) {
     Ok(feature) ->
       runner.new([
-        gfeature.to_test_suite(gfeature.FeatureConfig(
+        gfeature.to_suite(gfeature.FeatureConfig(
           feature: feature,
           step_registry: registry,
         )),
@@ -1153,7 +1147,7 @@ fn run_parsed_filtered(
   case parser.parse_string(content) {
     Ok(feature) ->
       runner.new([
-        gfeature.to_test_suite(gfeature.FeatureConfig(
+        gfeature.to_suite(gfeature.FeatureConfig(
           feature: feature,
           step_registry: registry,
         )),

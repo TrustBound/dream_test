@@ -23,7 +23,7 @@
 ////
 ////   // Convert to TestSuite and run
 ////   let config = FeatureConfig(feature: feature, step_registry: steps)
-////   to_test_suite(config)
+////   to_suite(config)
 //// }
 //// ```
 ////
@@ -156,9 +156,9 @@ pub type InlineStep {
 ///
 /// ```gleam
 /// let config = FeatureConfig(feature: feature, step_registry: steps)
-/// to_test_suite(config)
+/// to_suite(config)
 /// ```
-pub fn to_test_suite(config config: FeatureConfig(state)) -> TestSuite {
+pub fn to_suite(config config: FeatureConfig(state)) -> TestSuite {
   let feature = config.feature
   steps.to_suite(
     registry: config.step_registry,
@@ -223,7 +223,7 @@ pub fn feature(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(config)
+  to_suite(config)
 }
 
 /// Define an inline scenario.
@@ -444,5 +444,5 @@ pub fn feature_with_background(
     )
 
   let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_test_suite(config)
+  to_suite(config)
 }

@@ -342,7 +342,7 @@ Feature: Shopping Cart
 ##### Load a feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -390,7 +390,7 @@ pub fn tests() {
 
   // Convert to TestSuite and run
   let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_test_suite(config)
+  to_suite(config)
 }
 
 pub fn main() {
@@ -460,7 +460,7 @@ Feature: Stock control
 #### Run the feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -504,7 +504,7 @@ pub fn tests() {
   // Each Examples row becomes one test, for example
   // "Sell different amounts (Small orders, Example 1)".
   let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
-  to_test_suite(FeatureConfig(feature: feature, step_registry: steps))
+  to_suite(FeatureConfig(feature: feature, step_registry: steps))
 }
 ```
 
@@ -521,7 +521,7 @@ How the tests get their names and tags:
 #### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
+import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -540,7 +540,7 @@ pub fn tests() {
     it("names each test after its Rule and its Examples section", fn() {
       let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
       let suite =
-        to_test_suite(FeatureConfig(
+        to_suite(FeatureConfig(
           feature: feature,
           step_registry: steps.new(initial: Nil),
         ))
