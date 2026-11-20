@@ -1,11 +1,9 @@
-//// The children of `steps.to_suite` import unqualified next to
-//// `dream_test/types.Group`, with no clash of names.
+//// The children of `steps.to_suite` work next to an unqualified
+//// `dream_test/types.Group`. `steps.Group` and `types.Group` have the same
+//// name, so this module writes the children qualified: `steps.Group(...)`.
 
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{
-  type StepContext, type StepRegistry, SuiteFeature, SuiteGroup, SuiteNode,
-  SuiteScenarios,
-}
+import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
@@ -18,15 +16,15 @@ import dream_test/unit_context
 import gleam/list
 
 pub fn tests() {
-  describe("steps.SuiteChild with dream_test/types.Group", [
+  describe("steps.SuiteChild next to dream_test/types.Group", [
     it("builds and runs a suite from every kind of child", fn() {
       steps.to_suite(registry: registry(), name: "Shop", tags: [], children: [
-        SuiteFeature(shop_feature("Cart")),
-        SuiteScenarios(shop_feature("Stock")),
-        SuiteGroup(name: "Billing", tags: [], children: [
-          SuiteFeature(shop_feature("Invoice")),
+        steps.Feature(shop_feature("Cart")),
+        steps.Scenarios(shop_feature("Stock")),
+        steps.Group(name: "Billing", tags: [], children: [
+          steps.Feature(shop_feature("Invoice")),
         ]),
-        SuiteNode(
+        steps.Node(
           Group(name: "Plain", tags: [], children: [
             unit_context.it("starts from 3", starts_from_3),
           ]),

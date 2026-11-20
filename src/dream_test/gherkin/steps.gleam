@@ -285,33 +285,30 @@ pub fn new_with_setup(
 
 /// One child of the suite of `to_suite`.
 ///
-/// The names have the prefix `Suite`, so `SuiteGroup` and `SuiteFeature` do
-/// not clash with `dream_test/types.Group` or
-/// `dream_test/gherkin/types.Feature` when you import them unqualified. The
-/// other two names take the same prefix, so all four match.
+/// `Group` and `Feature` have the same names as `dream_test/types.Group`
+/// and `dream_test/gherkin/types.Feature`. When a module imports two of
+/// these names unqualified, the compiler reports the clash as an error.
+/// Then write the child qualified, for example `steps.Feature(cart)` or
+/// `steps.Group(...)`.
 ///
-/// - `SuiteFeature(feature)`: a group named after the Feature, with its
-///   tags and a test for each scenario, as in `feature.to_suite`. The
-///   scenarios run with the steps of the registry of `to_suite`. A Feature
-///   gets its tests only here, so it cannot run with the steps of one
-///   registry and the start of another.
-/// - `SuiteScenarios(feature)`: the tests of the scenarios of a Feature,
-///   and a group for each Rule, with no group for the Feature. The tags of
-///   the Feature itself are not on these tests.
-/// - `SuiteGroup(name, tags, children)`: a group of your own, for example
-///   with a tag, that holds more children.
-/// - `SuiteNode(node)`: a test, a hook or a group that you make, for
-///   example with `unit_context.it` or `unit_context.before_each`. It gets
-///   the same start as the scenarios.
+/// - `Feature(feature)`: a group named after the Feature, with its tags and
+///   a test for each scenario, as in `feature.to_suite`. The scenarios
+///   run with the steps of the registry of `to_suite`. A Feature gets its
+///   tests only here, so it cannot run with the steps of one registry and
+///   the start of another.
+/// - `Scenarios(feature)`: the tests of the scenarios of a Feature, and a
+///   group for each Rule, with no group for the Feature. The tags of the
+///   Feature itself are not on these tests.
+/// - `Group(name, tags, children)`: a group of your own, for example with a
+///   tag, that holds more children.
+/// - `Node(node)`: a test, a hook or a group that you make, for example
+///   with `unit_context.it` or `unit_context.before_each`. It gets the same
+///   start as the scenarios.
 pub type SuiteChild(state) {
-  SuiteFeature(feature: types.Feature)
-  SuiteScenarios(feature: types.Feature)
-  SuiteGroup(
-    name: String,
-    tags: List(String),
-    children: List(SuiteChild(state)),
-  )
-  SuiteNode(node: dream_types.Node(state))
+  Feature(feature: types.Feature)
+  Scenarios(feature: types.Feature)
+  Group(name: String, tags: List(String), children: List(SuiteChild(state)))
+  Node(node: dream_types.Node(state))
 }
 
 /// Make a suite whose tests start as the registry says: from the state of
@@ -321,8 +318,8 @@ pub type SuiteChild(state) {
 ///
 /// `feature.to_suite` and `gherkin/discover.to_suite` use it. Use it
 /// to run several Features with one start, for example one server for all
-/// of them. The scenarios of every `SuiteFeature` and `SuiteScenarios`
-/// child run with the steps of `registry`.
+/// of them. The scenarios of every `Feature` and `Scenarios` child run with
+/// the steps of `registry`.
 ///
 /// ## Parameters
 ///
@@ -335,11 +332,11 @@ pub type SuiteChild(state) {
 ///
 /// ```gleam
 /// to_suite(registry: steps, name: "Shop", tags: [], children: [
-///   SuiteFeature(cart),
-///   SuiteGroup(name: "Billing", tags: ["billing"], children: [
-///     SuiteFeature(invoice),
+///   Feature(cart),
+///   Group(name: "Billing", tags: ["billing"], children: [
+///     Feature(invoice),
 ///   ]),
-///   SuiteNode(unit_context.it("the server answers", answers)),
+///   Node(unit_context.it("the server answers", answers)),
 /// ])
 /// ```
 ///
@@ -359,8 +356,8 @@ pub fn to_suite(
 
 /// The suite of one Feature, for `feature.to_suite`: the top-level group of
 /// the suite is the group of the Feature, so its scenarios have
-/// `feature: Some(feature.name)`. With `to_suite` and `SuiteScenarios` they
-/// would have `None`, and with `SuiteFeature` the Feature group would be
+/// `feature: Some(feature.name)`. With `to_suite` and `Scenarios` they
+/// would have `None`, and with `Feature` the Feature group would be
 /// inside one more group.
 @internal
 pub fn feature_suite(
@@ -394,22 +391,22 @@ fn child_to_nodes(
   registry: StepRegistry(state),
 ) -> List(dream_types.Node(state)) {
   case child {
-    SuiteFeature(feature) -> [
+    Feature(feature) -> [
       dream_types.Group(
         name: feature.name,
         tags: feature.tags,
         children: feature_children(feature, registry, Some(feature.name)),
       ),
     ]
-    SuiteScenarios(feature) -> feature_children(feature, registry, None)
-    SuiteGroup(name: name, tags: tags, children: children) -> [
+    Scenarios(feature) -> feature_children(feature, registry, None)
+    Group(name: name, tags: tags, children: children) -> [
       dream_types.Group(
         name: name,
         tags: tags,
         children: children_to_nodes(children, registry),
       ),
     ]
-    SuiteNode(node) -> [node]
+    Node(node) -> [node]
   }
 }
 
@@ -906,7 +903,7 @@ type ScenarioScope(state) {
   ScenarioScope(
     feature_name: String,
     /// The name of the Feature when the scenarios are in the group of the
-    /// Feature, or `None` for the scenarios of `SuiteScenarios`.
+    /// Feature, or `None` for the scenarios of `Scenarios`.
     feature_group: Option(String),
     source: Option(String),
     registry: StepRegistry(state),

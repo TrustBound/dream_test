@@ -68,8 +68,8 @@ hook starts now lives for the tests of its group. A test runs its
   example to start one server for all the scenarios of a feature.
 - `steps.to_suite` makes one suite from several Features with one
   registry, so one setup serves all of them. Its children
-  (`steps.SuiteChild`) are `SuiteFeature`, `SuiteScenarios`, `SuiteGroup`
-  and `SuiteNode`.
+  (`steps.SuiteChild`) are `Feature`, `Scenarios`, `Group`
+  and `Node`.
 - `suite.from_tree` turns a tree that you build by hand (`types.Tree`)
   into a `TestSuite`.
 - Pending tests: `unit.pending(name)` and `unit_context.pending(name)` make

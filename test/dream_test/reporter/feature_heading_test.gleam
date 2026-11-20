@@ -6,7 +6,7 @@ import dream_test/gherkin/discover
 import dream_test/gherkin/feature
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{
-  type StepContext, type StepRegistry, SuiteFeature, SuiteGroup, SuiteScenarios,
+  type StepContext, type StepRegistry, Feature, Group, Scenarios,
 }
 import dream_test/gherkin/types as gherkin_types
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -203,8 +203,8 @@ fn discovered_suite() -> TestSuite {
 fn shop_suite() -> TestSuite {
   let cart = cart_feature()
   steps.to_suite(registry: registry(), name: "Shop", tags: [], children: [
-    SuiteGroup("Billing", [], [SuiteScenarios(cart)]),
-    SuiteFeature(cart),
+    Group("Billing", [], [Scenarios(cart)]),
+    Feature(cart),
   ])
 }
 

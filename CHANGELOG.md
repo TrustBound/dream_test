@@ -174,7 +174,7 @@ store. This release has breaking changes. Read
   `GherkinScenario(scenario_id: String, feature: Option(String), rule:
   Option(String))`. `feature` is the name of the Feature for a scenario in
   the group of its Feature, or `None` for a scenario of
-  `steps.SuiteScenarios`. `rule` is the name of the Rule group, for
+  `steps.Scenarios`. `rule` is the name of the Rule group, for
   example `Some("Rule: Stock")`, or `None` for a scenario outside a Rule.
   The BDD and Gherkin reporters read the Feature and the Rule from these
   fields, not from the place of a group or from a group name that starts
@@ -374,9 +374,9 @@ the guide labels them.
     runs the setup one time for the scenarios of all its files.
     `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
     that starts as the registry says. Its children are
-    `steps.SuiteChild` values: `SuiteFeature(feature)`,
-    `SuiteScenarios(feature)`, `SuiteGroup(name:, tags:, children:)` and
-    `SuiteNode(node)`. The scenarios of every Feature run with the steps
+    `steps.SuiteChild` values: `Feature(feature)`,
+    `Scenarios(feature)`, `Group(name:, tags:, children:)` and
+    `Node(node)`. The scenarios of every Feature run with the steps
     of that registry, so a suite of Features cannot mix the steps of one
     registry with the setup of another
   - The setup runs one time for each tree, before the first test of
@@ -395,7 +395,7 @@ the guide labels them.
     named `context setup`, and each test that did not start gets
     `not run: the context setup of "<tree>" stopped (<reason>)`
   - `steps.SuiteChild` puts several Features in one suite with one
-    setup: `SuiteFeature(feature)` is a group with the tests of a Feature
+    setup: `Feature(feature)` is a group with the tests of a Feature
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)
 

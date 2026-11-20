@@ -141,8 +141,8 @@ pub type TestKind {
   ///
   /// `feature` is the name of the Feature when the scenario is in the group
   /// of its Feature: the scenarios of `feature.to_suite`,
-  /// `steps.SuiteFeature` and `gherkin/discover.to_suite`. It is `None` for
-  /// the scenarios of `steps.SuiteScenarios`, which go straight into the
+  /// `steps.Feature` and `gherkin/discover.to_suite`. It is `None` for
+  /// the scenarios of `steps.Scenarios`, which go straight into the
   /// group around them, so no group is their Feature. The reporters print
   /// `Feature: <name>` only from this field.
   ///

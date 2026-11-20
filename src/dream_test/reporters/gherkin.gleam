@@ -74,7 +74,7 @@ pub fn format(report report: RunReport) -> String {
 /// of a group. A scenario in the group of its Feature
 /// (`GherkinScenario(feature: Some(name), ..)`) prints under the heading
 /// `Feature: <name>`. Any other result, such as a scenario of
-/// `steps.SuiteScenarios` (`feature: None`) or a unit test, prints under
+/// `steps.Scenarios` (`feature: None`) or a unit test, prints under
 /// its groups joined with ` > `, for example `Shop > Billing`, and under
 /// no heading when it has no group. For a scenario inside a Rule
 /// (`GherkinScenario(rule: Some(rule), ..)`), the Rule prints as a heading

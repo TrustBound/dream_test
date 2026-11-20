@@ -24,7 +24,7 @@
 ////   runs: use `full_name`. Only a Gherkin test has `feature` and `rule`,
 ////   after `kind`. `feature` is the name of its Feature, for example
 ////   `"Cart"`, or `null` for a scenario in no Feature group (the scenarios
-////   of `steps.SuiteScenarios`). `rule` is the name of its Rule group, for
+////   of `steps.Scenarios`). `rule` is the name of its Rule group, for
 ////   example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
 //// - `hook_failures`: one object for each teardown hook that failed
 ////   and each setup that stopped, in the order that they happened. Each object

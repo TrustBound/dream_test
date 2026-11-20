@@ -235,7 +235,7 @@ pub fn to_suite(
   let found = discover_files(discovery.pattern)
   let parsed = parse_all_features(result.unwrap(found, []))
 
-  let children = list.map(parsed.features, steps.SuiteFeature)
+  let children = list.map(parsed.features, steps.Feature)
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes = missing_files_nodes(discovery.pattern, found)
   suite.join(name: suite_name, suites: [
