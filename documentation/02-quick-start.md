@@ -52,7 +52,7 @@ pub fn suites() {
 What’s happening here (in English):
 
 - `from_path("snippets/unit/**.gleam")` finds test modules on disk, relative to `test/`. `snippets/unit` is the folder of this repository's examples. Use your own folder, for example `unit/**_test.gleam`.
-- Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`.
+- Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](07-runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
 - `to_suites()` turns them into suite values. A module can return any suite: a `unit` suite, a `unit_context` suite with its own context, or a Gherkin feature.
 - The runner executes those suites and streams output via a reporter.
 

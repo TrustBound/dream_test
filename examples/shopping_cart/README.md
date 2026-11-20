@@ -11,12 +11,14 @@ shopping_cart/
 │   ├── cart.gleam              # Cart lifecycle and item operations
 │   ├── pricing.gleam           # Subtotals, discounts, and totals
 │   ├── checkout.gleam          # Checkout operations
-│   └── products.gleam          # Sample product catalog
+│   ├── products.gleam          # Sample product catalog
+│   └── failure_demo.gleam      # Points to the failure demo in the tests
 ├── features/
 │   └── shopping_cart.feature   # Gherkin feature file
 ├── test/
 │   ├── shopping_cart_test.gleam    # Test entry point
 │   ├── steps/
+│   │   ├── cart_state.gleam        # State that the steps pass along
 │   │   ├── cart.gleam              # Cart manipulation steps
 │   │   ├── discount.gleam          # Discount application steps
 │   │   ├── checkout.gleam          # Checkout steps
@@ -24,6 +26,8 @@ shopping_cart/
 │   └── features/
 │       ├── shopping_cart.gleam     # Inline DSL feature definition
 │       └── shopping_cart_file.gleam # Loads `features/*.feature` into a TestSuite
+├── gleam.toml
+├── manifest.toml
 └── README.md
 ```
 
@@ -128,24 +132,40 @@ pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
 
 ```bash
 cd examples/shopping_cart
-make test
+gleam test
 ```
 
 ## Output
+
+While the tests run, a progress bar shows each test. Then the report shows:
 
 ```text
 Shopping Cart — Gherkin BDD Example
 ====================================
 
-Shopping Cart
-  ✓ Adding a single item to the cart
-  ✓ Adding multiple different items
-  ✓ Updating item quantity
-  ✓ Removing an item from the cart
-  ✓ Applying a percentage discount
-  ✓ Successful checkout
-  ✓ Cannot checkout an empty cart
-  ✓ Cannot add zero items
+Feature: Shopping Cart (inline)
+  ✓ Scenario: Adding a single item to the cart (3ms)
+  ✓ Scenario: Adding multiple different items (3ms)
+  ✓ Scenario: Updating item quantity (3ms)
+  ✓ Scenario: Removing an item from the cart (3ms)
+  ✓ Scenario: Applying a percentage discount
+  ✓ Scenario: Applying a fixed amount discount (1ms)
+  ✓ Scenario: Successful checkout (1ms)
+  ✓ Scenario: Cannot checkout an empty cart (1ms)
+  ✓ Scenario: Cannot add zero items (1ms)
+Feature files
+  Feature: Shopping Cart
+    ✓ Scenario: Adding a single item to the cart
+    ✓ Scenario: Adding multiple different items
+    ✓ Scenario: Updating item quantity
+    ✓ Scenario: Removing an item from the cart
+    ✓ Scenario: Applying a percentage discount
+    ✓ Scenario: Applying a fixed amount discount (1ms)
+    ✓ Scenario: Successful checkout
+    ✓ Scenario: Cannot checkout an empty cart
+    ✓ Scenario: Cannot add zero items
 
-Summary: 8 run, 0 failed, 8 passed
+Summary: 18 run, 0 failed, 18 passed in 17ms
 ```
+
+The times change from run to run. A test that takes less than 1 ms shows no time.

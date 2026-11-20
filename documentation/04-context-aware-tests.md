@@ -61,13 +61,11 @@ This is the “make dependencies explicit” version of hooks: instead of setup 
 
 ### A context from a setup (`describe_with_setup`)
 
-Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_setup` in place of `describe`:
+Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_setup` in place of `describe`. The reports call its setup the *context setup*, and its teardown the *context teardown*:
 
 - `setup` runs one time for the tests of this `describe_with_setup`, before the first of them, and only when at least one of them runs. A `suite.join` or `suite.group` of two such suites runs two setups, one for each. Its value is the context of every hook and test.
 - `teardown` gets the same value after the last test.
 - Both run in one process that lives while the tests run, so a process that the setup starts stays alive.
-
-The reports call this setup the *context setup*. It runs once for each tree that has a test to run, before the first test of that tree, and its value is the context. Its teardown, the *context teardown*, runs after the last test of that tree.
 - When `setup` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `context setup`, and `teardown` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the context setup crashed in Store: <reason>`, and a timeout reads `the context setup timed out in Store`.
 - When `teardown` returns `Error`, crashes or times out, the run report gets a teardown failure for the hook `context teardown`. The report shows `context teardown in Store`, then the message, for example `the context teardown crashed in Store: <reason>`.
 - When the process of the setup stops, each test that did not start is `SetupFailed` with `not run: the context setup of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `context setup`, and `teardown` still runs when `setup` returned.

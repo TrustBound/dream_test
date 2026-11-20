@@ -72,7 +72,7 @@ pub fn suites() {
 
 ### What you just set up
 
-- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`.
+- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](07-runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
 - The pattern names files under `test/`. `snippets/unit/**.gleam` is the folder of this repository's examples. In your project, use your own folder, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
 - `runner` executes suites with isolation, timeouts, and configurable parallelism.
 - `reporters` decide how results are rendered (human output vs JSON vs more).
