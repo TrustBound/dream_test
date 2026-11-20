@@ -363,7 +363,7 @@ pub fn after_each(
 ///
 /// It runs in the setup process of the group, with the default timeout.
 /// Every `after_all` hook
-/// runs, also after one fails. A failure goes into the teardown failures of
+/// runs, also after one fails. A failure goes into the hook failures of
 /// the run report, and the run fails. It does not run for a group that has
 /// no test after filtering.
 pub fn after_all(

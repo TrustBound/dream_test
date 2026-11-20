@@ -254,7 +254,7 @@ fn example_suite() {
 #### Custom post-run reporter (format a `RunReport`)
 
 If you want a new report format (JUnit XML, GitHub annotations, your own table layout),
-write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the setup and teardown failures with `types.report_hook_failures`, or get all the counts with `summary.count`. It counts the teardown hooks that failed (`teardown_failed`) apart from the setups whose process stopped (`setup_stopped`).
+write a pure formatter over the `types.RunReport`. Read the tests with `types.report_tests` and the hook failures (failed teardown hooks and stopped setups) with `types.report_hook_failures`, or get all the counts with `summary.count`. It counts the teardown hooks that failed (`teardown_failed`) apart from the setups whose process stopped (`setup_stopped`).
 
 The formatter needs these imports: `dream_test/reporters/summary`, `dream_test/types.{type RunReport}`, `gleam/int` and `gleam/string`.
 

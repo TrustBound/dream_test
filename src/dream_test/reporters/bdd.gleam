@@ -219,7 +219,7 @@ fn format_failures_header(color: Bool) -> String {
 /// ## Parameters
 ///
 /// - `report`: The run report to format: the test results and the
-///   teardown failures
+///   hook failures
 ///
 /// ## Returns
 ///

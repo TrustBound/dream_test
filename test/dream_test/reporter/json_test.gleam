@@ -276,7 +276,7 @@ pub fn tests() {
         |> or_fail_with("a stopped setup should have its own count")
       }),
 
-      it("writes every teardown failure after the tests", fn() {
+      it("writes every hook failure after the tests", fn() {
         json.format(report_with_cleanup_failure([]))
         |> after("\"tests\":")
         |> should
@@ -284,7 +284,7 @@ pub fn tests() {
           "[],\"hook_failures\":[{\"kind\":\"teardown_failed\",\"hook\":\"after_all\",\"path\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
         )
         |> or_fail_with(
-          "each teardown failure should have its kind, hook, scope and message",
+          "each hook failure should have its kind, hook, path and message",
         )
       }),
 

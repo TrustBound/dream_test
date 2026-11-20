@@ -47,7 +47,7 @@ hook starts now lives for the tests of its group. A test runs its
   to each test that it serves. A failed teardown hook keeps the test status,
   the other teardown hooks still run, and the run fails.
 - `runner.run` returns a `types.RunReport` with the test results, the
-  teardown failures and the crashed `reporter_types.Custom` reporters. The BDD and Gherkin reporters show a
+  hook failures (failed teardown hooks and stopped setups) and the crashed `reporter_types.Custom` reporters. The BDD and Gherkin reporters show a
   `Setup and teardown failures:` section.
 - When the process that keeps a setup alive stops, the runner reports the
   stopped setup one time and names each test that it did not run.

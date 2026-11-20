@@ -30,17 +30,18 @@
 ////   - `kind` `"teardown_failed"`: a teardown hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
 ////     `"after_each_suite"`, `"after_all_suites"` or `"context teardown"`
-////     (the teardown of a suite with a setup). `path` is a list of
+////     (the teardown of a tree with a context setup). `path` is a list of
 ////     names: the group names from the top, and the test name last for
-////     a per-test hook. It is the full test name for `after_each` and `after_each_test`,
-////     the group path for `after_all`, the suite name for
-////     `after_each_suite`, the group path of the suite for
-////     `context teardown`, `[]` for `after_all_suites`. `message` is the error message or the crash text.
+////     a per-test hook. It is the full test name for `after_each` and
+////     `after_each_test`, the group path for `after_all`, the suite name
+////     for `after_each_suite`, the group path of the tree for
+////     `context teardown`, and `[]` for `after_all_suites`. `message` is
+////     the error message or the crash text.
 ////   - `kind` `"setup_stopped"`: the process that keeps a setup alive
 ////     exited while its tests ran. `hook` is the setup hook:
 ////     `"before_all"`, `"before_each_suite"`, `"before_all_suites"` or
 ////     `"context setup"`. `path` is the group path for `before_all`, the
-////     suite name for `before_each_suite`, the group path of the suite for
+////     suite name for `before_each_suite`, the group path of the tree for
 ////     `context setup`, `[]` for `before_all_suites`. `message` is the
 ////     exit reason of the process. Only this kind has `not_run`: the
 ////     tests that had not started when the setup stopped, so they were

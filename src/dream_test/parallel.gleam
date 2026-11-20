@@ -219,7 +219,7 @@ pub type OuterSetup {
 /// Result of `run_tree_parallel_with_reporter`.
 ///
 /// This is returned as a semantic type (not a tuple) so callers can use named
-/// fields and avoid positional destructuring. A teardown failure is not a
+/// fields and avoid positional destructuring. A hook failure is not a
 /// test result, so it is in `hook_failures`, not in `results`.
 ///
 /// `outer_setups` are the setups of the config in the same order, as the
@@ -257,7 +257,7 @@ type ExecuteNodeConfig(context) {
 }
 
 /// What a run has collected so far, newest first: the test results and the
-/// teardown failures.
+/// hook failures.
 type Collected {
   Collected(results_rev: List(TestResult), hook_failures_rev: List(HookFailure))
 }
@@ -1484,7 +1484,7 @@ fn add_collected(newer: Collected, older: Collected) -> Collected {
   )
 }
 
-/// The results and teardown failures of test outcomes that are newest
+/// The results and hook failures of test outcomes that are newest
 /// first.
 fn collected_from_outcomes_rev(outcomes_rev: List(TestOutcome)) -> Collected {
   Collected(
@@ -1764,7 +1764,7 @@ fn before_all_result(
 
 /// End the scope of a group: report a setup process that stopped while the tests
 /// ran, run every `after_all` hook (in the setup process while it is alive, else
-/// in a new setup process), then stop the setup process. Gives the teardown failures
+/// in a new setup process), then stop the setup process. Gives the hook failures
 /// newest first.
 fn finish_group_scope(
   config: ParallelConfig,

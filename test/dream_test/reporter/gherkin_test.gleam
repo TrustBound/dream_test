@@ -155,7 +155,7 @@ Feature: Unknown Feature
     }),
 
     group("format", [
-      it("writes the teardown failures before the summary", fn() {
+      it("writes the hook failures before the summary", fn() {
         gherkin.format(
           report_with_cleanup_failure([
             scenario(["Cart"], "adds", types.Passed, []),
@@ -172,7 +172,7 @@ Feature: Unknown Feature
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("the teardown failures should have their own section")
+        |> or_fail_with("the hook failures should have their own section")
       }),
 
       it("writes every status and the failures", fn() {

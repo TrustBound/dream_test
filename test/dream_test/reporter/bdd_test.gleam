@@ -284,7 +284,7 @@ pub fn tests() {
     ]),
 
     group("render", [
-      it("writes the teardown failures before the summary", fn() {
+      it("writes the hook failures before the summary", fn() {
         bdd.render(
           config(False, reporter_types.BddFull),
           report_with_cleanup_failure([
@@ -302,10 +302,10 @@ pub fn tests() {
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("the teardown failures should have their own section")
+        |> or_fail_with("the hook failures should have their own section")
       }),
 
-      it("writes the teardown failures in colour", fn() {
+      it("writes the hook failures in colour", fn() {
         bdd.render(
           config(True, reporter_types.BddFailuresOnly),
           report_with_cleanup_failure([]),
@@ -322,7 +322,7 @@ pub fn tests() {
         |> or_fail_with("the teardown section should have colour")
       }),
 
-      it("writes the teardown failures in failures-only mode", fn() {
+      it("writes the hook failures in failures-only mode", fn() {
         bdd.render(
           config(False, reporter_types.BddFailuresOnly),
           report_with_cleanup_failure([
@@ -338,7 +338,7 @@ pub fn tests() {
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("failures-only mode should show teardown failures")
+        |> or_fail_with("failures-only mode should show hook failures")
       }),
 
       it("writes every status without colour", fn() {
@@ -462,7 +462,7 @@ pub fn tests() {
         |> or_fail_with("only the summary line")
       }),
 
-      it("writes the teardown failures in summary_only mode", fn() {
+      it("writes the hook failures in summary_only mode", fn() {
         bdd.render(
           config(False, reporter_types.BddSummaryOnly),
           report_with_cleanup_failure([
@@ -512,8 +512,8 @@ pub fn tests() {
       }),
     ]),
 
-    group("format with teardown failures", [
-      it("format writes the teardown failures before the summary", fn() {
+    group("format with hook failures", [
+      it("format writes the hook failures before the summary", fn() {
         bdd.format(
           report_with_cleanup_failure([
             result_of(["root"], "adds", types.Passed, [], types.Unit),
@@ -530,7 +530,7 @@ pub fn tests() {
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms\n",
         )
-        |> or_fail_with("format should show the teardown failures")
+        |> or_fail_with("format should show the hook failures")
       }),
     ]),
 

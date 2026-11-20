@@ -238,7 +238,7 @@ pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
 ///
 /// ## Returns
 ///
-/// The results and the teardown failures of the suite, in the order that
+/// The results and the hook failures of the suite, in the order that
 /// they ran, the new count of completed tests, and the outer setups as
 /// the executor saw them last.
 pub fn run(

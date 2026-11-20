@@ -1064,7 +1064,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   report
 }
 
-/// The test results and the teardown failures of the suites that ran so
+/// The test results and the hook failures of the suites that ran so
 /// far, in the order of the run.
 type Collected {
   Collected(tests: List(TestResult), hook_failures: List(HookFailure))

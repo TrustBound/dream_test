@@ -848,7 +848,7 @@ pub opaque type RunReport {
 ///
 /// ## Returns
 ///
-/// A `RunReport` with these tests, teardown failures and crashed results
+/// A `RunReport` with these tests, hook failures and crashed results
 /// reporters.
 ///
 /// ## Example
@@ -880,7 +880,7 @@ pub fn run_report(
 ///
 /// ## Returns
 ///
-/// The test results. Teardown failures are not test results.
+/// The test results. Hook failures are not test results.
 ///
 /// ## Example
 ///
@@ -914,7 +914,7 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 /// |> types.report_hook_failures
 /// |> should
 /// |> be_equal([])
-/// |> or_fail_with("an empty run should have no teardown failures")
+/// |> or_fail_with("an empty run should have no hook failures")
 /// ```
 pub fn report_hook_failures(report report: RunReport) -> List(HookFailure) {
   report.hook_failures

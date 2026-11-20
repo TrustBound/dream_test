@@ -32,7 +32,7 @@ pub fn make_test_with_duration(
   )
 }
 
-/// A run report with these test results and no teardown failures.
+/// A run report with these test results and no hook failures.
 pub fn report_of(results: List(TestResult)) -> types.RunReport {
   types.run_report(tests: results, hook_failures: [], reporter_crashes: [])
 }

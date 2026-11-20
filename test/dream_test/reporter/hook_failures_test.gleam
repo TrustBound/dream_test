@@ -10,7 +10,7 @@ pub fn tests() {
       hook_failures.format([])
       |> should
       |> be_equal("")
-      |> or_fail_with("no teardown failures should give no text")
+      |> or_fail_with("no hook failures should give no text")
     }),
 
     it("format gives a header, the hook and scope, and the message", fn() {
@@ -129,7 +129,7 @@ pub fn tests() {
       hook_failures.format_in_color([])
       |> should
       |> be_equal("")
-      |> or_fail_with("no teardown failures should give no text")
+      |> or_fail_with("no hook failures should give no text")
     }),
   ])
 }

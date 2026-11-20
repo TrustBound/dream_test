@@ -85,7 +85,7 @@ pub fn tests() {
       |> or_fail_with("report_tests should give the tests")
     }),
 
-    it("run_report keeps the teardown failures", fn() {
+    it("run_report keeps the hook failures", fn() {
       types.run_report(
         tests: [],
         hook_failures: [cleanup_failure()],

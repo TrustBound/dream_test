@@ -1398,7 +1398,7 @@ fn links_alive(pid: Pid) -> Bool
 @external(erlang, "dream_test_hook_resource_test_ffi", "table_setup_process_alive")
 fn table_setup_process_alive(name: Atom) -> Bool
 
-/// The tests and teardown failures of a run, in a form that a sandbox
+/// The tests and hook failures of a run, in a form that a sandbox
 /// can return.
 type RunSummary {
   RunSummary(

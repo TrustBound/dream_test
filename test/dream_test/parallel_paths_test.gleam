@@ -221,7 +221,7 @@ pub fn tests() {
       |> or_fail_with("every after_all should run")
     }),
 
-    it("run_tree_parallel gives the teardown failures", fn() {
+    it("run_tree_parallel gives the hook failures", fn() {
       parallel.run_tree_parallel(
         parallel.default_config(),
         types.tree("root", Nil, [
@@ -238,7 +238,7 @@ pub fn tests() {
           message: "no cleanup",
         ),
       ])
-      |> or_fail_with("run_tree_parallel should give the teardown failures")
+      |> or_fail_with("run_tree_parallel should give the hook failures")
     }),
 
     it("a before_all that crashes gives SetupFailed", fn() {

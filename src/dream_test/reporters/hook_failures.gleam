@@ -1,7 +1,7 @@
 //// The section of a report that lists the teardown hooks that failed and
 //// the setups that stopped.
 ////
-//// A teardown failure is not a test result, so the BDD and Gherkin
+//// A hook failure is not a test result, so the BDD and Gherkin
 //// reporters show it in its own section, after the test results and before
 //// the summary line. Use this module in a custom reporter to show the same
 //// section.
@@ -31,7 +31,7 @@ import gleam/string
 ///
 /// ## Parameters
 ///
-/// - `failures`: the teardown failures of the run, for example from
+/// - `failures`: the hook failures of the run, for example from
 ///   `types.report_hook_failures`
 ///
 /// ## Returns
@@ -63,7 +63,7 @@ pub fn format(failures failures: List(HookFailure)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `failures`: the teardown failures of the run
+/// - `failures`: the hook failures of the run
 ///
 /// ## Returns
 ///
