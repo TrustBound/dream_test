@@ -41,7 +41,7 @@ pub fn report_of(results: List(TestResult)) -> types.RunReport {
 pub fn cleanup_failure() -> types.HookFailure {
   types.TeardownFailed(
     hook: types.AfterAllHook,
-    groups: ["root"],
+    path: ["root"],
     message: "no cleanup",
   )
 }

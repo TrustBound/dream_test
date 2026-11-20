@@ -804,7 +804,7 @@ pub fn before_each_suite(
 /// suite. Every `after_each_suite` hook runs, also after one fails. If it
 /// returns `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailed` with hook `AfterEachSuiteHook`
-/// and the suite name in `groups`, and the run fails.
+/// and the suite name in `path`, and the run fails.
 ///
 /// The hook does not run for a suite that has no test after filtering.
 pub fn after_each_suite(
@@ -846,7 +846,7 @@ pub fn before_all_suites(
 /// `after_all_suites` hook runs, also after one fails. If it returns
 /// `Error("...")`, times out or crashes, the
 /// run report gets a `types.TeardownFailed` with hook `AfterAllSuitesHook`
-/// and `groups: []`, and the run fails.
+/// and `path: []`, and the run fails.
 ///
 /// The hook does not run when the run has no test after filtering.
 pub fn after_all_suites(
@@ -1370,7 +1370,7 @@ fn suite_setup_stopped(
 ) -> HookFailure {
   SetupStopped(
     setup: teardown.setup,
-    groups: teardown.scope,
+    path: teardown.scope,
     reason: reason,
     not_run: not_run,
   )
@@ -1480,7 +1480,7 @@ fn add_hook_failure(
   [
     TeardownFailed(
       hook: teardown.hook_kind,
-      groups: teardown.scope,
+      path: teardown.scope,
       message: message,
     ),
     ..failures_rev
@@ -1772,14 +1772,14 @@ fn outer_setup(
     Some(SuiteSetupProcessAlive(setup_process: alive)) -> [
       parallel.SetupRunning(
         setup: setup,
-        groups: scope,
+        path: scope,
         check_setup_process: fn() { check_suite_setup_process(alive) },
       ),
     ]
     Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)) -> [
       parallel.SetupStopped(
         setup: setup,
-        groups: scope,
+        path: scope,
         reason: reason,
         not_run: not_run,
       ),
@@ -1844,7 +1844,7 @@ fn stopped_setup_process(
   case outer_setup {
     parallel.SetupStopped(
       setup: stopped,
-      groups: _,
+      path: _,
       reason: reason,
       not_run: not_run,
     )

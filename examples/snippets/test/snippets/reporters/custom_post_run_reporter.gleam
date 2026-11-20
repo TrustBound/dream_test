@@ -78,12 +78,12 @@ pub fn tests() {
         hook_failures: [
           types.TeardownFailed(
             hook: types.AfterAllHook,
-            groups: ["Example Suite"],
+            path: ["Example Suite"],
             message: "no cleanup",
           ),
           types.SetupStopped(
             setup: types.BeforeAllHook,
-            groups: ["Example Suite"],
+            path: ["Example Suite"],
             reason: "killed",
             not_run: [],
           ),

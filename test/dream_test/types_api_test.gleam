@@ -232,7 +232,7 @@ fn passed_result() -> types.TestResult {
 fn cleanup_failure() -> types.HookFailure {
   types.TeardownFailed(
     hook: types.AfterAllHook,
-    groups: ["root"],
+    path: ["root"],
     message: "no cleanup",
   )
 }

@@ -627,7 +627,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// a group that has no test after filtering. Every `after_all` hook runs, also
 /// after one fails. If it returns `Error("message")` or crashes, the run
 /// report gets a `types.TeardownFailed` with hook `AfterAllHook` and the
-/// group path in `groups`, and the run fails. No test result is added.
+/// group path in `path`, and the run fails. No test result is added.
 ///
 /// ## Example
 ///

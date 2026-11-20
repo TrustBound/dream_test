@@ -260,7 +260,7 @@ pub fn tests() {
           hook_failures: [
             types.SetupStopped(
               setup: types.BeforeAllHook,
-              groups: ["root"],
+              path: ["root"],
               reason: "Boom",
               not_run: [],
             ),
@@ -281,7 +281,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"hook_failures\":[{\"kind\":\"teardown_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
+          "[],\"hook_failures\":[{\"kind\":\"teardown_failed\",\"hook\":\"after_all\",\"path\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
         )
         |> or_fail_with(
           "each teardown failure should have its kind, hook, scope and message",
@@ -294,7 +294,7 @@ pub fn tests() {
           hook_failures: [
             types.SetupStopped(
               setup: types.BeforeAllHook,
-              groups: ["root"],
+              path: ["root"],
               reason: "Boom",
               not_run: [["root", "b"], ["root", "c"]],
             ),
@@ -305,7 +305,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"hook_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
+          "[],\"hook_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"path\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
         )
         |> or_fail_with("a stopped setup should have its own kind")
       }),

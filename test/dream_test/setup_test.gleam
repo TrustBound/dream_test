@@ -177,7 +177,7 @@ pub fn tests() {
           [
             SetupStopped(
               setup: ContextSetupHook,
-              groups: ["broken"],
+              path: ["broken"],
               reason: "killed",
               not_run: [["broken", "first"], ["broken", "second"]],
             ),
@@ -206,7 +206,7 @@ pub fn tests() {
         #([#(["server", "passes"], Passed)], [
           TeardownFailed(
             hook: ContextTeardownHook,
-            groups: ["server"],
+            path: ["server"],
             message: "port still open",
           ),
         ]),
@@ -256,7 +256,7 @@ pub fn tests() {
           ),
         )
           |> string.contains(
-            "{\"kind\":\"teardown_failed\",\"hook\":\"context teardown\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
+            "{\"kind\":\"teardown_failed\",\"hook\":\"context teardown\",\"path\":[\"Server\"],\"message\":\"port still open\"}",
           ),
       )
       |> should
@@ -271,7 +271,7 @@ pub fn tests() {
       let failures = [
         SetupStopped(
           setup: ContextSetupHook,
-          groups: ["Server"],
+          path: ["Server"],
           reason: "killed",
           not_run: [["Server", "a"]],
         ),
@@ -286,7 +286,7 @@ pub fn tests() {
           ),
         )
           |> string.contains(
-            "{\"kind\":\"setup_stopped\",\"hook\":\"context setup\",\"groups\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
+            "{\"kind\":\"setup_stopped\",\"hook\":\"context setup\",\"path\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
           ),
       )
       |> should
@@ -329,7 +329,7 @@ pub fn tests() {
           [
             SetupStopped(
               setup: ContextSetupHook,
-              groups: ["server"],
+              path: ["server"],
               reason: "killed",
               not_run: [["server", "never runs"]],
             ),
@@ -374,7 +374,7 @@ pub fn tests() {
           [
             SetupStopped(
               setup: BeforeEachSuiteHook,
-              groups: ["all"],
+              path: ["all"],
               reason: "killed",
               not_run: [["server", "first"], ["server", "second"]],
             ),

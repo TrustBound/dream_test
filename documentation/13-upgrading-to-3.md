@@ -1062,7 +1062,7 @@ A setup hook and its teardown hook run only when at least one of the tests that 
 
 #### A setup whose process stops
 
-A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.HookFailure`. A `case` on a `HookFailure` needs a branch for it.
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, path, reason, not_run)`. `SetupStopped` is the second variant of `types.HookFailure`. A `case` on a `HookFailure` needs a branch for it.
 
 - Each test that had not started is `SetupFailed`, with a failure such as `not run: the setup from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
 - The teardown hooks still run, in a new process.
@@ -1429,8 +1429,8 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 
 - `summary` has the counts `teardown_failed` (teardown hooks that failed) and `setup_stopped` (setups whose process stopped).
 - The object has the list `hook_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
-- A failed teardown hook is an object with `"kind": "teardown_failed"`, `hook`, `groups` and `message`.
-- A setup that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
+- A failed teardown hook is an object with `"kind": "teardown_failed"`, `hook`, `path` and `message`.
+- A setup that stopped is an object with `"kind": "setup_stopped"`, `hook`, `path`, `message` and `not_run`, the full names of the tests that did not run.
 - A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
 - The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.

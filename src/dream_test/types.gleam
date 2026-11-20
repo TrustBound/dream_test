@@ -744,19 +744,20 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 ///
 /// ## Variants
 ///
-/// - `TeardownFailed(hook, groups, message)`: a teardown hook failed.
-///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
-///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
+/// - `TeardownFailed(hook, path, message)`: a teardown hook failed.
+///   `hook` is the hook. `path` is where it ran: the group names from the
+///   top, and for a per-test hook (`AfterEachTestHook`, `AfterEachHook`)
+///   the test name last, so the full name of the test. For `AfterAllHook`,
 ///   the group path. For `ContextTeardownHook` (the teardown of a
 ///   context setup), the group path of the tree: the groups around it and
 ///   its name. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
-/// - `SetupStopped(setup, groups, reason, not_run)`: a setup stopped.
+/// - `SetupStopped(setup, path, reason, not_run)`: a setup stopped.
 ///   The process that keeps its setup alive exited while or after its
 ///   setup hooks ran, for example because a `before_all` hook killed it,
 ///   or a process that the hook linked to it crashed. `setup` is the
-///   setup hook. `groups` is the group path for `BeforeAllHook`, the group
+///   setup hook. `path` is the group path for `BeforeAllHook`, the group
 ///   path of the tree for `ContextSetupHook` (a context setup), the suite
 ///   name for `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`.
 ///   `reason` is the exit reason of the process. The tests of the scope
@@ -776,15 +777,15 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 /// ```gleam
 /// types.TeardownFailed(
 ///   hook: types.AfterAllHook,
-///   groups: ["Database"],
+///   path: ["Database"],
 ///   message: "could not drop the test schema",
 /// )
 /// ```
 pub type HookFailure {
-  TeardownFailed(hook: TeardownHook, groups: List(String), message: String)
+  TeardownFailed(hook: TeardownHook, path: List(String), message: String)
   SetupStopped(
     setup: SetupHook,
-    groups: List(String),
+    path: List(String),
     reason: String,
     not_run: List(List(String)),
   )
@@ -976,7 +977,7 @@ pub fn report_reporter_crashes(
 ///   hook_failures: [
 ///     types.TeardownFailed(
 ///       hook: types.AfterAllSuitesHook,
-///       groups: [],
+///       path: [],
 ///       message: "could not stop the pool",
 ///     ),
 ///   ],

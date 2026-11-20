@@ -28,7 +28,7 @@ pub fn tests() {
       |> run_in_setups([
         SetupStopped(
           setup: BeforeAllSuitesHook,
-          groups: [],
+          path: [],
           reason: "Boom",
           not_run: [["first", "z"]],
         ),
@@ -73,7 +73,7 @@ pub fn tests() {
       |> run_in_setups([
         SetupRunning(
           setup: BeforeEachSuiteHook,
-          groups: ["suite"],
+          path: ["suite"],
           check_setup_process: fn() { Error("Boom") },
         ),
       ])
@@ -100,7 +100,7 @@ pub fn tests() {
       |> run_in_setups([
         SetupRunning(
           setup: BeforeAllSuitesHook,
-          groups: [],
+          path: [],
           check_setup_process: fn() { Ok(Nil) },
         ),
       ])
@@ -119,13 +119,13 @@ pub fn tests() {
       |> run_in_setups([
         SetupStopped(
           setup: BeforeAllSuitesHook,
-          groups: [],
+          path: [],
           reason: "outer",
           not_run: [],
         ),
         SetupStopped(
           setup: BeforeEachSuiteHook,
-          groups: ["suite"],
+          path: ["suite"],
           reason: "inner",
           not_run: [],
         ),
@@ -167,7 +167,7 @@ pub fn tests() {
         |> run_with_concurrency_one([
           SetupRunning(
             setup: BeforeAllSuitesHook,
-            groups: [],
+            path: [],
             check_setup_process: fn() { check_process(monitor) },
           ),
         ])
@@ -267,11 +267,11 @@ fn test_summary(
 
 fn setup_summary(setup: OuterSetup) -> #(types.SetupHook, SetupState) {
   case setup {
-    SetupRunning(setup: setup, groups: _, check_setup_process: _) -> #(
+    SetupRunning(setup: setup, path: _, check_setup_process: _) -> #(
       setup,
       Running,
     )
-    SetupStopped(setup: setup, groups: _, reason: reason, not_run: not_run) -> #(
+    SetupStopped(setup: setup, path: _, reason: reason, not_run: not_run) -> #(
       setup,
       Stopped(reason, not_run),
     )

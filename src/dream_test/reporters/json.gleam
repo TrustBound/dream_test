@@ -26,19 +26,20 @@
 ////   `null` for a scenario outside a Rule.
 //// - `hook_failures`: one object for each teardown hook that failed
 ////   and each setup that stopped, in the order that they happened. Each object
-////   has `kind`, `hook`, `groups` and `message`:
+////   has `kind`, `hook`, `path` and `message`:
 ////   - `kind` `"teardown_failed"`: a teardown hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
 ////     `"after_each_suite"`, `"after_all_suites"` or `"context teardown"`
-////     (the teardown of a suite with a setup). `groups` is a list of
-////     names: the full test name for `after_each` and `after_each_test`,
+////     (the teardown of a suite with a setup). `path` is a list of
+////     names: the group names from the top, and the test name last for
+////     a per-test hook. It is the full test name for `after_each` and `after_each_test`,
 ////     the group path for `after_all`, the suite name for
 ////     `after_each_suite`, the group path of the suite for
 ////     `context teardown`, `[]` for `after_all_suites`. `message` is the error message or the crash text.
 ////   - `kind` `"setup_stopped"`: the process that keeps a setup alive
 ////     exited while its tests ran. `hook` is the setup hook:
 ////     `"before_all"`, `"before_each_suite"`, `"before_all_suites"` or
-////     `"context setup"`. `groups` is the group path for `before_all`, the
+////     `"context setup"`. `path` is the group path for `before_all`, the
 ////     suite name for `before_each_suite`, the group path of the suite for
 ////     `context setup`, `[]` for `before_all_suites`. `message` is the
 ////     exit reason of the process. Only this kind has `not_run`: the
@@ -334,20 +335,20 @@ fn build_summary_json(counts: summary.Counts) -> Json {
 
 fn build_hook_failure_json(failure: HookFailure) -> Json {
   case failure {
-    TeardownFailed(hook: hook, groups: groups, message: message) ->
+    TeardownFailed(hook: hook, path: path, message: message) ->
       json.object(hook_failure_fields(
         "teardown_failed",
         types.teardown_hook_name(hook),
-        groups,
+        path,
         message,
       ))
-    SetupStopped(setup: setup, groups: groups, reason: reason, not_run: not_run) ->
+    SetupStopped(setup: setup, path: path, reason: reason, not_run: not_run) ->
       json.object(
         list.append(
           hook_failure_fields(
             "setup_stopped",
             types.setup_hook_name(setup),
-            groups,
+            path,
             reason,
           ),
           [#("not_run", json.array(not_run, full_name_json))],
@@ -363,13 +364,13 @@ fn full_name_json(full_name: List(String)) -> Json {
 fn hook_failure_fields(
   kind: String,
   hook: String,
-  groups: List(String),
+  path: List(String),
   message: String,
 ) -> List(#(String, Json)) {
   [
     #("kind", json.string(kind)),
     #("hook", json.string(hook)),
-    #("groups", json.array(groups, json.string)),
+    #("path", json.array(path, json.string)),
     #("message", json.string(message)),
   ]
 }

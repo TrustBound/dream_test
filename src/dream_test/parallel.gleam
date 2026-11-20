@@ -190,27 +190,27 @@ pub type RunTreeConfig(context) {
 ///
 /// ## Variants
 ///
-/// - `SetupRunning(setup, groups, check_setup_process)`: the process of the setup
+/// - `SetupRunning(setup, path, check_setup_process)`: the process of the setup
 ///   was alive at the last check. `check_setup_process` checks it again and gives
 ///   `Ok(Nil)` while it is alive, or `Error(reason)` after it stopped. The
 ///   executor does not call `check_setup_process` again after it gave `Error`.
 ///   With `sandbox.SetupProcess`, use `sandbox.check_setup_process`.
-/// - `SetupStopped(setup, groups, reason, not_run)`: the process of the
+/// - `SetupStopped(setup, path, reason, not_run)`: the process of the
 ///   setup exited with `reason`. `not_run` is the full name of each test
 ///   that was not run because of it (see `types.full_name`), in the order
 ///   of the run. Give `[]` for a setup that no test was skipped for yet.
 ///
-/// `setup` is the setup hook. `groups` is `[]` for the whole run, or the
+/// `setup` is the setup hook. `path` is `[]` for the whole run, or the
 /// names of the groups that the setup serves, for example `[suite name]`.
 pub type OuterSetup {
   SetupRunning(
     setup: SetupHook,
-    groups: List(String),
+    path: List(String),
     check_setup_process: fn() -> Result(Nil, String),
   )
   SetupStopped(
     setup: SetupHook,
-    groups: List(String),
+    path: List(String),
     reason: String,
     not_run: List(List(String)),
   )
@@ -988,7 +988,7 @@ fn context_setup_stopped(
     Collected(results_rev: results_rev, hook_failures_rev: [
       types.SetupStopped(
         setup: ContextSetupHook,
-        groups: scope,
+        path: scope,
         reason: reason,
         not_run: full_names(results),
       ),
@@ -1223,7 +1223,7 @@ fn refresh_setup_processes(
 
 fn refresh_outer_setup(scope: OuterSetup) -> OuterSetup {
   case scope {
-    SetupRunning(setup: setup, groups: names, check_setup_process: check) ->
+    SetupRunning(setup: setup, path: names, check_setup_process: check) ->
       checked_outer_setup(scope, setup, names, check())
     SetupStopped(..) -> scope
   }
@@ -1238,7 +1238,7 @@ fn checked_outer_setup(
   case checked {
     Ok(Nil) -> scope
     Error(reason) ->
-      SetupStopped(setup: setup, groups: names, reason: reason, not_run: [])
+      SetupStopped(setup: setup, path: names, reason: reason, not_run: [])
   }
 }
 
@@ -1346,7 +1346,7 @@ fn record_not_run(
           found,
           SetupStopped(
             setup: found.value.setup,
-            groups: found.value.scope,
+            path: found.value.scope,
             reason: found.value.reason,
             not_run: list.append(found.value.not_run, names),
           ),
@@ -1400,7 +1400,7 @@ fn rebuild(found: Found(item, value), replacement: item) -> List(item) {
 
 fn outer_stop(setup: OuterSetup) -> Result(Stop, Nil) {
   case setup {
-    SetupStopped(setup: setup, groups: scope, reason: reason, not_run: not_run) ->
+    SetupStopped(setup: setup, path: scope, reason: reason, not_run: not_run) ->
       Ok(Stop(setup: setup, scope: scope, reason: reason, not_run: not_run))
     SetupRunning(..) -> Error(Nil)
   }
@@ -1840,7 +1840,7 @@ fn group_setup_stopped(
 ) -> HookFailure {
   types.SetupStopped(
     setup: scope.hooks.setup,
-    groups: scope.groups,
+    path: scope.groups,
     reason: reason,
     not_run: not_run,
   )
@@ -1985,7 +1985,7 @@ fn add_hook_failure(
   [
     TeardownFailed(
       hook: scope.hooks.teardown,
-      groups: scope.groups,
+      path: scope.groups,
       message: message,
     ),
     ..failures_rev
@@ -2955,7 +2955,7 @@ fn teardown_failed(
   TestState(..state, hook_failures_rev: [
     TeardownFailed(
       hook: hook,
-      groups: types.full_name(job.scope, job.test_case.name),
+      path: types.full_name(job.scope, job.test_case.name),
       message: message,
     ),
     ..state.hook_failures_rev

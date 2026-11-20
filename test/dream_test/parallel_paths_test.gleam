@@ -158,7 +158,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterEachHook,
-          groups: ["root", "a"],
+          path: ["root", "a"],
           message: "no teardown",
         ),
       ])
@@ -199,7 +199,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterAllHook,
-          groups: ["root"],
+          path: ["root"],
           message: "no cleanup",
         ),
       ])
@@ -215,8 +215,8 @@ pub fn tests() {
       |> hook_failures_default
       |> should
       |> be_equal([
-        TeardownFailed(hook: AfterAllHook, groups: ["root"], message: "first"),
-        TeardownFailed(hook: AfterAllHook, groups: ["root"], message: "second"),
+        TeardownFailed(hook: AfterAllHook, path: ["root"], message: "first"),
+        TeardownFailed(hook: AfterAllHook, path: ["root"], message: "second"),
       ])
       |> or_fail_with("every after_all should run")
     }),
@@ -234,7 +234,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterAllHook,
-          groups: ["root"],
+          path: ["root"],
           message: "no cleanup",
         ),
       ])
@@ -270,7 +270,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterEachHook,
-          groups: ["root", "a"],
+          path: ["root", "a"],
           message: "hook timed out in root",
         ),
       ])
@@ -287,7 +287,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterEachHook,
-          groups: ["root", "a"],
+          path: ["root", "a"],
           message: "hook crashed in root: error:boom",
         ),
       ])
@@ -368,7 +368,7 @@ pub fn tests() {
         |> be_equal([
           TeardownFailed(
             hook: AfterEachTestHook,
-            groups: ["root", "a"],
+            path: ["root", "a"],
             message: "hook timed out in root",
           ),
         ])
@@ -386,7 +386,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterEachTestHook,
-          groups: ["root", "a"],
+          path: ["root", "a"],
           message: "hook crashed in root: error:boom",
         ),
       ])

@@ -26,7 +26,7 @@ pub fn tests() {
       hook_failures.format([
         types.TeardownFailed(
           hook: types.AfterAllSuitesHook,
-          groups: [],
+          path: [],
           message: "pool still running",
         ),
       ])
@@ -41,7 +41,7 @@ pub fn tests() {
       hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllHook,
-          groups: ["root", "pool"],
+          path: ["root", "pool"],
           reason: "Boom",
           not_run: [],
         ),
@@ -57,7 +57,7 @@ pub fn tests() {
       hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllHook,
-          groups: ["root"],
+          path: ["root"],
           reason: "Boom",
           not_run: [["root", "b"], ["root", "c"]],
         ),
@@ -73,7 +73,7 @@ pub fn tests() {
       hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllSuitesHook,
-          groups: [],
+          path: [],
           reason: "Boom",
           not_run: [["suite", "a"]],
         ),
@@ -89,7 +89,7 @@ pub fn tests() {
       hook_failures.format([
         types.TeardownFailed(
           hook: types.AfterEachHook,
-          groups: ["root", "adds"],
+          path: ["root", "adds"],
           message: "no teardown",
         ),
       ])
@@ -113,7 +113,7 @@ pub fn tests() {
       hook_failures.format_in_color([
         types.SetupStopped(
           setup: types.BeforeAllHook,
-          groups: ["root"],
+          path: ["root"],
           reason: "Boom",
           not_run: [["root", "b"]],
         ),

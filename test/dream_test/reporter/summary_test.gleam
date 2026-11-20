@@ -125,12 +125,12 @@ fn teardown_failed_and_setup_stopped() -> types.RunReport {
     hook_failures: [
       types.TeardownFailed(
         hook: types.AfterAllHook,
-        groups: ["root"],
+        path: ["root"],
         message: "no cleanup",
       ),
       types.SetupStopped(
         setup: types.BeforeAllHook,
-        groups: ["root"],
+        path: ["root"],
         reason: "Boom",
         not_run: [],
       ),

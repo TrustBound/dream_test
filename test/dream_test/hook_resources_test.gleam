@@ -123,7 +123,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterEachSuiteHook,
-          groups: ["suite"],
+          path: ["suite"],
           message: "hook crashed in suite: error:boom",
         ),
       ])
@@ -194,7 +194,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             TeardownFailed(
               hook: AfterAllHook,
-              groups: ["root"],
+              path: ["root"],
               message: "hook timed out in root",
             ),
           ]),
@@ -233,7 +233,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], hook_failures: [
               TeardownFailed(
                 hook: AfterAllSuitesHook,
-                groups: [],
+                path: [],
                 message: "hook timed out",
               ),
             ]),
@@ -277,7 +277,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], hook_failures: [
               TeardownFailed(
                 hook: AfterEachSuiteHook,
-                groups: ["suite"],
+                path: ["suite"],
                 message: "hook timed out in suite",
               ),
             ]),
@@ -368,7 +368,7 @@ pub fn tests() {
             hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
-                groups: ["first"],
+                path: ["first"],
                 reason: "killed",
                 not_run: [["first", "a"]],
               ),
@@ -425,7 +425,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllHook,
-                  groups: ["root"],
+                  path: ["root"],
                   reason: "killed",
                   not_run: [["root", "a"], ["root", "inner", "b"]],
                 ),
@@ -463,7 +463,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllHook,
-              groups: ["root"],
+              path: ["root"],
               reason: "Boom",
               not_run: [],
             ),
@@ -493,7 +493,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllHook,
-              groups: ["root"],
+              path: ["root"],
               reason: "Boom",
               not_run: [],
             ),
@@ -547,7 +547,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllHook,
-                  groups: ["root"],
+                  path: ["root"],
                   reason: "Boom",
                   not_run: [["root", "b"]],
                 ),
@@ -599,7 +599,7 @@ pub fn tests() {
             hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
-                groups: ["root"],
+                path: ["root"],
                 reason: "Boom",
                 not_run: [["root", "first", "c"], ["root", "second", "d"]],
               ),
@@ -651,7 +651,7 @@ pub fn tests() {
             hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
-                groups: ["root"],
+                path: ["root"],
                 reason: "Boom",
                 not_run: [["root", "inner", "c"]],
               ),
@@ -695,7 +695,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             TeardownFailed(
               hook: AfterEachHook,
-              groups: ["root", "a"],
+              path: ["root", "a"],
               message: "hook crashed in root: killed",
             ),
           ]),
@@ -716,7 +716,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             TeardownFailed(
               hook: AfterAllHook,
-              groups: ["root"],
+              path: ["root"],
               message: "hook crashed in root: error:boom",
             ),
           ]),
@@ -737,7 +737,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             TeardownFailed(
               hook: AfterAllHook,
-              groups: ["root"],
+              path: ["root"],
               message: "hook crashed in root: killed",
             ),
           ]),
@@ -796,7 +796,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
-                  groups: [],
+                  path: [],
                   reason: "killed",
                   not_run: [["suite", "a"]],
                 ),
@@ -836,7 +836,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeEachSuiteHook,
-                  groups: ["suite"],
+                  path: ["suite"],
                   reason: "killed",
                   not_run: [["suite", "a"]],
                 ),
@@ -861,7 +861,7 @@ pub fn tests() {
             RunSummary(tests: [#("a", Passed, [])], hook_failures: [
               TeardownFailed(
                 hook: AfterEachSuiteHook,
-                groups: ["suite"],
+                path: ["suite"],
                 message: "hook crashed in suite: killed",
               ),
             ]),
@@ -892,7 +892,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllSuitesHook,
-              groups: [],
+              path: [],
               reason: "Boom",
               not_run: [],
             ),
@@ -949,7 +949,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
-                  groups: [],
+                  path: [],
                   reason: "Boom",
                   not_run: [["second", "b"]],
                 ),
@@ -985,7 +985,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeEachSuiteHook,
-              groups: ["suite"],
+              path: ["suite"],
               reason: "Boom",
               not_run: [],
             ),
@@ -1022,7 +1022,7 @@ pub fn tests() {
           RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeEachSuiteHook,
-              groups: ["suite"],
+              path: ["suite"],
               reason: "Boom",
               not_run: [],
             ),
@@ -1073,7 +1073,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
-                  groups: [],
+                  path: [],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
                 ),
@@ -1128,7 +1128,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
-                  groups: [],
+                  path: [],
                   reason: "Boom",
                   not_run: [["suite", "inner", "c"]],
                 ),
@@ -1183,7 +1183,7 @@ pub fn tests() {
               hook_failures: [
                 SetupStopped(
                   setup: BeforeEachSuiteHook,
-                  groups: ["suite"],
+                  path: ["suite"],
                   reason: "Boom",
                   not_run: [["suite", "b"]],
                 ),
@@ -1235,13 +1235,13 @@ pub fn tests() {
             hook_failures: [
               SetupStopped(
                 setup: BeforeEachSuiteHook,
-                groups: ["suite"],
+                path: ["suite"],
                 reason: "Boom",
                 not_run: [],
               ),
               SetupStopped(
                 setup: BeforeAllSuitesHook,
-                groups: [],
+                path: [],
                 reason: "Boom",
                 not_run: [["suite", "b"]],
               ),
@@ -1261,7 +1261,7 @@ pub fn tests() {
       |> be_equal([
         TeardownFailed(
           hook: AfterAllSuitesHook,
-          groups: [],
+          path: [],
           message: "hook crashed: error:boom",
         ),
       ])

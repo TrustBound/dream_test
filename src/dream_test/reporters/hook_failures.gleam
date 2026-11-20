@@ -45,7 +45,7 @@ import gleam/string
 /// hook_failures.format([
 ///   types.SetupStopped(
 ///     setup: types.BeforeAllHook,
-///     groups: ["root"],
+///     path: ["root"],
 ///     reason: "Boom",
 ///     not_run: [["root", "b"], ["root", "c"]],
 ///   ),
@@ -108,15 +108,15 @@ fn format_failures(color: Bool, failures: List(HookFailure)) -> List(String) {
 
 fn format_failure(color: Bool, failure: HookFailure) -> String {
   case failure {
-    TeardownFailed(hook: hook, groups: groups, message: message) ->
-      failure_lines(color, with_groups(types.teardown_hook_name(hook), groups), [
+    TeardownFailed(hook: hook, path: path, message: message) ->
+      failure_lines(color, with_path(types.teardown_hook_name(hook), path), [
         message,
       ])
-    SetupStopped(setup: setup, groups: groups, reason: reason, not_run: not_run) ->
+    SetupStopped(setup: setup, path: path, reason: reason, not_run: not_run) ->
       failure_lines(
         color,
         types.setup_hook_name(setup)
-          <> quoted_groups(groups)
+          <> quoted_path(path)
           <> " stopped: the process that keeps its setup alive exited with "
           <> reason
           <> ".",
@@ -157,16 +157,16 @@ fn not_run_name(full_name: List(String)) -> String {
   "  " <> string.join(full_name, " > ")
 }
 
-fn quoted_groups(groups: List(String)) -> String {
-  case groups {
+fn quoted_path(path: List(String)) -> String {
+  case path {
     [] -> ""
-    _ -> " in \"" <> string.join(groups, " > ") <> "\""
+    _ -> " in \"" <> string.join(path, " > ") <> "\""
   }
 }
 
-fn with_groups(name: String, groups: List(String)) -> String {
-  case groups {
+fn with_path(name: String, path: List(String)) -> String {
+  case path {
     [] -> name
-    _ -> name <> " in " <> string.join(groups, " > ")
+    _ -> name <> " in " <> string.join(path, " > ")
   }
 }

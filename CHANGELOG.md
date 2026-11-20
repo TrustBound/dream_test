@@ -492,13 +492,13 @@ the guide labels them.
     `types.report_reporter_crashes`, and check it with `types.failed`.
     `RunReport` is opaque, so it can grow without a breaking change
   - `types.HookFailure`, a teardown hook that failed or a setup that
-    stopped. Its variant `types.TeardownFailed(hook:, groups:, message:)`
+    stopped. Its variant `types.TeardownFailed(hook:, path:, message:)`
     is a teardown hook that failed, with
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
     `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
     `ContextTeardownHook`), with
     `types.teardown_hook_name`
-  - `types.SetupStopped(setup:, groups:, reason:, not_run:)`, a variant of
+  - `types.SetupStopped(setup:, path:, reason:, not_run:)`, a variant of
     `types.HookFailure` for a setup that stopped: the process that
     keeps its setup alive exited while or after its setup hooks ran.
     `not_run` is the full name of each test that had not started and was
@@ -522,8 +522,8 @@ the guide labels them.
   - `parallel.OuterSetup`: a setup around the suite that keeps its
     resources alive in a process, for example the `before_all_suites` or
     `before_each_suite` setup. It is
-    `SetupRunning(setup:, groups:, check_setup_process:)` or
-    `SetupStopped(setup:, groups:, reason:, not_run:)`. The executor checks
+    `SetupRunning(setup:, path:, check_setup_process:)` or
+    `SetupStopped(setup:, path:, reason:, not_run:)`. The executor checks
     each one before each test and each group starts
 
 - **Sandbox** (`dream_test/sandbox`)
