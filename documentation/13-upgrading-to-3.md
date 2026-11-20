@@ -925,7 +925,7 @@ pub fn main() {
     progress.RunFinishedProgress(
       completed: completed_after_suite,
       total: total,
-      teardown_failures: counts.teardown_failed,
+      teardown_failed: counts.teardown_failed,
       setup_stopped: counts.setup_stopped,
     ),
   )

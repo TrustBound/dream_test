@@ -693,7 +693,7 @@ the guide labels them.
     of each test, for example `root > b`
   - The last progress line says `done, 1 teardown failed` when a teardown
     hook failed, and `done, 1 setup stopped` when a setup stopped
-    (`progress.RunFinishedProgress` has `teardown_failures` and
+    (`progress.RunFinishedProgress` has `teardown_failed` and
     `setup_stopped`)
 
 - **Gherkin**

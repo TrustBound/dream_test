@@ -87,7 +87,7 @@ pub fn tests() {
           progress.RunFinishedProgress(
             completed: 5,
             total: 2,
-            teardown_failures: 0,
+            teardown_failed: 0,
             setup_stopped: 0,
           ),
         )
@@ -116,7 +116,7 @@ pub fn tests() {
           progress.RunFinishedProgress(
             completed: 2,
             total: 2,
-            teardown_failures: 1,
+            teardown_failed: 1,
             setup_stopped: 0,
           ),
         )
@@ -131,7 +131,7 @@ pub fn tests() {
           progress.RunFinishedProgress(
             completed: 2,
             total: 2,
-            teardown_failures: 1,
+            teardown_failed: 1,
             setup_stopped: 2,
           ),
         )
@@ -175,7 +175,7 @@ pub fn tests() {
             progress.RunFinishedProgress(
               completed: 2,
               total: 2,
-              teardown_failures: 0,
+              teardown_failed: 0,
               setup_stopped: 0,
             ),
           )
@@ -192,7 +192,7 @@ pub fn tests() {
             progress.RunFinishedProgress(
               completed: 2,
               total: 2,
-              teardown_failures: 1,
+              teardown_failed: 1,
               setup_stopped: 0,
             ),
           )

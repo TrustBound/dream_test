@@ -55,7 +55,7 @@ pub fn new() -> ProgressReporter {
 /// - `RunStartedProgress`: the run starts. `total` is the number of tests.
 /// - `TestFinishedProgress`: one more test finished. `completed` counts the
 ///   finished tests, this one included.
-/// - `RunFinishedProgress`: the run finished. `teardown_failures` is the
+/// - `RunFinishedProgress`: the run finished. `teardown_failed` is the
 ///   number of teardown hooks that failed, and `setup_stopped` the number
 ///   of setups whose process stopped while their tests ran.
 ///
@@ -67,7 +67,7 @@ pub fn new() -> ProgressReporter {
 ///   progress.RunFinishedProgress(
 ///     completed: 4,
 ///     total: 4,
-///     teardown_failures: 0,
+///     teardown_failed: 0,
 ///     setup_stopped: 0,
 ///   ),
 /// )
@@ -82,7 +82,7 @@ pub type ProgressEvent {
   RunFinishedProgress(
     completed: Int,
     total: Int,
-    teardown_failures: Int,
+    teardown_failed: Int,
     setup_stopped: Int,
   )
 }
@@ -162,23 +162,23 @@ pub fn render(columns columns: Int, event event: ProgressEvent) -> String {
     RunFinishedProgress(
       completed: completed,
       total: total,
-      teardown_failures: teardown_failures,
+      teardown_failed: teardown_failed,
       setup_stopped: setup_stopped,
     ) ->
       render_line(
         width,
         completed,
         total,
-        done_label(teardown_failures, setup_stopped),
+        done_label(teardown_failed, setup_stopped),
       )
   }
 }
 
 /// `done` at the end of a run, with the number of teardown hooks that
 /// failed and of setups that stopped, when not zero.
-fn done_label(teardown_failures: Int, setup_stopped: Int) -> String {
+fn done_label(teardown_failed: Int, setup_stopped: Int) -> String {
   "done"
-  <> count_label(teardown_failures, " teardown failed")
+  <> count_label(teardown_failed, " teardown failed")
   <> count_label(setup_stopped, " setup stopped")
 }
 

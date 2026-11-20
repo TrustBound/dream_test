@@ -1030,7 +1030,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         progress.RunFinishedProgress(
           completed: completed2,
           total: total,
-          teardown_failures: counts.teardown_failed,
+          teardown_failed: counts.teardown_failed,
           setup_stopped: counts.setup_stopped,
         ),
         output,
