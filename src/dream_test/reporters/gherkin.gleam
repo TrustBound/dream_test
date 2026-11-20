@@ -21,7 +21,6 @@ import dream_test/types.{
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -71,12 +70,17 @@ pub fn format(report report: RunReport) -> String {
 /// Format test results as Gherkin feature and scenario lines, with no
 /// summary.
 ///
-/// The headings come from the result kind, not from the group names. For a
-/// scenario inside a Rule (`GherkinScenario(rule: Some(rule), ..)`), the
-/// Rule prints as a heading under its feature, the feature is the group
-/// before the Rule group, and the scenarios of the Rule indent two more
-/// spaces. For every other result, the feature is the last group. So a
-/// Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
+/// The headings come from the result kind, not from the place or the name
+/// of a group. A scenario in the group of its Feature
+/// (`GherkinScenario(feature: Some(name), ..)`) prints under the heading
+/// `Feature: <name>`. Any other result, such as a scenario of
+/// `steps.SuiteScenarios` (`feature: None`) or a unit test, prints under
+/// its groups joined with ` > `, for example `Shop > Billing`, and under
+/// no heading when it has no group. For a scenario inside a Rule
+/// (`GherkinScenario(rule: Some(rule), ..)`), the Rule prints as a heading
+/// under the first heading, and the scenarios of the Rule indent two more
+/// spaces. So a Feature named `Rule: refunds` prints as
+/// `Feature: Rule: refunds`.
 ///
 /// `format` gives these lines, then an empty line and the summary line.
 /// Use `format_scenarios` when you write your own summary, for example in a
@@ -90,6 +94,7 @@ pub fn format(report report: RunReport) -> String {
 /// import dream_test/reporters/gherkin as gherkin_reporter
 /// import dream_test/types.{GherkinScenario, Passed, TestResult}
 /// import dream_test/unit.{describe, it}
+/// import gleam/option.{None, Some}
 ///
 /// pub fn tests() {
 ///   describe("Gherkin scenario lines", [
@@ -102,7 +107,11 @@ pub fn format(report report: RunReport) -> String {
 ///           duration_ms: 0,
 ///           tags: [],
 ///           failures: [],
-///           kind: GherkinScenario(scenario_id: "cart", rule: None),
+///           kind: GherkinScenario(
+///             scenario_id: "cart",
+///             feature: Some("Shopping Cart"),
+///             rule: None,
+///           ),
 ///         )
 ///
 ///       gherkin_reporter.format_scenarios([result])
@@ -123,7 +132,7 @@ pub fn format(report report: RunReport) -> String {
 /// The feature and scenario lines as a `String`. Each line ends with `\n`.
 /// An empty list gives `""`.
 pub fn format_scenarios(results results: List(TestResult)) -> String {
-  format_all_results(results, Heading(feature: "", rule: None), "")
+  format_all_results(results, None, "")
 }
 
 /// Print test results using a provided writer function.
@@ -185,15 +194,20 @@ pub fn is_gherkin_result(result result: TestResult) -> Bool {
 // Result Formatting
 // ============================================================================
 
-/// The headings that a scenario line belongs under. `rule` is the name of the
-/// Rule group, from the result kind.
+/// The headings that a scenario line belongs under.
+///
+/// `title` is the first heading line: `Feature: <name>` for a scenario in
+/// the group of its Feature (`GherkinScenario(feature: Some(name), ..)`),
+/// else the groups of the result, outside its Rule group, joined with
+/// ` > `. It is `None` when there is no such group, so there is nothing to
+/// name. `rule` is the name of the Rule group, from the result kind.
 type Heading {
-  Heading(feature: String, rule: Option(String))
+  Heading(title: Option(String), rule: Option(String))
 }
 
 fn format_all_results(
   results: List(TestResult),
-  previous: Heading,
+  previous: Option(Heading),
   accumulated: String,
 ) -> String {
   case results {
@@ -203,51 +217,53 @@ fn format_all_results(
       let heading_text = format_heading_if_new(heading, previous)
       let scenario_text = format_scenario(result, heading)
       let updated = string.concat([accumulated, heading_text, scenario_text])
-      format_all_results(rest, heading, updated)
+      format_all_results(rest, Some(heading), updated)
     }
   }
 }
 
-/// The headings of a result. The Rule comes from the result kind. Discovery
-/// puts the suite name before the feature name, so the feature is the last
-/// group (or the group before the Rule group), not the first group.
+/// The headings of a result. The Feature and the Rule come from the result
+/// kind, never from the position of a group.
 fn heading_of(result: TestResult) -> Heading {
-  case result.kind {
-    GherkinScenario(rule: Some(rule), ..) ->
-      Heading(feature: feature_before_rule(result.groups), rule: Some(rule))
-    _ -> Heading(feature: last_group(result.groups), rule: None)
+  let #(groups, rule) = case result.kind {
+    GherkinScenario(rule: Some(rule), ..) -> #(
+      list.take(result.groups, list.length(result.groups) - 1),
+      Some(rule),
+    )
+    _ -> #(result.groups, None)
+  }
+  let title = case result.kind, groups {
+    GherkinScenario(feature: Some(feature), ..), _ ->
+      Some("Feature: " <> feature)
+    _, [] -> None
+    _, _ -> Some(string.join(groups, " > "))
+  }
+  Heading(title: title, rule: rule)
+}
+
+fn format_heading_if_new(
+  current: Heading,
+  previous: Option(Heading),
+) -> String {
+  case previous {
+    Some(previous) if previous == current -> ""
+    Some(previous) if previous.title == current.title ->
+      format_rule_heading(current)
+    _ ->
+      string.concat([format_title(current.title), format_rule_heading(current)])
   }
 }
 
-/// The group before the last group. The last group is the Rule group.
-fn feature_before_rule(groups: List(String)) -> String {
-  last_group(list.take(groups, list.length(groups) - 1))
-}
-
-fn last_group(groups: List(String)) -> String {
-  list.last(groups)
-  |> result.unwrap(unknown_feature)
-}
-
-const unknown_feature = "Unknown Feature"
-
-fn format_heading_if_new(current: Heading, previous: Heading) -> String {
-  case current.feature == previous.feature, current.rule == previous.rule {
-    True, True -> ""
-    True, False -> format_rule_heading(current.rule)
-    False, _ ->
-      string.concat([
-        "Feature: ",
-        current.feature,
-        "\n",
-        format_rule_heading(current.rule),
-      ])
+fn format_title(title: Option(String)) -> String {
+  case title {
+    Some(title) -> title <> "\n"
+    None -> ""
   }
 }
 
-fn format_rule_heading(rule: Option(String)) -> String {
-  case rule {
-    Some(rule) -> string.concat(["  ", rule, "\n"])
+fn format_rule_heading(heading: Heading) -> String {
+  case heading.rule {
+    Some(rule) -> string.concat([title_indent(heading), rule, "\n"])
     None -> ""
   }
 }
@@ -270,10 +286,19 @@ fn format_scenario(result: TestResult, heading: Heading) -> String {
   string.concat([scenario_line, failure_text])
 }
 
+/// Two spaces under a title line, none when there is no title line.
+fn title_indent(heading: Heading) -> String {
+  case heading.title {
+    Some(_) -> "  "
+    None -> ""
+  }
+}
+
+/// Two more spaces under a Rule heading.
 fn scenario_indent(heading: Heading) -> String {
   case heading.rule {
-    Some(_) -> "    "
-    None -> "  "
+    Some(_) -> title_indent(heading) <> "  "
+    None -> title_indent(heading)
   }
 }
 

@@ -169,14 +169,22 @@ fn gherkin_results() -> List(types.TestResult) {
       "adds",
       types.Passed,
       [],
-      types.GherkinScenario(scenario_id: "c1", rule: None),
+      types.GherkinScenario(
+        scenario_id: "c1",
+        feature: Some("Cart"),
+        rule: None,
+      ),
     ),
     result_of(
       ["Cart"],
       "removes",
       types.Failed,
       [failure("gone", types.EqualityFailure(actual: "1", expected: "0"))],
-      types.GherkinScenario(scenario_id: "c2", rule: None),
+      types.GherkinScenario(
+        scenario_id: "c2",
+        feature: Some("Cart"),
+        rule: None,
+      ),
     ),
   ]
 }

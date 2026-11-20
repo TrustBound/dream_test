@@ -976,8 +976,11 @@ fn has_scenario_id_shape(
   prefix: String,
 ) -> Bool {
   let id = step_scenario_id(result)
-  result.kind == test_types.GherkinScenario(scenario_id: id, rule: None)
-  && has_number_after(id, prefix)
+  case result.kind {
+    test_types.GherkinScenario(scenario_id: kind_id, rule: None, ..) ->
+      kind_id == id && has_number_after(id, prefix)
+    _ -> False
+  }
 }
 
 fn has_number_after(id: String, prefix: String) -> Bool {

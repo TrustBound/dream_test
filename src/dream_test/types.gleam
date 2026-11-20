@@ -131,17 +131,31 @@ pub type Status {
 /// - `Unit` - every test that is not a Gherkin scenario: the tests of
 ///   `dream_test/unit` and `dream_test/unit_context`, and the failing tests
 ///   that discovery makes for its errors
-/// - `GherkinScenario(scenario_id:, rule:)` - Tests from Gherkin features
+/// - `GherkinScenario(scenario_id:, feature:, rule:)` - Tests from Gherkin features
 ///   (inline DSL or `.feature` files)
 ///
 pub type TestKind {
   Unit
   /// A Gherkin scenario. `scenario_id` is the id that the steps get in
-  /// `StepContext.scenario_id`. `rule` is the name of the Rule group, for
-  /// example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None`
-  /// for a scenario outside a Rule. The Rule group is the last group of the
-  /// result, and the Feature is the group before it.
-  GherkinScenario(scenario_id: String, rule: Option(String))
+  /// `StepContext.scenario_id`.
+  ///
+  /// `feature` is the name of the Feature when the scenario is in the group
+  /// of its Feature: the scenarios of `feature.to_suite`,
+  /// `steps.SuiteFeature` and `gherkin/discover.to_suite`. It is `None` for
+  /// the scenarios of `steps.SuiteScenarios`, which go straight into the
+  /// group around them, so no group is their Feature. The reporters print
+  /// `Feature: <name>` only from this field.
+  ///
+  /// `rule` is the name of the Rule group, for example
+  /// `Some("Rule: Stock")`, for a scenario inside a Rule, and `None` for a
+  /// scenario outside a Rule. The Rule group is the last group of the
+  /// result. When `feature` is `Some`, the Feature group is the group
+  /// before the Rule group, or the last group outside a Rule.
+  GherkinScenario(
+    scenario_id: String,
+    feature: Option(String),
+    rule: Option(String),
+  )
 }
 
 /// Structured details about why an assertion failed.
@@ -338,7 +352,7 @@ pub type TestResult {
 ///   group in. Use `full_name(groups, name)` for the group path and the
 ///   test name together (deterministic, good for identifiers).
 /// - `tags`: effective tags (includes inherited group tags)
-/// - `kind`: `TestKind` (Unit or GherkinScenario(scenario_id:, rule:))
+/// - `kind`: `TestKind` (Unit or GherkinScenario(scenario_id:, feature:, rule:))
 /// - `source`: best-effort origin string (module name or `.feature` path)
 ///
 /// ### Source behavior

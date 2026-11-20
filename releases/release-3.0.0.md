@@ -177,7 +177,10 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   label `action:`, and `steps.then` with the label `check:`. In 2.x the
   label was `handler:`.
 - Gherkin: `types.GherkinScenario` is
-  `GherkinScenario(scenario_id:, rule:)`. In 2.x it held only the id.
+  `GherkinScenario(scenario_id:, feature:, rule:)`. In 2.x it held only the
+  id. The BDD and Gherkin reporters print `Feature:` from `feature`, so
+  both label the group of the Feature and no other group. The JSON report
+  has `feature` and `rule` for a Gherkin test.
 - Gherkin: `{float}` matches a number as Cucumber reads it, such as `20`,
   `.5` or `1e5`. In 2.x it needed a `.`. With `total {word}` and
   `total {float}`, the text `total 20` now runs the `{float}` step.

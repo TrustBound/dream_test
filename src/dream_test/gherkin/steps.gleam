@@ -357,6 +357,24 @@ pub fn to_suite(
   )
 }
 
+/// The suite of one Feature, for `feature.to_suite`: the top-level group of
+/// the suite is the group of the Feature, so its scenarios have
+/// `feature: Some(feature.name)`. With `to_suite` and `SuiteScenarios` they
+/// would have `None`, and with `SuiteFeature` the Feature group would be
+/// inside one more group.
+@internal
+pub fn feature_suite(
+  registry registry: StepRegistry(state),
+  feature feature: types.Feature,
+) -> TestSuite {
+  suite.new(
+    name: feature.name,
+    tags: feature.tags,
+    children: feature_children(feature, registry, Some(feature.name)),
+    context: registry.start,
+  )
+}
+
 fn children_to_nodes(
   children: List(SuiteChild(state)),
   registry: StepRegistry(state),
@@ -380,10 +398,10 @@ fn child_to_nodes(
       dream_types.Group(
         name: feature.name,
         tags: feature.tags,
-        children: feature_children(feature, registry),
+        children: feature_children(feature, registry, Some(feature.name)),
       ),
     ]
-    SuiteScenarios(feature) -> feature_children(feature, registry)
+    SuiteScenarios(feature) -> feature_children(feature, registry, None)
     SuiteGroup(name: name, tags: tags, children: children) -> [
       dream_types.Group(
         name: name,
@@ -862,13 +880,17 @@ fn list_at_loop(items: List(a), target: Int, current: Int) -> Option(a) {
 // ============================================================================
 
 /// The tests of the scenarios of `feature`, and a group for each Rule.
+/// `feature_group` is the name of the Feature when these nodes go into the
+/// group of the Feature, and `None` when they go into another group.
 fn feature_children(
   feature: types.Feature,
   registry: StepRegistry(state),
+  feature_group: Option(String),
 ) -> List(dream_types.Node(state)) {
   let scope =
     ScenarioScope(
       feature_name: feature.name,
+      feature_group: feature_group,
       source: feature.source,
       registry: registry,
       rule_group: None,
@@ -883,6 +905,9 @@ fn feature_children(
 type ScenarioScope(state) {
   ScenarioScope(
     feature_name: String,
+    /// The name of the Feature when the scenarios are in the group of the
+    /// Feature, or `None` for the scenarios of `SuiteScenarios`.
+    feature_group: Option(String),
     source: Option(String),
     registry: StepRegistry(state),
     /// The name of the Rule group (`Rule: <name>`) for the scenarios of a
@@ -1018,6 +1043,7 @@ fn scenario_node(
     tags: run.tags,
     kind: dream_types.GherkinScenario(
       scenario_id: scenario_id,
+      feature: scope.feature_group,
       rule: scope.rule_group,
     ),
     run: dream_types.WithInput(fn(start) {

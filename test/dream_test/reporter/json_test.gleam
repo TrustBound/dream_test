@@ -51,7 +51,7 @@ fn every_status() -> List(types.TestResult) {
       "skips",
       types.Skipped,
       [],
-      types.GherkinScenario(scenario_id: "f:1", rule: None),
+      types.GherkinScenario(scenario_id: "f:1", feature: None, rule: None),
     ),
     result_of("waits", types.Pending, [], types.Unit),
     result_of("times out", types.TimedOut, [], types.Unit),
@@ -320,7 +320,7 @@ pub fn tests() {
         |> or_fail_with("the summary should count each status")
       }),
 
-      it("writes the Rule of a Gherkin scenario inside a Rule", fn() {
+      it("writes the Feature and the Rule of a Gherkin scenario", fn() {
         json.format(
           report_of([
             result_of(
@@ -329,6 +329,7 @@ pub fn tests() {
               [],
               types.GherkinScenario(
                 scenario_id: "F::Rule: Stock::sells#1",
+                feature: Some("F"),
                 rule: Some("Rule: Stock"),
               ),
             ),
@@ -337,9 +338,36 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"hook_failures\":[]}\n",
+          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"feature\":\"F\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
-        |> or_fail_with("a Gherkin scenario should have its Rule")
+        |> or_fail_with(
+          "a Gherkin scenario should have its Feature and its Rule",
+        )
+      }),
+
+      it("writes a null Feature for a scenario outside a Feature", fn() {
+        json.format(
+          report_of([
+            result_of(
+              "pays",
+              types.Passed,
+              [],
+              types.GherkinScenario(
+                scenario_id: "pays#1",
+                feature: None,
+                rule: None,
+              ),
+            ),
+          ]),
+        )
+        |> after("\"tests\":")
+        |> should
+        |> be_equal(
+          "[{\"name\":\"pays\",\"full_name\":[\"s\",\"pays\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:pays#1\",\"feature\":null,\"rule\":null,\"failures\":[]}],\"hook_failures\":[]}\n",
+        )
+        |> or_fail_with(
+          "a scenario outside a Feature should have a null Feature",
+        )
       }),
 
       it("writes the status and kind of every test", fn() {
@@ -347,7 +375,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
+          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"feature\":null,\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("each test should have its status and kind")
       }),

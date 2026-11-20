@@ -1311,11 +1311,11 @@ pub fn tests() {
 }
 ```
 
-#### A Gherkin result kind has the Rule
+#### A Gherkin result kind has the Feature and the Rule
 
-`types.GherkinScenario` has two labelled fields: `GherkinScenario(scenario_id:, rule:)`. `rule` is the name of the Rule group, for example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None` for a scenario outside a Rule. Code that builds a result gives `rule: None` for a scenario outside a Rule. A pattern that matches the kind uses `GherkinScenario(..)` or names the fields.
+`types.GherkinScenario` has three labelled fields: `GherkinScenario(scenario_id:, feature:, rule:)`. `feature` is the name of the Feature, for example `Some("Cart")`, for a scenario in the group of its Feature, and `None` for a scenario of `steps.SuiteScenarios`, which is in no Feature group. `rule` is the name of the Rule group, for example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None` for a scenario outside a Rule. Code that builds a result gives both. A pattern that matches the kind uses `GherkinScenario(..)` or names the fields.
 
-The Gherkin reporter reads the Rule from the kind, not from a group name that starts with `Rule:`. In 2.x, a Feature named `Rule: refunds` printed as `Feature: Unknown Feature` with a `Rule: refunds` heading. In 3.0.0 it prints as `Feature: Rule: refunds`.
+The BDD and Gherkin reporters read the Feature and the Rule from the kind, not from the place of a group or from a group name that starts with `Rule:`. In 2.x, both reporters printed `Feature:` on the first group, so a suite name above the Feature was printed as the Feature, and a Feature named `Rule: refunds` printed as `Feature: Unknown Feature` with a `Rule: refunds` heading. In 3.0.0 both reporters print `Feature: <feature>` on the group of the Feature, and `Feature: Rule: refunds` for that Feature. For a scenario with `feature: None`, the Gherkin reporter prints its groups, joined with ` > `, as the heading.
 
 ##### 2.x: a Gherkin result with only the id <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L6-L18"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1335,7 +1335,7 @@ fn sample_results() -> List(types.TestResult) {
 }
 ```
 
-##### 3.0.0: a Gherkin result with the id and the Rule <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L7-L19"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a Gherkin result with the id, the Feature and the Rule <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L7-L23"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn sample_results() -> List(types.TestResult) {
@@ -1347,7 +1347,11 @@ fn sample_results() -> List(types.TestResult) {
       duration_ms: 0,
       tags: [],
       failures: [],
-      kind: types.GherkinScenario(scenario_id: "example", rule: None),
+      kind: types.GherkinScenario(
+        scenario_id: "example",
+        feature: Some("Example Feature"),
+        rule: None,
+      ),
     ),
   ]
 }

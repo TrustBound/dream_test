@@ -21,9 +21,11 @@
 ////   kind, failures). `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
 ////   scenario id ends with a number that is unique in the run and changes
 ////   from run to run, so do not compare `kind` of a Gherkin test between
-////   runs: use `full_name`. Only a Gherkin test has `rule`, after
-////   `kind`: the name of its Rule group, for example `"Rule: Stock"`, or
-////   `null` for a scenario outside a Rule.
+////   runs: use `full_name`. Only a Gherkin test has `feature` and `rule`,
+////   after `kind`. `feature` is the name of its Feature, for example
+////   `"Cart"`, or `null` for a scenario in no Feature group (the scenarios
+////   of `steps.SuiteScenarios`). `rule` is the name of its Rule group, for
+////   example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
 //// - `hook_failures`: one object for each teardown hook that failed
 ////   and each setup that stopped, in the order that they happened. Each object
 ////   has `kind`, `hook`, `path` and `message`:
@@ -390,17 +392,19 @@ fn build_test_json(result: TestResult) -> Json {
         #("tags", json.array(result.tags, json.string)),
         #("kind", json.string(kind_to_string(result.kind))),
       ],
-      rule_fields(result.kind),
+      gherkin_fields(result.kind),
       [#("failures", json.array(result.failures, build_failure_json))],
     ]),
   )
 }
 
-/// Only a Gherkin scenario has `rule`: the name of its Rule group, or
-/// `null` for a scenario outside a Rule.
-fn rule_fields(kind: TestKind) -> List(#(String, Json)) {
+/// Only a Gherkin scenario has `feature` and `rule`: the name of its
+/// Feature, or `null` for a scenario in no Feature group, and the name of
+/// its Rule group, or `null` for a scenario outside a Rule.
+fn gherkin_fields(kind: TestKind) -> List(#(String, Json)) {
   case kind {
-    GherkinScenario(rule: rule, ..) -> [
+    GherkinScenario(feature: feature, rule: rule, ..) -> [
+      #("feature", json.nullable(feature, json.string)),
       #("rule", json.nullable(rule, json.string)),
     ]
     _ -> []

@@ -19,7 +19,22 @@ fn scenario(
     duration_ms: 0,
     tags: [],
     failures: failures,
-    kind: types.GherkinScenario(scenario_id: "id", rule: None),
+    kind: types.GherkinScenario(
+      scenario_id: "id",
+      feature: option.from_result(list.last(groups)),
+      rule: None,
+    ),
+  )
+}
+
+/// A passed scenario under the groups `groups` that is in no Feature.
+fn scenario_without_feature(
+  groups: List(String),
+  name: String,
+) -> types.TestResult {
+  types.TestResult(
+    ..scenario(groups, name, types.Passed, []),
+    kind: types.GherkinScenario(scenario_id: "id", feature: None, rule: None),
   )
 }
 
@@ -31,7 +46,11 @@ fn scenario_in_rule(
 ) -> types.TestResult {
   types.TestResult(
     ..scenario(list.append(groups, [rule]), name, types.Passed, []),
-    kind: types.GherkinScenario(scenario_id: "id", rule: Some(rule)),
+    kind: types.GherkinScenario(
+      scenario_id: "id",
+      feature: option.from_result(list.last(groups)),
+      rule: Some(rule),
+    ),
   )
 }
 
@@ -85,9 +104,8 @@ pub fn tests() {
 Feature: G
   Rule: C
     Scenario: Four ✓
-Feature: Unknown Feature
-  Rule: D
-    Scenario: Five ✓
+Rule: D
+  Scenario: Five ✓
 ",
       )
       |> or_fail_with("expected Feature and Rule headings")
@@ -203,16 +221,38 @@ Feature: Unknown Feature
         |> or_fail_with("each status should have its marker")
       }),
 
-      it("writes a placeholder feature for a result with no group", fn() {
+      it("writes no heading for a scenario with no Feature and no group", fn() {
         gherkin.format(report_of([scenario([], "alone", types.Passed, [])]))
         |> should
         |> be_equal(
-          "Feature: Unknown Feature\n"
-          <> "  Scenario: alone ✓\n"
+          "Scenario: alone ✓\n"
           <> "\n"
           <> "Summary: 1 run, 0 failed, 1 passed in 0ms\n",
         )
-        |> or_fail_with("the feature should have a placeholder name")
+        |> or_fail_with(
+          "a scenario with nothing to name should have no heading",
+        )
+      }),
+
+      it("writes the groups of a scenario in no Feature as its heading", fn() {
+        gherkin.format_scenarios([
+          scenario_without_feature(["Shop", "Billing"], "pays"),
+        ])
+        |> should
+        |> be_equal("Shop > Billing\n  Scenario: pays ✓\n")
+        |> or_fail_with("the groups should be the heading, with no Feature")
+      }),
+
+      it("writes the groups of a unit test as its heading", fn() {
+        gherkin.format_scenarios([
+          types.TestResult(
+            ..scenario(["math", "add"], "sums", types.Passed, []),
+            kind: types.Unit,
+          ),
+        ])
+        |> should
+        |> be_equal("math > add\n  Scenario: sums ✓\n")
+        |> or_fail_with("a unit test has no Feature")
       }),
 
       it("format_scenarios writes the scenarios without a summary", fn() {

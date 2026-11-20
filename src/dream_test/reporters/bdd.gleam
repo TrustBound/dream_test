@@ -20,7 +20,7 @@ import dream_test/types.{
   SetupFailed, Skipped, SnapshotFailure, StringMatchFailure, TimedOut,
 }
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/string
 
@@ -566,7 +566,7 @@ fn format_one_result_parts_with_test_indent(
       color,
       new_segments,
       common_depth,
-      is_gherkin,
+      feature_depth(result),
       "",
     )
   let test_line =
@@ -583,14 +583,14 @@ fn format_header_segments_for_kind(
   color: Bool,
   segments: List(String),
   depth: Int,
-  is_gherkin: Bool,
+  feature_depth: Option(Int),
   accumulated: String,
 ) -> String {
   case segments {
     [] -> accumulated
     [segment, ..rest] -> {
       let indent = build_indent(depth)
-      let label = case is_gherkin && depth == 0 {
+      let label = case feature_depth == Some(depth) {
         True -> "Feature: " <> segment
         False -> segment
       }
@@ -602,7 +602,7 @@ fn format_header_segments_for_kind(
         color,
         rest,
         depth + 1,
-        is_gherkin,
+        feature_depth,
         updated,
       )
     }
@@ -899,5 +899,18 @@ fn format_snapshot_failure(
         "\n",
         format_expected_actual(color, base_indent, expected, actual),
       ])
+  }
+}
+
+/// The depth of the Feature group of a result: the group before its Rule
+/// group, or its last group outside a Rule. `None` when the result is in
+/// no Feature group: a unit test, or a scenario with `feature: None`.
+fn feature_depth(result: TestResult) -> Option(Int) {
+  let depth = list.length(result.groups)
+  case result.kind {
+    types.GherkinScenario(feature: Some(_), rule: Some(_), ..) ->
+      Some(depth - 2)
+    types.GherkinScenario(feature: Some(_), rule: None, ..) -> Some(depth - 1)
+    _ -> None
   }
 }

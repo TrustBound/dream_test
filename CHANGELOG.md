@@ -171,12 +171,18 @@ store. This release has breaking changes. Read
   and `discover.to_suite`. It still takes a `FeatureConfig`.
 - `StepContext` has no `world` field. It has a `scenario_id` field.
 - `types.GherkinScenario(String)` is now
-  `GherkinScenario(scenario_id: String, rule: Option(String))`. `rule` is
-  the name of the Rule group, for example `Some("Rule: Stock")`, or `None`
-  for a scenario outside a Rule. The Gherkin reporter reads the Rule from
-  this field, not from a group name that starts with `Rule:`, so a Feature
-  named `Rule: refunds` prints as `Feature: Rule: refunds`. A Gherkin test
-  in the JSON report has `rule` after `kind` (a string, or `null`).
+  `GherkinScenario(scenario_id: String, feature: Option(String), rule:
+  Option(String))`. `feature` is the name of the Feature for a scenario in
+  the group of its Feature, or `None` for a scenario of
+  `steps.SuiteScenarios`. `rule` is the name of the Rule group, for
+  example `Some("Rule: Stock")`, or `None` for a scenario outside a Rule.
+  The BDD and Gherkin reporters read the Feature and the Rule from these
+  fields, not from the place of a group or from a group name that starts
+  with `Rule:`. So both print `Feature:` on the same group, and a Feature
+  named `Rule: refunds` prints as `Feature: Rule: refunds`. A scenario with
+  `feature: None` gets no `Feature:` line: the Gherkin reporter prints its
+  groups joined with ` > ` as its heading. A Gherkin test in the JSON
+  report has `feature` and `rule` after `kind` (each a string, or `null`).
 - The scenario id ends with `#` and a number, for example
   `"Shopping Cart::Adding items#12"`, so it is unique in the run, also for
   two scenarios with the same name. In 2.x it was only the name path. The
@@ -290,7 +296,7 @@ the guide labels them.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
 - `feature.to_test_suite` is now `feature.to_suite`.
 - `StepContext` has `scenario_id` in place of `world`.
-- `GherkinScenario` has the fields `scenario_id` and `rule`.
+- `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`.
 - A pattern registered two times in one phase is an error.
 - `find_step` and `step_trie` take a `StepPhase` in place of a keyword.
 - Step text and patterns split into words only at spaces.
@@ -808,8 +814,9 @@ the guide labels them.
 - The Gherkin reporter writes the failures of a timed out scenario, for
   example `timeout` with its message, under the scenario line. Before, it
   showed only the `!` marker and no reason.
-- The Gherkin reporter uses the feature name for the `Feature:` line of a
-  discovered feature. Before, it used the suite name.
+- The BDD and Gherkin reporters use the feature name for the `Feature:`
+  line of a discovered feature, and label no other group as a Feature.
+  Before, both used the suite name.
 - Pretty JSON (`json.format_pretty`, `json.report_pretty` and the JSON
   reporter with `pretty`) writes an empty list as `[]`. Before, it wrote
   `[`, a line of spaces, and `]`. Compact JSON does not change.

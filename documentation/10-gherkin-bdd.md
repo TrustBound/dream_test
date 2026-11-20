@@ -409,7 +409,9 @@ A Rule can have its own Background.
 The Feature Background steps run first, then the Rule Background steps, then the scenario steps.
 So the first step of a Rule Background, or of a scenario in a Rule, can use `And`, `But` or `*` when a Background step runs before it.
 
-A scenario in a Rule is in a group named `Rule: <name>` (or `Rule:` for a Rule with no name), under the Feature group. Its result kind is `GherkinScenario(scenario_id:, rule: Some("Rule: <name>"))`. A scenario outside a Rule has `rule: None`. The Gherkin reporter prints the Rule heading from this field, so a Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
+A scenario in a Rule is in a group named `Rule: <name>` (or `Rule:` for a Rule with no name), under the Feature group. Its result kind is `GherkinScenario(scenario_id:, feature: Some("<feature>"), rule: Some("Rule: <name>"))`. A scenario outside a Rule has `rule: None`. The Gherkin reporter prints the Rule heading from this field, so a Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
+
+The `feature` field holds the name of the Feature when the scenario is in the group of its Feature: with `feature.to_suite`, `steps.SuiteFeature` and `discover.to_suite`. The BDD and Gherkin reporters print `Feature: <feature>` on that group and on no other group, so a suite name or a `suite.group` above the Feature prints as a plain group.
 
 A scenario can have more than one `Examples` section, and every row of every section runs.
 The tags of an `Examples` section apply to the tests that its rows make.
@@ -831,7 +833,7 @@ Summary: 4 run, 0 failed, 4 passed in 2ms
 `steps.to_suite` takes these children (`steps.SuiteChild`):
 
 - `SuiteFeature(feature)`: a group named after the Feature, with a test for each scenario.
-- `SuiteScenarios(feature)`: the tests of the scenarios, with no group for the Feature. The tags of the Feature do not reach the scenarios. The Gherkin reporter takes the name of the nearest group, for example the suite name, as the `Feature:` heading.
+- `SuiteScenarios(feature)`: the tests of the scenarios, with no group for the Feature. The tags of the Feature do not reach the scenarios. Their result kind has `feature: None`, so no group is labelled `Feature:`. The BDD reporter prints the groups around them as plain groups, and the Gherkin reporter prints those groups, joined with ` > `, as their heading, for example `Shop > Billing`.
 - `SuiteGroup(name:, tags:, children:)`: a group of your own, for example with a tag, that holds more children.
 - `SuiteNode(node)`: a test, a hook or a group that you make, for example with `unit_context.it` or `unit_context.before_each`. It gets the same start as the scenarios.
 

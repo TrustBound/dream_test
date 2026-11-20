@@ -159,13 +159,7 @@ pub type InlineStep {
 /// to_suite(config)
 /// ```
 pub fn to_suite(config config: FeatureConfig(state)) -> TestSuite {
-  let feature = config.feature
-  steps.to_suite(
-    registry: config.step_registry,
-    name: feature.name,
-    tags: feature.tags,
-    children: [steps.SuiteScenarios(feature: feature)],
-  )
+  steps.feature_suite(registry: config.step_registry, feature: config.feature)
 }
 
 // ============================================================================
