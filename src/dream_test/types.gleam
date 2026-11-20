@@ -598,7 +598,8 @@ pub fn status_from_failures(
 /// Whether a status means that the test failed: `Failed`, `SetupFailed` or
 /// `TimedOut`.
 ///
-/// `failed` and the failure lists of the BDD reporter use this check.
+/// `failed`, the failure lists of the BDD reporter and the `failed` count
+/// that the runner gives the coverage reporter use this check.
 /// The summary line counts each status apart: its `<count> failed` is the
 /// status `Failed` only. `failed` also counts tear-down failures, stopped
 /// set-ups and crashed results reporters.

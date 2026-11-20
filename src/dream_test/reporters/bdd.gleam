@@ -96,7 +96,8 @@ pub fn summary_only(
   }
 }
 
-/// Print only the failed tests and the summary line at the end of the run.
+/// Print only the failed tests, the set-up and tear-down failures section
+/// (when there is one), and the summary line at the end of the run.
 /// A failed test here is one with the status `Failed`, `TimedOut` or
 /// `SetupFailed` (see `types.is_failure`).
 pub fn failures_only(

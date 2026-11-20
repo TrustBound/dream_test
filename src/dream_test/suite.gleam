@@ -278,7 +278,8 @@ fn put_in_group(
   }
 }
 
-/// The parts, each with `source` as the source of its tests.
+/// The parts, each with `source` as the source of its tests when the part
+/// has no source yet. A source from an earlier `with_source` is kept.
 fn set_source(
   parts: List(Part),
   source: String,
@@ -288,7 +289,13 @@ fn set_source(
     [] -> list.reverse(moved_rev)
     [part, ..rest] ->
       set_source(rest, source, [
-        move_part(part, Place(..part.place, source: Some(source))),
+        move_part(
+          part,
+          Place(
+            ..part.place,
+            source: option.or(part.place.source, Some(source)),
+          ),
+        ),
         ..moved_rev
       ])
   }

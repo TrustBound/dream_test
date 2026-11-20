@@ -110,6 +110,17 @@ pub fn tests() {
       |> or_fail_with("only a test with no source should get the new source")
     }),
 
+    it("with_source keeps the source of an earlier with_source", fn() {
+      plain_suite()
+      |> suite.with_source(source: "custom")
+      |> suite.with_source(source: "module_test")
+      |> suite.tests
+      |> list.map(source)
+      |> should
+      |> be_equal([Some("custom")])
+      |> or_fail_with("the first source should stay")
+    }),
+
     it("a filter that keeps no test of a tree does not run the tree", fn() {
       let events = process.new_subject()
       let results =
