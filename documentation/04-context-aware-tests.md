@@ -13,7 +13,7 @@ Use `dream_test/unit_context` when you want hooks and tests to operate on a shar
 What changes is the **shape of the suite**:
 
 - In `unit`, `describe("name", [...])` builds a suite where `it("name", fn() { ... })` has no context parameter.
-- In `unit_context`, `describe("name", seed, [...])` builds a suite where `it("name", fn(context) { ... })` receives the current context value.
+- In `unit_context`, `describe("name", initial, [...])` builds a suite where `it("name", fn(context) { ... })` receives the current context value.
 
 In practice, “switching” between them is mostly swapping the import:
 
@@ -43,13 +43,13 @@ For setup/teardown that spans multiple suites, use runner-level hooks in [Runner
 
 ### The idea: context flows through the suite
 
-- You give `describe` an initial `seed` value.
+- You give `describe` an `initial` value.
 - `before_all` / `before_each` can transform that context.
 - Each `it` receives the current context.
 
-### Why the seed exists
+### Why the initial value exists
 
-The `seed` might look redundant at first (“why not let `before_all` create the context?”), but it’s doing an important job: it makes the **context type known when the suite is built**, before any tests run.
+The `initial` value might look redundant at first (“why not let `before_all` create the context?”), but it’s doing an important job: it makes the **context type known when the suite is built**, before any tests run.
 
 That matters in Gleam because:
 

@@ -84,7 +84,7 @@ pub type RunInput {
 
 /// Make a suite from a typed tree that you build yourself.
 ///
-/// The `seed` of the tree is the context of the tests. `unit.describe`
+/// The `initial` value of the tree is the context of the tests. `unit.describe`
 /// and `unit_context.describe` call this for you.
 ///
 /// ## Parameters
@@ -105,7 +105,7 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
     name: tree.name,
     tags: tree.tags,
     children: tree.children,
-    context: FixedContext(tree.seed),
+    context: FixedContext(tree.initial),
   )
 }
 

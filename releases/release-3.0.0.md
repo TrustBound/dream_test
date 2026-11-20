@@ -145,6 +145,10 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   a tree is one top-level group with its children and one context, and a
   suite holds one or more trees. The `parallel` functions take the tree
   with the label `tree:` in place of `suite:`.
+- The start value has the label `initial` in place of `seed`, as in
+  `steps.new(initial:)`: `unit_context.describe(name:, initial:,
+  children:)`, `types.tree(name:, initial:, children:)` and the field
+  `types.Tree.initial`. A call without labels does not change.
 - The `parallel` names say "tree" in place of "root": `run_root_parallel`
   is now `run_tree_parallel`, `run_root_parallel_with_reporter` is now
   `run_tree_parallel_with_reporter`, and `RunRootParallelWithReporterConfig`

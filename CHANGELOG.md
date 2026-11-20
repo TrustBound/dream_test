@@ -46,8 +46,13 @@ store. This release has breaking changes. Read
 - `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`.
   A tree is one top-level group with its children and one context; a
   suite holds one or more trees. The tree holds the top-level group
-  itself: `Tree(seed:, name:, tags:, children:)` in place of
+  itself: `Tree(initial:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
+- The start value has the label `initial` in place of `seed`:
+  `unit_context.describe(name:, initial:, children:)`,
+  `types.tree(name:, initial:, children:)` and the field
+  `types.Tree.initial`. `steps.new(initial:)` already used it. A call
+  without labels does not change.
 - `types.TestResult` and `types.TestInfo` hold `groups: List(String)` (the
   names of the groups around the test) in place of
   `full_name: List(String)`.
@@ -302,6 +307,8 @@ the guide labels them.
 - `steps.new` takes the initial state. `steps.step` is removed.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
 - `feature.to_test_suite` is now `feature.to_suite`.
+- `unit_context.describe` and `types.tree` take `initial:` in place of
+  `seed:`.
 - `StepContext` has `scenario_id` in place of `world`.
 - `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`.
 - A pattern registered two times in one phase is an error.

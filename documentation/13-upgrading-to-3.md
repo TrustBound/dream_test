@@ -963,7 +963,7 @@ pub fn main() {
 
 #### Suites built by hand
 
-This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
+This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(initial:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
 
 ##### 2.x: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L369-L396"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 
@@ -1051,11 +1051,42 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 
 pub fn tests() -> TestSuite {
   suite.from_tree(
-    Tree(seed: Nil, name: "doubling", tags: [], children: [
+    Tree(initial: Nil, name: "doubling", tags: [], children: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)
     ]),
   )
+}
+```
+
+#### `seed` is now `initial`
+
+The start value of a context has the label `initial` in place of `seed`, as in `steps.new(initial:)`. This affects `unit_context.describe(name:, initial:, children:)`, `types.tree(name:, initial:, children:)` and the field `initial` of `types.Tree`. A call without labels, such as `unit_context.describe("counter", 0, [...])`, does not change. Change only the label.
+
+##### 2.x: `unit_context.describe` with the label `seed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit_context.gleam#L115-L121"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+pub fn describe(
+  name name: String,
+  seed seed: context,
+  children children: List(ContextNode(context)),
+) -> TestSuite(context) {
+  Root(seed: seed, tree: Group(name: name, tags: [], children: children))
+}
+```
+
+##### 3.0.0: `unit_context.describe` with the label `initial` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/initial_label.gleam#L5-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn tests() -> TestSuite {
+  unit_context.describe(name: "a counter", initial: 41, children: [
+    unit_context.it("starts from the initial value", fn(count: Int) {
+      count
+      |> should
+      |> be_equal(41)
+      |> or_fail_with("expected the initial value 41")
+    }),
+  ])
 }
 ```
 

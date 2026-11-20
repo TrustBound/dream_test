@@ -72,7 +72,7 @@ pub type ContextNode(context) =
 /// ## Parameters
 ///
 /// - `name`: Display name for the suite (shown in reports)
-/// - `seed`: Initial context value passed into hooks and tests
+/// - `initial`: Initial context value passed into hooks and tests
 /// - `children`: Tests, groups, and hooks that make up the suite
 ///
 /// ## Returns
@@ -119,10 +119,15 @@ pub type ContextNode(context) =
 /// ```
 pub fn describe(
   name name: String,
-  seed seed: context,
+  initial initial: context,
   children children: List(ContextNode(context)),
 ) -> TestSuite {
-  suite.from_tree(Tree(seed: seed, name: name, tags: [], children: children))
+  suite.from_tree(Tree(
+    initial: initial,
+    name: name,
+    tags: [],
+    children: children,
+  ))
 }
 
 /// Create a nested group inside a context-aware suite.

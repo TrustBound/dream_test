@@ -19,7 +19,7 @@ pub fn tests() {
       |> or_fail_with("the suite should hold the tree")
     }),
 
-    it("from_tree gives each test the seed of the tree", fn() {
+    it("from_tree gives each test the initial value of the tree", fn() {
       run_all([number_suite()])
       |> should
       |> be_equal([#(["number", "gets 41"], Passed)])
@@ -258,7 +258,7 @@ fn ignore(_text: String) -> Nil {
 /// with no source.
 fn feature_file_suite() -> suite.TestSuite {
   suite.from_tree(
-    types.tree(name: "cart", seed: Nil, children: [
+    types.tree(name: "cart", initial: Nil, children: [
       types.Test(
         name: "from the file",
         tags: [],

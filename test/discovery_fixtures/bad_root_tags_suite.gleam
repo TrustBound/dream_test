@@ -4,7 +4,12 @@
 import dream_test/types.{type Tree, Tree}
 
 pub fn tests() -> Tree(Nil) {
-  Tree(seed: Nil, name: "bad_root_tags_suite", tags: [coerce(1)], children: [])
+  Tree(
+    initial: Nil,
+    name: "bad_root_tags_suite",
+    tags: [coerce(1)],
+    children: [],
+  )
 }
 
 @external(erlang, "gleam_stdlib", "identity")

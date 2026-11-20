@@ -240,7 +240,7 @@ pub fn to_suite(
   let missing_nodes = missing_files_nodes(discovery.pattern, found)
   suite.join(name: suite_name, suites: [
     suite.from_tree(Tree(
-      seed: Nil,
+      initial: Nil,
       name: suite_name,
       tags: [],
       children: list.append(error_nodes, missing_nodes),

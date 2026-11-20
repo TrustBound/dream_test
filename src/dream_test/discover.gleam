@@ -397,7 +397,7 @@ fn errors_at_top(name: String, errors: List(String)) -> List(TestSuite) {
     [] -> []
     _ -> [
       suite.from_tree(Tree(
-        seed: Nil,
+        initial: Nil,
         name: name,
         tags: [],
         children: errors_to_nodes(errors, []),
@@ -588,7 +588,7 @@ fn errors_to_nodes(
 
 fn errors_suite(errors: List(String)) -> TestSuite {
   suite.from_tree(Tree(
-    seed: Nil,
+    initial: Nil,
     name: "Discovery Errors",
     tags: ["discovery-error"],
     children: errors_to_nodes(errors, []),

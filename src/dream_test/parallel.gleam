@@ -609,13 +609,13 @@ pub fn run_tree_parallel(
   config config: ParallelConfig,
   tree tree: Tree(context),
 ) -> RunReport {
-  let Tree(seed: seed, name: name, tags: tags, children: children) = tree
+  let Tree(initial: initial, name: name, tags: tags, children: children) = tree
   let executor_input =
     ExecuteNodeConfig(
       config: config,
       scope: [],
       inherited_tags: [],
-      context: seed,
+      context: initial,
       inherited_before_each: [],
       inherited_after_each: [],
       runner_before_each_test: [],
@@ -718,14 +718,15 @@ pub fn run_tree_parallel(
 pub fn run_tree_parallel_with_reporter(
   config config: RunTreeParallelWithReporterConfig(context),
 ) -> RunTreeParallelWithReporterResult {
-  let Tree(seed: seed, name: name, tags: tags, children: children) = config.tree
+  let Tree(initial: initial, name: name, tags: tags, children: children) =
+    config.tree
   run_tree(RunTreeConfig(
     config: config.config,
     groups: [],
     name: name,
     tags: tags,
     children: children,
-    context: FixedContext(seed),
+    context: FixedContext(initial),
     progress_reporter: config.progress_reporter,
     write: config.write,
     total: config.total,

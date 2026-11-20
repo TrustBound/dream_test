@@ -57,7 +57,7 @@
 //// Dream Test compiles all unit/context/gherkin tests into a single tree model
 //// that the executor runs.
 ////
-//// - `Tree(context)` holds the initial seed value and the top-level group:
+//// - `Tree(context)` holds the initial value and the top-level group:
 ////   its name, tags and children. The top level is always a group. A
 ////   suite holds one or more trees.
 //// - `Node(context)` represents groups, tests, and lifecycle hooks.
@@ -385,7 +385,7 @@ pub type SuiteInfo {
 /// One tree of tests in the unified execution model.
 ///
 /// A `Tree(context)` is one top-level group with its children and one
-/// context source. It stores the initial `seed` context value and the
+/// context source. It stores the `initial` context value and the
 /// top-level group: its `name`, its `tags`, and its `children` (groups,
 /// tests and hooks). The top level is always a group, so a tree cannot be
 /// a single test. A suite holds one or more trees.
@@ -393,7 +393,7 @@ pub type SuiteInfo {
 /// ## Example
 ///
 /// ```gleam
-/// types.Tree(seed: Nil, name: "math", tags: [], children: [
+/// types.Tree(initial: Nil, name: "math", tags: [], children: [
 ///   types.Test(
 ///     name: "adds",
 ///     tags: [],
@@ -406,7 +406,7 @@ pub type SuiteInfo {
 /// ```
 pub type Tree(context) {
   Tree(
-    seed: context,
+    initial: context,
     name: String,
     tags: List(String),
     children: List(Node(context)),
@@ -502,8 +502,8 @@ pub fn call(
 ///
 /// ## Variants
 ///
-/// - `FixedContext(value)`: every test starts from `value`, as the `seed`
-///   of a `Tree`.
+/// - `FixedContext(value)`: every test starts from `value`, as from the
+///   `initial` value of a `Tree`.
 /// - `ContextFromSetup(setup, teardown)`: `setup` runs once for the tree,
 ///   before its first test, and only when at least one test of the tree
 ///   runs. Its value is the context of every hook and test. `teardown`
@@ -530,7 +530,7 @@ pub type SuiteContext(context) {
 /// ## Parameters
 ///
 /// - `name`: name of the top-level group
-/// - `seed`: the initial context value stored in the `Tree`
+/// - `initial`: the initial context value stored in the `Tree`
 /// - `children`: children under the top-level group
 ///
 /// ## Returns
@@ -538,10 +538,10 @@ pub type SuiteContext(context) {
 /// A `Tree(context)` with the name, no tags, and the children.
 pub fn tree(
   name name: String,
-  seed seed: context,
+  initial initial: context,
   children children: List(Node(context)),
 ) -> Tree(context) {
-  Tree(seed: seed, name: name, tags: [], children: children)
+  Tree(initial: initial, name: name, tags: [], children: children)
 }
 
 /// The complete name of a test: its group names, then its own name.

@@ -128,7 +128,7 @@ pub fn describe(
   name name: String,
   children children: List(UnitNode),
 ) -> TestSuite {
-  suite.from_tree(Tree(seed: Nil, name: name, tags: [], children: children))
+  suite.from_tree(Tree(initial: Nil, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a suite.
