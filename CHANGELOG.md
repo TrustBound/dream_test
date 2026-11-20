@@ -183,6 +183,13 @@ store. This release has breaking changes. Read
   `feature: None` gets no `Feature:` line: the Gherkin reporter prints its
   groups joined with ` > ` as its heading. A Gherkin test in the JSON
   report has `feature` and `rule` after `kind` (each a string, or `null`).
+- The Gherkin reporter heads a result that is not in a Feature group by
+  its groups joined with ` > `. A unit test `sums` in the groups `math`
+  and `add` now heads as `math > add`. In 2.x it headed as `Feature:
+  math`, the first group.
+- A Gherkin result with no Feature and no groups prints no heading line.
+  In 2.x it headed as `Feature: <test name>`. The `Feature: Unknown
+  Feature` placeholder is gone.
 - The scenario id ends with `#` and a number, for example
   `"Shopping Cart::Adding items#12"`, so it is unique in the run, also for
   two scenarios with the same name. In 2.x it was only the name path. The

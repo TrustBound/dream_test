@@ -1315,7 +1315,14 @@ pub fn tests() {
 
 `types.GherkinScenario` has three labelled fields: `GherkinScenario(scenario_id:, feature:, rule:)`. `feature` is the name of the Feature, for example `Some("Cart")`, for a scenario in the group of its Feature, and `None` for a scenario of `steps.Scenarios`, which is in no Feature group. `rule` is the name of the Rule group, for example `Some("Rule: Stock")`, for a scenario inside a Rule, and `None` for a scenario outside a Rule. Code that builds a result gives both. A pattern that matches the kind uses `GherkinScenario(..)` or names the fields.
 
-The BDD and Gherkin reporters read the Feature and the Rule from the kind, not from the place of a group or from a group name that starts with `Rule:`. In 2.x, both reporters printed `Feature:` on the first group, so a suite name above the Feature was printed as the Feature, and a Feature named `Rule: refunds` printed as `Feature: Unknown Feature` with a `Rule: refunds` heading. In 3.0.0 both reporters print `Feature: <feature>` on the group of the Feature, and `Feature: Rule: refunds` for that Feature. For a scenario with `feature: None`, the Gherkin reporter prints its groups, joined with ` > `, as the heading.
+The BDD and Gherkin reporters read the Feature and the Rule from the kind, not from the place of a group or from a group name that starts with `Rule:`. In 2.x, both reporters printed `Feature:` on the first group, so a suite name above the Feature was printed as the Feature. In 3.0.0 both reporters print `Feature: <feature>` on the group of the Feature. For a scenario with `feature: None`, the Gherkin reporter prints its groups, joined with ` > `, as the heading.
+
+The Gherkin reporter also heads other results by their groups:
+
+| Result | 2.x heading | 3.0.0 heading |
+|---|---|---|
+| A unit test `sums` in the groups `math` and `add`, given to `gherkin.format` | `Feature: math` | `math > add` |
+| A result with no groups and no Feature, for example a result built by hand | `Feature: <test name>` | no heading line: the scenario line prints alone, for example `Scenario: alone ✓` |
 
 ##### 2.x: a Gherkin result with only the id <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L6-L18"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 

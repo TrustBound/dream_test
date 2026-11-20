@@ -22,5 +22,5 @@ pub fn tests() -> TestSuite {
 
   discover.features("features/*.feature")
   |> discover.with_registry(registry)
-  |> discover.to_suite("Shopping Cart (file)")
+  |> discover.to_suite("Feature files")
 }

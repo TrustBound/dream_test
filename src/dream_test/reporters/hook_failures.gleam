@@ -24,8 +24,8 @@ import gleam/string
 /// group names, and the test name last for a per-test hook; left out for a
 /// hook of the whole run), and a line with the message. A
 /// setup that stopped (`SetupStopped`) has the line
-/// `<setup hook> in "<groups>" stopped: the process that keeps its setup
-/// alive exited with <reason>.` For the whole run, `in "<groups>"` is left
+/// `<setup hook> in "<path>" stopped: the process that keeps its setup
+/// alive exited with <reason>.` For the whole run, `in "<path>"` is left
 /// out. When the setup did not run some tests, the line
 /// `These tests had not started and were not run:` follows, then the full
 /// name of each test, with its names joined by ` > `.
