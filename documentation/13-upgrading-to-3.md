@@ -1143,7 +1143,7 @@ fn after_all_failed(report: RunReport) -> Bool {
 }
 ```
 
-A failed `after_each` or `after_each_test` hook also keeps the status of its test. In 2.x, the test became `Failed`, also when it was `TimedOut`, `Skipped` or `SetupFailed`. In 3.0.0, the report has `TeardownFailed(hook: AfterEachHook, ..)` with the full test name in `groups`.
+A failed `after_each` or `after_each_test` hook also keeps the status of its test. In 2.x, the test became `Failed`, also when it was `TimedOut`, `Skipped` or `SetupFailed`. In 3.0.0, the report has `TeardownFailed(hook: AfterEachHook, ..)` with the full test name in `path`.
 
 #### A failed setup hook, and a timeout
 

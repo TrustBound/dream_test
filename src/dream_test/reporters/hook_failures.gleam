@@ -20,8 +20,9 @@ import gleam/string
 
 /// Format the setup and teardown failures of a run without colour.
 ///
-/// A failed teardown hook has a line with the hook name and its groups
-/// (left out for a hook of the whole run), and a line with the message. A
+/// A failed teardown hook has a line with the hook name and its path (the
+/// group names, and the test name last for a per-test hook; left out for a
+/// hook of the whole run), and a line with the message. A
 /// setup that stopped (`SetupStopped`) has the line
 /// `<setup hook> in "<groups>" stopped: the process that keeps its setup
 /// alive exited with <reason>.` For the whole run, `in "<groups>"` is left
