@@ -228,7 +228,7 @@ pub fn tests() {
       |> should
       |> be_equal([
         "discovery_fixtures@not_a_suite: tests() did not return a test suite: 42",
-        "discovery_fixtures@bad_root_tags_suite: tests() did not return a test suite: {root,nil,<<\"bad_root_tags_suite\">>,[1],[]}",
+        "discovery_fixtures@bad_root_tags_suite: tests() did not return a test suite: {tree,nil,<<\"bad_root_tags_suite\">>,[1],[]}",
       ])
       |> or_fail_with("load should name the module and the value")
     }),

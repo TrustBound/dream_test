@@ -28,11 +28,11 @@ store. This release has breaking changes. Read
   `reporter_types.Custom` reporter that crashed, and a coverage error, for
   example a total below `coverage.minimum_percent`. In 2.x, a silent run
   dropped all output.
-- `parallel.run_root_parallel` returns `types.RunReport`, not
+- `parallel.run_tree_parallel` returns `types.RunReport`, not
   `List(TestResult)`.
-- `parallel.RunRootParallelWithReporterConfig` has a new field
+- `parallel.RunTreeParallelWithReporterConfig` has a new field
   `outer_setups: List(parallel.OuterSetup)`, and
-  `parallel.RunRootParallelWithReporterResult` has the new fields
+  `parallel.RunTreeParallelWithReporterResult` has the new fields
   `teardown_failures` and `outer_setups`.
 - `runner.exit_on_failure` stops the BEAM with `init:stop(1)` in place of
   `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
@@ -43,8 +43,10 @@ store. This release has breaking changes. Read
   (`SetupStopped`), when a `reporter_types.Custom` reporter crashed, and
   when coverage failed. 2.x had no tear-down failures in the report, no
   stopped set-ups, no custom reporters and no coverage.
-- `types.Root` holds the top-level group itself:
-  `Root(seed:, name:, tags:, children:)` in place of
+- `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`.
+  A tree is one top-level group with its children and one context; a
+  suite holds one or more trees. The tree holds the top-level group
+  itself: `Tree(seed:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
 - `types.TestResult` and `types.TestInfo` hold `groups: List(String)` (the
   names of the groups around the test) in place of
@@ -71,7 +73,7 @@ store. This release has breaking changes. Read
   and `runner.after_each_test` take `fn(TestInfo) -> Result(Nil, String)`.
   The hooks get the `TestInfo` of the test, not its context, and cannot
   change the context.
-- `parallel.RunRootParallelWithReporterConfig` takes
+- `parallel.RunTreeParallelWithReporterConfig` takes
   `runner_before_each_test` and `runner_after_each_test` as
   `List(fn(TestInfo) -> Result(Nil, String))`, the same type as the runner
   hooks, in place of functions that also got and gave the context.
@@ -89,8 +91,17 @@ store. This release has breaking changes. Read
   no error, so a wrong pattern gave a run that passed.
 - `types.AssertionResult` has the new variant `AssertionPending`, for
   `unit.pending`. A `case` on an `AssertionResult` needs a branch for it.
-- The typed `parallel` functions take a `types.Root(context)`. Build one
-  with `types.root`, not with `unit.describe`.
+- The typed `parallel` functions take a `types.Tree(context)`. Build one
+  with `types.tree`, not with `unit.describe`. The label of the tree is
+  `tree:` in place of `suite:`, in `run_tree_parallel` and in
+  `RunTreeParallelWithReporterConfig`.
+- The `parallel` names say "tree" in place of "root":
+  `run_root_parallel` is now `run_tree_parallel`,
+  `run_root_parallel_with_reporter` is now `run_tree_parallel_with_reporter`,
+  `RunRootParallelWithReporterConfig` is now
+  `RunTreeParallelWithReporterConfig`, and
+  `RunRootParallelWithReporterResult` is now
+  `RunTreeParallelWithReporterResult`.
 
 #### Hooks and processes
 
@@ -286,14 +297,18 @@ the guide labels them.
 - A `discover.features` pattern that matches no files fails the run.
 - A module discovery pattern that matches no test module fails the run,
   and so does a test module that does not load.
-- `runner.run` and `parallel.run_root_parallel` return a `types.RunReport`.
+- `runner.run` and `parallel.run_tree_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
 - `TestSuite` has no type parameter and is in `dream_test/suite`.
 - `runner.before_each_test` and `runner.after_each_test` get only the `TestInfo`.
 - Module discovery runs a suite with a context with its own context.
-- `RunRootParallelWithReporterConfig` has the new field `outer_setups`.
-- `types.Root` holds the group fields, and hooks and tests hold a `Callback`.
+- `run_root_parallel*` and `RunRootParallelWithReporter*` are now
+  `run_tree_parallel*` and `RunTreeParallelWithReporter*`.
+- `RunTreeParallelWithReporterConfig` has the new field `outer_setups`, and
+  its field `suite` is now `tree`.
+- `types.Root` is now `types.Tree` and holds the group fields, and hooks
+  and tests hold a `Callback`.
 - A failed set-up hook gives `SetupFailed`. A body timeout gives `TimedOut`.
 - A failed tear-down hook goes into the run report, not into the results.
 - Hooks run in one setup process of their scope.
@@ -315,7 +330,7 @@ the guide labels them.
   - Every suite has the type `suite.TestSuite`, whatever context its tests
     get. One `runner.new` takes `unit` suites, `unit_context` suites and
     Gherkin features together
-  - `suite.from_tree` makes a suite from a `types.Root` that you build
+  - `suite.from_tree` makes a suite from a `types.Tree` that you build
     yourself. `suite.new` makes one from children and a
     `types.SuiteContext`
   - `suite.group` puts suites in one group, and `suite.join` puts them one
@@ -327,9 +342,9 @@ the guide labels them.
   - `suite.with_source` gives each test of a suite that has no source a
     source, for example the module name. A test that has a source, such
     as the `.feature` path of a scenario, keeps it. Module discovery uses it
-  - `parallel.run_suite` runs a typed tree inside groups, with the new
-    config type `parallel.RunSuiteConfig`: the fields of
-    `RunRootParallelWithReporterConfig`, the tree as `name`, `tags`,
+  - `parallel.run_tree` runs a typed tree inside groups, with the new
+    config type `parallel.RunTreeConfig`: the fields of
+    `RunTreeParallelWithReporterConfig`, the tree as `name`, `tags`,
     `children` and `context`, and the groups around it
   - Module discovery loads suites with a context, and `discover.to_suite`
     keeps the context of each module suite

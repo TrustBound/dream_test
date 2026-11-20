@@ -70,8 +70,8 @@ hook starts now lives for the tests of its group. A test runs its
   registry, so one set-up serves all of them. Its children
   (`steps.SuiteChild`) are `SuiteFeature`, `SuiteScenarios`, `SuiteGroup`
   and `SuiteNode`.
-- `suite.from_tree` turns a suite tree that you build by hand
-  (`types.Root`) into a `TestSuite`.
+- `suite.from_tree` turns a tree that you build by hand (`types.Tree`)
+  into a `TestSuite`.
 - Pending tests: `unit.pending(name)` and `unit_context.pending(name)` make
   a test with a name and no body, for a test skeleton. The reporters show
   it as pending, and the run still passes.
@@ -104,7 +104,7 @@ is a `when` step for a scenario whose state is an `Int`.
 Each item that needs a code change has a 2.x and a 3.0.0 example in
 [Upgrading to 3.0.0](../documentation/13-upgrading-to-3.md).
 
-- `runner.run` and `parallel.run_root_parallel` return `types.RunReport`, and
+- `runner.run` and `parallel.run_tree_parallel` return `types.RunReport`, and
   the reporter functions that format a whole run take one.
   `runner.has_failures` is now `types.failed`.
 - Gherkin: `world` is removed, `steps.new` takes the initial state,
@@ -141,7 +141,17 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - `reporters/types.ResultsReporter` has the new variant `Custom(render:)`.
   A `case` on a `ResultsReporter` needs a branch for it.
 - `sandbox.run_isolated` takes the function and its input as two parameters.
-- `types.Root`, `types.TestResult` and `types.TestInfo` changed shape, and
+- `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`:
+  a tree is one top-level group with its children and one context, and a
+  suite holds one or more trees. The `parallel` functions take the tree
+  with the label `tree:` in place of `suite:`.
+- The `parallel` names say "tree" in place of "root": `run_root_parallel`
+  is now `run_tree_parallel`, `run_root_parallel_with_reporter` is now
+  `run_tree_parallel_with_reporter`, and `RunRootParallelWithReporterConfig`
+  and `RunRootParallelWithReporterResult` are now
+  `RunTreeParallelWithReporterConfig` and
+  `RunTreeParallelWithReporterResult`.
+- `types.Tree`, `types.TestResult` and `types.TestInfo` changed shape, and
   `types.ModuleCoverage` and `types.CoverageSummary` are removed.
 - `TestSuite` has no type parameter and is in `dream_test/suite`, and
   `runner.RunBuilder` has no type parameter.
@@ -174,7 +184,8 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - Gherkin: `parser.parse_file` returns `Result(Feature, FeatureFileError)`.
   In 2.x it returned `Result(Feature, String)`. `discover.list_files`
   returns a `Result`.
-- A `types.Root` is no longer a `TestSuite`. Pass it to `suite.from_tree`.
+- A `types.Tree` (in 2.x `types.Root`) is no longer a `TestSuite`. Pass it
+  to `suite.from_tree`.
 
 ## Requirements
 

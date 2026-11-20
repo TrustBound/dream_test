@@ -114,7 +114,7 @@ pub fn main() {
 
 `runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a set-up for all scenarios](10-gherkin-bdd.md#a-set-up-for-all-scenarios-for-example-a-server) for an example.
 
-To make a suite from a `types.Root` that you build yourself, use `suite.from_tree`.
+To make a suite from a `types.Tree` that you build yourself, use `suite.from_tree`.
 
 To make one suite from several suites, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
 
@@ -341,7 +341,7 @@ fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
 
 ### Advanced: running the executor directly
 
-Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor. The executor runs a typed tree, a `types.Root(context)`. Build one with `types.root`, not with `unit.describe`, which gives a `TestSuite`.
+Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor. The executor runs a typed tree, a `types.Tree(context)`: one top-level group with its children and one context. Build one with `types.tree`, not with `unit.describe`, which gives a `TestSuite`.
 
 #### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -353,14 +353,14 @@ import dream_test/unit.{describe, it}
 
 pub fn tests() {
   describe("Parallel executor", [
-    it("can run a suite and return a report of the results", fn() {
-      let suite =
-        types.root("Suite", Nil, [
+    it("can run a tree and return a report of the results", fn() {
+      let tree =
+        types.tree("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])
 
-      parallel.run_root_parallel(parallel.default_config(), suite)
+      parallel.run_tree_parallel(parallel.default_config(), tree)
       |> types.report_tests
       |> should
       |> have_length(2)

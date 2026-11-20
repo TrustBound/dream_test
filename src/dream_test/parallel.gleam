@@ -1,7 +1,7 @@
-//// Unified Root/Node execution engine (parallel tests, sequential groups).
+//// Unified Tree/Node execution engine (parallel tests, sequential groups).
 ////
-//// This module executes a typed tree, a `types.Root(context)`. A
-//// `dream_test/suite.TestSuite` keeps such a tree inside it, and the runner
+//// This module executes a typed tree, a `types.Tree(context)`. A
+//// `dream_test/suite.TestSuite` keeps one or more such trees inside it, and the runner
 //// runs it with this module.
 ////
 //// NOTE: This module is intentionally event-agnostic; `runner` composes it
@@ -21,14 +21,14 @@
 ////
 //// pub fn tests() {
 ////   describe("Parallel executor", [
-////     it("can run a suite and return a report of the results", fn() {
-////       let suite =
-////         types.root("Suite", Nil, [
+////     it("can run a tree and return a report of the results", fn() {
+////       let tree =
+////         types.tree("Suite", Nil, [
 ////           it("a", fn() { Ok(succeed()) }),
 ////           it("b", fn() { Ok(succeed()) }),
 ////         ])
 ////
-////       parallel.run_root_parallel(parallel.default_config(), suite)
+////       parallel.run_tree_parallel(parallel.default_config(), tree)
 ////       |> types.report_tests
 ////       |> should
 ////       |> have_length(2)
@@ -47,14 +47,14 @@ import dream_test/sandbox.{
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type Root, type RunReport, type SetUpHook, type Status, type SuiteContext,
+  type RunReport, type SetUpHook, type Status, type SuiteContext,
   type TeardownFailure, type TeardownHook, type TestInfo, type TestKind,
-  type TestResult, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
+  type TestResult, type Tree, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
   AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
   AssertionPending, AssertionSkipped, BeforeAll, BeforeAllHook,
   BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetUp, Failed,
-  FixedContext, Group, Passed, Pending, Root, SetupFailed, Skipped,
-  SuiteSetUpHook, SuiteTearDownHook, TeardownFailure, Test, TestResult, TimedOut,
+  FixedContext, Group, Passed, Pending, SetupFailed, Skipped, SuiteSetUpHook,
+  SuiteTearDownHook, TeardownFailure, Test, TestResult, TimedOut, Tree,
   WithInput,
 }
 import gleam/erlang/atom.{type Atom}
@@ -99,12 +99,12 @@ import gleam/string
 ///
 ///   describe("ParallelConfig", [
 ///     it("can be constructed to customize execution", fn() {
-///       let suite =
-///         types.root("Suite", Nil, [
+///       let tree =
+///         types.tree("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///         ])
 ///
-///       parallel.run_root_parallel(config, suite)
+///       parallel.run_tree_parallel(config, tree)
 ///       |> types.report_tests
 ///       |> should
 ///       |> have_length(1)
@@ -117,19 +117,19 @@ pub type ParallelConfig {
   ParallelConfig(max_concurrency: Int, default_timeout_ms: Int)
 }
 
-/// Configuration for `run_root_parallel_with_reporter`.
+/// Configuration for `run_tree_parallel_with_reporter`.
 ///
 /// This is an advanced API intended for building custom runners that want to
-/// drive a reporter while executing a single suite.
+/// drive a reporter while executing a single tree.
 ///
 /// `outer_setups` are the set-ups around the suite that keep their
 /// resources alive in a process, outermost first: for example the
 /// `before_all_suites` set-up of the whole run and the `before_each_suite`
 /// set-up of the suite. Give `[]` when the suite has no such set-up.
-pub type RunRootParallelWithReporterConfig(context) {
-  RunRootParallelWithReporterConfig(
+pub type RunTreeParallelWithReporterConfig(context) {
+  RunTreeParallelWithReporterConfig(
     config: ParallelConfig,
-    suite: Root(context),
+    tree: Tree(context),
     progress_reporter: Option(progress.ProgressReporter),
     write: fn(String) -> Nil,
     total: Int,
@@ -140,9 +140,9 @@ pub type RunRootParallelWithReporterConfig(context) {
   )
 }
 
-/// Configuration for `run_suite`.
+/// Configuration for `run_tree`.
 ///
-/// It holds the same fields as `RunRootParallelWithReporterConfig`, with the
+/// It holds the same fields as `RunTreeParallelWithReporterConfig`, with the
 /// tree in its own fields and one more field, `groups`:
 ///
 /// - `groups`: the names of the groups around the tree, outermost first.
@@ -154,8 +154,8 @@ pub type RunRootParallelWithReporterConfig(context) {
 /// - `context`: where the tests get their context, a
 ///   `types.FixedContext(value)` or a `types.ContextFromSetUp(set_up,
 ///   tear_down)` (see `types.SuiteContext`).
-pub type RunSuiteConfig(context) {
-  RunSuiteConfig(
+pub type RunTreeConfig(context) {
+  RunTreeConfig(
     config: ParallelConfig,
     groups: List(String),
     name: String,
@@ -173,7 +173,7 @@ pub type RunSuiteConfig(context) {
 }
 
 /// A set-up around a suite that keeps its resources alive in a process,
-/// for `run_root_parallel_with_reporter`.
+/// for `run_tree_parallel_with_reporter`.
 ///
 /// The executor checks each outer set-up before each test and each group
 /// starts. After the process of a set-up stopped, no test or hook of the
@@ -217,7 +217,7 @@ pub type OuterSetup {
   )
 }
 
-/// Result of `run_root_parallel_with_reporter`.
+/// Result of `run_tree_parallel_with_reporter`.
 ///
 /// This is returned as a semantic type (not a tuple) so callers can use named
 /// fields and avoid positional destructuring. A tear-down failure is not a
@@ -227,8 +227,8 @@ pub type OuterSetup {
 /// executor saw them last. A set-up whose process stopped during the run
 /// is `SetupStopped`, and its `check_setup_process` will not tell again: use this
 /// list, not `check_setup_process`, to learn that the set-up stopped.
-pub type RunRootParallelWithReporterResult {
-  RunRootParallelWithReporterResult(
+pub type RunTreeParallelWithReporterResult {
+  RunTreeParallelWithReporterResult(
     results: List(TestResult),
     teardown_failures: List(TeardownFailure),
     completed: Int,
@@ -540,14 +540,14 @@ type SetupProcesses(context) {
 ///
 /// pub fn tests() {
 ///   describe("Parallel executor", [
-///     it("can run a suite and return a report of the results", fn() {
-///       let suite =
-///         types.root("Suite", Nil, [
+///     it("can run a tree and return a report of the results", fn() {
+///       let tree =
+///         types.tree("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///           it("b", fn() { Ok(succeed()) }),
 ///         ])
 ///
-///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       parallel.run_tree_parallel(parallel.default_config(), tree)
 ///       |> types.report_tests
 ///       |> should
 ///       |> have_length(2)
@@ -568,7 +568,7 @@ pub fn default_config() -> ParallelConfig {
   ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 }
 
-/// Run a single suite and return results.
+/// Run a single tree and return results.
 ///
 /// This does **not** drive a reporter.
 ///
@@ -582,14 +582,14 @@ pub fn default_config() -> ParallelConfig {
 ///
 /// pub fn tests() {
 ///   describe("Parallel executor", [
-///     it("can run a suite and return a report of the results", fn() {
-///       let suite =
-///         types.root("Suite", Nil, [
+///     it("can run a tree and return a report of the results", fn() {
+///       let tree =
+///         types.tree("Suite", Nil, [
 ///           it("a", fn() { Ok(succeed()) }),
 ///           it("b", fn() { Ok(succeed()) }),
 ///         ])
 ///
-///       parallel.run_root_parallel(parallel.default_config(), suite)
+///       parallel.run_tree_parallel(parallel.default_config(), tree)
 ///       |> types.report_tests
 ///       |> should
 ///       |> have_length(2)
@@ -602,18 +602,18 @@ pub fn default_config() -> ParallelConfig {
 /// ## Parameters
 ///
 /// - `config`: execution settings (concurrency + default timeout)
-/// - `suite`: the suite to execute
+/// - `tree`: the tree to execute
 ///
 /// ## Returns
 ///
 /// A `types.RunReport` with the `TestResult` of each test, in deterministic
 /// (declaration) order, and the `after_each` and `after_all` hooks that
 /// failed, in the order that they ran.
-pub fn run_root_parallel(
+pub fn run_tree_parallel(
   config config: ParallelConfig,
-  suite suite: Root(context),
+  tree tree: Tree(context),
 ) -> RunReport {
-  let Root(seed: seed, name: name, tags: tags, children: children) = suite
+  let Tree(seed: seed, name: name, tags: tags, children: children) = tree
   let executor_input =
     ExecuteNodeConfig(
       config: config,
@@ -640,7 +640,7 @@ pub fn run_root_parallel(
   )
 }
 
-/// Run a single suite while driving a reporter.
+/// Run a single tree while driving a reporter.
 ///
 /// This is used by `dream_test/runner` internally.
 ///
@@ -652,12 +652,12 @@ pub fn run_root_parallel(
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/parallel
-/// import dream_test/types.{type Root}
+/// import dream_test/types.{type Tree}
 /// import dream_test/unit.{it}
 /// import gleam/option.{None}
 /// 
-/// pub fn suite() -> Root(Nil) {
-///   types.root("suite", Nil, [
+/// pub fn tree() -> Tree(Nil) {
+///   types.tree("suite", Nil, [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
@@ -670,10 +670,10 @@ pub fn run_root_parallel(
 ///   let total = 1
 ///   let completed = 0
 ///   let parallel_result =
-///     parallel.run_root_parallel_with_reporter(
-///       parallel.RunRootParallelWithReporterConfig(
+///     parallel.run_tree_parallel_with_reporter(
+///       parallel.RunTreeParallelWithReporterConfig(
 ///         config: parallel.default_config(),
-///         suite: suite(),
+///         tree: tree(),
 ///         progress_reporter: None,
 ///         write: ignore,
 ///         total: total,
@@ -683,7 +683,7 @@ pub fn run_root_parallel(
 ///         outer_setups: [],
 ///       ),
 ///     )
-///   let parallel.RunRootParallelWithReporterResult(
+///   let parallel.RunTreeParallelWithReporterResult(
 ///     results: results,
 ///     teardown_failures: _teardown_failures,
 ///     completed: _completed_after_suite,
@@ -697,7 +697,7 @@ pub fn run_root_parallel(
 /// ## Parameters
 ///
 /// - `config`: execution settings for this suite
-/// - `suite`: the suite to execute
+/// - `tree`: the tree to execute
 /// - `progress_reporter`: optional progress reporter state (typically `Some(progress.new())`)
 /// - `write`: output sink for any progress output (typically `io.print`)
 /// - `total`: total number of tests in the overall run (across all suites)
@@ -711,7 +711,7 @@ pub fn run_root_parallel(
 ///
 /// ## Returns
 ///
-/// A `RunRootParallelWithReporterResult` containing:
+/// A `RunTreeParallelWithReporterResult` containing:
 /// - `results`: this suite’s results, in deterministic (declaration) order
 /// - `teardown_failures`: this suite’s `after_each`, `after_each_test` and
 ///   `after_all` hooks that failed, in the order that they ran
@@ -719,12 +719,11 @@ pub fn run_root_parallel(
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
 /// - `outer_setups`: the outer set-ups as the executor saw them last; a
 ///   set-up whose process stopped is `SetupStopped`
-pub fn run_root_parallel_with_reporter(
-  config config: RunRootParallelWithReporterConfig(context),
-) -> RunRootParallelWithReporterResult {
-  let Root(seed: seed, name: name, tags: tags, children: children) =
-    config.suite
-  run_suite(RunSuiteConfig(
+pub fn run_tree_parallel_with_reporter(
+  config config: RunTreeParallelWithReporterConfig(context),
+) -> RunTreeParallelWithReporterResult {
+  let Tree(seed: seed, name: name, tags: tags, children: children) = config.tree
+  run_tree(RunTreeConfig(
     config: config.config,
     groups: [],
     name: name,
@@ -743,25 +742,25 @@ pub fn run_root_parallel_with_reporter(
 
 /// Run a typed tree inside the groups `groups`, while driving a reporter.
 ///
-/// This is what `run_root_parallel_with_reporter` does, for a tree that
-/// can be inside groups. `dream_test/suite` uses it to run each suite: a
-/// suite that `suite.group` put in a group runs with that group in
-/// `groups`.
+/// This is what `run_tree_parallel_with_reporter` does, for a tree that
+/// can be inside groups. `dream_test/suite` uses it to run each tree of a
+/// suite: the trees of a suite that `suite.group` put in a group run with
+/// that group in `groups`.
 ///
 /// ## Parameters
 ///
 /// - `config`: the tree, where it is, and the run around it (see
-///   `RunSuiteConfig`)
+///   `RunTreeConfig`)
 ///
 /// ## Returns
 ///
-/// A `RunRootParallelWithReporterResult`, as
-/// `run_root_parallel_with_reporter` gives it.
+/// A `RunTreeParallelWithReporterResult`, as
+/// `run_tree_parallel_with_reporter` gives it.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// parallel.run_suite(parallel.RunSuiteConfig(
+/// parallel.run_tree(parallel.RunTreeConfig(
 ///   config: parallel.default_config(),
 ///   groups: ["all"],
 ///   name: "suite",
@@ -777,26 +776,26 @@ pub fn run_root_parallel_with_reporter(
 ///   outer_setups: [],
 /// ))
 /// ```
-pub fn run_suite(
-  config config: RunSuiteConfig(context),
-) -> RunRootParallelWithReporterResult {
+pub fn run_tree(
+  config config: RunTreeConfig(context),
+) -> RunTreeParallelWithReporterResult {
   let setup_processes =
     refresh_setup_processes(
       SetupProcesses(outer: config.outer_setups, groups: []),
     )
   case config.context, stopped_setup(setup_processes) {
     FixedContext(value: value), _ ->
-      suite_result(
+      tree_result(
         config,
-        execute_or_fail_group(suite_input(config, value, setup_processes)),
+        execute_or_fail_group(tree_input(config, value, setup_processes)),
       )
     ContextFromSetUp(..), Some(stopped) ->
-      suite_result(
+      tree_result(
         config,
         fail_after_stop(
           config.groups,
           [],
-          suite_node(config),
+          tree_node(config),
           stopped,
           progress_output(config.progress_reporter, config.write),
           config.completed,
@@ -810,13 +809,13 @@ pub fn run_suite(
 }
 
 /// The top-level group of the tree of a suite.
-fn suite_node(config: RunSuiteConfig(context)) -> Node(context) {
+fn tree_node(config: RunTreeConfig(context)) -> Node(context) {
   Group(name: config.name, tags: config.tags, children: config.children)
 }
 
 /// The executor input for the tree of a suite with its context.
-fn suite_input(
-  config: RunSuiteConfig(context),
+fn tree_input(
+  config: RunTreeConfig(context),
   context: context,
   setup_processes: SetupProcesses(context),
 ) -> ExecuteNodeConfig(context) {
@@ -829,7 +828,7 @@ fn suite_input(
     inherited_after_each: [],
     runner_before_each_test: config.runner_before_each_test,
     runner_after_each_test: config.runner_after_each_test,
-    node: suite_node(config),
+    node: tree_node(config),
     progress_output: progress_output(config.progress_reporter, config.write),
     total: config.total,
     completed: config.completed,
@@ -838,12 +837,12 @@ fn suite_input(
   )
 }
 
-fn suite_result(
-  config: RunSuiteConfig(context),
+fn tree_result(
+  config: RunTreeConfig(context),
   ran: #(Collected, Int, SetupProcesses(context)),
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let #(collected, completed, setup_processes) = ran
-  RunRootParallelWithReporterResult(
+  RunTreeParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
     teardown_failures: list.reverse(collected.teardown_failures_rev),
     completed: completed,
@@ -855,11 +854,11 @@ fn suite_result(
 /// Run the set-up of a suite in a new setup process, then the tests with
 /// its value, then the tear-down in the same setup process.
 fn start_set_up(
-  config: RunSuiteConfig(context),
+  config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   set_up: fn() -> Result(context, String),
   tear_down: fn(context) -> Result(Nil, String),
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let scope = list.append(config.groups, [config.name])
   case
     sandbox.run_in_setup_process(
@@ -917,14 +916,14 @@ fn failed_set_up(message: String) -> AssertionFailure {
 }
 
 fn run_after_set_up(
-  config: RunSuiteConfig(context),
+  config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   own: ScopeSetupProcess(context),
   context: context,
   tear_down: fn(context) -> Result(Nil, String),
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let #(collected, completed, setup_processes_after) =
-    execute_or_fail_group(suite_input(
+    execute_or_fail_group(tree_input(
       config,
       context,
       SetupProcesses(..setup_processes, groups: [own]),
@@ -937,7 +936,7 @@ fn run_after_set_up(
       context,
       [WithInput(tear_down)],
     )
-  suite_result(config, #(
+  tree_result(config, #(
     add_collected(
       Collected(results_rev: [], teardown_failures_rev: teardown_failures_rev),
       collected,
@@ -950,13 +949,13 @@ fn run_after_set_up(
 /// Each test of a suite whose set-up failed is `SetupFailed` with
 /// `failure`. The tear-down does not run.
 fn suite_set_up_failed(
-  config: RunSuiteConfig(context),
+  config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   failure: AssertionFailure,
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let results_rev =
-    fail_group_nodes(config.groups, [], [suite_node(config)], [failure], [])
-  suite_result(config, #(
+    fail_group_nodes(config.groups, [], [tree_node(config)], [failure], [])
+  tree_result(config, #(
     Collected(results_rev: results_rev, teardown_failures_rev: []),
     emit_test_finished_progress_results(
       progress_output(config.progress_reporter, config.write),
@@ -973,23 +972,23 @@ fn suite_set_up_failed(
 /// test in `not_run`, and the tear-down does not run: there is no value
 /// to give it.
 fn suite_set_up_stopped(
-  config: RunSuiteConfig(context),
+  config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   scope: List(String),
   reason: String,
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let stop =
     Stop(set_up: SuiteSetUpHook, scope: scope, reason: reason, not_run: [])
   let results_rev =
     fail_group_nodes(
       config.groups,
       [],
-      [suite_node(config)],
+      [tree_node(config)],
       [not_run_failure(stop)],
       [],
     )
   let results = list.reverse(results_rev)
-  suite_result(config, #(
+  tree_result(config, #(
     Collected(results_rev: results_rev, teardown_failures_rev: [
       types.SetupStopped(
         set_up: SuiteSetUpHook,

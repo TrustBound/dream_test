@@ -60,7 +60,7 @@ import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, AssertionFailed, AssertionFailure, Root, Test,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure, Test, Tree,
   Unit,
 }
 import gleam/list
@@ -239,7 +239,7 @@ pub fn to_suite(
   let error_nodes = errors_to_nodes(parsed.failures, [])
   let missing_nodes = missing_files_nodes(discovery.pattern, found)
   suite.join(name: suite_name, suites: [
-    suite.from_tree(Root(
+    suite.from_tree(Tree(
       seed: Nil,
       name: suite_name,
       tags: [],

@@ -40,7 +40,7 @@
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AssertionFailed, AssertionFailure, NoInput,
-  Root, Test, Unit,
+  Test, Tree, Unit,
 }
 import gleam/list
 import gleam/option.{None}
@@ -396,7 +396,7 @@ fn errors_at_top(name: String, errors: List(String)) -> List(TestSuite) {
   case errors {
     [] -> []
     _ -> [
-      suite.from_tree(Root(
+      suite.from_tree(Tree(
         seed: Nil,
         name: name,
         tags: [],
@@ -587,7 +587,7 @@ fn errors_to_nodes(
 }
 
 fn errors_suite(errors: List(String)) -> TestSuite {
-  suite.from_tree(Root(
+  suite.from_tree(Tree(
     seed: Nil,
     name: "Discovery Errors",
     tags: ["discovery-error"],

@@ -16,13 +16,13 @@
 //// or to read what a suite holds (`name`, `tests`).
 
 import dream_test/parallel.{
-  type OuterSetup, type ParallelConfig, type RunRootParallelWithReporterResult,
-  RunRootParallelWithReporterResult, RunSuiteConfig,
+  type OuterSetup, type ParallelConfig, type RunTreeParallelWithReporterResult,
+  RunTreeConfig, RunTreeParallelWithReporterResult,
 }
 import dream_test/reporters/progress.{type ProgressReporter}
 import dream_test/types.{
-  type Node, type Root, type SuiteContext, type TestInfo, AfterAll, AfterEach,
-  BeforeAll, BeforeEach, FixedContext, Group, Test, TestInfo,
+  type Node, type SuiteContext, type TestInfo, AfterAll, AfterEach, BeforeAll,
+  BeforeEach, FixedContext, Group, Test, TestInfo,
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -44,7 +44,7 @@ type Part {
     place: Place,
     tests: List(TestInfo),
     tests_at: fn(Place) -> List(TestInfo),
-    run: fn(Place, RunInput) -> RunRootParallelWithReporterResult,
+    run: fn(Place, RunInput) -> RunTreeParallelWithReporterResult,
   )
 }
 
@@ -62,7 +62,7 @@ type Place {
 ///   (see `runner.filter_tests`). A tree with no kept test does not run.
 ///   `None` runs every test.
 /// - `progress_reporter`, `write`, `total`, `completed`: the progress
-///   output, as in `parallel.RunRootParallelWithReporterConfig`.
+///   output, as in `parallel.RunTreeParallelWithReporterConfig`.
 /// - `before_each_test`, `after_each_test`: the runner hooks around each
 ///   test (see `runner.before_each_test`). They get the `TestInfo` of the
 ///   test, not its context.
@@ -98,9 +98,9 @@ pub type RunInput {
 /// ## Example
 ///
 /// ```gleam
-/// suite.from_tree(types.root("numbers", 41, [unit_context.it("is 41", is_41)]))
+/// suite.from_tree(types.tree("numbers", 41, [unit_context.it("is 41", is_41)]))
 /// ```
-pub fn from_tree(tree tree: Root(context)) -> TestSuite {
+pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
   new(
     name: tree.name,
     tags: tree.tags,
@@ -243,7 +243,7 @@ pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
 pub fn run(
   suite suite: TestSuite,
   input input: RunInput,
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   run_parts(suite.parts, input, nothing_ran(input))
 }
 
@@ -309,8 +309,8 @@ fn move_part(part: Part, place: Place) -> Part {
 fn run_parts(
   parts: List(Part),
   input: RunInput,
-  ran: RunRootParallelWithReporterResult,
-) -> RunRootParallelWithReporterResult {
+  ran: RunTreeParallelWithReporterResult,
+) -> RunTreeParallelWithReporterResult {
   case parts {
     [] -> ran
     [part, ..rest] -> run_parts(rest, input, run_next_part(input, ran, part))
@@ -319,9 +319,9 @@ fn run_parts(
 
 fn run_next_part(
   input: RunInput,
-  ran: RunRootParallelWithReporterResult,
+  ran: RunTreeParallelWithReporterResult,
   part: Part,
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   let next =
     part.run(
       part.place,
@@ -332,7 +332,7 @@ fn run_next_part(
         outer_setups: ran.outer_setups,
       ),
     )
-  RunRootParallelWithReporterResult(
+  RunTreeParallelWithReporterResult(
     results: list.append(ran.results, next.results),
     teardown_failures: list.append(
       ran.teardown_failures,
@@ -344,8 +344,8 @@ fn run_next_part(
   )
 }
 
-fn nothing_ran(input: RunInput) -> RunRootParallelWithReporterResult {
-  RunRootParallelWithReporterResult(
+fn nothing_ran(input: RunInput) -> RunTreeParallelWithReporterResult {
+  RunTreeParallelWithReporterResult(
     results: [],
     teardown_failures: [],
     completed: input.completed,
@@ -392,7 +392,7 @@ fn run_tree(
   tree: Tree(context),
   place: Place,
   input: RunInput,
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   case
     selected_children(
       placed_children(tree.children, place.source),
@@ -403,7 +403,7 @@ fn run_tree(
   {
     None -> nothing_ran(input)
     Some(children) ->
-      parallel.run_suite(RunSuiteConfig(
+      parallel.run_tree(RunTreeConfig(
         config: input.config,
         groups: place.groups,
         name: tree.name,

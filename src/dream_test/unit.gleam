@@ -58,7 +58,7 @@
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Root, Test, Unit,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Test, Tree, Unit,
 }
 import gleam/option.{None}
 
@@ -128,7 +128,7 @@ pub fn describe(
   name name: String,
   children children: List(UnitNode),
 ) -> TestSuite {
-  suite.from_tree(Root(seed: Nil, name: name, tags: [], children: children))
+  suite.from_tree(Tree(seed: Nil, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a suite.

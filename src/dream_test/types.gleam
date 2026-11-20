@@ -51,14 +51,15 @@
 //// }
 //// ```
 //// =============================================================================
-//// Unified tree model (Root/Node)
+//// Unified tree model (Tree/Node)
 //// =============================================================================
 ////
 //// Dream Test compiles all unit/context/gherkin tests into a single tree model
 //// that the executor runs.
 ////
-//// - `Root(context)` holds the initial seed value and the top-level group:
-////   its name, tags and children. The top level is always a group.
+//// - `Tree(context)` holds the initial seed value and the top-level group:
+////   its name, tags and children. The top level is always a group. A
+////   suite holds one or more trees.
 //// - `Node(context)` represents groups, tests, and lifecycle hooks.
 ////
 
@@ -367,17 +368,18 @@ pub type SuiteInfo {
   SuiteInfo(name: String, tests: List(TestInfo), source: Option(String))
 }
 
-/// A complete test suite in the unified execution model.
+/// One tree of tests in the unified execution model.
 ///
-/// A `Root(context)` stores the initial `seed` context value and the
-/// top-level group of the suite: its `name`, its `tags`, and its `children`
-/// (groups, tests and hooks). The top level is always a group, so a suite
-/// cannot be a single test.
+/// A `Tree(context)` is one top-level group with its children and one
+/// context source. It stores the initial `seed` context value and the
+/// top-level group: its `name`, its `tags`, and its `children` (groups,
+/// tests and hooks). The top level is always a group, so a tree cannot be
+/// a single test. A suite holds one or more trees.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// types.Root(seed: Nil, name: "math", tags: [], children: [
+/// types.Tree(seed: Nil, name: "math", tags: [], children: [
 ///   types.Test(
 ///     name: "adds",
 ///     tags: [],
@@ -388,8 +390,8 @@ pub type SuiteInfo {
 ///   ),
 /// ])
 /// ```
-pub type Root(context) {
-  Root(
+pub type Tree(context) {
+  Tree(
     seed: context,
     name: String,
     tags: List(String),
@@ -487,7 +489,7 @@ pub fn call(
 /// ## Variants
 ///
 /// - `FixedContext(value)`: every test starts from `value`, as the `seed`
-///   of a `Root`.
+///   of a `Tree`.
 /// - `ContextFromSetUp(set_up, tear_down)`: `set_up` runs once, before the
 ///   first test of the suite, and only when at least one test of the suite
 ///   runs. Its value is the context of every hook and test. `tear_down`
@@ -506,7 +508,7 @@ pub type SuiteContext(context) {
   )
 }
 
-/// Construct a root suite with a single top-level group.
+/// Construct a tree with a single top-level group.
 ///
 /// This is primarily a low-level helper; most users should start from
 /// `dream_test/unit.describe` or `dream_test/unit_context.describe`.
@@ -514,18 +516,18 @@ pub type SuiteContext(context) {
 /// ## Parameters
 ///
 /// - `name`: name of the top-level group
-/// - `seed`: the initial context value stored in the `Root`
+/// - `seed`: the initial context value stored in the `Tree`
 /// - `children`: children under the top-level group
 ///
 /// ## Returns
 ///
-/// A `Root(context)` with the name, no tags, and the children.
-pub fn root(
+/// A `Tree(context)` with the name, no tags, and the children.
+pub fn tree(
   name name: String,
   seed seed: context,
   children children: List(Node(context)),
-) -> Root(context) {
-  Root(seed: seed, name: name, tags: [], children: children)
+) -> Tree(context) {
+  Tree(seed: seed, name: name, tags: [], children: children)
 }
 
 /// The complete name of a test: its group names, then its own name.
@@ -816,7 +818,7 @@ pub type ReporterCrash {
 /// The result of a run: the result of each test, the tear-down hooks that
 /// failed, and the results reporters that crashed.
 ///
-/// `runner.run` and `parallel.run_root_parallel` give a `RunReport`, and the
+/// `runner.run` and `parallel.run_tree_parallel` give a `RunReport`, and the
 /// reporters take one. Use `run_report` to make one, `report_tests`,
 /// `report_teardown_failures` and `report_reporter_crashes` to read it, and
 /// `failed` to check it.

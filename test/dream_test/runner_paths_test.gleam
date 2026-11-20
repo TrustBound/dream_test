@@ -11,7 +11,7 @@ import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/suite
 import dream_test/types.{
-  type Status, type TestResult, AssertionOk, Passed, Root, Test, Unit,
+  type Status, type TestResult, AssertionOk, Passed, Test, Tree, Unit,
 }
 import dream_test/unit.{describe, it}
 import gleam/erlang/process.{type Subject}
@@ -392,7 +392,7 @@ fn suite_source(sources: List(Option(String))) -> String {
   let seen = process.new_subject()
   let _ =
     runner.new([
-      suite.from_tree(Root(seed: Nil, name: "s", tags: [], children: tests)),
+      suite.from_tree(Tree(seed: Nil, name: "s", tags: [], children: tests)),
     ])
     |> runner.before_each_suite(fn(info) {
       record(seen, string.inspect(info.source))

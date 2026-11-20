@@ -1750,7 +1750,7 @@ fn run_one_suite(
 fn run_suite_tests(
   suite_run: SuiteTests,
   outer_setups: List(parallel.OuterSetup),
-) -> parallel.RunRootParallelWithReporterResult {
+) -> parallel.RunTreeParallelWithReporterResult {
   suite.run(
     suite_run.suite,
     suite.RunInput(

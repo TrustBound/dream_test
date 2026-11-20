@@ -24,16 +24,16 @@ import gleam/option.{None, Some}
 
 pub fn tests() {
   describe("dream_test/parallel paths", [
-    it("run_root_parallel runs a suite", fn() {
-      parallel.run_root_parallel(
+    it("run_tree_parallel runs a tree", fn() {
+      parallel.run_tree_parallel(
         parallel.default_config(),
-        types.root("root", Nil, [it("passes", fn() { Ok(AssertionOk) })]),
+        types.tree("root", Nil, [it("passes", fn() { Ok(AssertionOk) })]),
       )
       |> types.report_tests
       |> summaries
       |> should
       |> be_equal([#(["root", "passes"], Passed, [])])
-      |> or_fail_with("run_root_parallel should run the suite")
+      |> or_fail_with("run_tree_parallel should run the tree")
     }),
 
     it("a before_all failure gives SetupFailed in nested groups", fn() {
@@ -221,10 +221,10 @@ pub fn tests() {
       |> or_fail_with("every after_all should run")
     }),
 
-    it("run_root_parallel gives the tear-down failures", fn() {
-      parallel.run_root_parallel(
+    it("run_tree_parallel gives the tear-down failures", fn() {
+      parallel.run_tree_parallel(
         parallel.default_config(),
-        types.root("root", Nil, [
+        types.tree("root", Nil, [
           after_all(fn() { Error("no cleanup") }),
           it("a", fn() { Ok(AssertionOk) }),
         ]),
@@ -238,7 +238,7 @@ pub fn tests() {
           message: "no cleanup",
         ),
       ])
-      |> or_fail_with("run_root_parallel should give the tear-down failures")
+      |> or_fail_with("run_tree_parallel should give the tear-down failures")
     }),
 
     it("a before_all that crashes gives SetupFailed", fn() {

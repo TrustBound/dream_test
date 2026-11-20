@@ -1,6 +1,6 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/parallel.{
-  type OuterSetup, type RunRootParallelWithReporterResult, SetupRunning,
+  type OuterSetup, type RunTreeParallelWithReporterResult, SetupRunning,
   SetupStopped,
 }
 import dream_test/sandbox
@@ -17,7 +17,7 @@ pub fn tests() {
   describe("dream_test/parallel outer set-ups", [
     it("a stopped outer set-up gives SetupFailed to each test", fn() {
       let reports = process.new_subject()
-      types.root("suite", Nil, [
+      types.tree("suite", Nil, [
         unit.before_all(fn() {
           process.send(reports, "before_all ran")
           Ok(Nil)
@@ -69,7 +69,7 @@ pub fn tests() {
     }),
 
     it("a set-up whose check gives an error is stopped", fn() {
-      types.root("suite", Nil, [it("a", passing_test)])
+      types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(
           set_up: BeforeEachSuiteHook,
@@ -96,7 +96,7 @@ pub fn tests() {
     }),
 
     it("a scope whose check gives Ok stays alive and its tests run", fn() {
-      types.root("suite", Nil, [it("a", passing_test)])
+      types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupRunning(
           set_up: BeforeAllSuitesHook,
@@ -115,7 +115,7 @@ pub fn tests() {
     }),
 
     it("the outermost stopped set-up is the failure of a test", fn() {
-      types.root("suite", Nil, [it("a", passing_test)])
+      types.tree("suite", Nil, [it("a", passing_test)])
       |> run_in_setups([
         SetupStopped(
           set_up: BeforeAllSuitesHook,
@@ -157,7 +157,7 @@ pub fn tests() {
         let setup_process =
           process.spawn_unlinked(fn() { process.sleep_forever() })
         let monitor = process.monitor(setup_process)
-        types.root("suite", Nil, [
+        types.tree("suite", Nil, [
           it("a", fn() {
             kill_and_wait(setup_process)
             Ok(AssertionOk)
@@ -209,32 +209,32 @@ type SetupState {
 }
 
 fn run_in_setups(
-  suite: types.Root(Nil),
+  tree: types.Tree(Nil),
   setups: List(OuterSetup),
-) -> RunRootParallelWithReporterResult {
-  run_with_config(suite, parallel.default_config(), setups)
+) -> RunTreeParallelWithReporterResult {
+  run_with_config(tree, parallel.default_config(), setups)
 }
 
 fn run_with_concurrency_one(
-  suite: types.Root(Nil),
+  tree: types.Tree(Nil),
   setups: List(OuterSetup),
-) -> RunRootParallelWithReporterResult {
+) -> RunTreeParallelWithReporterResult {
   run_with_config(
-    suite,
+    tree,
     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 1000),
     setups,
   )
 }
 
 fn run_with_config(
-  suite: types.Root(Nil),
+  tree: types.Tree(Nil),
   config: parallel.ParallelConfig,
   setups: List(OuterSetup),
-) -> RunRootParallelWithReporterResult {
-  parallel.run_root_parallel_with_reporter(
-    parallel.RunRootParallelWithReporterConfig(
+) -> RunTreeParallelWithReporterResult {
+  parallel.run_tree_parallel_with_reporter(
+    parallel.RunTreeParallelWithReporterConfig(
       config: config,
-      suite: suite,
+      tree: tree,
       progress_reporter: None,
       write: ignore,
       total: 0,
@@ -246,7 +246,7 @@ fn run_with_config(
   )
 }
 
-fn summary(result: RunRootParallelWithReporterResult) -> Summary {
+fn summary(result: RunTreeParallelWithReporterResult) -> Summary {
   Summary(
     tests: list.map(result.results, test_summary),
     setups: list.map(result.outer_setups, setup_summary),

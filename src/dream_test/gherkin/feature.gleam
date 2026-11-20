@@ -137,7 +137,7 @@ pub type InlineStep {
 /// 1.
 ///
 /// Tags follow Gherkin: a scenario inherits the Feature tags and the Rule
-/// tags. The suite root holds the Feature tags, a Rule group holds the Rule
+/// tags. The top-level group holds the Feature tags, a Rule group holds the Rule
 /// tags, and a test holds the scenario tags, then the `Examples` tags. The
 /// runner adds the tags of the groups of a test in front of its own tags.
 /// So the tags of a test result, and the tags that a `runner.filter_tests`

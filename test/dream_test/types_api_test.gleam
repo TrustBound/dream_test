@@ -23,9 +23,9 @@ pub fn tests() {
       |> or_fail_with("MatchFailed should map to AssertionFailed(failure)")
     }),
 
-    it("root builds a Root with a top-level Group", fn() {
-      let suite = types.root("r", Nil, [])
-      let types.Root(seed: seed, name: _, tags: _, children: _) = suite
+    it("tree builds a Tree with a top-level Group", fn() {
+      let tree = types.tree("r", Nil, [])
+      let types.Tree(seed: seed, name: _, tags: _, children: _) = tree
 
       seed
       |> should
@@ -33,10 +33,10 @@ pub fn tests() {
       |> or_fail_with("seed should be preserved")
     }),
 
-    it("root keeps the name, no tags and the children", fn() {
-      let suite = types.root("r", Nil, [])
+    it("tree keeps the name, no tags and the children", fn() {
+      let tree = types.tree("r", Nil, [])
 
-      #(suite.name, suite.tags, suite.children)
+      #(tree.name, tree.tags, tree.children)
       |> should
       |> be_equal(#("r", [], []))
       |> or_fail_with("expected the name r, no tags and no children")

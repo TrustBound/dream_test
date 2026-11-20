@@ -59,7 +59,7 @@ import dream_test/suite.{type TestSuite}
 import dream_test/types.{
   type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
   AssertionSkipped, BeforeAll, BeforeEach, ContextFromSetUp, Group, NoInput,
-  Root, Test, Unit, WithInput,
+  Test, Tree, Unit, WithInput,
 }
 import gleam/option.{None}
 
@@ -122,7 +122,7 @@ pub fn describe(
   seed seed: context,
   children children: List(ContextNode(context)),
 ) -> TestSuite {
-  suite.from_tree(Root(seed: seed, name: name, tags: [], children: children))
+  suite.from_tree(Tree(seed: seed, name: name, tags: [], children: children))
 }
 
 /// Create a nested group inside a context-aware suite.

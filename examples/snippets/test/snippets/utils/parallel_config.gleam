@@ -8,12 +8,12 @@ pub fn tests() {
 
   describe("ParallelConfig", [
     it("can be constructed to customize execution", fn() {
-      let suite =
-        types.root("Suite", Nil, [
+      let tree =
+        types.tree("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
         ])
 
-      parallel.run_root_parallel(config, suite)
+      parallel.run_tree_parallel(config, tree)
       |> types.report_tests
       |> should
       |> have_length(1)

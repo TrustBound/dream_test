@@ -651,9 +651,92 @@ fn test_label(info: TestInfo) -> String {
 }
 ```
 
+#### `types.Root` is now `types.Tree`
+
+This change affects only code that uses `types.Root` or `dream_test/parallel` directly. A `Root` was one tree of tests, not a whole suite, so it has a new name. `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`. A tree is one top-level group with its children and one context. A suite holds one or more trees. The `parallel` functions take the tree with the label `tree:`. In 2.x the label was `suite:`.
+
+##### 2.x: the tree with the label `suite:` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L32-L44"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+  let parallel_result =
+    parallel.run_root_parallel_with_reporter(
+      parallel.RunRootParallelWithReporterConfig(
+        config: parallel.default_config(),
+        suite: suite(),
+        progress_reporter: Some(reporter),
+        write: write,
+        total: total,
+        completed: completed,
+        runner_before_each_test: [],
+        runner_after_each_test: [],
+      ),
+    )
+```
+
+##### 3.0.0: a tree from `types.tree` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L5-L13"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/types.{type Tree}
+import dream_test/unit.{it}
+import gleam/option.{Some}
+
+pub fn tree() -> Tree(Nil) {
+  types.tree("suite", Nil, [
+    it("passes", fn() { Ok(succeed()) }),
+  ])
+}
+```
+
+##### 3.0.0: the tree with the label `tree:` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_with_reporter.gleam#L25-L38"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+  let parallel_result =
+    parallel.run_tree_parallel_with_reporter(
+      parallel.RunTreeParallelWithReporterConfig(
+        config: parallel.default_config(),
+        tree: tree(),
+        progress_reporter: Some(reporter),
+        write: write,
+        total: total,
+        completed: completed,
+        runner_before_each_test: [],
+        runner_after_each_test: [],
+        outer_setups: [],
+      ),
+    )
+```
+
+#### The `parallel` names say "tree"
+
+This change affects only code that uses `dream_test/parallel` directly. The names that said "root" now say "tree":
+
+- `run_root_parallel` is now `run_tree_parallel`.
+- `run_root_parallel_with_reporter` is now `run_tree_parallel_with_reporter`.
+- `RunRootParallelWithReporterConfig` is now `RunTreeParallelWithReporterConfig`.
+- `RunRootParallelWithReporterResult` is now `RunTreeParallelWithReporterResult`.
+
+##### 2.x: a call to `run_root_parallel` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L14-L17"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+      parallel.run_root_parallel(parallel.default_config(), suite)
+      |> should
+      |> have_length(2)
+      |> or_fail_with("expected two results")
+```
+
+##### 3.0.0: a call to `run_tree_parallel` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_direct.gleam#L15-L19"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+      parallel.run_tree_parallel(parallel.default_config(), tree)
+      |> types.report_tests
+      |> should
+      |> have_length(2)
+      |> or_fail_with("expected two results")
+```
+
 #### Running a suite with `parallel`
 
-`parallel.run_root_parallel` returns a `RunReport`. The typed `parallel` functions take a `types.Root(context)`. `unit.describe` gives a `TestSuite` now, so build the tree with `types.root`.
+`parallel.run_tree_parallel` returns a `RunReport`. The typed `parallel` functions take a `types.Tree(context)`. `unit.describe` gives a `TestSuite` now, so build the tree with `types.tree`.
 
 ##### 2.x: `run_root_parallel` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L1-L20"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -680,7 +763,7 @@ pub fn tests() {
 }
 ```
 
-##### 3.0.0: `run_root_parallel` returns a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_direct.gleam#L1-L22"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: `run_tree_parallel` returns a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/parallel_direct.gleam#L1-L22"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{have_length, or_fail_with, should, succeed}
@@ -690,14 +773,14 @@ import dream_test/unit.{describe, it}
 
 pub fn tests() {
   describe("Parallel executor", [
-    it("can run a suite and return a list of results", fn() {
-      let suite =
-        types.root("Suite", Nil, [
+    it("can run a tree and return a list of results", fn() {
+      let tree =
+        types.tree("Suite", Nil, [
           it("a", fn() { Ok(succeed()) }),
           it("b", fn() { Ok(succeed()) }),
         ])
 
-      parallel.run_root_parallel(parallel.default_config(), suite)
+      parallel.run_tree_parallel(parallel.default_config(), tree)
       |> types.report_tests
       |> should
       |> have_length(2)
@@ -707,9 +790,9 @@ pub fn tests() {
 }
 ```
 
-#### `RunRootParallelWithReporterConfig` has `outer_setups`
+#### `RunTreeParallelWithReporterConfig` has `outer_setups`
 
-This change affects only code that calls `parallel.run_root_parallel_with_reporter` directly. `RunRootParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunRootParallelWithReporterResult` has two new fields, `teardown_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
+This change affects only code that calls `parallel.run_tree_parallel_with_reporter` (in 2.x `run_root_parallel_with_reporter`) directly. `RunTreeParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunTreeParallelWithReporterResult` has two new fields, `teardown_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
 
 ##### 2.x: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L1-L62"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -785,12 +868,12 @@ import dream_test/matchers.{succeed}
 import dream_test/parallel
 import dream_test/reporters/progress
 import dream_test/reporters/summary
-import dream_test/types.{type Root}
+import dream_test/types.{type Tree}
 import dream_test/unit.{it}
 import gleam/option.{Some}
 
-pub fn suite() -> Root(Nil) {
-  types.root("suite", Nil, [
+pub fn tree() -> Tree(Nil) {
+  types.tree("suite", Nil, [
     it("passes", fn() { Ok(succeed()) }),
   ])
 }
@@ -806,10 +889,10 @@ pub fn main() {
   |> write
 
   let parallel_result =
-    parallel.run_root_parallel_with_reporter(
-      parallel.RunRootParallelWithReporterConfig(
+    parallel.run_tree_parallel_with_reporter(
+      parallel.RunTreeParallelWithReporterConfig(
         config: parallel.default_config(),
-        suite: suite(),
+        tree: tree(),
         progress_reporter: Some(reporter),
         write: write,
         total: total,
@@ -819,7 +902,7 @@ pub fn main() {
         outer_setups: [],
       ),
     )
-  let parallel.RunRootParallelWithReporterResult(
+  let parallel.RunTreeParallelWithReporterResult(
     results: results,
     teardown_failures: teardown_failures,
     completed: completed_after_suite,
@@ -854,7 +937,7 @@ pub fn main() {
 
 #### Suites built by hand
 
-This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` holds the fields of its top-level group: `Root(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Root` to `suite.from_tree` to get a `TestSuite` for the runner.
+This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(seed:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
 
 ##### 2.x: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L369-L396"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 
@@ -909,7 +992,7 @@ pub fn tests() -> TestSuite(Nil) {
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type Node, BeforeAll, NoInput, Root, Test, Unit, WithInput,
+  type Node, BeforeAll, NoInput, Test, Tree, Unit, WithInput,
 }
 import gleam/int
 import gleam/list
@@ -942,7 +1025,7 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 
 pub fn tests() -> TestSuite {
   suite.from_tree(
-    Root(seed: Nil, name: "doubling", tags: [], children: [
+    Tree(seed: Nil, name: "doubling", tags: [], children: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)
     ]),

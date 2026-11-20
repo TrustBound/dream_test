@@ -1,8 +1,8 @@
 //// Direct black-box tests of public items that other modules use for you:
 //// `suite.new`, `types.FixedContext` and `types.ContextFromSetUp` built by
 //// hand, `types.AssertionPending` from a body, `suite.run` with a
-//// `suite.RunInput`, and `parallel.run_suite` with a
-//// `parallel.RunSuiteConfig`.
+//// `suite.RunInput`, and `parallel.run_tree` with a
+//// `parallel.RunTreeConfig`.
 
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/parallel
@@ -115,11 +115,11 @@ pub fn tests() {
       |> or_fail_with("suite.run should give the result and the new count")
     }),
 
-    unit.it("parallel.run_suite runs a tree inside its groups", fn() {
+    unit.it("parallel.run_tree runs a tree inside its groups", fn() {
       let names = process.new_subject()
       let ran =
-        parallel.run_suite(
-          parallel.RunSuiteConfig(
+        parallel.run_tree(
+          parallel.RunTreeConfig(
             config: parallel.default_config(),
             groups: ["all"],
             name: "suite",
@@ -146,7 +146,7 @@ pub fn tests() {
         1,
         Ok(["all", "suite", "passes"]),
       ))
-      |> or_fail_with("run_suite should put the tree inside its groups")
+      |> or_fail_with("run_tree should put the tree inside its groups")
     }),
   ])
 }

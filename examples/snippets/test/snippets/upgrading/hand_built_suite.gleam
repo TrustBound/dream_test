@@ -1,7 +1,7 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type Node, BeforeAll, NoInput, Root, Test, Unit, WithInput,
+  type Node, BeforeAll, NoInput, Test, Tree, Unit, WithInput,
 }
 import gleam/int
 import gleam/list
@@ -34,7 +34,7 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 
 pub fn tests() -> TestSuite {
   suite.from_tree(
-    Root(seed: Nil, name: "doubling", tags: [], children: [
+    Tree(seed: Nil, name: "doubling", tags: [], children: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)
     ]),

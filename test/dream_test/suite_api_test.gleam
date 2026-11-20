@@ -178,7 +178,7 @@ fn plain_suite() {
 
 fn number_suite() {
   suite.from_tree(
-    types.root("number", 41, [unit_context.it("gets 41", check_number)]),
+    types.tree("number", 41, [unit_context.it("gets 41", check_number)]),
   )
 }
 
@@ -215,7 +215,7 @@ fn run_all(suites: List(suite.TestSuite)) -> List(#(List(String), Status)) {
 }
 
 fn run_summary(
-  ran: parallel.RunRootParallelWithReporterResult,
+  ran: parallel.RunTreeParallelWithReporterResult,
 ) -> #(List(#(List(String), Status)), Int) {
   #(list.map(ran.results, full_name_and_status), ran.completed)
 }
@@ -258,7 +258,7 @@ fn ignore(_text: String) -> Nil {
 /// with no source.
 fn feature_file_suite() -> suite.TestSuite {
   suite.from_tree(
-    types.root(name: "cart", seed: Nil, children: [
+    types.tree(name: "cart", seed: Nil, children: [
       types.Test(
         name: "from the file",
         tags: [],
