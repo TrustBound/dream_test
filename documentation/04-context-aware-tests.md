@@ -66,9 +66,11 @@ Sometimes the context is a resource that must start before the first test and st
 - `setup` runs one time, before the first test, and only when at least one test of the suite runs. Its value is the context of every hook and test.
 - `teardown` gets the same value after the last test.
 - Both run in one process that lives while the tests run, so a process that the setup starts stays alive.
-- When `setup` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `suite setup`, and `teardown` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the suite setup crashed in Store: <reason>`, and a timeout reads `the suite setup timed out in Store`.
-- When `teardown` returns `Error`, crashes or times out, the run report gets a teardown failure for the hook `suite teardown`. The report shows `suite teardown in Store`, then the message, for example `the suite teardown crashed in Store: <reason>`.
-- When the process of the setup stops, each test that did not start is `SetupFailed` with `not run: the suite setup of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `suite setup`, and `teardown` still runs when `setup` returned.
+
+The reports call this setup the *context setup*. It runs once for each tree that has a test to run, before the first test of that tree, and its value is the context. Its teardown, the *context teardown*, runs after the last test of that tree.
+- When `setup` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `context setup`, and `teardown` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the context setup crashed in Store: <reason>`, and a timeout reads `the context setup timed out in Store`.
+- When `teardown` returns `Error`, crashes or times out, the run report gets a teardown failure for the hook `context teardown`. The report shows `context teardown in Store`, then the message, for example `the context teardown crashed in Store: <reason>`.
+- When the process of the setup stops, each test that did not start is `SetupFailed` with `not run: the context setup of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `context setup`, and `teardown` still runs when `setup` returned.
 
 #### A suite whose context comes from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

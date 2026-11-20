@@ -54,7 +54,7 @@ pub fn tests() {
       |> or_fail_with("each linked counter should stop with its test")
     }),
 
-    it("a linked counter that a suite setup starts stops after the run", fn() {
+    it("a linked counter that a context setup starts stops after the run", fn() {
       // The setup starts a counter that links to the setup process and
       // does not trap exits. The teardown leaves it alone. When the run
       // returns, the counter must stop with the setup process.

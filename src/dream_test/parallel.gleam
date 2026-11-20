@@ -52,10 +52,10 @@ import dream_test/types.{
   type TestResult, type Tree, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
   AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
   AssertionPending, AssertionSkipped, BeforeAll, BeforeAllHook,
-  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetup, Failed,
-  FixedContext, Group, Passed, Pending, SetupFailed, Skipped, SuiteSetupHook,
-  SuiteTeardownHook, TeardownFailure, Test, TestResult, TimedOut, Tree,
-  WithInput,
+  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetup,
+  ContextSetupHook, ContextTeardownHook, Failed, FixedContext, Group, Passed,
+  Pending, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
+  Tree, WithInput,
 }
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
@@ -499,12 +499,12 @@ type ScopeHooks {
 /// The names for the scope whose setup is `setup`.
 fn scope_hooks(setup: SetupHook) -> ScopeHooks {
   case setup {
-    SuiteSetupHook ->
+    ContextSetupHook ->
       ScopeHooks(
-        setup: SuiteSetupHook,
-        teardown: SuiteTeardownHook,
-        setup_text: "the suite setup",
-        teardown_text: "the suite teardown",
+        setup: ContextSetupHook,
+        teardown: ContextTeardownHook,
+        setup_text: "the context setup",
+        teardown_text: "the context teardown",
       )
     BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
       ScopeHooks(
@@ -851,8 +851,8 @@ fn tree_result(
   )
 }
 
-/// Run the setup of a suite in a new setup process, then the tests with
-/// its value, then the teardown in the same setup process.
+/// Run the context setup of a tree in a new setup process, then the tests
+/// with its value, then the teardown in the same setup process.
 fn start_setup(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
@@ -875,44 +875,44 @@ fn start_setup(
         SetupProcessAlive(
           scope: scope,
           setup_process: setup_process,
-          setup: SuiteSetupHook,
+          setup: ContextSetupHook,
         ),
         context,
         teardown,
       )
     SetupProcessReturned(setup_process: setup_process, value: Error(message)) -> {
       sandbox.stop_setup_process(setup_process)
-      suite_setup_failed(config, setup_processes, failed_setup(message))
+      context_setup_failed(config, setup_processes, failed_setup(message))
     }
     SetupProcessCaught(setup_process: setup_process, reason: reason) -> {
       sandbox.stop_setup_process(setup_process)
-      suite_setup_failed(
+      context_setup_failed(
         config,
         setup_processes,
         failed_setup(scope_crash_message(
-          scope_hooks(SuiteSetupHook).setup_text,
+          scope_hooks(ContextSetupHook).setup_text,
           scope,
           reason,
         )),
       )
     }
     SetupProcessTimedOut ->
-      suite_setup_failed(
+      context_setup_failed(
         config,
         setup_processes,
         failed_setup(scope_timeout_message(
-          scope_hooks(SuiteSetupHook).setup_text,
+          scope_hooks(ContextSetupHook).setup_text,
           scope,
         )),
       )
     SetupProcessExited(reason: reason) | SetupProcessLost(reason: reason) ->
-      suite_setup_stopped(config, setup_processes, scope, reason)
+      context_setup_stopped(config, setup_processes, scope, reason)
   }
 }
 
-/// The failure of each test of a suite whose setup failed.
+/// The failure of each test of a tree whose context setup failed.
 fn failed_setup(message: String) -> AssertionFailure {
-  hook_failure(types.setup_hook_name(SuiteSetupHook), message)
+  hook_failure(types.setup_hook_name(ContextSetupHook), message)
 }
 
 fn run_after_setup(
@@ -931,7 +931,7 @@ fn run_after_setup(
   let teardown_failures_rev =
     finish_group_scope(
       config.config,
-      GroupScope(groups: own.scope, hooks: scope_hooks(SuiteSetupHook)),
+      GroupScope(groups: own.scope, hooks: scope_hooks(ContextSetupHook)),
       option.from_result(list.first(setup_processes_after.groups)),
       context,
       [WithInput(teardown)],
@@ -946,9 +946,9 @@ fn run_after_setup(
   ))
 }
 
-/// Each test of a suite whose setup failed is `SetupFailed` with
+/// Each test of a tree whose context setup failed is `SetupFailed` with
 /// `failure`. The teardown does not run.
-fn suite_setup_failed(
+fn context_setup_failed(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   failure: AssertionFailure,
@@ -967,18 +967,18 @@ fn suite_setup_failed(
   ))
 }
 
-/// The process of the setup of a suite stopped before the setup
+/// The process of the context setup of a tree stopped before the setup
 /// returned. No test runs, the run report gets a `SetupStopped` with each
 /// test in `not_run`, and the teardown does not run: there is no value
 /// to give it.
-fn suite_setup_stopped(
+fn context_setup_stopped(
   config: RunTreeConfig(context),
   setup_processes: SetupProcesses(context),
   scope: List(String),
   reason: String,
 ) -> RunTreeParallelWithReporterResult {
   let stop =
-    Stop(setup: SuiteSetupHook, scope: scope, reason: reason, not_run: [])
+    Stop(setup: ContextSetupHook, scope: scope, reason: reason, not_run: [])
   let results_rev =
     fail_group_nodes(
       config.groups,
@@ -991,7 +991,7 @@ fn suite_setup_stopped(
   tree_result(config, #(
     Collected(results_rev: results_rev, teardown_failures_rev: [
       types.SetupStopped(
-        setup: SuiteSetupHook,
+        setup: ContextSetupHook,
         groups: scope,
         reason: reason,
         not_run: full_names(results),
@@ -1428,8 +1428,8 @@ fn group_stop(setup_process: ScopeSetupProcess(context)) -> Result(Stop, Nil) {
 /// The failure of a test that was not run because `stop` stopped:
 /// `not run: the setup from <setup hook> in "<groups>" stopped (<reason>)`,
 /// without `in "<groups>"` for the whole run, or
-/// `not run: the suite setup of "<suite>" stopped (<reason>)` for the
-/// setup of a suite. The operator is the name of the setup hook.
+/// `not run: the context setup of "<tree>" stopped (<reason>)` for the
+/// context setup of a tree. The operator is the name of the setup hook.
 fn not_run_failure(stop: Stop) -> AssertionFailure {
   AssertionFailure(
     operator: types.setup_hook_name(stop.setup),
@@ -1442,12 +1442,14 @@ fn not_run_failure(stop: Stop) -> AssertionFailure {
   )
 }
 
-/// `the suite setup of "<suite>" stopped` for the setup of a suite, and
-/// `the setup from <setup hook> in "<groups>" stopped` for a hook.
+/// `the context setup of "<tree>" stopped` for the context setup of a tree,
+/// and `the setup from <setup hook> in "<groups>" stopped` for a hook.
 fn stopped_setup_text(stop: Stop) -> String {
   case stop.setup {
-    SuiteSetupHook ->
-      "the suite setup of \"" <> string.join(stop.scope, " > ") <> "\" stopped"
+    ContextSetupHook ->
+      "the context setup of \""
+      <> string.join(stop.scope, " > ")
+      <> "\" stopped"
     BeforeAllHook | BeforeEachSuiteHook | BeforeAllSuitesHook ->
       "the setup from "
       <> types.setup_hook_name(stop.setup)
@@ -3024,7 +3026,7 @@ fn hook_timeout_message(scope: List(String)) -> String {
 }
 
 /// `<text> crashed in <groups>: <reason>`, for example
-/// `the suite setup crashed in Server: error:boom`.
+/// `the context setup crashed in Server: error:boom`.
 fn scope_crash_message(
   text: String,
   scope: List(String),

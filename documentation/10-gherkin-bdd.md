@@ -665,8 +665,9 @@ Some features need a resource that lives for all their scenarios, for example a 
 - Each scenario starts from the value of the setup. A change that one scenario makes to its state does not reach the next scenario.
 - The teardown gets the same value after the last scenario.
 - The setup and the teardown run in one process that lives while the scenarios run. A process that the setup starts stays alive.
-- When the process of the setup stops while the scenarios run, each scenario that did not start yet is `SetupFailed`. The run report gets a `types.SetupStopped` for the hook `suite setup`, and its `not_run` lists those scenarios. The teardown still runs.
-- When the setup returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `suite setup`, and the teardown does not run. A crash reads `the suite setup crashed in Server: <reason>`. When the teardown fails, the run report gets a teardown failure for the hook `suite teardown`, for example `suite teardown in Server` then `the suite teardown crashed in Server: <reason>`.
+- The reports call them the *context setup* and the *context teardown*. The context setup runs once for each tree that has a scenario to run, before its first scenario, and its value is the starting state. The context teardown runs after the last scenario of that tree.
+- When the process of the setup stops while the scenarios run, each scenario that did not start yet is `SetupFailed`. The run report gets a `types.SetupStopped` for the hook `context setup`, and its `not_run` lists those scenarios. The teardown still runs.
+- When the setup returns `Error`, crashes or times out, each scenario is `SetupFailed` with the operator `context setup`, and the teardown does not run. A crash reads `the context setup crashed in Server: <reason>`. When the teardown fails, the run report gets a teardown failure for the hook `context teardown`, for example `context teardown in Server` then `the context teardown crashed in Server: <reason>`.
 
 With `discover.to_suite`, the setup runs one time for the scenarios of all the files. A parse error test does not need the setup, so it runs without it.
 

@@ -62,7 +62,7 @@ hook starts now lives for the tests of its group. A test runs its
   takes `unit` suites, `unit_context` suites and Gherkin features together.
   `suite.group` and `suite.join` put suites together, and each keeps its
   own context.
-- A suite setup gives the context of a whole suite and runs once, only
+- A context setup gives the context of a tree and runs once, only
   when at least one of its tests runs: `unit_context.describe_with_setup`
   for unit tests, and `steps.new_with_setup` for Gherkin scenarios, for
   example to start one server for all the scenarios of a feature.

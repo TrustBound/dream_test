@@ -1062,7 +1062,7 @@ A setup hook and its teardown hook run only when at least one of the tests that 
 
 #### A setup whose process stops
 
-A `before_all`, `before_each_suite` or `before_all_suites` hook, or a suite setup, runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
 
 - Each test that had not started is `SetupFailed`, with a failure such as `not run: the setup from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
 - The teardown hooks still run, in a new process.
@@ -1198,7 +1198,7 @@ pub fn suite() {
 
 A test process that stops during the body gives `Failed` with `crash: worker crashed in <group>: <reason>`. In 2.x, the failure was `crash: killed`.
 
-When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook. A process that a `before_all` hook or a suite setup starts and links stops after the last test that the hook serves: its setup process exits with reason `shutdown`.
+When a test ends, its process exits with reason `shutdown`. A process that the test started and linked to itself, such as an actor from `process.start_actor`, stops with it, also when the test passed. In 2.x, such a process stayed alive after a test that passed, failed or crashed. Do not keep a linked process from one test for a later test: start it in a `before_all` hook. A process that a `before_all` hook or a context setup starts and links stops after the last test that the hook serves: its setup process exits with reason `shutdown`.
 
 ### Reporters
 

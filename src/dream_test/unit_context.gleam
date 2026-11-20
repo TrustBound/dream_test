@@ -453,13 +453,13 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
 /// run, so a process that the setup starts and links stays alive.
 ///
 /// - When `setup` returns `Error`, crashes or times out, each test is
-///   `SetupFailed` with the operator `suite setup`, and `teardown` does not run.
+///   `SetupFailed` with the operator `context setup`, and `teardown` does not run.
 /// - When the process of the setup stops, the tests that did not start
 ///   are `SetupFailed`, and the run report gets a `types.SetupStopped` with
-///   the setup `types.SuiteSetupHook`. `teardown` still runs when the
+///   the setup `types.ContextSetupHook`. `teardown` still runs when the
 ///   setup returned.
 /// - When `teardown` returns `Error`, crashes or times out, the run report
-///   gets a `types.TeardownFailure` with the hook `types.SuiteTeardownHook`.
+///   gets a `types.TeardownFailure` with the hook `types.ContextTeardownHook`.
 ///
 /// ## Parameters
 ///

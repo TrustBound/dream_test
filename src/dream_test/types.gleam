@@ -643,16 +643,17 @@ pub fn is_failure(status status: Status) -> Bool {
 /// - `AfterAllHook`: `unit.after_all` (and the same hook of the other DSLs)
 /// - `AfterEachSuiteHook`: `runner.after_each_suite`
 /// - `AfterAllSuitesHook`: `runner.after_all_suites`
-/// - `SuiteTeardownHook`: the teardown of a suite whose context comes from
+/// - `ContextTeardownHook`: the teardown of a tree whose context comes from
 ///   a setup (`unit_context.describe_with_setup`,
-///   `steps.new_with_setup`). Its name is `"suite teardown"`.
+///   `steps.new_with_setup`). It runs after the last test of that tree.
+///   Its name is `"context teardown"`.
 pub type TeardownHook {
   AfterEachTestHook
   AfterEachHook
   AfterAllHook
   AfterEachSuiteHook
   AfterAllSuitesHook
-  SuiteTeardownHook
+  ContextTeardownHook
 }
 
 /// The name of a teardown hook, as reporters show it.
@@ -681,7 +682,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
     AfterAllHook -> "after_all"
     AfterEachSuiteHook -> "after_each_suite"
     AfterAllSuitesHook -> "after_all_suites"
-    SuiteTeardownHook -> "suite teardown"
+    ContextTeardownHook -> "context teardown"
   }
 }
 
@@ -696,14 +697,15 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 ///   of one suite.
 /// - `BeforeAllSuitesHook`: `runner.before_all_suites`. It serves every
 ///   test of the run.
-/// - `SuiteSetupHook`: the setup of a suite whose context comes from a
+/// - `ContextSetupHook`: the setup of a tree whose context comes from a
 ///   setup (`unit_context.describe_with_setup`, `steps.new_with_setup`).
-///   It serves the tests of that suite. Its name is `"suite setup"`.
+///   It runs once, before the first test of that tree, and its value is
+///   the context of the tests of that tree. Its name is `"context setup"`.
 pub type SetupHook {
   BeforeAllHook
   BeforeEachSuiteHook
   BeforeAllSuitesHook
-  SuiteSetupHook
+  ContextSetupHook
 }
 
 /// The name of a setup hook, as reporters show it.
@@ -730,7 +732,7 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
     BeforeAllHook -> "before_all"
     BeforeEachSuiteHook -> "before_each_suite"
     BeforeAllSuitesHook -> "before_all_suites"
-    SuiteSetupHook -> "suite setup"
+    ContextSetupHook -> "context setup"
   }
 }
 
@@ -745,9 +747,9 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 /// - `TeardownFailure(hook, groups, message)`: a teardown hook failed.
 ///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
 ///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
-///   the group path. For `SuiteTeardownHook` (the teardown of a suite
-///   setup), the group path of the suite: the groups around it and its
-///   name. For `AfterEachSuiteHook`, the suite name. For
+///   the group path. For `ContextTeardownHook` (the teardown of a
+///   context setup), the group path of the tree: the groups around it and
+///   its name. For `AfterEachSuiteHook`, the suite name. For
 ///   `AfterAllSuitesHook`, `[]`. `message` is the error message of the
 ///   hook, or the crash text.
 /// - `SetupStopped(setup, groups, reason, not_run)`: a setup stopped.
@@ -755,14 +757,14 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 ///   setup hooks ran, for example because a `before_all` hook killed it,
 ///   or a process that the hook linked to it crashed. `setup` is the
 ///   setup hook. `groups` is the group path for `BeforeAllHook`, the group
-///   path of the suite for `SuiteSetupHook` (a suite setup), the suite
+///   path of the tree for `ContextSetupHook` (a context setup), the suite
 ///   name for `BeforeEachSuiteHook` and `[]` for `BeforeAllSuitesHook`.
 ///   `reason` is the exit reason of the process. The tests of the scope
 ///   that had not started are not run: each one is `SetupFailed` with the
 ///   failure `not run: the setup from <setup hook> in "<groups>" stopped
 ///   (<reason>)`, without `in "<groups>"` for `BeforeAllSuitesHook`, or
-///   `not run: the suite setup of "<suite>" stopped (<reason>)` for
-///   `SuiteSetupHook`, where `<suite>` is the group path joined with
+///   `not run: the context setup of "<tree>" stopped (<reason>)` for
+///   `ContextSetupHook`, where `<tree>` is the group path joined with
 ///   ` > `. `not_run` is the full name of each of these tests (see
 ///   `full_name`), in the order of the run. The runner records each test
 ///   when it skips it. When a test is in the scope of more than one

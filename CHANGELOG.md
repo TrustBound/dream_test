@@ -373,15 +373,18 @@ the guide labels them.
   - The setup runs one time, before the first test, and only when at
     least one test of the suite runs. The teardown gets its value after
     the last test. Both run in one process that lives while the tests run
+  - The reports call this setup the context setup: it runs once for each
+    tree that has a test to run, and its value is the context. Its
+    teardown, the context teardown, runs after the last test of that tree
   - A failed setup gives `SetupFailed` to each test, with the operator
-    `suite setup`, and the teardown does not run. A crash reads
-    `the suite setup crashed in <suite>: <reason>`, and a timeout reads
-    `the suite setup timed out in <suite>`. A failed teardown is a
-    teardown failure with the new hook `types.SuiteTeardownHook`, named
-    `suite teardown` in the reports and in JSON. A setup whose process
-    stops is a `SetupStopped` with the new hook `types.SuiteSetupHook`,
-    named `suite setup`, and each test that did not start gets
-    `not run: the suite setup of "<suite>" stopped (<reason>)`
+    `context setup`, and the teardown does not run. A crash reads
+    `the context setup crashed in <suite>: <reason>`, and a timeout reads
+    `the context setup timed out in <suite>`. A failed teardown is a
+    teardown failure with the new hook `types.ContextTeardownHook`, named
+    `context teardown` in the reports and in JSON. A setup whose process
+    stops is a `SetupStopped` with the new hook `types.ContextSetupHook`,
+    named `context setup`, and each test that did not start gets
+    `not run: the context setup of "<tree>" stopped (<reason>)`
   - `steps.SuiteChild` puts several Features in one suite with one
     setup: `SuiteFeature(feature)` is a group with the tests of a Feature
 
@@ -491,7 +494,7 @@ the guide labels them.
   - `types.TeardownFailure(hook:, groups:, message:)` and
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
     `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
-    `SuiteTeardownHook`), with
+    `ContextTeardownHook`), with
     `types.teardown_hook_name`
   - `types.SetupStopped(setup:, groups:, reason:, not_run:)`, a variant of
     `types.TeardownFailure` for a setup that stopped: the process that
@@ -501,7 +504,7 @@ the guide labels them.
     `not run: the setup from before_all in "Database" stopped (killed)`,
     the teardown hooks still run, and `types.failed` is `True`. Also
     `types.SetupHook` (`BeforeAllHook`, `BeforeEachSuiteHook`,
-    `BeforeAllSuitesHook`, `SuiteSetupHook`) with
+    `BeforeAllSuitesHook`, `ContextSetupHook`) with
     `types.setup_hook_name`
   - `types.is_failure(status)`, the one check for a failure status
     (`Failed`, `SetupFailed`, `TimedOut`)
@@ -735,7 +738,7 @@ the guide labels them.
   when the test ends, as the `dream_test/process` docs say. The test
   process exits with reason `shutdown`. Before, a linked process that did
   not trap exits stayed alive after a test that passed, failed or crashed.
-- A process that a suite setup or a `before_all` hook starts and links
+- A process that a context setup or a `before_all` hook starts and links
   to its setup process stops when the setup process stops. The setup
   process exits with reason `shutdown`. Before, it exited with reason
   `normal`, and a linked process that did not trap exits stayed alive

@@ -189,13 +189,13 @@ pub fn tests() {
         types.AfterAllHook,
         types.AfterEachSuiteHook,
         types.AfterAllSuitesHook,
-        types.SuiteTeardownHook,
+        types.ContextTeardownHook,
       ]
       |> list.map(types.teardown_hook_name)
       |> should
       |> be_equal([
         "after_each_test", "after_each", "after_all", "after_each_suite",
-        "after_all_suites", "suite teardown",
+        "after_all_suites", "context teardown",
       ])
       |> or_fail_with("each hook should have its builder name")
     }),
@@ -205,12 +205,12 @@ pub fn tests() {
         types.BeforeAllHook,
         types.BeforeEachSuiteHook,
         types.BeforeAllSuitesHook,
-        types.SuiteSetupHook,
+        types.ContextSetupHook,
       ]
       |> list.map(types.setup_hook_name)
       |> should
       |> be_equal([
-        "before_all", "before_each_suite", "before_all_suites", "suite setup",
+        "before_all", "before_each_suite", "before_all_suites", "context setup",
       ])
       |> or_fail_with("each setup hook should have its builder name")
     }),

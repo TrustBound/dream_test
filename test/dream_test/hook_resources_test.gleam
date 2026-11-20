@@ -810,7 +810,7 @@ pub fn tests() {
     ),
 
     it(
-      "a before_each_suite hook that kills its process stops the suite setup",
+      "a before_each_suite hook that kills its process stops the setup of its suite",
       fn() {
         let reports = process.new_subject()
         runner.new([describe("suite", [it("a", passing_test)])])
@@ -964,7 +964,7 @@ pub fn tests() {
       },
     ),
 
-    it("a stopped suite setup without after_each_suite is reported", fn() {
+    it("a suite's stopped setup without after_each_suite is reported", fn() {
       let crash = new_crash()
       runner.new([
         describe("suite", [
@@ -992,10 +992,10 @@ pub fn tests() {
           ]),
         ),
       )
-      |> or_fail_with("a stopped suite setup should be reported")
+      |> or_fail_with("a suite's stopped setup should be reported")
     }),
 
-    it("a stopped suite setup runs after_each_suite in a new process", fn() {
+    it("a suite's stopped setup runs after_each_suite in a new process", fn() {
       let crash = new_crash()
       let reports = process.new_subject()
       runner.new([
@@ -1144,7 +1144,7 @@ pub fn tests() {
     ),
 
     it(
-      "the tests that have not started after the suite setup stopped are not run",
+      "the tests that have not started after the suite's setup stopped are not run",
       fn() {
         let crash = new_crash()
         let reports = process.new_subject()
@@ -1192,7 +1192,7 @@ pub fn tests() {
           ),
           Error(Nil),
         ))
-        |> or_fail_with("b should not run after the suite setup stopped")
+        |> or_fail_with("b should not run after the suite's setup stopped")
       },
     ),
 

@@ -8,8 +8,8 @@ import dream_test/runner
 import dream_test/suite
 import dream_test/types.{
   type AssertionFailure, type Status, type TeardownFailure, type TestInfo,
-  type TestResult, AssertionFailure, BeforeEachSuiteHook, Passed, SetupFailed,
-  SetupStopped, SuiteSetupHook, SuiteTeardownHook, TeardownFailure,
+  type TestResult, AssertionFailure, BeforeEachSuiteHook, ContextSetupHook,
+  ContextTeardownHook, Passed, SetupFailed, SetupStopped, TeardownFailure,
 }
 import dream_test/unit.{describe, it}
 import dream_test/unit_context
@@ -95,10 +95,10 @@ pub fn tests() {
         #(
           [
             #(["broken", "first"], SetupFailed, [
-              failure("suite setup", "port in use"),
+              failure("context setup", "port in use"),
             ]),
             #(["broken", "second"], SetupFailed, [
-              failure("suite setup", "port in use"),
+              failure("context setup", "port in use"),
             ]),
           ],
           [],
@@ -122,8 +122,8 @@ pub fn tests() {
       |> be_equal(
         #(
           [
-            "the suite setup crashed in broken: error:#{",
-            "the suite setup crashed in broken: error:#{",
+            "the context setup crashed in broken: error:#{",
+            "the context setup crashed in broken: error:#{",
           ],
           [],
         ),
@@ -144,10 +144,10 @@ pub fn tests() {
         #(
           [
             #(["broken", "first"], SetupFailed, [
-              failure("suite setup", "the suite setup timed out in broken"),
+              failure("context setup", "the context setup timed out in broken"),
             ]),
             #(["broken", "second"], SetupFailed, [
-              failure("suite setup", "the suite setup timed out in broken"),
+              failure("context setup", "the context setup timed out in broken"),
             ]),
           ],
           [],
@@ -176,7 +176,7 @@ pub fn tests() {
           ],
           [
             SetupStopped(
-              setup: SuiteSetupHook,
+              setup: ContextSetupHook,
               groups: ["broken"],
               reason: "killed",
               not_run: [["broken", "first"], ["broken", "second"]],
@@ -205,7 +205,7 @@ pub fn tests() {
       |> be_equal(
         #([#(["server", "passes"], Passed)], [
           TeardownFailure(
-            hook: SuiteTeardownHook,
+            hook: ContextTeardownHook,
             groups: ["server"],
             message: "port still open",
           ),
@@ -229,11 +229,11 @@ pub fn tests() {
       types.report_teardown_failures(report)
       |> list.map(teardown_message_start)
       |> should
-      |> be_equal(["the suite teardown crashed in server: error:#{"])
+      |> be_equal(["the context teardown crashed in server: error:#{"])
       |> or_fail_with("the teardown failure should name the crash")
     }),
 
-    it("the reports name a failed suite teardown in plain words", fn() {
+    it("the reports name a failed context teardown in plain words", fn() {
       let failures =
         runner.new([
           unit_context.describe_with_setup(
@@ -256,21 +256,21 @@ pub fn tests() {
           ),
         )
           |> string.contains(
-            "{\"kind\":\"hook_failed\",\"hook\":\"suite teardown\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
+            "{\"kind\":\"hook_failed\",\"hook\":\"context teardown\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
           ),
       )
       |> should
       |> be_equal(#(
-        "Setup and teardown failures:\n  suite teardown in Server\n    port still open\n",
+        "Setup and teardown failures:\n  context teardown in Server\n    port still open\n",
         True,
       ))
-      |> or_fail_with("the reports should say suite teardown")
+      |> or_fail_with("the reports should say context teardown")
     }),
 
-    it("the reports name a stopped suite setup in plain words", fn() {
+    it("the reports name a stopped context setup in plain words", fn() {
       let failures = [
         SetupStopped(
-          setup: SuiteSetupHook,
+          setup: ContextSetupHook,
           groups: ["Server"],
           reason: "killed",
           not_run: [["Server", "a"]],
@@ -286,15 +286,15 @@ pub fn tests() {
           ),
         )
           |> string.contains(
-            "{\"kind\":\"setup_stopped\",\"hook\":\"suite setup\",\"groups\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
+            "{\"kind\":\"setup_stopped\",\"hook\":\"context setup\",\"groups\":[\"Server\"],\"message\":\"killed\",\"not_run\":[[\"Server\",\"a\"]]}",
           ),
       )
       |> should
       |> be_equal(#(
-        "Setup and teardown failures:\n  suite setup in \"Server\" stopped: the process that keeps its setup alive exited with killed.\n    These tests had not started and were not run:\n      Server > a\n",
+        "Setup and teardown failures:\n  context setup in \"Server\" stopped: the process that keeps its setup alive exited with killed.\n    These tests had not started and were not run:\n      Server > a\n",
         True,
       ))
-      |> or_fail_with("the reports should say suite setup")
+      |> or_fail_with("the reports should say context setup")
     }),
 
     it("a setup process that stops during the tests runs the teardown", fn() {
@@ -328,7 +328,7 @@ pub fn tests() {
           ],
           [
             SetupStopped(
-              setup: SuiteSetupHook,
+              setup: ContextSetupHook,
               groups: ["server"],
               reason: "killed",
               not_run: [["server", "never runs"]],
@@ -342,12 +342,15 @@ pub fn tests() {
 
     it("an outer setup that stopped skips the setup", fn() {
       let events = process.new_subject()
-      let setup_processes = process.new_name("suite_setup_process")
+      let setup_processes = process.new_name("context_setup_process")
       let report =
         runner.new([
           suite.join(name: "all", suites: [
             unit_context.describe("first", setup_processes, [
-              unit_context.it("stops the suite setup", kill_suite_setup_process),
+              unit_context.it(
+                "stops the context setup",
+                kill_context_setup_process,
+              ),
             ]),
             counted_suite(events),
           ]),
@@ -364,7 +367,7 @@ pub fn tests() {
       |> be_equal(
         #(
           [
-            #(["first", "stops the suite setup"], Passed),
+            #(["first", "stops the context setup"], Passed),
             #(["server", "first"], SetupFailed),
             #(["server", "second"], SetupFailed),
           ],
@@ -471,13 +474,13 @@ fn kill_and_wait(setup_process: Pid) {
 
 /// Kill the process of the `before_each_suite` hook and wait until it is
 /// gone.
-fn kill_suite_setup_process(name: Name(Nil)) {
+fn kill_context_setup_process(name: Name(Nil)) {
   case process.named(name) {
     Ok(setup_process) -> {
       kill_and_wait_for(setup_process)
       Ok(succeed())
     }
-    Error(Nil) -> Error("the suite setup has no process")
+    Error(Nil) -> Error("the context setup has no process")
   }
 }
 
@@ -497,8 +500,8 @@ fn is_named(info: TestInfo, name: String) -> Bool {
 
 fn stopped_failure() -> AssertionFailure {
   failure(
-    "suite setup",
-    "not run: the suite setup of \"broken\" stopped (killed)",
+    "context setup",
+    "not run: the context setup of \"broken\" stopped (killed)",
   )
 }
 
@@ -531,14 +534,14 @@ fn first_message_start(
   result: #(List(String), Status, List(AssertionFailure)),
 ) -> String {
   case result.2 {
-    [first, ..] -> string.slice(first.message, 0, 43)
+    [first, ..] -> string.slice(first.message, 0, 45)
     [] -> ""
   }
 }
 
 fn teardown_message_start(failure: TeardownFailure) -> String {
   case failure {
-    TeardownFailure(message: message, ..) -> string.slice(message, 0, 46)
+    TeardownFailure(message: message, ..) -> string.slice(message, 0, 48)
     SetupStopped(..) -> ""
   }
 }
