@@ -534,7 +534,7 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 /// This is useful for cleanup that must always run (even after assertion
 /// failures). Every `after_each` hook runs, also after one fails. If it
 /// returns `Error("message")` or crashes, the status of the test does not
-/// change: the run report gets a `types.TeardownFailure` with hook
+/// change: the run report gets a `types.TeardownFailed` with hook
 /// `AfterEachHook`, and the run fails. It runs in the process of the test
 /// with the default timeout. If the body times out or the test process
 /// stops, it still runs, in a new process.
@@ -626,7 +626,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// so it can stop a resource that `before_all` started. It does not run for
 /// a group that has no test after filtering. Every `after_all` hook runs, also
 /// after one fails. If it returns `Error("message")` or crashes, the run
-/// report gets a `types.TeardownFailure` with hook `AfterAllHook` and the
+/// report gets a `types.TeardownFailed` with hook `AfterAllHook` and the
 /// group path in `groups`, and the run fails. No test result is added.
 ///
 /// ## Example

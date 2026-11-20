@@ -8,10 +8,10 @@ import dream_test/runner
 import dream_test/sandbox
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionFailure, type AssertionResult, type Node, type Status,
-  type TeardownFailure, type TestResult, AfterAllHook, AfterEachHook,
-  AfterEachTestHook, AssertionFailure, AssertionOk, Failed, Passed, SetupFailed,
-  Skipped, TeardownFailure, Test, TimedOut, Unit,
+  type AssertionFailure, type AssertionResult, type HookFailure, type Node,
+  type Status, type TestResult, AfterAllHook, AfterEachHook, AfterEachTestHook,
+  AssertionFailure, AssertionOk, Failed, Passed, SetupFailed, Skipped,
+  TeardownFailed, Test, TimedOut, Unit,
 }
 import dream_test/unit.{
   after_all, after_each, before_all, before_each, describe, group, it, skip,
@@ -153,10 +153,10 @@ pub fn tests() {
         after_each(fn() { Error("no teardown") }),
         it("a", fn() { Ok(AssertionOk) }),
       ])
-      |> teardown_failures_default
+      |> hook_failures_default
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachHook,
           groups: ["root", "a"],
           message: "no teardown",
@@ -194,10 +194,10 @@ pub fn tests() {
         after_all(fn() { Error("no cleanup") }),
         it("a", fn() { Ok(AssertionOk) }),
       ])
-      |> teardown_failures_default
+      |> hook_failures_default
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterAllHook,
           groups: ["root"],
           message: "no cleanup",
@@ -212,11 +212,11 @@ pub fn tests() {
         after_all(fn() { Error("second") }),
         it("a", fn() { Ok(AssertionOk) }),
       ])
-      |> teardown_failures_default
+      |> hook_failures_default
       |> should
       |> be_equal([
-        TeardownFailure(hook: AfterAllHook, groups: ["root"], message: "first"),
-        TeardownFailure(hook: AfterAllHook, groups: ["root"], message: "second"),
+        TeardownFailed(hook: AfterAllHook, groups: ["root"], message: "first"),
+        TeardownFailed(hook: AfterAllHook, groups: ["root"], message: "second"),
       ])
       |> or_fail_with("every after_all should run")
     }),
@@ -229,10 +229,10 @@ pub fn tests() {
           it("a", fn() { Ok(AssertionOk) }),
         ]),
       )
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterAllHook,
           groups: ["root"],
           message: "no cleanup",
@@ -265,10 +265,10 @@ pub fn tests() {
         }),
         it("a", fn() { Ok(AssertionOk) }),
       ])
-      |> teardown_failures_sequential_with_timeout(50)
+      |> hook_failures_sequential_with_timeout(50)
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachHook,
           groups: ["root", "a"],
           message: "hook timed out in root",
@@ -282,10 +282,10 @@ pub fn tests() {
         after_each(fn() { erlang_error(atom.create("boom")) }),
         it("a", fn() { Ok(AssertionOk) }),
       ])
-      |> teardown_failures_default
+      |> hook_failures_default
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachHook,
           groups: ["root", "a"],
           message: "hook crashed in root: error:boom",
@@ -363,10 +363,10 @@ pub fn tests() {
         })
         |> runner.silent()
         |> runner.run()
-        |> types.report_teardown_failures
+        |> types.report_hook_failures
         |> should
         |> be_equal([
-          TeardownFailure(
+          TeardownFailed(
             hook: AfterEachTestHook,
             groups: ["root", "a"],
             message: "hook timed out in root",
@@ -381,10 +381,10 @@ pub fn tests() {
       |> runner.after_each_test(fn(_info) { erlang_error(atom.create("boom")) })
       |> runner.silent()
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachTestHook,
           groups: ["root", "a"],
           message: "hook crashed in root: error:boom",
@@ -409,7 +409,7 @@ pub fn tests() {
       |> runner.default_timeout_ms(60_000)
       |> runner.silent()
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([])
       |> or_fail_with("the timed-out test process should be gone")
@@ -457,7 +457,7 @@ pub fn tests() {
         |> runner.silent()
         |> runner.run()
       #(
-        list.length(types.report_teardown_failures(report)),
+        list.length(types.report_hook_failures(report)),
         count_calls(first_calls, 0),
         count_calls(second_calls, 0),
       )
@@ -766,23 +766,23 @@ fn summaries(
 @external(erlang, "erlang", "error")
 fn erlang_error(reason: Atom) -> a
 
-fn teardown_failures_default(suite: TestSuite) -> List(TeardownFailure) {
+fn hook_failures_default(suite: TestSuite) -> List(HookFailure) {
   runner.new([suite])
   |> runner.silent()
   |> runner.run()
-  |> types.report_teardown_failures
+  |> types.report_hook_failures
 }
 
-fn teardown_failures_sequential_with_timeout(
+fn hook_failures_sequential_with_timeout(
   suite: TestSuite,
   timeout_ms: Int,
-) -> List(TeardownFailure) {
+) -> List(HookFailure) {
   runner.new([suite])
   |> runner.max_concurrency(1)
   |> runner.default_timeout_ms(timeout_ms)
   |> runner.silent()
   |> runner.run()
-  |> types.report_teardown_failures
+  |> types.report_hook_failures
 }
 
 fn statuses(results: List(TestResult)) -> List(#(List(String), Status)) {

@@ -76,7 +76,7 @@ pub fn tests() {
     it("run_report keeps the tests", fn() {
       types.run_report(
         tests: [passed_result()],
-        teardown_failures: [],
+        hook_failures: [],
         reporter_crashes: [],
       )
       |> types.report_tests
@@ -88,19 +88,19 @@ pub fn tests() {
     it("run_report keeps the teardown failures", fn() {
       types.run_report(
         tests: [],
-        teardown_failures: [cleanup_failure()],
+        hook_failures: [cleanup_failure()],
         reporter_crashes: [],
       )
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([cleanup_failure()])
-      |> or_fail_with("report_teardown_failures should give the failures")
+      |> or_fail_with("report_hook_failures should give the failures")
     }),
 
     it("failed is False when every test passed and no teardown failed", fn() {
       types.run_report(
         tests: [passed_result()],
-        teardown_failures: [],
+        hook_failures: [],
         reporter_crashes: [],
       )
       |> types.failed
@@ -112,7 +112,7 @@ pub fn tests() {
     it("failed is True for a teardown failure only", fn() {
       types.run_report(
         tests: [passed_result()],
-        teardown_failures: [
+        hook_failures: [
           cleanup_failure(),
         ],
         reporter_crashes: [],
@@ -126,7 +126,7 @@ pub fn tests() {
     it("failed is True for a test that failed", fn() {
       types.run_report(
         tests: [types.TestResult(..passed_result(), status: types.TimedOut)],
-        teardown_failures: [],
+        hook_failures: [],
         reporter_crashes: [],
       )
       |> types.failed
@@ -138,7 +138,7 @@ pub fn tests() {
     it("run_report keeps the crashed reporters in list order", fn() {
       types.run_report(
         tests: [passed_result()],
-        teardown_failures: [],
+        hook_failures: [],
         reporter_crashes: [
           types.ReporterCrash(position: 1, reason: "error:first"),
           types.ReporterCrash(position: 3, reason: "error:second"),
@@ -156,7 +156,7 @@ pub fn tests() {
     it("failed is True for a crashed reporter only", fn() {
       types.run_report(
         tests: [passed_result()],
-        teardown_failures: [],
+        hook_failures: [],
         reporter_crashes: [
           types.ReporterCrash(position: 1, reason: "error:badarith"),
         ],
@@ -229,8 +229,8 @@ fn passed_result() -> types.TestResult {
   )
 }
 
-fn cleanup_failure() -> types.TeardownFailure {
-  types.TeardownFailure(
+fn cleanup_failure() -> types.HookFailure {
+  types.TeardownFailed(
     hook: types.AfterAllHook,
     groups: ["root"],
     message: "no cleanup",

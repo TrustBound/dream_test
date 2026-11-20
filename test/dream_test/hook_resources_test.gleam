@@ -16,7 +16,7 @@ import dream_test/types.{
   type AssertionResult, type Status, type TestResult, AfterAllHook,
   AfterAllSuitesHook, AfterEachHook, AfterEachSuiteHook, AssertionFailure,
   AssertionOk, BeforeAllHook, BeforeAllSuitesHook, BeforeEachSuiteHook, Failed,
-  Passed, SetupFailed, SetupStopped, TeardownFailure, TimedOut,
+  Passed, SetupFailed, SetupStopped, TeardownFailed, TimedOut,
 }
 import dream_test/unit.{describe, it}
 import dream_test/unit_context
@@ -118,10 +118,10 @@ pub fn tests() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_each_suite(fn(_suite) { erlang_error(boom()) })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachSuiteHook,
           groups: ["suite"],
           message: "hook crashed in suite: error:boom",
@@ -175,7 +175,7 @@ pub fn tests() {
             tests: [
               #("a", SetupFailed, [#("before_all", "hook timed out in root")]),
             ],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
       )
@@ -191,8 +191,8 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            TeardownFailure(
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+            TeardownFailed(
               hook: AfterAllHook,
               groups: ["root"],
               message: "hook timed out in root",
@@ -214,7 +214,7 @@ pub fn tests() {
             tests: [
               #("a", SetupFailed, [#("before_all_suites", "hook timed out")]),
             ],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
       )
@@ -230,8 +230,8 @@ pub fn tests() {
         |> should
         |> be_equal(
           SandboxCompleted(
-            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-              TeardownFailure(
+            RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+              TeardownFailed(
                 hook: AfterAllSuitesHook,
                 groups: [],
                 message: "hook timed out",
@@ -258,7 +258,7 @@ pub fn tests() {
                 #("before_each_suite", "hook timed out in suite"),
               ]),
             ],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
       )
@@ -274,8 +274,8 @@ pub fn tests() {
         |> should
         |> be_equal(
           SandboxCompleted(
-            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-              TeardownFailure(
+            RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+              TeardownFailed(
                 hook: AfterEachSuiteHook,
                 groups: ["suite"],
                 message: "hook timed out in suite",
@@ -306,7 +306,7 @@ pub fn tests() {
         SandboxCompleted(
           RunSummary(
             tests: [#("hangs", TimedOut, [#("timeout", "test timed out")])],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
         Ok("set up"),
@@ -335,7 +335,7 @@ pub fn tests() {
                 #("crash", "worker crashed in root: killed"),
               ]),
             ],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
         Ok("set up"),
@@ -365,7 +365,7 @@ pub fn tests() {
               ]),
               #("b", Passed, []),
             ],
-            teardown_failures: [
+            hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
                 groups: ["first"],
@@ -422,7 +422,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllHook,
                   groups: ["root"],
@@ -460,7 +460,7 @@ pub fn tests() {
       |> should
       |> be_equal(#(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllHook,
               groups: ["root"],
@@ -490,7 +490,7 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllHook,
               groups: ["root"],
@@ -544,7 +544,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllHook,
                   groups: ["root"],
@@ -596,7 +596,7 @@ pub fn tests() {
                 ),
               ]),
             ],
-            teardown_failures: [
+            hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
                 groups: ["root"],
@@ -648,7 +648,7 @@ pub fn tests() {
                 ),
               ]),
             ],
-            teardown_failures: [
+            hook_failures: [
               SetupStopped(
                 setup: BeforeAllHook,
                 groups: ["root"],
@@ -676,7 +676,7 @@ pub fn tests() {
             tests: [
               #("a", SetupFailed, [#("before_each", "hook timed out in root")]),
             ],
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
       )
@@ -692,8 +692,8 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            TeardownFailure(
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+            TeardownFailed(
               hook: AfterEachHook,
               groups: ["root", "a"],
               message: "hook crashed in root: killed",
@@ -713,8 +713,8 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            TeardownFailure(
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+            TeardownFailed(
               hook: AfterAllHook,
               groups: ["root"],
               message: "hook crashed in root: error:boom",
@@ -734,8 +734,8 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-            TeardownFailure(
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+            TeardownFailed(
               hook: AfterAllHook,
               groups: ["root"],
               message: "hook crashed in root: killed",
@@ -793,7 +793,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
                   groups: [],
@@ -833,7 +833,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeEachSuiteHook,
                   groups: ["suite"],
@@ -858,8 +858,8 @@ pub fn tests() {
         |> should
         |> be_equal(
           SandboxCompleted(
-            RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
-              TeardownFailure(
+            RunSummary(tests: [#("a", Passed, [])], hook_failures: [
+              TeardownFailed(
                 hook: AfterEachSuiteHook,
                 groups: ["suite"],
                 message: "hook crashed in suite: killed",
@@ -889,7 +889,7 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeAllSuitesHook,
               groups: [],
@@ -946,7 +946,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
                   groups: [],
@@ -982,7 +982,7 @@ pub fn tests() {
       |> should
       |> be_equal(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeEachSuiteHook,
               groups: ["suite"],
@@ -1019,7 +1019,7 @@ pub fn tests() {
       |> should
       |> be_equal(#(
         SandboxCompleted(
-          RunSummary(tests: [#("a", Passed, [])], teardown_failures: [
+          RunSummary(tests: [#("a", Passed, [])], hook_failures: [
             SetupStopped(
               setup: BeforeEachSuiteHook,
               groups: ["suite"],
@@ -1070,7 +1070,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
                   groups: [],
@@ -1125,7 +1125,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeAllSuitesHook,
                   groups: [],
@@ -1180,7 +1180,7 @@ pub fn tests() {
                   ),
                 ]),
               ],
-              teardown_failures: [
+              hook_failures: [
                 SetupStopped(
                   setup: BeforeEachSuiteHook,
                   groups: ["suite"],
@@ -1232,7 +1232,7 @@ pub fn tests() {
                 ),
               ]),
             ],
-            teardown_failures: [
+            hook_failures: [
               SetupStopped(
                 setup: BeforeEachSuiteHook,
                 groups: ["suite"],
@@ -1256,10 +1256,10 @@ pub fn tests() {
       runner.new([describe("suite", [it("a", passing_test)])])
       |> runner.after_all_suites(fn(_suites) { erlang_error(boom()) })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterAllSuitesHook,
           groups: [],
           message: "hook crashed: error:boom",
@@ -1403,7 +1403,7 @@ fn table_setup_process_alive(name: Atom) -> Bool
 type RunSummary {
   RunSummary(
     tests: List(#(String, Status, List(#(String, String)))),
-    teardown_failures: List(types.TeardownFailure),
+    hook_failures: List(types.HookFailure),
   )
 }
 
@@ -1462,7 +1462,7 @@ fn run_with_short_timeout(builder: runner.RunBuilder) -> RunSummary {
     |> runner.run()
   RunSummary(
     tests: failures(types.report_tests(report)),
-    teardown_failures: types.report_teardown_failures(report),
+    hook_failures: types.report_hook_failures(report),
   )
 }
 

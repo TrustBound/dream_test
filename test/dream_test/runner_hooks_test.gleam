@@ -6,7 +6,7 @@ import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{
   type TestResult, AfterAllSuitesHook, AfterEachSuiteHook, AfterEachTestHook,
-  AssertionOk, Passed, SetupFailed, TeardownFailure, Unit,
+  AssertionOk, Passed, SetupFailed, TeardownFailed, Unit,
 }
 import dream_test/unit.{describe, group, it, with_tags}
 import dream_test/unit_context.{
@@ -142,14 +142,10 @@ pub fn tests() {
       |> runner.before_all_suites(fn(_suites) { Error("nope") })
       |> runner.after_all_suites(fn(_suites) { Error("cleanup") })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
-          hook: AfterAllSuitesHook,
-          groups: [],
-          message: "cleanup",
-        ),
+        TeardownFailed(hook: AfterAllSuitesHook, groups: [], message: "cleanup"),
       ])
       |> or_fail_with("after_all_suites should run and its failure be kept")
     }),
@@ -170,11 +166,11 @@ pub fn tests() {
       |> runner.after_all_suites(fn(_suites) { Error("first") })
       |> runner.after_all_suites(fn(_suites) { Error("second") })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(hook: AfterAllSuitesHook, groups: [], message: "first"),
-        TeardownFailure(hook: AfterAllSuitesHook, groups: [], message: "second"),
+        TeardownFailed(hook: AfterAllSuitesHook, groups: [], message: "first"),
+        TeardownFailed(hook: AfterAllSuitesHook, groups: [], message: "second"),
       ])
       |> or_fail_with("every after_all_suites hook should run")
     }),
@@ -203,10 +199,10 @@ pub fn tests() {
       |> runner.before_each_suite(fail_for_suite_one)
       |> runner.after_each_suite(fail_for_suite_one)
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachSuiteHook,
           groups: ["suite_one"],
           message: "suite_one failed",
@@ -220,15 +216,15 @@ pub fn tests() {
       |> runner.after_each_suite(fn(_suite) { Error("first") })
       |> runner.after_each_suite(fn(_suite) { Error("second") })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachSuiteHook,
           groups: ["suite"],
           message: "first",
         ),
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachSuiteHook,
           groups: ["suite"],
           message: "second",
@@ -285,15 +281,15 @@ pub fn tests() {
       |> runner.after_each_test(fn(_info) { Error("first") })
       |> runner.after_each_test(fn(_info) { Error("second") })
       |> runner.run()
-      |> types.report_teardown_failures
+      |> types.report_hook_failures
       |> should
       |> be_equal([
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachTestHook,
           groups: ["suite", "after"],
           message: "first",
         ),
-        TeardownFailure(
+        TeardownFailed(
           hook: AfterEachTestHook,
           groups: ["suite", "after"],
           message: "second",

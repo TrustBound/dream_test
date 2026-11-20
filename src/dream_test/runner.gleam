@@ -66,10 +66,10 @@ import dream_test/sandbox.{
 }
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionFailure, type RunReport, type SetupHook, type TeardownFailure,
+  type AssertionFailure, type HookFailure, type RunReport, type SetupHook,
   type TeardownHook, type TestResult, AfterAllSuitesHook, AfterEachSuiteHook,
   BeforeAllSuitesHook, BeforeEachSuiteHook, Passed, SetupFailed, SetupStopped,
-  TeardownFailure,
+  TeardownFailed,
 }
 import gleam/int
 import gleam/io
@@ -763,7 +763,7 @@ pub fn before_each_test(
 /// Every `after_each_test` hook
 /// runs, also after one fails. If it returns `Error("...")` or crashes, the
 /// status of the test does not change: the run report gets a
-/// `types.TeardownFailure` with hook `AfterEachTestHook`, and the run fails.
+/// `types.TeardownFailed` with hook `AfterEachTestHook`, and the run fails.
 pub fn after_each_test(
   builder builder: RunBuilder,
   hook hook: fn(types.TestInfo) -> Result(Nil, String),
@@ -803,7 +803,7 @@ pub fn before_each_suite(
 /// in the setup process of the suite, with the default timeout of the
 /// suite. Every `after_each_suite` hook runs, also after one fails. If it
 /// returns `Error("...")`, times out or crashes, the
-/// run report gets a `types.TeardownFailure` with hook `AfterEachSuiteHook`
+/// run report gets a `types.TeardownFailed` with hook `AfterEachSuiteHook`
 /// and the suite name in `groups`, and the run fails.
 ///
 /// The hook does not run for a suite that has no test after filtering.
@@ -845,7 +845,7 @@ pub fn before_all_suites(
 /// in the setup process of the run, with the default timeout. Every
 /// `after_all_suites` hook runs, also after one fails. If it returns
 /// `Error("...")`, times out or crashes, the
-/// run report gets a `types.TeardownFailure` with hook `AfterAllSuitesHook`
+/// run report gets a `types.TeardownFailed` with hook `AfterAllSuitesHook`
 /// and `groups: []`, and the run fails.
 ///
 /// The hook does not run when the run has no test after filtering.
@@ -914,7 +914,7 @@ pub fn after_all_suites(
 ///
 /// A `types.RunReport`: the `TestResult` of each test, in deterministic
 /// order, and the teardown hooks that failed. Read it with
-/// `types.report_tests` and `types.report_teardown_failures`, and check it
+/// `types.report_tests` and `types.report_hook_failures`, and check it
 /// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
 /// when `types.failed(report)` is `True`, when a `reporter_types.Custom`
 /// reporter crashes, or when coverage fails (a total or a file below a
@@ -974,7 +974,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         builder.runner_before_each_test,
         builder.runner_after_each_test,
         builder.test_filter,
-        Collected(tests: [], teardown_failures: []),
+        Collected(tests: [], hook_failures: []),
         all_suites_setup_process,
       )
     SuiteSetupFailed(setup_process: all_suites_setup_process, message: message) -> {
@@ -993,7 +993,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
           setup_failures,
         )
       #(
-        Collected(tests: setup_failures, teardown_failures: []),
+        Collected(tests: setup_failures, hook_failures: []),
         completed_after_failures,
         alive_suite_setup_process(all_suites_setup_process),
       )
@@ -1013,12 +1013,11 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
       all_suites_setup_process_after_run,
     )
 
-  let teardown_failures =
-    list.append(collected.teardown_failures, after_all_failures)
+  let hook_failures = list.append(collected.hook_failures, after_all_failures)
   let report =
     types.run_report(
       tests: collected.tests,
-      teardown_failures: teardown_failures,
+      hook_failures: hook_failures,
       reporter_crashes: [],
     )
 
@@ -1041,7 +1040,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   let report =
     types.run_report(
       tests: collected.tests,
-      teardown_failures: teardown_failures,
+      hook_failures: hook_failures,
       reporter_crashes: write_results_reporters(
         builder.results_reporters,
         report,
@@ -1068,7 +1067,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
 /// The test results and the teardown failures of the suites that ran so
 /// far, in the order of the run.
 type Collected {
-  Collected(tests: List(TestResult), teardown_failures: List(TeardownFailure))
+  Collected(tests: List(TestResult), hook_failures: List(HookFailure))
 }
 
 /// Each suite run with the `SuiteInfo` of its suite, so the hooks of a
@@ -1180,7 +1179,7 @@ type SuiteSetup(input) {
 }
 
 /// The teardown hooks of a suite-level scope, the kind of hook that they
-/// are in a `TeardownFailure`, and the setup hook of the scope for a
+/// are in a `TeardownFailed`, and the setup hook of the scope for a
 /// `SetupStopped` failure.
 type SuiteTeardown(input) {
   SuiteTeardown(
@@ -1315,7 +1314,7 @@ fn suite_setup_result(
 fn finish_suite_scope(
   teardown: SuiteTeardown(input),
   setup_process: Option(SuiteScopeSetupProcess(input)),
-) -> List(TeardownFailure) {
+) -> List(HookFailure) {
   case setup_process, teardown.hooks {
     None, _ -> run_suite_teardown(teardown, None, [])
     Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)), _ ->
@@ -1336,8 +1335,8 @@ fn finish_suite_scope(
 fn run_suite_teardown(
   teardown: SuiteTeardown(input),
   setup_process: Option(SuiteSetupProcess(input)),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
   let #(last_setup_process, next_failures_rev) =
     run_suite_teardown_hooks(
       teardown,
@@ -1354,7 +1353,7 @@ fn run_suite_teardown(
 fn stop_checked_suite_setup_process(
   teardown: SuiteTeardown(input),
   checked: Result(SuiteSetupProcess(input), String),
-) -> List(TeardownFailure) {
+) -> List(HookFailure) {
   case checked {
     Ok(setup_process) -> {
       sandbox.stop_setup_process(setup_process)
@@ -1368,7 +1367,7 @@ fn suite_setup_stopped(
   teardown: SuiteTeardown(input),
   reason: String,
   not_run: List(List(String)),
-) -> TeardownFailure {
+) -> HookFailure {
   SetupStopped(
     setup: teardown.setup,
     groups: teardown.scope,
@@ -1386,8 +1385,8 @@ fn run_suite_teardown_hooks(
   teardown: SuiteTeardown(input),
   hooks: List(fn(input) -> Result(Nil, String)),
   setup_process: Option(SuiteSetupProcess(input)),
-  failures_rev: List(TeardownFailure),
-) -> #(Option(SuiteSetupProcess(input)), List(TeardownFailure)) {
+  failures_rev: List(HookFailure),
+) -> #(Option(SuiteSetupProcess(input)), List(HookFailure)) {
   case hooks {
     [] -> #(setup_process, failures_rev)
     [hook, ..rest] ->
@@ -1414,8 +1413,8 @@ fn suite_teardown_result(
     SuiteHookCall(input),
     Result(Nil, String),
   ),
-  failures_rev: List(TeardownFailure),
-) -> #(Option(SuiteSetupProcess(input)), List(TeardownFailure)) {
+  failures_rev: List(HookFailure),
+) -> #(Option(SuiteSetupProcess(input)), List(HookFailure)) {
   case setup_process_result {
     SetupProcessReturned(setup_process: setup_process, value: Ok(Nil)) ->
       run_suite_teardown_hooks(
@@ -1429,14 +1428,14 @@ fn suite_teardown_result(
         teardown,
         rest,
         Some(setup_process),
-        add_teardown_failure(teardown, message, failures_rev),
+        add_hook_failure(teardown, message, failures_rev),
       )
     SetupProcessCaught(setup_process: setup_process, reason: reason) ->
       run_suite_teardown_hooks(
         teardown,
         rest,
         Some(setup_process),
-        add_teardown_failure(
+        add_hook_failure(
           teardown,
           suite_hook_crash_message(teardown.scope, reason),
           failures_rev,
@@ -1447,7 +1446,7 @@ fn suite_teardown_result(
         teardown,
         rest,
         None,
-        add_teardown_failure(
+        add_hook_failure(
           teardown,
           suite_hook_timeout_message(teardown.scope),
           failures_rev,
@@ -1458,7 +1457,7 @@ fn suite_teardown_result(
         teardown,
         rest,
         None,
-        add_teardown_failure(
+        add_hook_failure(
           teardown,
           suite_hook_crash_message(teardown.scope, reason),
           failures_rev,
@@ -1473,13 +1472,13 @@ fn suite_teardown_result(
 }
 
 /// Put a failure of a teardown hook in front of `failures_rev`.
-fn add_teardown_failure(
+fn add_hook_failure(
   teardown: SuiteTeardown(input),
   message: String,
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
   [
-    TeardownFailure(
+    TeardownFailed(
       hook: teardown.hook_kind,
       groups: teardown.scope,
       message: message,
@@ -1567,9 +1566,9 @@ fn run_suites_with_hooks(
         keep,
         Collected(
           tests: list.append(collected.tests, suite_collected.tests),
-          teardown_failures: list.append(
-            collected.teardown_failures,
-            suite_collected.teardown_failures,
+          hook_failures: list.append(
+            collected.hook_failures,
+            suite_collected.hook_failures,
           ),
         ),
         setup_process_after_suite,
@@ -1631,10 +1630,7 @@ fn run_suite_after_run_setup_stopped(
       outer_setup(BeforeAllSuitesHook, [], all_suites_setup_process),
     )
   #(
-    Collected(
-      tests: result.results,
-      teardown_failures: result.teardown_failures,
-    ),
+    Collected(tests: result.results, hook_failures: result.hook_failures),
     result.completed,
     stopped_suite_setup_process(
       all_suites_setup_process,
@@ -1681,7 +1677,7 @@ fn run_one_suite(
           message,
         )
       #(
-        Collected(tests: setup_failures, teardown_failures: []),
+        Collected(tests: setup_failures, hook_failures: []),
         emit_test_finished_progress_results(
           suite_run.progress_reporter,
           suite_run.output,
@@ -1703,10 +1699,7 @@ fn run_one_suite(
           ),
         )
       #(
-        Collected(
-          tests: result.results,
-          teardown_failures: result.teardown_failures,
-        ),
+        Collected(tests: result.results, hook_failures: result.hook_failures),
         result.completed,
         stopped_suite_setup_process(
           all_suites_setup_process,
@@ -1736,8 +1729,8 @@ fn run_one_suite(
   #(
     Collected(
       tests: tests_collected.tests,
-      teardown_failures: list.append(
-        tests_collected.teardown_failures,
+      hook_failures: list.append(
+        tests_collected.hook_failures,
         after_each_failures,
       ),
     ),

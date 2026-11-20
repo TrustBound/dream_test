@@ -334,10 +334,7 @@ fn run_next_part(
     )
   RunTreeParallelWithReporterResult(
     results: list.append(ran.results, next.results),
-    teardown_failures: list.append(
-      ran.teardown_failures,
-      next.teardown_failures,
-    ),
+    hook_failures: list.append(ran.hook_failures, next.hook_failures),
     completed: next.completed,
     progress_reporter: next.progress_reporter,
     outer_setups: next.outer_setups,
@@ -347,7 +344,7 @@ fn run_next_part(
 fn nothing_ran(input: RunInput) -> RunTreeParallelWithReporterResult {
   RunTreeParallelWithReporterResult(
     results: [],
-    teardown_failures: [],
+    hook_failures: [],
     completed: input.completed,
     progress_reporter: input.progress_reporter,
     outer_setups: input.outer_setups,

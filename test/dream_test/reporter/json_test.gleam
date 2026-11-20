@@ -188,7 +188,7 @@ pub fn tests() {
         |> after("\"summary\":")
         |> should
         |> be_equal(
-          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}\n",
+          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("compact JSON should have no spaces or new lines")
       }),
@@ -228,7 +228,7 @@ pub fn tests() {
           <> "      \"failures\": []\n"
           <> "    }\n"
           <> "  ],\n"
-          <> "  \"teardown_failures\": []\n"
+          <> "  \"hook_failures\": []\n"
           <> "}\n",
         )
         |> or_fail_with("pretty JSON should have one field on each line")
@@ -257,7 +257,7 @@ pub fn tests() {
       it("counts stopped setups apart from failed teardown hooks", fn() {
         types.run_report(
           tests: [],
-          teardown_failures: [
+          hook_failures: [
             types.SetupStopped(
               setup: types.BeforeAllHook,
               groups: ["root"],
@@ -281,7 +281,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"hook_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
+          "[],\"hook_failures\":[{\"kind\":\"teardown_failed\",\"hook\":\"after_all\",\"groups\":[\"root\"],\"message\":\"no cleanup\"}]}\n",
         )
         |> or_fail_with(
           "each teardown failure should have its kind, hook, scope and message",
@@ -291,7 +291,7 @@ pub fn tests() {
       it("writes a stopped setup with its setup hook and reason", fn() {
         types.run_report(
           tests: [],
-          teardown_failures: [
+          hook_failures: [
             types.SetupStopped(
               setup: types.BeforeAllHook,
               groups: ["root"],
@@ -305,7 +305,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[],\"teardown_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
+          "[],\"hook_failures\":[{\"kind\":\"setup_stopped\",\"hook\":\"before_all\",\"groups\":[\"root\"],\"message\":\"Boom\",\"not_run\":[[\"root\",\"b\"],[\"root\",\"c\"]]}]}\n",
         )
         |> or_fail_with("a stopped setup should have its own kind")
       }),
@@ -337,7 +337,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"teardown_failures\":[]}\n",
+          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("a Gherkin scenario should have its Rule")
       }),
@@ -347,7 +347,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"teardown_failures\":[]}\n",
+          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("each test should have its status and kind")
       }),
@@ -361,7 +361,7 @@ pub fn tests() {
         |> after("\"failures\":")
         |> should
         |> be_equal(
-          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}],\"teardown_failures\":[]}\n",
+          "[{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":false,\"actual\":true},{\"operator\":\"check\",\"message\":\"m\",\"expected_some\":true,\"actual\":\"None\"},{\"operator\":\"check\",\"message\":\"m\",\"expected_ok\":false,\"actual\":\"Ok(1)\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"[1]\",\"operation\":\"contain\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"2\",\"actual\":\"1\",\"comparison_operator\":\">\"},{\"operator\":\"check\",\"message\":\"m\",\"pattern\":\"x\",\"actual\":\"abc\",\"operation\":\"start_with\"},{\"operator\":\"check\",\"message\":\"m\",\"expected\":\"old\",\"actual\":\"new\",\"snapshot_path\":\"a.snap\",\"is_missing\":false},{\"operator\":\"check\",\"message\":\"m\",\"actual\":\"7\",\"description\":\"is even\"}]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("each payload should have its own fields")
       }),

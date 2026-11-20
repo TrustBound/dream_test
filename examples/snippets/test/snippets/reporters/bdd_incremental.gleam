@@ -57,7 +57,7 @@ pub fn tests() {
         bdd.format_summary_only(
           types.run_report(
             tests: [passing_result()],
-            teardown_failures: [],
+            hook_failures: [],
             reporter_crashes: [],
           ),
         )

@@ -24,10 +24,10 @@
 ////   runs: use `full_name`. Only a Gherkin test has `rule`, after
 ////   `kind`: the name of its Rule group, for example `"Rule: Stock"`, or
 ////   `null` for a scenario outside a Rule.
-//// - `teardown_failures`: one object for each teardown hook that failed
+//// - `hook_failures`: one object for each teardown hook that failed
 ////   and each setup that stopped, in the order that they happened. Each object
 ////   has `kind`, `hook`, `groups` and `message`:
-////   - `kind` `"hook_failed"`: a teardown hook failed. `hook` is
+////   - `kind` `"teardown_failed"`: a teardown hook failed. `hook` is
 ////     `"after_each_test"`, `"after_each"`, `"after_all"`,
 ////     `"after_each_suite"`, `"after_all_suites"` or `"context teardown"`
 ////     (the teardown of a suite with a setup). `groups` is a list of
@@ -46,7 +46,7 @@
 ////     not run. Each one is its `full_name` list, as in `tests`.
 ////
 //// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
-//// or `setup_stopped` count and no `teardown_failures` list: a failed teardown hook was a
+//// or `setup_stopped` count and no `hook_failures` list: a failed teardown hook was a
 //// test with a name such as `<after_all>` in `tests`.
 ////
 //// ## Usage
@@ -83,12 +83,12 @@
 import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
-  type AssertionFailure, type FailurePayload, type RunReport, type Status,
-  type TeardownFailure, type TestKind, type TestResult, BooleanFailure,
-  CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
-  Failed, GherkinScenario, OptionFailure, Passed, Pending, ResultFailure,
-  SetupFailed, SetupStopped, Skipped, SnapshotFailure, StringMatchFailure,
-  TeardownFailure, TimedOut, Unit,
+  type AssertionFailure, type FailurePayload, type HookFailure, type RunReport,
+  type Status, type TestKind, type TestResult, BooleanFailure, CollectionFailure,
+  ComparisonFailure, CustomMatcherFailure, EqualityFailure, Failed,
+  GherkinScenario, OptionFailure, Passed, Pending, ResultFailure, SetupFailed,
+  SetupStopped, Skipped, SnapshotFailure, StringMatchFailure, TeardownFailed,
+  TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -304,11 +304,8 @@ fn build_report_json(report: RunReport) -> Json {
     #("summary", build_summary_json(counts)),
     #("tests", json.array(types.report_tests(report), build_test_json)),
     #(
-      "teardown_failures",
-      json.array(
-        types.report_teardown_failures(report),
-        build_teardown_failure_json,
-      ),
+      "hook_failures",
+      json.array(types.report_hook_failures(report), build_hook_failure_json),
     ),
   ])
 }
@@ -335,11 +332,11 @@ fn build_summary_json(counts: summary.Counts) -> Json {
   ])
 }
 
-fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
+fn build_hook_failure_json(failure: HookFailure) -> Json {
   case failure {
-    TeardownFailure(hook: hook, groups: groups, message: message) ->
-      json.object(teardown_failure_fields(
-        "hook_failed",
+    TeardownFailed(hook: hook, groups: groups, message: message) ->
+      json.object(hook_failure_fields(
+        "teardown_failed",
         types.teardown_hook_name(hook),
         groups,
         message,
@@ -347,7 +344,7 @@ fn build_teardown_failure_json(failure: TeardownFailure) -> Json {
     SetupStopped(setup: setup, groups: groups, reason: reason, not_run: not_run) ->
       json.object(
         list.append(
-          teardown_failure_fields(
+          hook_failure_fields(
             "setup_stopped",
             types.setup_hook_name(setup),
             groups,
@@ -363,7 +360,7 @@ fn full_name_json(full_name: List(String)) -> Json {
   json.array(full_name, json.string)
 }
 
-fn teardown_failure_fields(
+fn hook_failure_fields(
   kind: String,
   hook: String,
   groups: List(String),

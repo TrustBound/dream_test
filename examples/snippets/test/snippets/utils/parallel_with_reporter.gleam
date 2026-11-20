@@ -38,7 +38,7 @@ pub fn main() {
     )
   let parallel.RunTreeParallelWithReporterResult(
     results: results,
-    teardown_failures: teardown_failures,
+    hook_failures: hook_failures,
     completed: completed_after_suite,
     progress_reporter: _progress_reporter,
     outer_setups: _outer_setups,
@@ -49,7 +49,7 @@ pub fn main() {
     summary.count(
       types.run_report(
         tests: results,
-        teardown_failures: teardown_failures,
+        hook_failures: hook_failures,
         reporter_crashes: [],
       ),
     )

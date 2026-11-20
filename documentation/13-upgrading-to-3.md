@@ -792,7 +792,7 @@ pub fn tests() {
 
 #### `RunTreeParallelWithReporterConfig` has `outer_setups`
 
-This change affects only code that calls `parallel.run_tree_parallel_with_reporter` (in 2.x `run_root_parallel_with_reporter`) directly. `RunTreeParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunTreeParallelWithReporterResult` has two new fields, `teardown_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
+This change affects only code that calls `parallel.run_tree_parallel_with_reporter` (in 2.x `run_root_parallel_with_reporter`) directly. `RunTreeParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunTreeParallelWithReporterResult` has two new fields, `hook_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
 
 ##### 2.x: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L1-L62"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -904,7 +904,7 @@ pub fn main() {
     )
   let parallel.RunTreeParallelWithReporterResult(
     results: results,
-    teardown_failures: teardown_failures,
+    hook_failures: hook_failures,
     completed: completed_after_suite,
     progress_reporter: _progress_reporter,
     outer_setups: _outer_setups,
@@ -913,7 +913,7 @@ pub fn main() {
   let report =
     types.run_report(
       tests: results,
-      teardown_failures: teardown_failures,
+      hook_failures: hook_failures,
       reporter_crashes: [],
     )
 
@@ -1062,7 +1062,7 @@ A setup hook and its teardown hook run only when at least one of the tests that 
 
 #### A setup whose process stops
 
-A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.TeardownFailure`. A `case` on a `TeardownFailure` needs a branch for it.
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, groups, reason, not_run)`. `SetupStopped` is the second variant of `types.HookFailure`. A `case` on a `HookFailure` needs a branch for it.
 
 - Each test that had not started is `SetupFailed`, with a failure such as `not run: the setup from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
 - The teardown hooks still run, in a new process.
@@ -1071,7 +1071,7 @@ A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context se
 
 #### A failed `after_all` hook
 
-In 2.x, a failed `after_all`, `after_each_suite` or `after_all_suites` hook added a fake test to the results, with a name such as `<after_all>`. The test count grew by one, and the later hooks of the same kind did not run. In 3.0.0, every hook runs. `types.report_teardown_failures(report)` has one `TeardownFailure` for each failure.
+In 2.x, a failed `after_all`, `after_each_suite` or `after_all_suites` hook added a fake test to the results, with a name such as `<after_all>`. The test count grew by one, and the later hooks of the same kind did not run. In 3.0.0, every hook runs. `types.report_hook_failures(report)` has one `HookFailure` for each failure.
 
 ##### 2.x: look for the fake `<after_all>` test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L1857-L1866"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
 
@@ -1107,17 +1107,17 @@ fn database_suite() {
 }
 
 fn after_all_failed(report: RunReport) -> Bool {
-  types.report_teardown_failures(report)
+  types.report_hook_failures(report)
   |> list.any(fn(failure) {
     case failure {
-      TeardownFailure(hook: AfterAllHook, ..) -> True
+      TeardownFailed(hook: AfterAllHook, ..) -> True
       _ -> False
     }
   })
 }
 ```
 
-A failed `after_each` or `after_each_test` hook also keeps the status of its test. In 2.x, the test became `Failed`, also when it was `TimedOut`, `Skipped` or `SetupFailed`. In 3.0.0, the report has `TeardownFailure(hook: AfterEachHook, ..)` with the full test name in `groups`.
+A failed `after_each` or `after_each_test` hook also keeps the status of its test. In 2.x, the test became `Failed`, also when it was `TimedOut`, `Skipped` or `SetupFailed`. In 3.0.0, the report has `TeardownFailed(hook: AfterEachHook, ..)` with the full test name in `groups`.
 
 #### A failed setup hook, and a timeout
 
@@ -1204,7 +1204,7 @@ When a test ends, its process exits with reason `shutdown`. A process that the t
 
 #### Reporter functions take a `RunReport`
 
-These functions take a `types.RunReport` in place of `List(TestResult)`: `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`, `json.render`, `json.format`, `json.format_pretty`, `json.report`, `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report` functions return the report. To format a list of results that you made, use `types.run_report(tests: results, teardown_failures: [], reporter_crashes: [])`.
+These functions take a `types.RunReport` in place of `List(TestResult)`: `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`, `json.render`, `json.format`, `json.format_pretty`, `json.report`, `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report` functions return the report. To format a list of results that you made, use `types.run_report(tests: results, hook_failures: [], reporter_crashes: [])`.
 
 ##### 2.x: format a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/bdd_formatting.gleam#L1-L31"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1271,7 +1271,7 @@ pub fn tests() {
         bdd.format(
           types.run_report(
             tests: sample_results(),
-            teardown_failures: [],
+            hook_failures: [],
             reporter_crashes: [],
           ),
         )
@@ -1428,8 +1428,8 @@ In 2.x, `runner.results_reporters` took only the built-in reporters. A custom re
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
 
 - `summary` has the counts `teardown_failed` (teardown hooks that failed) and `setup_stopped` (setups whose process stopped).
-- The object has the list `teardown_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
-- A failed teardown hook is an object with `"kind": "hook_failed"`, `hook`, `groups` and `message`.
+- The object has the list `hook_failures`. In JSON schema version 1.0, a failed `after_all` hook was a test named `<after_all>` in `tests`.
+- A failed teardown hook is an object with `"kind": "teardown_failed"`, `hook`, `groups` and `message`.
 - A setup that stopped is an object with `"kind": "setup_stopped"`, `hook`, `groups`, `message` and `not_run`, the full names of the tests that did not run.
 - A Gherkin test object has `rule` after `kind`: the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `rule`.
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.

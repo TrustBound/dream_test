@@ -19,7 +19,7 @@
 import dream_test/reporters/ansi
 import dream_test/timing
 import dream_test/types.{
-  type RunReport, type TeardownFailure, type TestResult, Failed, Passed, Pending,
+  type HookFailure, type RunReport, type TestResult, Failed, Passed, Pending,
   SetupFailed, Skipped, TimedOut,
 }
 import gleam/int
@@ -37,7 +37,7 @@ import gleam/string
 /// ```gleam
 /// summary.count(types.run_report(
 ///   tests: [passed_result, failed_result],
-///   teardown_failures: [],
+///   hook_failures: [],
 ///   reporter_crashes: [],
 /// ))
 /// // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
@@ -60,12 +60,12 @@ pub type Counts {
     timed_out: Int,
     /// Results with status `SetupFailed`
     setup_failed: Int,
-    /// Teardown hooks that failed: the `TeardownFailure` entries of
-    /// `types.report_teardown_failures`. They are not test results, so they
+    /// Teardown hooks that failed: the `TeardownFailed` entries of
+    /// `types.report_hook_failures`. They are not test results, so they
     /// are not part of `run`.
     teardown_failed: Int,
     /// Setups whose process stopped while their tests ran: the
-    /// `SetupStopped` entries of `types.report_teardown_failures`. They are
+    /// `SetupStopped` entries of `types.report_hook_failures`. They are
     /// not part of `run`.
     setup_stopped: Int,
     /// Sum of the `duration_ms` of all results
@@ -93,11 +93,7 @@ pub type Counts {
 /// ```
 pub fn count(report report: RunReport) -> Counts {
   let counts = list.fold(types.report_tests(report), empty_counts(), add_result)
-  list.fold(
-    types.report_teardown_failures(report),
-    counts,
-    add_teardown_failure,
-  )
+  list.fold(types.report_hook_failures(report), counts, add_hook_failure)
 }
 
 /// Format the summary line without colour.
@@ -176,9 +172,9 @@ fn add_result(counts: Counts, result: TestResult) -> Counts {
   }
 }
 
-fn add_teardown_failure(counts: Counts, failure: TeardownFailure) -> Counts {
+fn add_hook_failure(counts: Counts, failure: HookFailure) -> Counts {
   case failure {
-    types.TeardownFailure(..) ->
+    types.TeardownFailed(..) ->
       Counts(..counts, teardown_failed: counts.teardown_failed + 1)
     types.SetupStopped(..) ->
       Counts(..counts, setup_stopped: counts.setup_stopped + 1)

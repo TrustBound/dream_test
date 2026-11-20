@@ -7,14 +7,14 @@
 //// section.
 ////
 //// ```gleam
-//// import dream_test/reporters/teardown
+//// import dream_test/reporters/hook_failures
 ////
-//// teardown.format(types.report_teardown_failures(report))
+//// hook_failures.format(types.report_hook_failures(report))
 //// // -> "Setup and teardown failures:\n  after_all in Database\n    could not drop the schema\n"
 //// ```
 
 import dream_test/reporters/ansi
-import dream_test/types.{type TeardownFailure, SetupStopped, TeardownFailure}
+import dream_test/types.{type HookFailure, SetupStopped, TeardownFailed}
 import gleam/list
 import gleam/string
 
@@ -32,7 +32,7 @@ import gleam/string
 /// ## Parameters
 ///
 /// - `failures`: the teardown failures of the run, for example from
-///   `types.report_teardown_failures`
+///   `types.report_hook_failures`
 ///
 /// ## Returns
 ///
@@ -42,7 +42,7 @@ import gleam/string
 /// ## Example
 ///
 /// ```gleam
-/// teardown.format([
+/// hook_failures.format([
 ///   types.SetupStopped(
 ///     setup: types.BeforeAllHook,
 ///     groups: ["root"],
@@ -52,7 +52,7 @@ import gleam/string
 /// ])
 /// // -> "Setup and teardown failures:\n  before_all in \"root\" stopped: the process that keeps its setup alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
 /// ```
-pub fn format(failures failures: List(TeardownFailure)) -> String {
+pub fn format(failures failures: List(HookFailure)) -> String {
   format_section(failures, False)
 }
 
@@ -73,13 +73,13 @@ pub fn format(failures failures: List(TeardownFailure)) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// io.print(teardown.format_in_color(types.report_teardown_failures(report)))
+/// io.print(hook_failures.format_in_color(types.report_hook_failures(report)))
 /// ```
-pub fn format_in_color(failures failures: List(TeardownFailure)) -> String {
+pub fn format_in_color(failures failures: List(HookFailure)) -> String {
   format_section(failures, True)
 }
 
-fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
+fn format_section(failures: List(HookFailure), color: Bool) -> String {
   case failures {
     [] -> ""
     _ ->
@@ -96,10 +96,7 @@ fn format_section(failures: List(TeardownFailure), color: Bool) -> String {
 }
 
 /// The text of each failure, in order.
-fn format_failures(
-  color: Bool,
-  failures: List(TeardownFailure),
-) -> List(String) {
+fn format_failures(color: Bool, failures: List(HookFailure)) -> List(String) {
   case failures {
     [] -> []
     [failure, ..rest] -> [
@@ -109,9 +106,9 @@ fn format_failures(
   }
 }
 
-fn format_failure(color: Bool, failure: TeardownFailure) -> String {
+fn format_failure(color: Bool, failure: HookFailure) -> String {
   case failure {
-    TeardownFailure(hook: hook, groups: groups, message: message) ->
+    TeardownFailed(hook: hook, groups: groups, message: message) ->
       failure_lines(color, with_groups(types.teardown_hook_name(hook), groups), [
         message,
       ])

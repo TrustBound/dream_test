@@ -33,7 +33,7 @@ store. This release has breaking changes. Read
 - `parallel.RunTreeParallelWithReporterConfig` has a new field
   `outer_setups: List(parallel.OuterSetup)`, and
   `parallel.RunTreeParallelWithReporterResult` has the new fields
-  `teardown_failures` and `outer_setups`.
+  `hook_failures` and `outer_setups`.
 - `runner.exit_on_failure` stops the BEAM with `init:stop(1)` in place of
   `erlang:halt(1)`, so the BEAM shuts down cleanly. As in 2.x, a failed run
   writes all its output, and then ends the program with status 1 inside
@@ -487,17 +487,19 @@ the guide labels them.
   - `types.RunReport`, the result of a run: the test results, the
     teardown hooks that failed and the results reporters that crashed.
     Make one with
-    `types.run_report(tests:, teardown_failures:, reporter_crashes:)`, read
-    it with `types.report_tests`, `types.report_teardown_failures` and
+    `types.run_report(tests:, hook_failures:, reporter_crashes:)`, read
+    it with `types.report_tests`, `types.report_hook_failures` and
     `types.report_reporter_crashes`, and check it with `types.failed`.
     `RunReport` is opaque, so it can grow without a breaking change
-  - `types.TeardownFailure(hook:, groups:, message:)` and
+  - `types.HookFailure`, a teardown hook that failed or a setup that
+    stopped. Its variant `types.TeardownFailed(hook:, groups:, message:)`
+    is a teardown hook that failed, with
     `types.TeardownHook` (`AfterEachTestHook`, `AfterEachHook`,
     `AfterAllHook`, `AfterEachSuiteHook`, `AfterAllSuitesHook`,
     `ContextTeardownHook`), with
     `types.teardown_hook_name`
   - `types.SetupStopped(setup:, groups:, reason:, not_run:)`, a variant of
-    `types.TeardownFailure` for a setup that stopped: the process that
+    `types.HookFailure` for a setup that stopped: the process that
     keeps its setup alive exited while or after its setup hooks ran.
     `not_run` is the full name of each test that had not started and was
     not run. Each such test is `SetupFailed` with a failure such as
@@ -553,9 +555,9 @@ the guide labels them.
   - `dream_test/reporters/summary` gives the summary line of the BDD and
     Gherkin reporters (`summary.format` and `summary.format_in_color`) and
     the counts behind it (`summary.count`, which gives `summary.Counts`)
-  - `dream_test/reporters/teardown` (`format`, `format_in_color`) gives the
+  - `dream_test/reporters/hook_failures` (`format`, `format_in_color`) gives the
     `Setup and teardown failures:` section of the BDD and Gherkin
-    reporters, from `types.report_teardown_failures(report)`
+    reporters, from `types.report_hook_failures(report)`
   - `gherkin.format_scenarios` gives the feature and scenario lines of the
     Gherkin reporter without the summary line
   - `progress.line` and `progress.ProgressEvent` (`RunStartedProgress`,

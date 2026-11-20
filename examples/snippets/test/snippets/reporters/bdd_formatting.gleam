@@ -24,7 +24,7 @@ pub fn tests() {
         bdd.format(
           types.run_report(
             tests: sample_results(),
-            teardown_failures: [],
+            hook_failures: [],
             reporter_crashes: [],
           ),
         )

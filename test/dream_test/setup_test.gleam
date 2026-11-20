@@ -2,14 +2,14 @@
 //// `unit_context.describe_with_setup`.
 
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+import dream_test/reporters/hook_failures
 import dream_test/reporters/json
-import dream_test/reporters/teardown
 import dream_test/runner
 import dream_test/suite
 import dream_test/types.{
-  type AssertionFailure, type Status, type TeardownFailure, type TestInfo,
+  type AssertionFailure, type HookFailure, type Status, type TestInfo,
   type TestResult, AssertionFailure, BeforeEachSuiteHook, ContextSetupHook,
-  ContextTeardownHook, Passed, SetupFailed, SetupStopped, TeardownFailure,
+  ContextTeardownHook, Passed, SetupFailed, SetupStopped, TeardownFailed,
 }
 import dream_test/unit.{describe, it}
 import dream_test/unit_context
@@ -31,7 +31,7 @@ pub fn tests() {
         |> runner.run()
       #(
         statuses(report),
-        types.report_teardown_failures(report),
+        types.report_hook_failures(report),
         receive_all(events, []),
       )
       |> should
@@ -87,7 +87,7 @@ pub fn tests() {
         |> runner.run()
       #(
         failures(report),
-        types.report_teardown_failures(report),
+        types.report_hook_failures(report),
         receive_all(events, []),
       )
       |> should
@@ -164,7 +164,7 @@ pub fn tests() {
         |> runner.run()
       #(
         failures(report),
-        types.report_teardown_failures(report),
+        types.report_hook_failures(report),
         receive_all(events, []),
       )
       |> should
@@ -200,11 +200,11 @@ pub fn tests() {
         ])
         |> runner.silent()
         |> runner.run()
-      #(statuses(report), types.report_teardown_failures(report))
+      #(statuses(report), types.report_hook_failures(report))
       |> should
       |> be_equal(
         #([#(["server", "passes"], Passed)], [
-          TeardownFailure(
+          TeardownFailed(
             hook: ContextTeardownHook,
             groups: ["server"],
             message: "port still open",
@@ -226,7 +226,7 @@ pub fn tests() {
         ])
         |> runner.silent()
         |> runner.run()
-      types.report_teardown_failures(report)
+      types.report_hook_failures(report)
       |> list.map(teardown_message_start)
       |> should
       |> be_equal(["the context teardown crashed in server: error:#{"])
@@ -245,18 +245,18 @@ pub fn tests() {
         ])
         |> runner.silent()
         |> runner.run()
-        |> types.report_teardown_failures
+        |> types.report_hook_failures
       #(
-        teardown.format(failures),
+        hook_failures.format(failures),
         json.format(
           types.run_report(
             tests: [],
-            teardown_failures: failures,
+            hook_failures: failures,
             reporter_crashes: [],
           ),
         )
           |> string.contains(
-            "{\"kind\":\"hook_failed\",\"hook\":\"context teardown\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
+            "{\"kind\":\"teardown_failed\",\"hook\":\"context teardown\",\"groups\":[\"Server\"],\"message\":\"port still open\"}",
           ),
       )
       |> should
@@ -277,11 +277,11 @@ pub fn tests() {
         ),
       ]
       #(
-        teardown.format(failures),
+        hook_failures.format(failures),
         json.format(
           types.run_report(
             tests: [],
-            teardown_failures: failures,
+            hook_failures: failures,
             reporter_crashes: [],
           ),
         )
@@ -316,7 +316,7 @@ pub fn tests() {
         |> runner.run()
       #(
         statuses(report),
-        types.report_teardown_failures(report),
+        types.report_hook_failures(report),
         receive_all(events, []),
       )
       |> should
@@ -360,7 +360,7 @@ pub fn tests() {
         |> runner.run()
       #(
         statuses(report),
-        types.report_teardown_failures(report),
+        types.report_hook_failures(report),
         receive_all(events, []),
       )
       |> should
@@ -540,9 +540,9 @@ fn first_message_start(
 }
 
 /// The first 48 characters of the message of a teardown failure.
-fn teardown_message_start(failure: TeardownFailure) -> String {
+fn teardown_message_start(failure: HookFailure) -> String {
   case failure {
-    TeardownFailure(message: message, ..) -> string.slice(message, 0, 48)
+    TeardownFailed(message: message, ..) -> string.slice(message, 0, 48)
     SetupStopped(..) -> ""
   }
 }

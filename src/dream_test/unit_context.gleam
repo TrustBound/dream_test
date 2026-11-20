@@ -349,7 +349,7 @@ pub fn before_each(
 /// Run after each test for cleanup.
 ///
 /// If it returns `Error` or crashes, the status of the test does not change:
-/// the run report gets a `types.TeardownFailure`, and the run fails. If the
+/// the run report gets a `types.TeardownFailed`, and the run fails. If the
 /// body times out or the test process stops, it still runs, in a new
 /// process, with the context after the last `before_each` hook that
 /// returned.
@@ -459,7 +459,7 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
 ///   the setup `types.ContextSetupHook`. `teardown` still runs when the
 ///   setup returned.
 /// - When `teardown` returns `Error`, crashes or times out, the run report
-///   gets a `types.TeardownFailure` with the hook `types.ContextTeardownHook`.
+///   gets a `types.TeardownFailed` with the hook `types.ContextTeardownHook`.
 ///
 /// ## Parameters
 ///

@@ -100,7 +100,7 @@ pub fn tests() {
       |> or_fail_with("the line should end with the teardown failures")
     }),
     it("format counts failed teardown hooks and stopped setups apart", fn() {
-      summary.format(hook_failed_and_setup_stopped())
+      summary.format(teardown_failed_and_setup_stopped())
       |> should
       |> be_equal(
         "Summary: 0 run, 0 failed, 0 passed, 1 teardown failed, 1 setup stopped in 0ms\n",
@@ -119,11 +119,11 @@ pub fn tests() {
 }
 
 /// A report with one failed teardown hook and one stopped setup.
-fn hook_failed_and_setup_stopped() -> types.RunReport {
+fn teardown_failed_and_setup_stopped() -> types.RunReport {
   types.run_report(
     tests: [],
-    teardown_failures: [
-      types.TeardownFailure(
+    hook_failures: [
+      types.TeardownFailed(
         hook: types.AfterAllHook,
         groups: ["root"],
         message: "no cleanup",

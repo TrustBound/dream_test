@@ -38,7 +38,7 @@ pub fn tests() {
       bdd.report(
         types.run_report(
           tests: [passing_result()],
-          teardown_failures: [],
+          hook_failures: [],
           reporter_crashes: [],
         ),
         write_bdd_report_to_file,

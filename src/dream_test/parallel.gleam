@@ -46,16 +46,15 @@ import dream_test/sandbox.{
 }
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type AssertionResult, type Callback, type Node,
-  type RunReport, type SetupHook, type Status, type SuiteContext,
-  type TeardownFailure, type TeardownHook, type TestInfo, type TestKind,
-  type TestResult, type Tree, AfterAll, AfterAllHook, AfterEach, AfterEachHook,
-  AfterEachTestHook, AssertionFailed, AssertionFailure, AssertionOk,
-  AssertionPending, AssertionSkipped, BeforeAll, BeforeAllHook,
-  BeforeAllSuitesHook, BeforeEach, BeforeEachSuiteHook, ContextFromSetup,
-  ContextSetupHook, ContextTeardownHook, Failed, FixedContext, Group, Passed,
-  Pending, SetupFailed, Skipped, TeardownFailure, Test, TestResult, TimedOut,
-  Tree, WithInput,
+  type AssertionFailure, type AssertionResult, type Callback, type HookFailure,
+  type Node, type RunReport, type SetupHook, type Status, type SuiteContext,
+  type TeardownHook, type TestInfo, type TestKind, type TestResult, type Tree,
+  AfterAll, AfterAllHook, AfterEach, AfterEachHook, AfterEachTestHook,
+  AssertionFailed, AssertionFailure, AssertionOk, AssertionPending,
+  AssertionSkipped, BeforeAll, BeforeAllHook, BeforeAllSuitesHook, BeforeEach,
+  BeforeEachSuiteHook, ContextFromSetup, ContextSetupHook, ContextTeardownHook,
+  Failed, FixedContext, Group, Passed, Pending, SetupFailed, Skipped,
+  TeardownFailed, Test, TestResult, TimedOut, Tree, WithInput,
 }
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{
@@ -221,7 +220,7 @@ pub type OuterSetup {
 ///
 /// This is returned as a semantic type (not a tuple) so callers can use named
 /// fields and avoid positional destructuring. A teardown failure is not a
-/// test result, so it is in `teardown_failures`, not in `results`.
+/// test result, so it is in `hook_failures`, not in `results`.
 ///
 /// `outer_setups` are the setups of the config in the same order, as the
 /// executor saw them last. A setup whose process stopped during the run
@@ -230,7 +229,7 @@ pub type OuterSetup {
 pub type RunTreeParallelWithReporterResult {
   RunTreeParallelWithReporterResult(
     results: List(TestResult),
-    teardown_failures: List(TeardownFailure),
+    hook_failures: List(HookFailure),
     completed: Int,
     progress_reporter: Option(progress.ProgressReporter),
     outer_setups: List(OuterSetup),
@@ -260,16 +259,13 @@ type ExecuteNodeConfig(context) {
 /// What a run has collected so far, newest first: the test results and the
 /// teardown failures.
 type Collected {
-  Collected(
-    results_rev: List(TestResult),
-    teardown_failures_rev: List(TeardownFailure),
-  )
+  Collected(results_rev: List(TestResult), hook_failures_rev: List(HookFailure))
 }
 
 /// What one test gives: its result, and the `after_each` and
 /// `after_each_test` hooks that failed after it, in the order that they ran.
 type TestOutcome {
-  TestOutcome(result: TestResult, teardown_failures: List(TeardownFailure))
+  TestOutcome(result: TestResult, hook_failures: List(HookFailure))
 }
 
 /// Where the progress lines of a run go: the progress reporter, and the
@@ -328,7 +324,7 @@ type TestState(context) {
     context: context,
     status: Status,
     failures_rev: List(AssertionFailure),
-    teardown_failures_rev: List(TeardownFailure),
+    hook_failures_rev: List(HookFailure),
     started_ms: Int,
   )
 }
@@ -635,7 +631,7 @@ pub fn run_tree_parallel(
   let #(collected, _completed, _setup_processes) = execute_node(executor_input)
   types.run_report(
     tests: list.reverse(collected.results_rev),
-    teardown_failures: list.reverse(collected.teardown_failures_rev),
+    hook_failures: list.reverse(collected.hook_failures_rev),
     reporter_crashes: [],
   )
 }
@@ -685,7 +681,7 @@ pub fn run_tree_parallel(
 ///     )
 ///   let parallel.RunTreeParallelWithReporterResult(
 ///     results: results,
-///     teardown_failures: _teardown_failures,
+///     hook_failures: _hook_failures,
 ///     completed: _completed_after_suite,
 ///     progress_reporter: _progress_reporter,
 ///     outer_setups: _outer_setups,
@@ -713,7 +709,7 @@ pub fn run_tree_parallel(
 ///
 /// A `RunTreeParallelWithReporterResult` containing:
 /// - `results`: this tree’s results, in deterministic (declaration) order
-/// - `teardown_failures`: this tree’s `after_each`, `after_each_test` and
+/// - `hook_failures`: this tree’s `after_each`, `after_each_test` and
 ///   `after_all` hooks that failed, in the order that they ran
 /// - `completed`: updated completed count after driving `TestFinished` events
 /// - `progress_reporter`: progress reporter state (unchanged for the built-in progress reporter)
@@ -844,7 +840,7 @@ fn tree_result(
   let #(collected, completed, setup_processes) = ran
   RunTreeParallelWithReporterResult(
     results: list.reverse(collected.results_rev),
-    teardown_failures: list.reverse(collected.teardown_failures_rev),
+    hook_failures: list.reverse(collected.hook_failures_rev),
     completed: completed,
     progress_reporter: config.progress_reporter,
     outer_setups: setup_processes.outer,
@@ -928,7 +924,7 @@ fn run_after_setup(
       context,
       SetupProcesses(..setup_processes, groups: [own]),
     ))
-  let teardown_failures_rev =
+  let hook_failures_rev =
     finish_group_scope(
       config.config,
       GroupScope(groups: own.scope, hooks: scope_hooks(ContextSetupHook)),
@@ -938,7 +934,7 @@ fn run_after_setup(
     )
   tree_result(config, #(
     add_collected(
-      Collected(results_rev: [], teardown_failures_rev: teardown_failures_rev),
+      Collected(results_rev: [], hook_failures_rev: hook_failures_rev),
       collected,
     ),
     completed,
@@ -956,7 +952,7 @@ fn context_setup_failed(
   let results_rev =
     fail_group_nodes(config.groups, [], [tree_node(config)], [failure], [])
   tree_result(config, #(
-    Collected(results_rev: results_rev, teardown_failures_rev: []),
+    Collected(results_rev: results_rev, hook_failures_rev: []),
     emit_test_finished_progress_results(
       progress_output(config.progress_reporter, config.write),
       config.completed,
@@ -989,7 +985,7 @@ fn context_setup_stopped(
     )
   let results = list.reverse(results_rev)
   tree_result(config, #(
-    Collected(results_rev: results_rev, teardown_failures_rev: [
+    Collected(results_rev: results_rev, hook_failures_rev: [
       types.SetupStopped(
         setup: ContextSetupHook,
         groups: scope,
@@ -1081,7 +1077,7 @@ fn execute_node(
               list.reverse(group_results_rev),
             )
 
-          let teardown_failures_rev =
+          let hook_failures_rev =
             finish_group_scope(
               config,
               before_all_scope(group_scope),
@@ -1094,7 +1090,7 @@ fn execute_node(
             add_collected(
               Collected(
                 results_rev: group_results_rev,
-                teardown_failures_rev: teardown_failures_rev,
+                hook_failures_rev: hook_failures_rev,
               ),
               base_collected,
             ),
@@ -1169,7 +1165,7 @@ fn execute_node(
               setup_processes_after_groups.groups,
               list.length(setup_processes.groups),
             )
-          let teardown_failures_rev =
+          let hook_failures_rev =
             finish_group_scope(
               config,
               before_all_scope(group_scope),
@@ -1180,10 +1176,7 @@ fn execute_node(
 
           #(
             add_collected(
-              Collected(
-                results_rev: [],
-                teardown_failures_rev: teardown_failures_rev,
-              ),
+              Collected(results_rev: [], hook_failures_rev: hook_failures_rev),
               add_collected(after_groups, base_collected),
             ),
             completed_after_groups,
@@ -1477,16 +1470,16 @@ fn result_full_name(result: TestResult) -> List(String) {
 }
 
 fn empty_collected() -> Collected {
-  Collected(results_rev: [], teardown_failures_rev: [])
+  Collected(results_rev: [], hook_failures_rev: [])
 }
 
 /// Put `newer` in front of `older`. Both lists are newest first.
 fn add_collected(newer: Collected, older: Collected) -> Collected {
   Collected(
     results_rev: list.append(newer.results_rev, older.results_rev),
-    teardown_failures_rev: list.append(
-      newer.teardown_failures_rev,
-      older.teardown_failures_rev,
+    hook_failures_rev: list.append(
+      newer.hook_failures_rev,
+      older.hook_failures_rev,
     ),
   )
 }
@@ -1496,10 +1489,7 @@ fn add_collected(newer: Collected, older: Collected) -> Collected {
 fn collected_from_outcomes_rev(outcomes_rev: List(TestOutcome)) -> Collected {
   Collected(
     results_rev: list.map(outcomes_rev, outcome_result),
-    teardown_failures_rev: list.flat_map(
-      outcomes_rev,
-      outcome_teardown_failures_rev,
-    ),
+    hook_failures_rev: list.flat_map(outcomes_rev, outcome_hook_failures_rev),
   )
 }
 
@@ -1507,10 +1497,8 @@ fn outcome_result(outcome: TestOutcome) -> TestResult {
   outcome.result
 }
 
-fn outcome_teardown_failures_rev(
-  outcome: TestOutcome,
-) -> List(TeardownFailure) {
-  list.reverse(outcome.teardown_failures)
+fn outcome_hook_failures_rev(outcome: TestOutcome) -> List(HookFailure) {
+  list.reverse(outcome.hook_failures)
 }
 
 fn fail_tests_due_to_before_all(
@@ -1784,7 +1772,7 @@ fn finish_group_scope(
   setup_process: Option(ScopeSetupProcess(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
-) -> List(TeardownFailure) {
+) -> List(HookFailure) {
   case setup_process, hooks {
     None, _ -> run_after_all_hooks(config, scope, None, context, hooks, [])
     Some(SetupProcessGone(reason: reason, not_run: not_run, ..)), _ ->
@@ -1815,8 +1803,8 @@ fn run_after_all_hooks(
   setup_process: Option(GroupSetupProcess(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
   let #(last_setup_process, next_failures_rev) =
     run_after_all_chain(
       config,
@@ -1835,7 +1823,7 @@ fn run_after_all_hooks(
 fn stop_checked_setup_process(
   scope: GroupScope,
   checked: Result(GroupSetupProcess(context), String),
-) -> List(TeardownFailure) {
+) -> List(HookFailure) {
   case checked {
     Ok(setup_process) -> {
       sandbox.stop_setup_process(setup_process)
@@ -1849,7 +1837,7 @@ fn group_setup_stopped(
   scope: GroupScope,
   reason: String,
   not_run: List(List(String)),
-) -> TeardownFailure {
+) -> HookFailure {
   types.SetupStopped(
     setup: scope.hooks.setup,
     groups: scope.groups,
@@ -1868,8 +1856,8 @@ fn run_after_all_chain(
   setup_process: Option(GroupSetupProcess(context)),
   context: context,
   hooks: List(Callback(context, Result(Nil, String))),
-  failures_rev: List(TeardownFailure),
-) -> #(Option(GroupSetupProcess(context)), List(TeardownFailure)) {
+  failures_rev: List(HookFailure),
+) -> #(Option(GroupSetupProcess(context)), List(HookFailure)) {
   case hooks {
     [] -> #(setup_process, failures_rev)
     [hook, ..rest] ->
@@ -1912,8 +1900,8 @@ fn after_all_result(
     GroupHookCall(context),
     Result(context, String),
   ),
-  failures_rev: List(TeardownFailure),
-) -> #(Option(GroupSetupProcess(context)), List(TeardownFailure)) {
+  failures_rev: List(HookFailure),
+) -> #(Option(GroupSetupProcess(context)), List(HookFailure)) {
   let AfterAllStep(
     config: config,
     scope: scope,
@@ -1938,7 +1926,7 @@ fn after_all_result(
         Some(setup_process),
         context,
         rest,
-        add_teardown_failure(scope, message, failures_rev),
+        add_hook_failure(scope, message, failures_rev),
       )
     SetupProcessCaught(setup_process: setup_process, reason: reason) ->
       run_after_all_chain(
@@ -1947,7 +1935,7 @@ fn after_all_result(
         Some(setup_process),
         context,
         rest,
-        add_teardown_failure(
+        add_hook_failure(
           scope,
           scope_crash_message(scope.hooks.teardown_text, scope.groups, reason),
           failures_rev,
@@ -1960,7 +1948,7 @@ fn after_all_result(
         None,
         context,
         rest,
-        add_teardown_failure(
+        add_hook_failure(
           scope,
           scope_timeout_message(scope.hooks.teardown_text, scope.groups),
           failures_rev,
@@ -1973,7 +1961,7 @@ fn after_all_result(
         None,
         context,
         rest,
-        add_teardown_failure(
+        add_hook_failure(
           scope,
           scope_crash_message(scope.hooks.teardown_text, scope.groups, reason),
           failures_rev,
@@ -1989,13 +1977,13 @@ fn after_all_result(
 
 /// Put a failure of the teardown of a group scope in front of
 /// `failures_rev`.
-fn add_teardown_failure(
+fn add_hook_failure(
   scope: GroupScope,
   message: String,
-  failures_rev: List(TeardownFailure),
-) -> List(TeardownFailure) {
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
   [
-    TeardownFailure(
+    TeardownFailed(
       hook: scope.hooks.teardown,
       groups: scope.groups,
       message: message,
@@ -2103,7 +2091,7 @@ fn fail_after_stop(
   let results = list.reverse(results_rev)
   #(
     add_collected(
-      Collected(results_rev: results_rev, teardown_failures_rev: []),
+      Collected(results_rev: results_rev, hook_failures_rev: []),
       collected,
     ),
     emit_test_finished_progress_results(
@@ -2286,7 +2274,7 @@ fn not_run_results(
               failures: [failure],
               kind: test_case.kind,
             ),
-            teardown_failures: [],
+            hook_failures: [],
           ),
         ),
         ..results_rev
@@ -2338,7 +2326,7 @@ fn new_test_job(
       context: group.context,
       status: Passed,
       failures_rev: [],
-      teardown_failures_rev: [],
+      hook_failures_rev: [],
       started_ms: now,
     ),
     default_timeout_ms: group.config.default_timeout_ms,
@@ -2964,13 +2952,13 @@ fn teardown_failed(
   hook: TeardownHook,
   message: String,
 ) -> TestState(context) {
-  TestState(..state, teardown_failures_rev: [
-    TeardownFailure(
+  TestState(..state, hook_failures_rev: [
+    TeardownFailed(
       hook: hook,
       groups: types.full_name(job.scope, job.test_case.name),
       message: message,
     ),
-    ..state.teardown_failures_rev
+    ..state.hook_failures_rev
   ])
 }
 
@@ -2989,7 +2977,7 @@ fn test_outcome(
       failures: list.reverse(state.failures_rev),
       kind: job.test_case.kind,
     ),
-    teardown_failures: list.reverse(state.teardown_failures_rev),
+    hook_failures: list.reverse(state.hook_failures_rev),
   )
 }
 

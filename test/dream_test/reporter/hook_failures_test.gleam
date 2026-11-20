@@ -1,20 +1,20 @@
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters/teardown
+import dream_test/reporters/hook_failures
 import dream_test/types
 import dream_test/unit.{describe, it}
 import fixtures/test_results.{cleanup_failure}
 
 pub fn tests() {
-  describe("dream_test/reporters/teardown", [
+  describe("dream_test/reporters/hook_failures", [
     it("format gives no text when no teardown failed", fn() {
-      teardown.format([])
+      hook_failures.format([])
       |> should
       |> be_equal("")
       |> or_fail_with("no teardown failures should give no text")
     }),
 
     it("format gives a header, the hook and scope, and the message", fn() {
-      teardown.format([cleanup_failure()])
+      hook_failures.format([cleanup_failure()])
       |> should
       |> be_equal(
         "Setup and teardown failures:\n  after_all in root\n    no cleanup\n",
@@ -23,8 +23,8 @@ pub fn tests() {
     }),
 
     it("format shows a hook of the whole run without a scope", fn() {
-      teardown.format([
-        types.TeardownFailure(
+      hook_failures.format([
+        types.TeardownFailed(
           hook: types.AfterAllSuitesHook,
           groups: [],
           message: "pool still running",
@@ -38,7 +38,7 @@ pub fn tests() {
     }),
 
     it("format shows a stopped setup without a list when all tests ran", fn() {
-      teardown.format([
+      hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllHook,
           groups: ["root", "pool"],
@@ -54,7 +54,7 @@ pub fn tests() {
     }),
 
     it("format lists the tests that a stopped setup did not run", fn() {
-      teardown.format([
+      hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllHook,
           groups: ["root"],
@@ -70,7 +70,7 @@ pub fn tests() {
     }),
 
     it("format shows a stopped setup of the whole run without a scope", fn() {
-      teardown.format([
+      hook_failures.format([
         types.SetupStopped(
           setup: types.BeforeAllSuitesHook,
           groups: [],
@@ -86,8 +86,8 @@ pub fn tests() {
     }),
 
     it("format joins a scope of more than one name with >", fn() {
-      teardown.format([
-        types.TeardownFailure(
+      hook_failures.format([
+        types.TeardownFailed(
           hook: types.AfterEachHook,
           groups: ["root", "adds"],
           message: "no teardown",
@@ -101,7 +101,7 @@ pub fn tests() {
     }),
 
     it("format_in_color makes the header bold red and the hook red", fn() {
-      teardown.format_in_color([cleanup_failure()])
+      hook_failures.format_in_color([cleanup_failure()])
       |> should
       |> be_equal(
         "\u{1b}[1m\u{1b}[31mSetup and teardown failures:\u{1b}[0m\u{1b}[0m\n  \u{1b}[31mafter_all in root\u{1b}[0m\n    no cleanup\n",
@@ -110,7 +110,7 @@ pub fn tests() {
     }),
 
     it("format_in_color makes a stopped setup red and its list plain", fn() {
-      teardown.format_in_color([
+      hook_failures.format_in_color([
         types.SetupStopped(
           setup: types.BeforeAllHook,
           groups: ["root"],
@@ -126,7 +126,7 @@ pub fn tests() {
     }),
 
     it("format_in_color gives no text when no teardown failed", fn() {
-      teardown.format_in_color([])
+      hook_failures.format_in_color([])
       |> should
       |> be_equal("")
       |> or_fail_with("no teardown failures should give no text")

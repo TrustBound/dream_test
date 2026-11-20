@@ -75,8 +75,8 @@ pub fn tests() {
     it("counts stopped setups apart from failed teardown hooks", fn() {
       types.run_report(
         tests: [],
-        teardown_failures: [
-          types.TeardownFailure(
+        hook_failures: [
+          types.TeardownFailed(
             hook: types.AfterAllHook,
             groups: ["Example Suite"],
             message: "no cleanup",

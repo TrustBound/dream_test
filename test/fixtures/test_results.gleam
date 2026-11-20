@@ -34,12 +34,12 @@ pub fn make_test_with_duration(
 
 /// A run report with these test results and no teardown failures.
 pub fn report_of(results: List(TestResult)) -> types.RunReport {
-  types.run_report(tests: results, teardown_failures: [], reporter_crashes: [])
+  types.run_report(tests: results, hook_failures: [], reporter_crashes: [])
 }
 
 /// A teardown failure of `after_all` in the group `root`.
-pub fn cleanup_failure() -> types.TeardownFailure {
-  types.TeardownFailure(
+pub fn cleanup_failure() -> types.HookFailure {
+  types.TeardownFailed(
     hook: types.AfterAllHook,
     groups: ["root"],
     message: "no cleanup",
@@ -53,7 +53,7 @@ pub fn report_with_cleanup_failure(
 ) -> types.RunReport {
   types.run_report(
     tests: results,
-    teardown_failures: [cleanup_failure()],
+    hook_failures: [cleanup_failure()],
     reporter_crashes: [],
   )
 }

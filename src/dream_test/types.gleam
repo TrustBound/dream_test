@@ -96,7 +96,7 @@ import gleam/option.{type Option}
 /// `before_each_test`, `before_all` and the suite-level setup hooks) gives
 /// `SetupFailed`. A teardown hook (`after_each`, `after_each_test`,
 /// `after_all` and the suite-level teardown hooks) gives a
-/// `TeardownFailure` in the run report, and the test keeps its status.
+/// `TeardownFailed` in the run report, and the test keeps its status.
 ///
 /// ```gleam
 /// describe("Handles failures", [
@@ -634,7 +634,7 @@ pub fn is_failure(status status: Status) -> Bool {
   }
 }
 
-/// A teardown hook. A `TeardownFailure` names the hook that failed.
+/// A teardown hook. A `TeardownFailed` names the hook that failed.
 ///
 /// Each variant is the hook of the builder function with the same name:
 ///
@@ -744,7 +744,7 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 ///
 /// ## Variants
 ///
-/// - `TeardownFailure(hook, groups, message)`: a teardown hook failed.
+/// - `TeardownFailed(hook, groups, message)`: a teardown hook failed.
 ///   `hook` is the hook. `groups` is where it ran: for `AfterEachTestHook`
 ///   and `AfterEachHook`, the full name of the test. For `AfterAllHook`,
 ///   the group path. For `ContextTeardownHook` (the teardown of a
@@ -774,14 +774,14 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// types.TeardownFailure(
+/// types.TeardownFailed(
 ///   hook: types.AfterAllHook,
 ///   groups: ["Database"],
 ///   message: "could not drop the test schema",
 /// )
 /// ```
-pub type TeardownFailure {
-  TeardownFailure(hook: TeardownHook, groups: List(String), message: String)
+pub type HookFailure {
+  TeardownFailed(hook: TeardownHook, groups: List(String), message: String)
   SetupStopped(
     setup: SetupHook,
     groups: List(String),
@@ -822,12 +822,12 @@ pub type ReporterCrash {
 ///
 /// `runner.run` and `parallel.run_tree_parallel` give a `RunReport`, and the
 /// reporters take one. Use `run_report` to make one, `report_tests`,
-/// `report_teardown_failures` and `report_reporter_crashes` to read it, and
+/// `report_hook_failures` and `report_reporter_crashes` to read it, and
 /// `failed` to check it.
 pub opaque type RunReport {
   RunReport(
     tests: List(TestResult),
-    teardown_failures: List(TeardownFailure),
+    hook_failures: List(HookFailure),
     reporter_crashes: List(ReporterCrash),
   )
 }
@@ -840,8 +840,8 @@ pub opaque type RunReport {
 /// ## Parameters
 ///
 /// - `tests`: the result of each test, in the order of the run
-/// - `teardown_failures`: the teardown hooks that failed, in the order
-///   that they ran
+/// - `hook_failures`: the teardown hooks that failed and the setups
+///   that stopped, in the order that they happened
 /// - `reporter_crashes`: the results reporters that crashed, in list order.
 ///   Give `[]` when no reporter crashed, or when no reporter ran yet.
 ///
@@ -853,7 +853,7 @@ pub opaque type RunReport {
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
+/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
 /// |> types.failed
 /// |> should
 /// |> be_equal(False)
@@ -861,12 +861,12 @@ pub opaque type RunReport {
 /// ```
 pub fn run_report(
   tests tests: List(TestResult),
-  teardown_failures teardown_failures: List(TeardownFailure),
+  hook_failures hook_failures: List(HookFailure),
   reporter_crashes reporter_crashes: List(ReporterCrash),
 ) -> RunReport {
   RunReport(
     tests: tests,
-    teardown_failures: teardown_failures,
+    hook_failures: hook_failures,
     reporter_crashes: reporter_crashes,
   )
 }
@@ -884,7 +884,7 @@ pub fn run_report(
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
+/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
 /// |> types.report_tests
 /// |> should
 /// |> be_equal([])
@@ -894,7 +894,8 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
   report.tests
 }
 
-/// The teardown hooks that failed in a run, in the order that they ran.
+/// The hook failures of a run: the teardown hooks that failed and the
+/// setups that stopped, in the order that they happened.
 ///
 /// ## Parameters
 ///
@@ -902,21 +903,20 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 ///
 /// ## Returns
 ///
-/// The teardown failures, or `[]` when every teardown hook succeeded.
+/// The hook failures, or `[]` when no teardown hook failed and no setup
+/// stopped.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
-/// |> types.report_teardown_failures
+/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+/// |> types.report_hook_failures
 /// |> should
 /// |> be_equal([])
 /// |> or_fail_with("an empty run should have no teardown failures")
 /// ```
-pub fn report_teardown_failures(
-  report report: RunReport,
-) -> List(TeardownFailure) {
-  report.teardown_failures
+pub fn report_hook_failures(report report: RunReport) -> List(HookFailure) {
+  report.hook_failures
 }
 
 /// The results reporters whose render function crashed in a run, in list
@@ -940,7 +940,7 @@ pub fn report_teardown_failures(
 /// ## Example
 ///
 /// ```gleam
-/// types.run_report(tests: [], teardown_failures: [], reporter_crashes: [])
+/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
 /// |> types.report_reporter_crashes
 /// |> should
 /// |> be_equal([])
@@ -973,8 +973,8 @@ pub fn report_reporter_crashes(
 /// ```gleam
 /// types.run_report(
 ///   tests: [],
-///   teardown_failures: [
-///     types.TeardownFailure(
+///   hook_failures: [
+///     types.TeardownFailed(
 ///       hook: types.AfterAllSuitesHook,
 ///       groups: [],
 ///       message: "could not stop the pool",
@@ -988,7 +988,7 @@ pub fn report_reporter_crashes(
 /// |> or_fail_with("a teardown failure should fail the run")
 /// ```
 pub fn failed(report report: RunReport) -> Bool {
-  !list.is_empty(report.teardown_failures)
+  !list.is_empty(report.hook_failures)
   || !list.is_empty(report.reporter_crashes)
   || list.any(report.tests, has_failure_status)
 }

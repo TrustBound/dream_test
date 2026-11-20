@@ -11,8 +11,8 @@
 //// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
+import dream_test/reporters/hook_failures
 import dream_test/reporters/summary
-import dream_test/reporters/teardown
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type RunReport, type Status, type TestResult,
@@ -56,9 +56,9 @@ import gleam/string
 /// The formatted report as a `String`.
 pub fn format(report report: RunReport) -> String {
   let summary_text = summary.format(report)
-  let teardown_text = case types.report_teardown_failures(report) {
+  let teardown_text = case types.report_hook_failures(report) {
     [] -> ""
-    _ -> "\n" <> teardown.format(types.report_teardown_failures(report))
+    _ -> "\n" <> hook_failures.format(types.report_hook_failures(report))
   }
   string.concat([
     format_scenarios(types.report_tests(report)),

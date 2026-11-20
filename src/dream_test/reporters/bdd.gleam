@@ -9,8 +9,8 @@
 
 import dream_test/reporters/ansi
 import dream_test/reporters/gherkin as gherkin_reporter
+import dream_test/reporters/hook_failures
 import dream_test/reporters/summary
-import dream_test/reporters/teardown
 import dream_test/reporters/types as reporter_types
 import dream_test/timing
 import dream_test/types.{
@@ -192,11 +192,11 @@ fn format_summary(color: Bool, report: RunReport) -> String {
 /// The teardown section with a blank line before it, or `""` when no
 /// teardown hook failed.
 fn format_teardown_section(color: Bool, report: RunReport) -> String {
-  case types.report_teardown_failures(report), color {
+  case types.report_hook_failures(report), color {
     [], _ -> ""
     _, True ->
-      "\n" <> teardown.format_in_color(types.report_teardown_failures(report))
-    _, False -> "\n" <> teardown.format(types.report_teardown_failures(report))
+      "\n" <> hook_failures.format_in_color(types.report_hook_failures(report))
+    _, False -> "\n" <> hook_failures.format(types.report_hook_failures(report))
   }
 }
 
@@ -301,7 +301,7 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
 /// bdd.report(
 ///   types.run_report(
 ///     tests: [passing_result()],
-///     teardown_failures: [],
+///     hook_failures: [],
 ///     reporter_crashes: [],
 ///   ),
 ///   write_bdd_report_to_file,
@@ -496,7 +496,7 @@ pub fn format_incremental_parts_with_test_indent(
 ///   bdd.format_summary_only(
 ///     types.run_report(
 ///       tests: [passing_result()],
-///       teardown_failures: [],
+///       hook_failures: [],
 ///       reporter_crashes: [],
 ///     ),
 ///   )

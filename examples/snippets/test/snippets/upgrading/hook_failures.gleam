@@ -2,7 +2,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/runner
 import dream_test/types.{
   type RunReport, AfterAllHook, Failed, Passed, Pending, SetupFailed, Skipped,
-  TeardownFailure, TimedOut,
+  TeardownFailed, TimedOut,
 }
 import dream_test/unit.{after_all, before_all, describe, it}
 import gleam/list
@@ -19,10 +19,10 @@ fn database_suite() {
 }
 
 fn after_all_failed(report: RunReport) -> Bool {
-  types.report_teardown_failures(report)
+  types.report_hook_failures(report)
   |> list.any(fn(failure) {
     case failure {
-      TeardownFailure(hook: AfterAllHook, ..) -> True
+      TeardownFailed(hook: AfterAllHook, ..) -> True
       _ -> False
     }
   })

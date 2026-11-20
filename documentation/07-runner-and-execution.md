@@ -274,7 +274,7 @@ about what is running.
 **Failures and where the hooks run**:
 
 - A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
-- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining teardown hooks still run, the failure goes into `types.report_teardown_failures(report)`, and the run fails.
+- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining teardown hooks still run, the failure goes into `types.report_hook_failures(report)`, and the run fails.
 - The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
 
 `source` is best-effort:
