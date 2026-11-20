@@ -70,11 +70,11 @@ store. This release has breaking changes. Read
   `add_failure`) is removed. Nothing in Dream Test used it.
 - `TestSuite` has no type parameter and moves to the new module
   `dream_test/suite`. `types.TestSuite(context)` is removed. Each tree of
-  a suite keeps its context inside the suite, so one `runner.new` takes a `unit` suite, a
-  `unit_context` suite and a Gherkin feature together. `unit.describe`,
-  `unit_context.describe`, the Gherkin suite functions and module
-  discovery give a `suite.TestSuite`. To run a tree that you build
-  yourself, give it to `suite.from_tree`.
+  a suite keeps its context inside the suite, so one `runner.new` takes a
+  `unit` suite, a `unit_context` suite and a Gherkin feature together.
+  `unit.describe`, `unit_context.describe`, the Gherkin suite functions
+  and module discovery give a `suite.TestSuite`. To run a tree that you
+  build yourself, give it to `suite.from_tree`.
 - `runner.RunBuilder` has no type parameter. `runner.before_each_test`
   and `runner.after_each_test` take `fn(TestInfo) -> Result(Nil, String)`.
   The hooks get the `TestInfo` of the test, not its context, and cannot

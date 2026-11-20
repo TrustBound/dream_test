@@ -99,7 +99,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 **Format:**
 
-```
+```text
 <type>[optional scope]: <description>
 
 ## Why This Change Was Made
@@ -130,13 +130,13 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 **Scope:** If your branch has an issue number (e.g., `feature/SVC-123`), use it as the scope:
 
-```
+```text
 feat(SVC-123): add timeout support to test runner
 ```
 
 **Example:**
 
-```
+```text
 feat: add timeout support to test runner
 
 ## Why This Change Was Made
@@ -156,7 +156,7 @@ feat: add timeout support to test runner
 
 **Breaking changes:** Add `!` after type:
 
-```
+```text
 feat!: remove deprecated assertion API
 ```
 

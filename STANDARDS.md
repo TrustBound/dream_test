@@ -228,7 +228,7 @@ pub fn status_from_failures(
 
 **Module path conventions**:
 
-```
+```text
 dream_test/suite           # Test suites
 dream_test/matchers        # Matcher API
 dream_test/types           # Shared data types

@@ -6,7 +6,7 @@ This document explains when to use which patterns and where to put code in a Dre
 
 Here's the recommended structure for a Dream application:
 
-```
+```text
 your_app/
 ├── src/
 │   ├── main.gleam          # Application entry point
@@ -159,7 +159,7 @@ pub fn load() -> Config {
 - ❌ Response formatting (use views)
 
 **Structure:**
-```
+```text
 controllers/
 ├── users_controller.gleam
 ├── tasks_controller.gleam
@@ -201,7 +201,7 @@ pub fn show(request: Request, context: Context, services: Services) -> Response 
 - ✅ Error handling
 
 **Structure:**
-```
+```text
 middleware/
 ├── auth_middleware.gleam
 ├── logging_middleware.gleam
@@ -238,7 +238,7 @@ pub fn require_auth(request: Request, context: Context, services: Services, next
 - ❌ Response formatting (use views)
 
 **Structure:**
-```
+```text
 models/
 ├── user/
 │   ├── user_model.gleam
@@ -283,7 +283,7 @@ pub fn get(db: Connection, user_id: Int) -> Result(User, Error) {
 - ❌ Request handling (use controllers)
 
 **Structure:**
-```
+```text
 views/
 ├── user_view.gleam
 ├── task_view.gleam
@@ -328,7 +328,7 @@ pub fn to_html(user: User) -> String {
 - ❌ Pure formatting (that's a view)
 
 **Structure:**
-```
+```text
 operations/
 ├── create_user.gleam
 ├── reorder_tasks.gleam
@@ -371,7 +371,7 @@ pub fn execute(services: Services, params: Params) -> Result(ResultType, Error)
 - ❌ JSON-only responses (use views)
 
 **Structure:**
-```
+```text
 templates/
 ├── elements/        # Low-level HTML elements
 │   ├── button.gleam
@@ -432,7 +432,7 @@ pub fn task_card(task: Task) -> String {
 - ✅ External service client setup
 
 **Structure:**
-```
+```text
 services/
 ├── database.gleam
 ├── cache.gleam
@@ -466,7 +466,7 @@ pub fn init_cache() -> Result(ets.Table, Error) {
 - ✅ Domain-specific types
 
 **Structure:**
-```
+```text
 types/
 ├── user.gleam
 ├── task.gleam
@@ -506,7 +506,7 @@ pub type UserParams {
 - ✅ Validation helpers
 
 **Structure:**
-```
+```text
 utilities/
 ├── response_helpers.gleam
 ├── form_parser.gleam
