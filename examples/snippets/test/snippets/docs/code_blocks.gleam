@@ -114,7 +114,7 @@ const run_by_other_projects = [
   "examples/cache_app/test/cache_app_test.gleam",
   "examples/shopping_cart/test/features/shopping_cart.gleam",
   "examples/shopping_cart/test/steps/cart.gleam",
-  "examples/shopping_cart/test/steps/cart_world.gleam",
+  "examples/shopping_cart/test/steps/cart_state.gleam",
 ]
 
 /// The tag of the 2.x code that the upgrade guide shows.

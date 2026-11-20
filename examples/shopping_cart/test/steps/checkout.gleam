@@ -3,15 +3,15 @@
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import shopping_cart/checkout
 import shopping_cart/types as cart_types
-import steps/cart_world.{
-  type CartWorld, type Checkout, CartWorld, CheckedOut, CheckoutFailed,
+import steps/cart_state.{
+  type CartState, type Checkout, CartState, CheckedOut, CheckoutFailed,
 }
 
 // ============================================================================
 // Step Registration
 // ============================================================================
 
-pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
   |> steps.when("I checkout", step_checkout)
 }
@@ -21,13 +21,13 @@ pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
 // ============================================================================
 
 fn step_checkout(
-  world: CartWorld,
+  state: CartState,
   _context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   Ok(
-    CartWorld(
-      ..world,
-      checkout: checkout_outcome(checkout.checkout(world.cart)),
+    CartState(
+      ..state,
+      checkout: checkout_outcome(checkout.checkout(state.cart)),
     ),
   )
 }

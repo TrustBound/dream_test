@@ -9,13 +9,13 @@ import gleam/string
 import shopping_cart/cart
 import shopping_cart/products
 import shopping_cart/types as cart_types
-import steps/cart_world.{type CartWorld, CartWorld}
+import steps/cart_state.{type CartState, CartState}
 
 // ============================================================================
 // Step Registration
 // ============================================================================
 
-pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
   |> steps.given("I have an empty cart", step_empty_cart)
   |> steps.given("I add {int} {word} to the cart", step_add_product)
@@ -30,35 +30,35 @@ pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
 // ============================================================================
 
 fn step_empty_cart(
-  world: CartWorld,
+  state: CartState,
   _context: StepContext,
-) -> Result(CartWorld, String) {
-  Ok(CartWorld(..world, cart: cart.new()))
+) -> Result(CartState, String) {
+  Ok(CartState(..state, cart: cart.new()))
 }
 
 fn step_add_product(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use quantity <- result.try(get_int(context.captures, 0))
   use product_name <- result.try(get_string(context.captures, 1))
   use updated <- result.try(
-    cart.add_item(world.cart, lookup_product(product_name), quantity)
+    cart.add_item(state.cart, lookup_product(product_name), quantity)
     |> result.map_error(add_item_error_to_string),
   )
-  Ok(CartWorld(..world, cart: updated))
+  Ok(CartState(..state, cart: updated))
 }
 
 fn step_try_add_product(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use quantity <- result.try(get_int(context.captures, 0))
   use product_name <- result.try(get_string(context.captures, 1))
-  case cart.add_item(world.cart, lookup_product(product_name), quantity) {
-    Ok(updated) -> Ok(CartWorld(..world, cart: updated, last_error: None))
+  case cart.add_item(state.cart, lookup_product(product_name), quantity) {
+    Ok(updated) -> Ok(CartState(..state, cart: updated, last_error: None))
     Error(error) ->
-      Ok(CartWorld(..world, last_error: Some(add_item_error_to_string(error))))
+      Ok(CartState(..state, last_error: Some(add_item_error_to_string(error))))
   }
 }
 
@@ -70,31 +70,31 @@ fn add_item_error_to_string(error: cart_types.CartError) -> String {
 }
 
 fn step_update_quantity(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use product_name <- result.try(get_string(context.captures, 0))
   use quantity <- result.try(get_int(context.captures, 1))
   case
     cart.update_quantity(
-      world.cart,
+      state.cart,
       normalize_product_id(product_name),
       quantity,
     )
   {
-    Ok(updated) -> Ok(CartWorld(..world, cart: updated))
-    Error(_) -> Ok(CartWorld(..world, last_error: Some("update failed")))
+    Ok(updated) -> Ok(CartState(..state, cart: updated))
+    Error(_) -> Ok(CartState(..state, last_error: Some("update failed")))
   }
 }
 
 fn step_remove_product(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use product_name <- result.try(get_string(context.captures, 0))
-  case cart.remove_item(world.cart, normalize_product_id(product_name)) {
-    Ok(updated) -> Ok(CartWorld(..world, cart: updated))
-    Error(_) -> Ok(CartWorld(..world, last_error: Some("remove failed")))
+  case cart.remove_item(state.cart, normalize_product_id(product_name)) {
+    Ok(updated) -> Ok(CartState(..state, cart: updated))
+    Error(_) -> Ok(CartState(..state, last_error: Some("remove failed")))
   }
 }
 

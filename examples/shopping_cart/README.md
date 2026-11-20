@@ -77,13 +77,13 @@ Both approaches share the same step definitions!
 
 Steps are organized by domain concern in `test/steps/`:
 
-Each scenario starts from `cart_world.initial()` and passes one `CartWorld` value from step to step. A `given` or `when` step returns a new `CartWorld`. A `then` step reads it.
+Each scenario starts from `cart_state.initial()` and passes one `CartState` value from step to step. A `given` or `when` step returns a new `CartState`. A `then` step reads it.
 
-### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_world.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The scenario state <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart_state.gleam#L8-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-pub type CartWorld {
-  CartWorld(
+pub type CartState {
+  CartState(
     /// The cart that the steps change
     cart: cart_types.Cart,
     /// What happened at checkout
@@ -104,7 +104,7 @@ pub type Checkout {
 ### Cart step registration <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/steps/cart.gleam#L18-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
   |> steps.given("I have an empty cart", step_empty_cart)
   |> steps.given("I add {int} {word} to the cart", step_add_product)

@@ -5,8 +5,8 @@ import shopping_cart/cart
 import shopping_cart/types as cart_types
 
 /// The state of one scenario.
-pub type CartWorld {
-  CartWorld(
+pub type CartState {
+  CartState(
     /// The cart that the steps change
     cart: cart_types.Cart,
     /// What happened at checkout
@@ -24,6 +24,6 @@ pub type Checkout {
 }
 
 /// The state that each scenario starts from: an empty cart.
-pub fn initial() -> CartWorld {
-  CartWorld(cart: cart.new(), checkout: NotCheckedOut, last_error: None)
+pub fn initial() -> CartState {
+  CartState(cart: cart.new(), checkout: NotCheckedOut, last_error: None)
 }

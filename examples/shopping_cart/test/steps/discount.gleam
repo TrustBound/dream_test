@@ -8,13 +8,13 @@ import gleam/option.{Some}
 import gleam/result
 import shopping_cart/pricing
 import shopping_cart/types as cart_types
-import steps/cart_world.{type CartWorld, CartWorld}
+import steps/cart_state.{type CartState, CartState}
 
 // ============================================================================
 // Step Registration
 // ============================================================================
 
-pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
   |> steps.when("I apply a {int}% discount", step_apply_percent_discount)
   |> steps.when("I apply a ${float} discount", step_apply_fixed_discount)
@@ -25,19 +25,19 @@ pub fn register(registry: StepRegistry(CartWorld)) -> StepRegistry(CartWorld) {
 // ============================================================================
 
 fn step_apply_percent_discount(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use percent <- result.try(get_int(context.captures, 0))
-  Ok(apply_discount(world, cart_types.PercentOff(int.to_float(percent))))
+  Ok(apply_discount(state, cart_types.PercentOff(int.to_float(percent))))
 }
 
 fn step_apply_fixed_discount(
-  world: CartWorld,
+  state: CartState,
   context: StepContext,
-) -> Result(CartWorld, String) {
+) -> Result(CartState, String) {
   use amount <- result.try(get_float(context.captures, 0))
-  Ok(apply_discount(world, cart_types.FixedAmount(amount)))
+  Ok(apply_discount(state, cart_types.FixedAmount(amount)))
 }
 
 // ============================================================================
@@ -45,11 +45,11 @@ fn step_apply_fixed_discount(
 // ============================================================================
 
 fn apply_discount(
-  world: CartWorld,
+  state: CartState,
   discount: cart_types.Discount,
-) -> CartWorld {
-  case pricing.apply_discount(world.cart, discount) {
-    Ok(updated) -> CartWorld(..world, cart: updated)
-    Error(_) -> CartWorld(..world, last_error: Some("discount failed"))
+) -> CartState {
+  case pricing.apply_discount(state.cart, discount) {
+    Ok(updated) -> CartState(..state, cart: updated)
+    Error(_) -> CartState(..state, last_error: Some("discount failed"))
   }
 }
