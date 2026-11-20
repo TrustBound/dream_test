@@ -331,7 +331,8 @@ pub type TestResult {
 /// ### Source behavior
 ///
 /// - Unit discovery uses the **module name**
-/// - Gherkin discovery uses the **.feature file path**
+/// - Gherkin discovery uses the **.feature file path**, also when module
+///   discovery finds the Gherkin suite
 /// - Manually constructed suites use `None`
 pub type TestInfo {
   TestInfo(

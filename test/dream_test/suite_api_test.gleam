@@ -90,6 +90,26 @@ pub fn tests() {
       |> or_fail_with("each test should have the source")
     }),
 
+    it("with_source keeps a source that a test already has", fn() {
+      let sourced =
+        suite.with_source(suite: feature_file_suite(), source: "module_test")
+      let ran =
+        runner.new([sourced])
+        |> runner.filter_tests(has_source(_, "cart.feature"))
+        |> runner.silent()
+        |> runner.run()
+        |> types.report_tests
+        |> list.map(full_name_and_status)
+      #(list.map(suite.tests(sourced), source), ran)
+      |> should
+      |> be_equal(
+        #([Some("cart.feature"), Some("module_test")], [
+          #(["cart", "from the file"], Passed),
+        ]),
+      )
+      |> or_fail_with("only a test with no source should get the new source")
+    }),
+
     it("a filter that keeps no test of a tree does not run the tree", fn() {
       let events = process.new_subject()
       let results =
@@ -221,4 +241,33 @@ fn receive_all(
 
 fn ignore(_text: String) -> Nil {
   Nil
+}
+
+/// A suite with one test that has the source `cart.feature` and one test
+/// with no source.
+fn feature_file_suite() -> suite.TestSuite {
+  suite.from_tree(
+    types.root(name: "cart", seed: Nil, children: [
+      types.Test(
+        name: "from the file",
+        tags: [],
+        kind: types.Unit,
+        run: types.NoInput(fn() { Ok(types.AssertionOk) }),
+        timeout_ms: None,
+        source: Some("cart.feature"),
+      ),
+      types.Test(
+        name: "with no file",
+        tags: [],
+        kind: types.Unit,
+        run: types.NoInput(fn() { Ok(types.AssertionOk) }),
+        timeout_ms: None,
+        source: None,
+      ),
+    ]),
+  )
+}
+
+fn has_source(info: TestInfo, path: String) -> Bool {
+  info.source == Some(path)
 }

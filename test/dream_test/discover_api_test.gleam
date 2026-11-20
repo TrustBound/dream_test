@@ -156,6 +156,16 @@ pub fn tests() {
       |> or_fail_with("the context suite should get the context 41")
     }),
 
+    it("keeps the .feature path as the source of a Gherkin suite", fn() {
+      discover.new()
+      |> from_path("discovery_fixtures/feature_suite.gleam")
+      |> discover.to_suites()
+      |> list.flat_map(suite_test_sources)
+      |> should
+      |> be_equal([Some("test/discovery_fixtures/feature_suite.feature")])
+      |> or_fail_with("the source should stay the path of the .feature file")
+    }),
+
     it("to_suite runs each suite with its own context", fn() {
       runner.new([
         discover.new()

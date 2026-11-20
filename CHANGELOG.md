@@ -324,8 +324,9 @@ the guide labels them.
     `suite.run` takes a `suite.RunInput`: the concurrency and default
     timeout, the test filter, the progress output, the runner hooks
     around each test and the outer set-ups
-  - `suite.with_source` gives each test of a suite a source, for example
-    the module name. Module discovery uses it
+  - `suite.with_source` gives each test of a suite that has no source a
+    source, for example the module name. A test that has a source, such
+    as the `.feature` path of a scenario, keeps it. Module discovery uses it
   - `parallel.run_suite` runs a typed tree inside groups, with the new
     config type `parallel.RunSuiteConfig`: the fields of
     `RunRootParallelWithReporterConfig`, the tree as `name`, `tags`,

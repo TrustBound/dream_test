@@ -279,7 +279,7 @@ about what is running.
 `source` is best-effort:
 
 - Unit discovery suites use the **Erlang module name**, for example `unit@cart_test` for `test/unit/cart_test.gleam`.
-- Gherkin discovery suites use the **.feature path**.
+- Gherkin discovery suites use the **.feature path**. When module discovery finds a module whose `tests()` gives a Gherkin discovery suite, each scenario keeps the `.feature` path. A test gets the module name only when it has no source.
 - Manually constructed suites use `None`.
 
 #### Runner hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_hooks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>

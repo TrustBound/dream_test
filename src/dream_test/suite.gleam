@@ -49,7 +49,8 @@ type Part {
 }
 
 /// Where a part runs: inside the groups `groups`, outermost first, and with
-/// `source` as the source of each test when it is `Some`.
+/// `source` as the source of each test that has no source, when it is
+/// `Some`.
 type Place {
   Place(groups: List(String), source: Option(String))
 }
@@ -204,8 +205,10 @@ pub fn join(name name: String, suites suites: List(TestSuite)) -> TestSuite {
   TestSuite(name: name, parts: list.flat_map(suites, suite_parts))
 }
 
-/// Give each test of the suite the source `source`, for example the name
-/// of the module that made the suite. Module discovery does this.
+/// Give each test of the suite that has no source the source `source`,
+/// for example the name of the module that made the suite. Module
+/// discovery does this. A test that already has a source keeps it, for
+/// example a Gherkin scenario keeps the path of its `.feature` file.
 ///
 /// ## Example
 ///
@@ -409,7 +412,8 @@ fn keep_every_test(_info: TestInfo) -> Bool {
   True
 }
 
-/// The children with `source` as the source of each test, when it is set.
+/// The children with `source` as the source of each test that has no
+/// source, when `source` is set.
 fn placed_children(
   children: List(Node(context)),
   source: Option(String),
@@ -441,8 +445,9 @@ fn node_with_source(node: Node(context), source: String) -> Node(context) {
         tags: tags,
         children: nodes_with_source(children, source),
       )
-    Test(..) -> Test(..node, source: Some(source))
-    BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) -> node
+    Test(source: None, ..) -> Test(..node, source: Some(source))
+    Test(..) | BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) ->
+      node
   }
 }
 
