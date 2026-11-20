@@ -304,16 +304,18 @@ let thing = other_module.something() // qualified access to secondary
 **Real example in a gherkin module**:
 
 ```gleam
-// Gherkin types are the primary subject → unqualified
+// Gherkin is the primary subject → unqualified
+import dream_test/gherkin/steps.{Group, Scenarios}
 import dream_test/gherkin/types.{type Feature, type Scenario}
 
-// Core test types are supporting → alias conflicts, alias module
-import dream_test/types.{
-  type TestSuite, TestSuite, SuiteGroup,
-} as test_types
+// Core test types are supporting → alias the conflicting `Group`,
+// alias the module (both modules are named `types`)
+import dream_test/types.{type Node, Group as NodeGroup} as test_types
 
 let feature: Feature = ...
-let suite = TestSuite(name: "test", items: [SuiteGroup(...)])
+let child = Group(name: "Checkout", tags: [], children: [Scenarios(feature)])
+let node: Node(Nil) = NodeGroup(name: "plain", tags: [], children: [])
+let kind = test_types.Unit
 ```
 
 If there are no conflicting names, you can use unqualified imports from both without aliasing:
@@ -321,7 +323,7 @@ If there are no conflicting names, you can use unqualified imports from both wit
 ```gleam
 // ✅ No conflicts: unqualified from both
 import dream_test/gherkin/types.{type Feature}
-import dream_test/types.{type TestSuite, TestSuite}
+import dream_test/suite.{type TestSuite}
 
 // Both Feature and TestSuite are unqualified
 ```
@@ -332,26 +334,26 @@ import dream_test/types.{type TestSuite, TestSuite}
 2. **Alias based on subject** — the file's primary domain gets unqualified; supporting modules get aliased
 3. **Alias conflicting types inline** — use `type Foo as OtherFoo` for individual type conflicts
 4. **Alias the module** — use `as module_name` when you need qualified access to the secondary module
-5. **Import both type and constructor** — if a type has a constructor with the same name (e.g., `TestSuite`), import both: `type TestSuite, TestSuite`
+5. **Import both type and constructor** — if a type has a constructor with the same name (e.g., `Tree`), import both: `type Tree, Tree`
 
 ❌ **Don't** use fully qualified references when unqualified would work:
 
 ```gleam
 // Bad: Noisy qualified references
-let suite = dream_types.TestSuite(
-  name: name,
-  items: dream_types.SuiteGroup(nested),
-)
+let tree =
+  dream_types.Tree(initial: Nil, name: name, tags: [], children: [
+    dream_types.Group(name: "nested", tags: [], children: nested),
+  ])
 ```
 
 ✅ **Do** use unqualified imports:
 
 ```gleam
 // Good: Clean unqualified usage
-let suite = TestSuite(
-  name: name,
-  items: SuiteGroup(nested),
-)
+let tree =
+  Tree(initial: Nil, name: name, tags: [], children: [
+    Group(name: "nested", tags: [], children: nested),
+  ])
 ```
 
 ---

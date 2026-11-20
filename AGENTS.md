@@ -38,8 +38,8 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 ## 3. Type Imports
 
 - To import a **type** unqualified, use the `type` syntax:
-  - `import dream_test/context.{type TestContext, add_failure}`
-  - Then use `TestContext` and `add_failure` directly.
+  - `import dream_test/types.{type TestResult, full_name}`
+  - Then use `TestResult` and `full_name` directly.
 - Importing a constructor or value without `type` does **not** make it available as a type.
   - If you see "There is a value in scope with the name X, but no type in scope with that name", you probably forgot `type`.
 
@@ -55,13 +55,14 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
   - Example:
     ```gleam
     case node {
-      ItTest(name, run) ->
-        build_it_test_case(...)
+      Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-      DescribeGroup(name, children) -> {
+      Group(name: name, children: children, ..) -> {
         let new_prefix = list.append(name_prefix, [name])
-        to_test_cases_from_list(module_name, new_prefix, children, accumulated)
+        collect_test_names(new_prefix, children, [])
       }
+
+      _ -> []
     }
     ```
 - Forgetting `{ .. }` around multiple expressions in a branch leads to syntax errors like "I was expecting an expression after this".

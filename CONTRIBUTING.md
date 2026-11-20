@@ -181,18 +181,19 @@ Add tests in the appropriate `test/dream_test/` subdirectory matching the source
 ### Test structure
 
 ```gleam
-import dream_test/unit.{describe, it}
-import dream_test/matchers.{should, , fail_with, or_fail_with}
+import dream_test/matchers.{fail_with}
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{AssertionOk, MatchFailed, MatchOk}
+import dream_test/unit.{describe, it}
 
-pub fn tests() {
+pub fn tests() -> TestSuite {
   describe("Feature name", [
     it("does something when condition", fn() {
       let result = some_function()
 
       case result {
-        MatchOk(_) -> AssertionOk
-        MatchFailed(_) -> fail_with("Expected success")
+        MatchOk(_) -> Ok(AssertionOk)
+        MatchFailed(_) -> Ok(fail_with("Expected success"))
       }
     }),
   ])
@@ -267,7 +268,10 @@ Every public function needs:
 /// |> be_equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```
-pub fn be_equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
+pub fn be_equal(
+  value_or_result value_or_result: MatchResult(a),
+  expected expected: a,
+) -> MatchResult(a) {
   // ...
 }
 ````
