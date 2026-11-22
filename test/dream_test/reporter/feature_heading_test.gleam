@@ -51,6 +51,60 @@ Summary: 2 run, 0 failed, 2 passed in 0ms
         |> or_fail_with("Cart should be the Feature")
       }),
     ]),
+    group("steps.feature_suite", [
+      it("bdd labels the top-level group as the Feature", fn() {
+        bdd_text(steps.feature_suite(
+          registry: registry(),
+          feature: cart_feature(),
+        ))
+        |> should
+        |> be_equal(
+          "Feature: Cart
+  ✓ Scenario: has 3 items
+  Rule: Discounts
+    ✓ Scenario: still 3 items
+
+Summary: 2 run, 0 failed, 2 passed in 0ms
+",
+        )
+        |> or_fail_with("the top-level group should be Feature: Cart")
+      }),
+      it("gherkin labels the top-level group as the Feature", fn() {
+        gherkin_text(steps.feature_suite(
+          registry: registry(),
+          feature: cart_feature(),
+        ))
+        |> should
+        |> be_equal(
+          "Feature: Cart
+  Scenario: has 3 items ✓
+  Rule: Discounts
+    Scenario: still 3 items ✓
+",
+        )
+        |> or_fail_with("the top-level group should be Feature: Cart")
+      }),
+    ]),
+    group("an inline feature.feature", [
+      it("bdd labels the top-level group as the Feature", fn() {
+        bdd_text(inline_suite())
+        |> should
+        |> be_equal(
+          "Feature: Cart
+  ✓ Scenario: has 3 items
+
+Summary: 1 run, 0 failed, 1 passed in 0ms
+",
+        )
+        |> or_fail_with("the inline feature should be Feature: Cart")
+      }),
+      it("gherkin labels the top-level group as the Feature", fn() {
+        gherkin_text(inline_suite())
+        |> should
+        |> be_equal("Feature: Cart\n  Scenario: has 3 items ✓\n")
+        |> or_fail_with("the inline feature should be Feature: Cart")
+      }),
+    ]),
     group("features from gherkin/discover", [
       it("bdd labels each Feature group", fn() {
         bdd_text(discovered_suite())
@@ -177,10 +231,15 @@ fn report_of_scenario_without_feature() -> RunReport {
 
 fn outer_group_suite() -> TestSuite {
   suite.group(name: "Outer", suites: [
-    feature.to_suite(feature.FeatureConfig(
-      feature: cart_feature(),
-      step_registry: registry(),
-    )),
+    steps.feature_suite(registry: registry(), feature: cart_feature()),
+  ])
+}
+
+fn inline_suite() -> TestSuite {
+  feature.feature(name: "Cart", registry: registry(), scenarios: [
+    feature.scenario(name: "has 3 items", inline_steps: [
+      feature.then("the shop has 3 items"),
+    ]),
   ])
 }
 

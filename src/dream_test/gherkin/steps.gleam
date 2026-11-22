@@ -246,7 +246,7 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 /// a setup.
 ///
 /// `setup` runs once for each tree that the registry builds, that is for
-/// each suite that `feature.to_suite`, `steps.to_suite` or
+/// each suite that `feature_suite`, `to_suite` or
 /// `gherkin/discover.to_suite` makes from it. It runs before the first
 /// scenario of that tree, and only when at least one of its scenarios
 /// runs. `gherkin/discover.to_suite` makes one tree for the scenarios of
@@ -292,7 +292,7 @@ pub fn new_with_setup(
 /// `steps.Group(...)`.
 ///
 /// - `Feature(feature)`: a group named after the Feature, with its tags and
-///   a test for each scenario, as in `feature.to_suite`. The scenarios
+///   a test for each scenario, as in `feature_suite`. The scenarios
 ///   run with the steps of the registry of `to_suite`. A Feature gets its
 ///   tests only here, so it cannot run with the steps of one registry and
 ///   the start of another.
@@ -316,7 +316,7 @@ pub type SuiteChild(state) {
 /// runs one time for all the children, and only when at least one of
 /// their tests runs.
 ///
-/// `feature.to_suite` and `gherkin/discover.to_suite` use it. Use it
+/// `gherkin/discover.to_suite` uses it. Use it
 /// to run several Features with one start, for example one server for all
 /// of them. The scenarios of every `Feature` and `Scenarios` child run with
 /// the steps of `registry`.
@@ -354,12 +354,59 @@ pub fn to_suite(
   )
 }
 
-/// The suite of one Feature, for `feature.to_suite`: the top-level group of
-/// the suite is the group of the Feature, so its scenarios have
-/// `feature: Some(feature.name)`. With `to_suite` and `Scenarios` they
-/// would have `None`, and with `Feature` the Feature group would be
-/// inside one more group.
-@internal
+/// Make a suite from one parsed Feature.
+///
+/// The top-level group of the suite is the Feature. So the BDD and Gherkin
+/// reporters print `Feature: <name>` for it, and each scenario has
+/// `feature: Some(<name>)`. The suite has one test for each scenario, and one
+/// test for each example row of a scenario with `Examples`. Each Rule becomes
+/// a group named `Rule: <name>` (or `Rule:` when the Rule has no name). So the
+/// full name of a scenario in a Rule is `Feature > Rule: <name> > Scenario`.
+///
+/// The steps of the Feature Background run first, then the steps of the Rule
+/// Background, then the scenario steps. So a scenario that starts with `And`,
+/// `But` or `*` takes the phase of the last Background step.
+///
+/// An example row test is named `<scenario> (Example N)`, or
+/// `<scenario> (<examples name>, Example N)` when its `Examples` section has
+/// a name. N counts the rows of all `Examples` sections of the scenario, from
+/// 1.
+///
+/// Tags follow Gherkin: a scenario inherits the Feature tags and the Rule
+/// tags. The top-level group holds the Feature tags, a Rule group holds the
+/// Rule tags, and a test holds the scenario tags, then the `Examples` tags.
+/// The runner adds the tags of the groups of a test in front of its own tags.
+/// So the tags of a test result, and the tags that a `runner.filter_tests`
+/// predicate sees, are the Feature tags, then the Rule tags, then the
+/// scenario tags, then the `Examples` tags, each one time.
+///
+/// Use `to_suite` to put several Features, groups and tests under one name
+/// with one start. Use `gherkin/discover.to_suite` to load `.feature` files
+/// by a pattern.
+///
+/// ## Parameters
+///
+/// - `registry`: the steps, and where each scenario starts
+/// - `feature`: the parsed Feature, for example from `parser.parse_file`
+///
+/// ## Returns
+///
+/// A `TestSuite` to run with `runner.new([suite]) |> runner.run()`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(feature) = parser.parse_file("test/cart.feature")
+///
+/// let registry =
+///   steps.new(initial: 0)
+///   |> steps.given("the cart is empty", step_empty_cart)
+///   |> steps.when("I add {int} items", step_add_items)
+///   |> steps.then("the cart has {int} items", step_has_items)
+///
+/// steps.feature_suite(registry: registry, feature: feature)
+/// ```
+///
 pub fn feature_suite(
   registry registry: StepRegistry(state),
   feature feature: types.Feature,

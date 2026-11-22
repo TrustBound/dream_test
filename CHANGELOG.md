@@ -167,17 +167,16 @@ store. This release has breaking changes. Read
 - The `world` key/value store is removed, with `dream_test/gherkin/world`
   and its ETS table. Each scenario made one atom that was never freed.
   Each scenario now has one typed state value.
-- `steps.new` takes the initial scenario state, and `StepRegistry`,
-  `FeatureConfig` and `discover.RunnableDiscovery` take the state type as a
-  type parameter.
+- `steps.new` takes the initial scenario state, and `StepRegistry` and
+  `discover.RunnableDiscovery` take the state type as a type parameter.
 - The phase of a step definition sets its kind. `steps.given` and
   `steps.when` take an action,
   `fn(state, StepContext) -> Result(state, String)`. `steps.then` takes a
   check, `fn(state, StepContext) -> Result(AssertionResult, String)`. A
   check cannot change the state. The `StepHandler` type is removed.
 - `steps.when_` is now `steps.when`, and `steps.then_` is now `steps.then`.
-- `feature.to_test_suite` is now `feature.to_suite`, as `steps.to_suite`
-  and `discover.to_suite`. It still takes a `FeatureConfig`.
+- `feature.to_test_suite` and `FeatureConfig` are removed. A suite from one
+  parsed Feature is `steps.feature_suite(registry:, feature:)`.
 - `StepContext` has no `world` field. It has a `scenario_id` field.
 - `types.GherkinScenario(String)` is now
   `GherkinScenario(scenario_id: String, feature: Option(String), rule:
@@ -310,7 +309,8 @@ the guide labels them.
 - Gherkin steps get and return a typed scenario state. `world` is removed.
 - `steps.new` takes the initial state. `steps.step` is removed.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
-- `feature.to_test_suite` is now `feature.to_suite`.
+- `feature.to_test_suite` and `FeatureConfig` are removed. Use
+  `steps.feature_suite(registry:, feature:)`.
 - `unit_context.describe` and `types.tree` take `initial:` in place of
   `seed:`.
 - `StepContext` has `scenario_id` in place of `world`.

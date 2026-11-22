@@ -342,9 +342,8 @@ Feature: Shopping Cart
 ##### Load a feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int}
+import dream_test/gherkin/steps.{type StepContext, feature_suite, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -388,9 +387,8 @@ pub fn tests() {
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
 
-  // Convert to TestSuite and run
-  let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_suite(config)
+  // Make a suite from the Feature
+  feature_suite(registry: steps, feature: feature)
 }
 
 pub fn main() {
@@ -411,7 +409,7 @@ So the first step of a Rule Background, or of a scenario in a Rule, can use `And
 
 A scenario in a Rule is in a group named `Rule: <name>` (or `Rule:` for a Rule with no name), under the Feature group. Its result kind is `GherkinScenario(scenario_id:, feature: Some("<feature>"), rule: Some("Rule: <name>"))`. A scenario outside a Rule has `rule: None`. The Gherkin reporter prints the Rule heading from this field, so a Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
 
-The `feature` field holds the name of the Feature when the scenario is in the group of its Feature: with `feature.to_suite`, `steps.Feature` and `discover.to_suite`. The BDD and Gherkin reporters print `Feature: <feature>` on that group and on no other group, so a suite name or a `suite.group` above the Feature prints as a plain group.
+The `feature` field holds the name of the Feature when the scenario is in the group of its Feature: with `steps.feature_suite`, `steps.Feature`, the `feature.feature` builders and `discover.to_suite`. The BDD and Gherkin reporters print `Feature: <feature>` on that group and on no other group, so a suite name or a `suite.group` above the Feature prints as a plain group.
 
 A scenario can have more than one `Examples` section, and every row of every section runs.
 The tags of an `Examples` section apply to the tests that its rows make.
@@ -462,9 +460,8 @@ Feature: Stock control
 #### Run the feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int}
+import dream_test/gherkin/steps.{type StepContext, feature_suite, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
@@ -506,7 +503,7 @@ pub fn tests() {
   // Each Examples row becomes one test, for example
   // "Sell different amounts (Small orders, Example 1)".
   let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
-  to_suite(FeatureConfig(feature: feature, step_registry: steps))
+  feature_suite(registry: steps, feature: feature)
 }
 ```
 
@@ -523,7 +520,6 @@ How the tests get their names and tags:
 #### Test names of Rules and Examples <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_rule_names.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -542,10 +538,7 @@ pub fn tests() {
     it("names each test after its Rule and its Examples section", fn() {
       let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
       let suite =
-        to_suite(FeatureConfig(
-          feature: feature,
-          step_registry: steps.new(initial: Nil),
-        ))
+        steps.feature_suite(registry: steps.new(initial: Nil), feature: feature)
 
       runner.new([suite])
       |> runner.run()

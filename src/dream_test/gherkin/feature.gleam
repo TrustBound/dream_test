@@ -1,31 +1,11 @@
-//// Convert Gherkin features into runnable `TestSuite`s.
+//// Build Gherkin features inline in Gleam code.
 ////
-//// This module does two related jobs:
-//// - **Execute parsed `.feature` files**: turn a parsed `gherkin/types.Feature`
-////   into a `TestSuite` using a step registry (your Given/When/Then handlers).
-//// - **Provide an inline DSL**: build features directly in Gleam when you don’t
-////   want to keep `.feature` files on disk.
+//// Use this module when you do not want to keep `.feature` files on disk.
+//// `feature` and `feature_with_background` make a `TestSuite` whose
+//// top-level group is the Feature, as `steps.feature_suite` does.
 ////
-//// ## Example (file-based)
-////
-//// ```gleam
-//// pub fn tests() {
-////   // Define the steps and the state each scenario starts from
-////   let steps =
-////     steps.new(initial: Cart(server_running: False, items: 0))
-////     |> given("the server is running", step_server_running)
-////     |> given("the cart is empty", step_empty_cart)
-////     |> when("I add {int} items", step_add_items)
-////     |> then("the cart should have {int} items", step_verify_count)
-////
-////   // Parse the .feature file
-////   let assert Ok(feature) = parser.parse_file("test/cart.feature")
-////
-////   // Convert to TestSuite and run
-////   let config = FeatureConfig(feature: feature, step_registry: steps)
-////   to_suite(config)
-//// }
-//// ```
+//// To run a parsed `.feature` file, use `steps.feature_suite`. To load
+//// `.feature` files by a pattern, use `gherkin/discover`.
 ////
 //// ## Example (inline DSL)
 ////
@@ -67,20 +47,6 @@ import gleam/option.{None, Some}
 // Types
 // ============================================================================
 
-/// Configuration for running a feature.
-///
-/// Contains the parsed feature and step registry needed to execute it.
-/// `state` is the scenario state type of the step registry.
-///
-pub type FeatureConfig(state) {
-  FeatureConfig(
-    /// The parsed feature to run
-    feature: gherkin_types.Feature,
-    /// Registry of step definitions
-    step_registry: StepRegistry(state),
-  )
-}
-
 /// Configuration for an inline scenario.
 ///
 /// Used with the inline DSL to define scenarios in Gleam code.
@@ -115,51 +81,6 @@ pub type InlineStep {
     /// Step text after the keyword
     text: String,
   )
-}
-
-// ============================================================================
-// Feature → TestSuite Conversion
-// ============================================================================
-/// Convert a Feature to a TestSuite.
-///
-/// Creates a TestSuite with one test per scenario, and one test per example
-/// row of a scenario with `Examples`. Each Rule becomes a group named
-/// `Rule: <name>` (or `Rule:` when the Rule has no name), so the full name of
-/// a scenario in a Rule is `Feature > Rule: <name> > Scenario`.
-///
-/// The steps of the Feature Background run first, then the steps of the Rule
-/// Background, then the scenario steps. So a scenario that starts with `And`,
-/// `But` or `*` takes the phase of the last Background step.
-///
-/// An example row test is named `<scenario> (Example N)`, or
-/// `<scenario> (<examples name>, Example N)` when its `Examples` section has
-/// a name. N counts the rows of all `Examples` sections of the scenario, from
-/// 1.
-///
-/// Tags follow Gherkin: a scenario inherits the Feature tags and the Rule
-/// tags. The top-level group holds the Feature tags, a Rule group holds the Rule
-/// tags, and a test holds the scenario tags, then the `Examples` tags. The
-/// runner adds the tags of the groups of a test in front of its own tags.
-/// So the tags of a test result, and the tags that a `runner.filter_tests`
-/// predicate sees, are the Feature tags, then the Rule tags, then the
-/// scenario tags, then the `Examples` tags, each one time.
-///
-/// ## Parameters
-///
-/// - `config`: FeatureConfig with feature and step registry
-///
-/// ## Returns
-///
-/// A TestSuite that can be run with `runner.new([suite]) |> runner.run()`.
-///
-/// ## Example
-///
-/// ```gleam
-/// let config = FeatureConfig(feature: feature, step_registry: steps)
-/// to_suite(config)
-/// ```
-pub fn to_suite(config config: FeatureConfig(state)) -> TestSuite {
-  steps.feature_suite(registry: config.step_registry, feature: config.feature)
 }
 
 // ============================================================================
@@ -216,8 +137,7 @@ pub fn feature(
       rules: [],
     )
 
-  let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_suite(config)
+  steps.feature_suite(registry: registry, feature: parsed_feature)
 }
 
 /// Define an inline scenario.
@@ -437,6 +357,5 @@ pub fn feature_with_background(
       rules: [],
     )
 
-  let config = FeatureConfig(feature: parsed_feature, step_registry: registry)
-  to_suite(config)
+  steps.feature_suite(registry: registry, feature: parsed_feature)
 }

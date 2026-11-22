@@ -140,7 +140,7 @@ pub type TestKind {
   /// `StepContext.scenario_id`.
   ///
   /// `feature` is the name of the Feature when the scenario is in the group
-  /// of its Feature: the scenarios of `feature.to_suite`,
+  /// of its Feature: the scenarios of `steps.feature_suite`,
   /// `steps.Feature` and `gherkin/discover.to_suite`. It is `None` for
   /// the scenarios of `steps.Scenarios`, which go straight into the
   /// group around them, so no group is their Feature. The reporters print

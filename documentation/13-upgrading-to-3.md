@@ -23,7 +23,7 @@ Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 
 Do the steps in this order. The first steps affect the most projects.
 
-1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` is now `feature.to_suite`. See [Gherkin step definitions](#gherkin-step-definitions).
+1. **Gherkin step definitions.** Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` and `FeatureConfig` are removed: use `steps.feature_suite`. See [Gherkin step definitions](#gherkin-step-definitions).
 2. **Suites and the run report.** A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. See [The runner and the run report](#the-runner-and-the-run-report).
 3. **Hooks.** A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. See [Hooks](#hooks).
 4. **Reporters.** The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. See [Reporters](#reporters).
@@ -431,7 +431,7 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 | `InlineStep(keyword: "When", text: "I add 3")` | `InlineStep(keyword: gherkin_types.When, text: "I add 3")`. The `given`, `when`, `then`, `and` and `but` helpers do not change. |
 | `let d: FeatureDiscovery = discover.with_registry(found, steps)` | `let d: RunnableDiscovery(Int) = discover.with_registry(found, steps)` |
 | `discover.to_suite` on a `FeatureDiscovery` | Call `discover.with_registry` first. `to_suite` takes only a `RunnableDiscovery`. |
-| `FeatureConfig` | `FeatureConfig(state)` |
+| `FeatureConfig` | Removed. Use `steps.feature_suite(registry:, feature:)`. |
 | A `discover.features` pattern that matched no files gave an empty suite, and the run passed. | `to_suite` gives one failing test, `No feature files match the pattern "<pattern>"`, tagged `no-feature-files`. `load` gives the error `parser.NoMatchingFeatureFiles(pattern)`. Fix the pattern. |
 | A `discover.features` pattern that cannot be searched, for example `features/{a.feature`, crashed the test run. | `to_suite` gives one failing test, `Cannot search for feature files with the pattern "<pattern>": <reason>`, tagged `invalid-feature-pattern`. `load` gives the error `parser.InvalidFeatureFilePattern(pattern, reason)`. Fix the pattern. |
 | `steps.given(registry, pattern, handler: f)` | `steps.given` and `steps.when` take `action: f`, and `steps.then` takes `check: f`. Code that does not write the label does not change. |
@@ -467,9 +467,9 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
     }),
 ```
 
-#### `feature.to_test_suite` is now `feature.to_suite`
+#### `feature.to_test_suite` and `FeatureConfig` are removed
 
-`feature.to_test_suite` is now `feature.to_suite`, with the same name as `steps.to_suite` and `discover.to_suite`. It still takes a `FeatureConfig`. Change the call, and the name in the import: `import dream_test/gherkin/feature.{FeatureConfig, to_suite}`.
+`feature.to_test_suite` and `FeatureConfig` are removed. A suite from one parsed Feature is `steps.feature_suite(registry:, feature:)`. Its top-level group is the Feature, as in 2.x. Remove the import `dream_test/gherkin/feature.{FeatureConfig, to_test_suite}`, and import `steps.feature_suite` in its place: `import dream_test/gherkin/steps.{feature_suite}`.
 
 ##### 2.x: a suite from `feature.to_test_suite` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L45-L50"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -482,15 +482,14 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
   to_test_suite(config)
 ```
 
-##### 3.0.0: a suite from `feature.to_suite` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L44-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+##### 3.0.0: a suite from `steps.feature_suite` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L43-L47"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
   // Parse the .feature file
   let assert Ok(feature) = parser.parse_file("test/cart.feature")
 
-  // Convert to TestSuite and run
-  let config = FeatureConfig(feature: feature, step_registry: steps)
-  to_suite(config)
+  // Make a suite from the Feature
+  feature_suite(registry: steps, feature: feature)
 ```
 
 #### How step text matches a pattern

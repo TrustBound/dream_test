@@ -1,6 +1,5 @@
-import dream_test/gherkin/feature.{FeatureConfig, to_suite}
 import dream_test/gherkin/parser
-import dream_test/gherkin/steps.{type StepContext, get_int}
+import dream_test/gherkin/steps.{type StepContext, feature_suite, get_int}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import gleam/result
 
@@ -42,5 +41,5 @@ pub fn tests() {
   // Each Examples row becomes one test, for example
   // "Sell different amounts (Small orders, Example 1)".
   let assert Ok(feature) = parser.parse_file("test/features/stock.feature")
-  to_suite(FeatureConfig(feature: feature, step_registry: steps))
+  feature_suite(registry: steps, feature: feature)
 }
