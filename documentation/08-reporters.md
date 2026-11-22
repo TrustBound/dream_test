@@ -315,7 +315,7 @@ This is intentionally **not** the common path; most users should attach progress
 
 ### Gherkin reporter (post-run, Cucumber-style)
 
-If your suites come from the Gherkin modules (`dream_test/gherkin/feature`, `dream_test/gherkin/discover`), `dream_test/reporters/gherkin` renders the results in a Cucumber-like format.
+If your suites come from the Gherkin modules (`dream_test/gherkin/feature`, `dream_test/gherkin/steps`, `dream_test/gherkin/discover`), `dream_test/reporters/gherkin` renders the results in a Cucumber-like format.
 
 #### Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/gherkin_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -367,7 +367,7 @@ pub fn main() {
 - **Big suites in an interactive terminal**: progress output, with a results reporter for the end.
 - **CI logs**: BDD output without progress, or with `bdd.failures_only`.
 - **Tooling / CI integration**: JSON output (and/or post-run formatting to write files).
-- **Behavior specs**: use `dream_test/reporters/gherkin` when your suites come from `dream_test/gherkin/feature` or `dream_test/gherkin/discover`.
+- **Behavior specs**: use `dream_test/reporters/gherkin` when your suites come from `dream_test/gherkin/feature`, `dream_test/gherkin/steps` or `dream_test/gherkin/discover`.
 
 ### What's Next?
 

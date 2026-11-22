@@ -1,8 +1,9 @@
 //// Parse Gherkin `.feature` files into `gherkin/types.Feature`.
 ////
 //// Use this when you have Gherkin text (from a file on disk, a fixture, or a
-//// string literal) and you want a structured representation you can convert
-//// into runnable tests via `dream_test/gherkin/feature`.
+//// string literal) and you want a structured representation. Turn it into
+//// runnable tests with `steps.feature_suite`, or load `.feature` files by a
+//// pattern with `dream_test/gherkin/discover`.
 ////
 //// The parser follows the official Gherkin grammar for English:
 //// `Feature` (and its synonyms `Business Need` and `Ability`), `Rule`,
