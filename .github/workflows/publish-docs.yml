@@ -8,6 +8,10 @@ on:
         required: false
         type: string
 
+env:
+  # A read-only Hex key. With it, dependency lookups do not hit the limit for requests with no key.
+  HEXPM_READ_API_KEY: ${{ secrets.HEX_READ_API_KEY }}
+
 jobs:
   publish-docs:
     name: Publish Documentation to Hex

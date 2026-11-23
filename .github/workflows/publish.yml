@@ -11,6 +11,10 @@ on:
   workflow_dispatch:
     # Allows manual triggering
 
+env:
+  # A read-only Hex key. With it, dependency lookups do not hit the limit for requests with no key.
+  HEXPM_READ_API_KEY: ${{ secrets.HEX_READ_API_KEY }}
+
 jobs:
   publish:
     name: Publish Package to Hex
