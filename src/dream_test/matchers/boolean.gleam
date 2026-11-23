@@ -7,11 +7,18 @@
 ////
 //// ## Example
 ////
+//// ### Assert that a value is true <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/boolean/be_true.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// True
-//// |> should
-//// |> be_true()
-//// |> or_fail_with("expected True")
+//// import dream_test/matchers.{be_true, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn true_is_true() -> Result(AssertionResult, String) {
+////   True
+////   |> should
+////   |> be_true()
+////   |> or_fail_with("expected True")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -26,11 +33,18 @@ import gleam/option.{Some}
 ///
 /// ## Example
 ///
+/// ### Assert that a value is true <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/boolean/be_true.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// True
-/// |> should
-/// |> be_true()
-/// |> or_fail_with("expected True")
+/// import dream_test/matchers.{be_true, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn true_is_true() -> Result(AssertionResult, String) {
+///   True
+///   |> should
+///   |> be_true()
+///   |> or_fail_with("expected True")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -72,11 +86,18 @@ fn check_is_true(actual: Bool) -> MatchResult(Bool) {
 ///
 /// ## Example
 ///
+/// ### Assert that a value is false <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/boolean/be_false.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// False
-/// |> should
-/// |> be_false()
-/// |> or_fail_with("expected False")
+/// import dream_test/matchers.{be_false, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn false_is_false() -> Result(AssertionResult, String) {
+///   False
+///   |> should
+///   |> be_false()
+///   |> or_fail_with("expected False")
+/// }
 /// ```
 ///
 /// ## Parameters

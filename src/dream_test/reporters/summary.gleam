@@ -4,11 +4,16 @@
 //// JSON reporter writes the same counts. Use this module in a custom
 //// reporter to give the same summary as dream_test.
 ////
+//// ### Format the summary line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/summary/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/reporters/summary
+//// import dream_test/types.{type RunReport}
 ////
-//// summary.format(report)
-//// // -> "Summary: 3 run, 1 failed, 2 passed in 12ms\n"
+//// pub fn summary_line(report: RunReport) -> String {
+////   summary.format(report)
+////   // -> "Summary: 3 run, 1 failed, 2 passed in 12ms\n"
+//// }
 //// ```
 ////
 //// The line always has the run, failed and passed counts. The failed count
@@ -34,15 +39,27 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Count the results of a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/summary/counts.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// summary.count(types.run_report(
-///   tests: [passed_result, failed_result],
-///   hook_failures: [],
-///   reporter_crashes: [],
-/// ))
-/// // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
-/// //    timed_out: 0, setup_failed: 0, teardown_failed: 0, setup_stopped: 0,
-/// //    duration_ms: 0)
+/// import dream_test/reporters/summary.{type Counts}
+/// import dream_test/types.{type TestResult}
+///
+/// pub fn count_two_results(
+///   passed_result: TestResult,
+///   failed_result: TestResult,
+/// ) -> Counts {
+///   summary.count(
+///     types.run_report(
+///       tests: [passed_result, failed_result],
+///       hook_failures: [],
+///       reporter_crashes: [],
+///     ),
+///   )
+///   // -> Counts(run: 2, passed: 1, failed: 1, skipped: 0, pending: 0,
+///   //    timed_out: 0, setup_failed: 0, teardown_failed: 0, setup_stopped: 0,
+///   //    duration_ms: 0)
+/// }
 /// ```
 pub type Counts {
   Counts(
@@ -86,10 +103,17 @@ pub type Counts {
 ///
 /// ## Example
 ///
+/// ### Read the failed count <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/summary/count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let counts = summary.count(report)
-/// counts.failed
-/// // -> 1
+/// import dream_test/reporters/summary
+/// import dream_test/types.{type RunReport}
+///
+/// pub fn failed_count(report: RunReport) -> Int {
+///   let counts = summary.count(report)
+///   counts.failed
+///   // -> 1
+/// }
 /// ```
 pub fn count(report report: RunReport) -> Counts {
   let counts = list.fold(types.report_tests(report), empty_counts(), add_result)
@@ -108,9 +132,16 @@ pub fn count(report report: RunReport) -> Counts {
 ///
 /// ## Example
 ///
+/// ### Format a summary line with a skipped test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/summary/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// summary.format(report)
-/// // -> "Summary: 4 run, 1 failed, 2 passed, 1 skipped in 12ms\n"
+/// import dream_test/reporters/summary
+/// import dream_test/types.{type RunReport}
+///
+/// pub fn summary_line_with_skipped(report: RunReport) -> String {
+///   summary.format(report)
+///   // -> "Summary: 4 run, 1 failed, 2 passed, 1 skipped in 12ms\n"
+/// }
 /// ```
 pub fn format(report report: RunReport) -> String {
   format_counts(count(report), False)
@@ -133,8 +164,16 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Example
 ///
+/// ### Print the summary line in color <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/summary/format_in_color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// io.print(summary.format_in_color(report))
+/// import dream_test/reporters/summary
+/// import dream_test/types.{type RunReport}
+/// import gleam/io
+///
+/// pub fn print_summary_in_color(report: RunReport) -> Nil {
+///   io.print(summary.format_in_color(report))
+/// }
 /// ```
 pub fn format_in_color(report report: RunReport) -> String {
   format_counts(count(report), True)

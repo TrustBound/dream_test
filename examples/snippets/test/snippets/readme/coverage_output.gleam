@@ -1,4 +1,5 @@
-//// The coverage tables that the README shows, rendered from a report.
+//// The coverage tables that the docs show, rendered from a report and
+//// compared with the output files under `test/outputs/`.
 
 import dream_test/coverage
 import dream_test/coverage/report.{type LineCoverage, LineCoverage}
@@ -8,27 +9,101 @@ import dream_test/unit.{describe, it}
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
-import gleam/string
+import snippets_outputs
 
 pub fn tests() {
-  describe("README coverage output", [
+  describe("Coverage output in the docs", [
     it("shows the table with the missing lines", fn() {
-      coverage_reporter.render(
-        report: report.new([cart_file()]),
-        config: coverage.new() |> coverage.show_missing(),
-      )
+      // Act
+      let table =
+        coverage_reporter.render(
+          report: report.new([cart_file()]),
+          config: coverage.new() |> coverage.show_missing(),
+        )
+
+      // Assert
+      Ok(table)
       |> should
-      |> be_equal(missing_table())
-      |> or_fail_with("expected the table in the README")
+      |> be_equal(snippets_outputs.read_after_blank_line(
+        "coverage_table_missing",
+      ))
+      |> or_fail_with("expected test/outputs/coverage_table_missing.txt")
     }),
     it("shows the excluded lines and files", fn() {
-      coverage_reporter.render(
-        report: excluded_report(),
-        config: coverage.new() |> coverage.no_lcov() |> coverage.show_excluded(),
-      )
+      // Act
+      let table =
+        coverage_reporter.render(
+          report: excluded_report(),
+          config: coverage.new()
+            |> coverage.no_lcov()
+            |> coverage.show_excluded(),
+        )
+
+      // Assert
+      Ok(table)
       |> should
-      |> be_equal(excluded_table())
-      |> or_fail_with("expected the excluded table in the README")
+      |> be_equal(snippets_outputs.read_after_blank_line(
+        "coverage_table_excluded",
+      ))
+      |> or_fail_with("expected test/outputs/coverage_table_excluded.txt")
+    }),
+    it("shows a file with no executable lines", fn() {
+      // Act
+      let table =
+        coverage_reporter.render(
+          report: report.new([
+            cart_file(),
+            report.file("src/app/types.gleam", []),
+          ]),
+          config: coverage.new(),
+        )
+
+      // Assert
+      Ok(table)
+      |> should
+      |> be_equal(snippets_outputs.read_after_blank_line(
+        "coverage_table_with_empty_file",
+      ))
+      |> or_fail_with(
+        "expected test/outputs/coverage_table_with_empty_file.txt",
+      )
+    }),
+    it("hides the complete files", fn() {
+      // Act
+      let table =
+        coverage_reporter.render(
+          report: report.new([
+            complete_file("src/app/a.gleam"),
+            complete_file("src/app/b.gleam"),
+            cart_file(),
+          ]),
+          config: coverage.new() |> coverage.hide_complete(),
+        )
+
+      // Assert
+      Ok(table)
+      |> should
+      |> be_equal(snippets_outputs.read_after_blank_line(
+        "coverage_table_hidden",
+      ))
+      |> or_fail_with("expected test/outputs/coverage_table_hidden.txt")
+    }),
+    it("warns about files that a Gleam version before 1.19 built", fn() {
+      // Act
+      let table =
+        coverage_reporter.render(
+          report: report.new([cart_file()])
+            |> report.add_inexact_line_files(["src/app/cart.gleam"]),
+          config: coverage.new(),
+        )
+
+      // Assert
+      Ok(table)
+      |> should
+      |> be_equal(snippets_outputs.read_after_blank_line(
+        "coverage_table_inexact_lines",
+      ))
+      |> or_fail_with("expected test/outputs/coverage_table_inexact_lines.txt")
     }),
   ])
 }
@@ -47,6 +122,16 @@ fn cart_lines() -> List(LineCoverage) {
       _ -> LineCoverage(line: line, calls: 1)
     }
   })
+}
+
+/// Lines 1 to 20 are executable, and all of them ran.
+fn complete_file(source_path: String) {
+  report.file(
+    source_path,
+    int.range(from: 1, to: 21, with: [], run: list.prepend)
+      |> list.reverse()
+      |> list.map(fn(line) { LineCoverage(line: line, calls: 1) }),
+  )
 }
 
 fn excluded_report() {
@@ -68,35 +153,4 @@ fn excluded_report() {
       reason: Some("generated code"),
     ),
   ])
-}
-
-fn missing_table() {
-  string.join(
-    [
-      "",
-      "Coverage",
-      "File                Lines  Cover  Missing",
-      "src/app/cart.gleam  18/20  90.0%  12-13",
-      "Total               18/20  90.0%",
-      "LCOV: build/coverage/lcov.info",
-      "",
-    ],
-    "\n",
-  )
-}
-
-fn excluded_table() {
-  string.join(
-    [
-      "",
-      "Coverage",
-      "File                        Lines  Cover  Excluded",
-      "src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71",
-      "src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)",
-      "Total                       18/20  90.0%",
-      "Excluded: 1 file, 6 lines in 1 file",
-      "",
-    ],
-    "\n",
-  )
 }

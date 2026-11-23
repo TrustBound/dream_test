@@ -51,17 +51,40 @@
 ////
 //// ## Example
 ////
+//// ### Look up a step with a float capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/lookup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-////       step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
-////       |> should
-////       |> be_equal(
-////         Some(
-////           step_trie.StepMatch(handler: "total_usd", captures: [
-////             step_trie.CapturedFloat(19.99),
-////           ]),
-////         ),
-////       )
-////       |> or_fail_with("expected float capture for $19.99USD")
+//// import dream_test/gherkin/step_trie
+//// import dream_test/gherkin/types.{ThenPhase}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/types as dream_types
+//// import gleam/option.{Some}
+//// import gleam/result
+////
+//// pub fn total_usd_captures_a_float() -> Result(
+////   dream_types.AssertionResult,
+////   String,
+//// ) {
+////   use trie <- result.try(
+////     step_trie.new()
+////     |> step_trie.insert(
+////       phase: ThenPhase,
+////       pattern: "the total is ${float}USD",
+////       handler: "total_usd",
+////     ),
+////   )
+////
+////   step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
+////   |> should
+////   |> be_equal(
+////     Some(
+////       step_trie.StepMatch(handler: "total_usd", captures: [
+////         step_trie.CapturedFloat(19.99),
+////       ]),
+////     ),
+////   )
+////   |> or_fail_with("expected float capture for $19.99USD")
+//// }
 //// ```
 
 import dream_test/gherkin/types.{type StepPhase}
@@ -195,14 +218,20 @@ pub type StepMatch(handler) {
 ///
 /// ## Example
 ///
+/// ### Insert a pattern into a new trie <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let trie =
-///         step_trie.new()
-///         |> step_trie.insert(
-///           phase: GivenPhase,
-///           pattern: "I have an empty cart",
-///           handler: "empty",
-///         )
+/// import dream_test/gherkin/step_trie.{type StepTrie}
+/// import dream_test/gherkin/types.{GivenPhase}
+///
+/// pub fn empty_cart_trie() -> Result(StepTrie(String), String) {
+///   step_trie.new()
+///   |> step_trie.insert(
+///     phase: GivenPhase,
+///     pattern: "I have an empty cart",
+///     handler: "empty",
+///   )
+/// }
 /// ```
 ///
 pub fn new() -> StepTrie(handler) {
@@ -232,13 +261,20 @@ pub fn new() -> StepTrie(handler) {
 ///
 /// ## Example
 ///
+/// ### Insert a pattern with a placeholder <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/insert.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       step_trie.new()
-///       |> step_trie.insert(
-///         phase: GivenPhase,
-///         pattern: "I have {int} items",
-///         handler: "count",
-///       )
+/// import dream_test/gherkin/step_trie.{type StepTrie}
+/// import dream_test/gherkin/types.{GivenPhase}
+///
+/// pub fn item_count_trie() -> Result(StepTrie(String), String) {
+///   step_trie.new()
+///   |> step_trie.insert(
+///     phase: GivenPhase,
+///     pattern: "I have {int} items",
+///     handler: "count",
+///   )
+/// }
 /// ```
 ///
 pub fn insert(
@@ -439,22 +475,33 @@ fn literal_text(segment: StepSegment) -> String {
 ///
 /// ## Example
 ///
+/// ### Split a pattern into segments <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/parse_step_pattern.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       step_trie.parse_step_pattern("the total is ${float}USD")
-///       |> should
-///       |> be_equal([
-///         [step_trie.LiteralText("the")],
-///         [step_trie.LiteralText("total")],
-///         [step_trie.LiteralText("is")],
-///         [
-///           step_trie.LiteralText("$"),
-///           step_trie.FloatParam,
-///           step_trie.LiteralText("USD"),
-///         ],
-///       ])
-///       |> or_fail_with(
-///         "expected ${float}USD to split into literal + FloatParam segments",
-///       )
+/// import dream_test/gherkin/step_trie
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn float_with_prefix_and_suffix_splits_into_segments() -> Result(
+///   AssertionResult,
+///   String,
+/// ) {
+///   step_trie.parse_step_pattern("the total is ${float}USD")
+///   |> should
+///   |> be_equal([
+///     [step_trie.LiteralText("the")],
+///     [step_trie.LiteralText("total")],
+///     [step_trie.LiteralText("is")],
+///     [
+///       step_trie.LiteralText("$"),
+///       step_trie.FloatParam,
+///       step_trie.LiteralText("USD"),
+///     ],
+///   ])
+///   |> or_fail_with(
+///     "expected ${float}USD to split into literal + FloatParam segments",
+///   )
+/// }
 /// ```
 ///
 pub fn parse_step_pattern(pattern pattern: String) -> List(List(StepSegment)) {
@@ -540,17 +587,40 @@ fn add_literal(
 ///
 /// ## Example
 ///
+/// ### Look up a step with a float capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/lookup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
-///       |> should
-///       |> be_equal(
-///         Some(
-///           step_trie.StepMatch(handler: "total_usd", captures: [
-///             step_trie.CapturedFloat(19.99),
-///           ]),
-///         ),
-///       )
-///       |> or_fail_with("expected float capture for $19.99USD")
+/// import dream_test/gherkin/step_trie
+/// import dream_test/gherkin/types.{ThenPhase}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{Some}
+/// import gleam/result
+///
+/// pub fn total_usd_captures_a_float() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   use trie <- result.try(
+///     step_trie.new()
+///     |> step_trie.insert(
+///       phase: ThenPhase,
+///       pattern: "the total is ${float}USD",
+///       handler: "total_usd",
+///     ),
+///   )
+///
+///   step_trie.lookup(trie, ThenPhase, "the total is $19.99USD")
+///   |> should
+///   |> be_equal(
+///     Some(
+///       step_trie.StepMatch(handler: "total_usd", captures: [
+///         step_trie.CapturedFloat(19.99),
+///       ]),
+///     ),
+///   )
+///   |> or_fail_with("expected float capture for $19.99USD")
+/// }
 /// ```
 ///
 pub fn lookup(
@@ -583,11 +653,19 @@ pub fn lookup(
 ///
 /// ## Example
 ///
+/// ### Split step text into words <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/step_trie/tokenize_step_text.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
-///       |> should
-///       |> be_equal(["I", "add", "\"Red Widget\"", "and", "pay", "$19.99USD"])
-///       |> or_fail_with("expected tokenization to keep the quoted run")
+/// import dream_test/gherkin/step_trie
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn quoted_run_stays_one_word() -> Result(AssertionResult, String) {
+///   step_trie.tokenize_step_text("I add \"Red Widget\" and pay $19.99USD")
+///   |> should
+///   |> be_equal(["I", "add", "\"Red Widget\"", "and", "pay", "$19.99USD"])
+///   |> or_fail_with("expected tokenization to keep the quoted run")
+/// }
 /// ```
 ///
 pub fn tokenize_step_text(text text: String) -> List(String) {

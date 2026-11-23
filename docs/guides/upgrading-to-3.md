@@ -12,10 +12,7 @@ Read this page if your project uses Dream Test 2.x. Most projects need only the 
 - code that uses the result of `runner.run` as a list
 - the label `seed:` of `unit_context.describe`, which is now `initial:`
 
-Each 2.x example has one of two labels:
-
-- **2.x code, from tag 2.1.3**: the code is a copy of a file at the 2.1.3 tag. The link opens that file at the shown lines.
-- **2.x, not compiled**: no file at the 2.1.3 tag shows the old form. The example uses only the 2.1.3 API. The link opens the 2.1.3 source of the API that the example uses.
+Each 2.x example has the label **Code at 2.1.3**: the code is a copy of a file at the 2.1.3 tag. The link opens that file at the shown lines. The docs check compares each 2.x example with that file at the tag. Where no file at the 2.1.3 tag shows the old usage, the example shows the 2.1.3 source that makes the old behavior, and the text says so.
 
 Each 3.0.0 example is a tested snippet. The snippet tests compile it and run it.
 
@@ -41,7 +38,7 @@ In 2.x, steps shared data through `world`, a key/value store in an ETS table. Ea
 
 Give the initial state to `steps.new`. Register each step with the function for its phase: `given`, `when` or `then`.
 
-##### 2.x: steps that use `world` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_hero.gleam#L1-L54"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: steps that use `world` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_hero.gleam#L1-L54"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{but, feature, given, scenario, then, when}
@@ -169,7 +166,7 @@ If `world` held a resource for all scenarios, for example a server or a connecti
 
 A scenario that kept more than one `world` key needs a record as its state. Each step returns a copy of the record with the changed fields.
 
-##### 2.x: a step that writes two `world` keys <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/shopping_cart/test/steps/cart.gleam#L52-L72"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a step that writes two `world` keys <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/shopping_cart/test/steps/cart.gleam#L52-L72"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn step_try_add_product(
@@ -242,12 +239,18 @@ fn step_try_add_product(
 
 The id is different. In 2.x it was the name path, for example `"Shopping Cart::Adding items"`, and two scenarios with the same name had the same id. In 3.0.0 it ends with `#` and a number, for example `"Shopping Cart::Adding items#12"`, so it is unique in the run. The number changes between runs, so do not use the id to key data that you keep between runs. The JSON report writes the same id in `"kind": "gherkin:<id>"`. A check that compares the whole id must now compare only the start.
 
-##### 2.x: read the scenario id from `world` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/gherkin/world.gleam#L558-L560"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
+No step at the 2.1.3 tag reads the id. The 2.1.3 snippet below makes a world by hand and reads its id with the same function.
+
+##### 2.x: read the scenario id from `world` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/world_scenario_id.gleam"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
-fn step_place_order(context: StepContext) -> Result(AssertionResult, String) {
-  put(context.world, "order_id", world.scenario_id(context.world))
-  Ok(succeed())
+import dream_test/gherkin/world
+
+pub fn main() {
+  let w = world.new_world("example_scenario")
+  let id = world.scenario_id(w)
+  world.cleanup(w)
+  id
 }
 ```
 
@@ -263,7 +266,7 @@ fn step_place_order(shop: Shop, context: StepContext) -> Result(Shop, String) {
 
 `steps.step` is removed. It registered a pattern for every phase. Register each pattern with `given`, `when` or `then`. To use one pattern in two phases, register it two times. A function that returns a registry names the state type, for example `StepRegistry(Shop)`.
 
-##### 2.x: a register function with `steps.step` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/shopping_cart/test/steps/cart.gleam#L19-L26"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a register function with `steps.step` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/shopping_cart/test/steps/cart.gleam#L19-L26"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 pub fn register(registry: StepRegistry) -> StepRegistry {
@@ -297,7 +300,7 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
 
 `steps.find_step` takes a `StepPhase` (`GivenPhase`, `WhenPhase` or `ThenPhase`) in place of a `StepKeyword`. `step_trie.insert` and `step_trie.lookup` take a `StepPhase` in place of a keyword `String`. `step_trie.insert` returns a `Result`, because a second handler for one phase and pattern is an error. The trie has no `"*"` handler.
 
-##### 2.x: find a step by its keyword <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_steps_registry.gleam#L25-L35"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: find a step by its keyword <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_steps_registry.gleam#L25-L35"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("can extract an int capture", fn() {
@@ -334,7 +337,7 @@ In 2.x, a second definition of a pattern replaced the first with no message. In 
     }),
 ```
 
-##### 2.x: a step trie with keyword strings <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/step_trie.gleam#L46-L75"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a step trie with keyword strings <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/step_trie.gleam#L46-L75"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("lookup finds the most specific pattern and captures typed values", fn() {
@@ -442,7 +445,7 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
 
 `discover.list_files` returns `Result(List(String), parser.FeatureFileError)`. A pattern that cannot be searched, for example `features/{a.feature`, gives `Error(parser.InvalidFeatureFilePattern(pattern, reason))`. A pattern that matches no files gives `Ok([])`. In 2.x, it returned `List(String)`, and a pattern that cannot be searched stopped the test run with a crash.
 
-##### 2.x: `list_files` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/discover_loading.gleam#L7-L13"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `list_files` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/discover_loading.gleam#L7-L13"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("list_files returns matching .feature file paths", fn() {
@@ -471,7 +474,7 @@ The usual chain `discover.features(...) |> discover.with_registry(steps) |> disc
 
 `feature.to_test_suite` and `FeatureConfig` are removed. A suite from one parsed Feature is `steps.feature_suite(registry:, feature:)`. Its top-level group is the Feature, as in 2.x. Remove the import `dream_test/gherkin/feature.{FeatureConfig, to_test_suite}`, and import `steps.feature_suite` in its place: `import dream_test/gherkin/steps.{feature_suite}`.
 
-##### 2.x: a suite from `feature.to_test_suite` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L45-L50"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a suite from `feature.to_test_suite` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_file.gleam#L45-L50"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
   // Parse the .feature file
@@ -515,7 +518,7 @@ In 3.0.0, step text and step patterns are split into words in the same way: at s
 
 `types.TestSuite(context)` is removed. A suite now has the type `TestSuite` from the new module `dream_test/suite`, with no type parameter. Each tree of a suite keeps its context inside the suite, so one `runner.new` takes suites with different contexts: `unit` suites, `unit_context` suites and Gherkin features. `runner.RunBuilder` has no type parameter too. Change each `TestSuite(Nil)` or `TestSuite(context)` annotation to `TestSuite`, and import it from `dream_test/suite`.
 
-##### 2.x: a suite with the type `TestSuite(Nil)` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L5-L13"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a suite with the type `TestSuite(Nil)` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L5-L13"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/types.{type TestSuite}
@@ -565,7 +568,7 @@ pub fn main() {
 
 `types.failed` is also `True` when a teardown hook failed and every test passed, when a setup stopped, and when a `reporter_types.Custom` reporter crashed.
 
-##### 2.x: check a run with `runner.has_failures` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/has_failures.gleam#L1-L30"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: check a run with `runner.has_failures` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/has_failures.gleam#L1-L30"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -655,7 +658,7 @@ A `before_each_test` or `after_each_test` hook gets only the `TestInfo` of the t
 
 `TestResult` and `TestInfo` hold `groups`, the names of the groups around the test. The `full_name` field is removed. `types.full_name(groups, name)` gives the old list. The JSON report still writes `full_name` as the full list.
 
-##### 2.x: a runner hook that reads `info.full_name` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/runner_hooks.gleam#L36-L39"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a runner hook that reads `info.full_name` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/runner/runner_hooks.gleam#L36-L39"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn before_each_test_hook(info: TestInfo, ctx: Nil) -> Result(Nil, String) {
@@ -682,7 +685,7 @@ fn test_label(info: TestInfo) -> String {
 
 This change affects only code that uses `types.Root` or `dream_test/parallel` directly. A `Root` was one tree of tests, not a whole suite, so it has a new name. `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`. A tree is one top-level group with its children and one context. A suite holds one or more trees. The `parallel` functions take the tree with the label `tree:`. In 2.x the label was `suite:`.
 
-##### 2.x: the tree with the label `suite:` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L32-L44"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: the tree with the label `suite:` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L32-L44"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
   let parallel_result =
@@ -742,7 +745,7 @@ This change affects only code that uses `dream_test/parallel` directly. The name
 - `RunRootParallelWithReporterConfig` is now `RunTreeParallelWithReporterConfig`.
 - `RunRootParallelWithReporterResult` is now `RunTreeParallelWithReporterResult`.
 
-##### 2.x: a call to `run_root_parallel` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L14-L17"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a call to `run_root_parallel` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L14-L17"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
       parallel.run_root_parallel(parallel.default_config(), suite)
@@ -765,7 +768,7 @@ This change affects only code that uses `dream_test/parallel` directly. The name
 
 `parallel.run_tree_parallel` returns a `RunReport`. The typed `parallel` functions take a `types.Tree(context)`. `unit.describe` gives a `TestSuite` now, so build the tree with `types.tree`.
 
-##### 2.x: `run_root_parallel` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L1-L20"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `run_root_parallel` returns a list <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_direct.gleam#L1-L20"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{have_length, or_fail_with, should, succeed}
@@ -821,7 +824,7 @@ pub fn tests() {
 
 This change affects only code that calls `parallel.run_tree_parallel_with_reporter` (in 2.x `run_root_parallel_with_reporter`) directly. `RunTreeParallelWithReporterConfig` has a new field, `outer_setups`. Give it `[]`. Its fields `runner_before_each_test` and `runner_after_each_test` are `List(fn(TestInfo) -> Result(Nil, String))`. In 2.x the hooks also got the context. `RunTreeParallelWithReporterResult` has two new fields, `hook_failures` and `outer_setups`. This example also uses the new progress API. See [Progress events](#progress-events).
 
-##### 2.x: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L1-L62"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a run with a progress reporter <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L1-L62"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{succeed}
@@ -966,49 +969,33 @@ pub fn main() {
 
 This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(initial:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
 
-##### 2.x: a table of tests built by hand <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L369-L396"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
+No file at the 2.1.3 tag builds a table of tests by hand. The 2.1.3 source of `unit.describe` and `unit.it` builds the same values: a `Root` with `seed` and `tree`, and a `Test` whose `run` takes the context.
+
+##### 2.x: `unit.describe` builds a `Root` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit.gleam#L125-L130"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{
-  type Node, type TestSuite, BeforeAll, Group, Root, Test, Unit,
+pub fn describe(
+  name name: String,
+  children children: List(UnitNode),
+) -> TestSuite(Nil) {
+  Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
 }
-import gleam/int
-import gleam/list
-import gleam/option.{None}
+```
 
-fn doubling_cases() -> List(#(Int, Int)) {
-  [#(1, 2), #(2, 4), #(21, 42)]
-}
+##### 2.x: `unit.it` builds a `Test` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit.gleam#L248-L260"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
-fn check_tables() -> Result(Nil, String) {
-  Ok(Nil)
-}
-
-fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
-  let #(input, expected) = pair
+```gleam
+pub fn it(
+  name name: String,
+  run run: fn() -> Result(AssertionResult, String),
+) -> UnitNode {
   Test(
-    name: "doubles " <> int.to_string(input),
+    name: name,
     tags: [],
     kind: Unit,
-    run: fn(_context: Nil) {
-      input * 2
-      |> should
-      |> be_equal(expected)
-      |> or_fail_with("wrong double")
-    },
+    run: fn(_nil: Nil) { run() },
     timeout_ms: None,
     source: None,
-  )
-}
-
-pub fn tests() -> TestSuite(Nil) {
-  Root(
-    seed: Nil,
-    tree: Group(name: "doubling", tags: [], children: [
-      BeforeAll(fn(_context: Nil) { check_tables() }),
-      ..list.map(doubling_cases(), doubling_test)
-    ]),
   )
 }
 ```
@@ -1064,7 +1051,7 @@ pub fn tests() -> TestSuite {
 
 The start value of a context has the label `initial` in place of `seed`, as in `steps.new(initial:)`. This affects `unit_context.describe(name:, initial:, children:)`, `types.tree(name:, initial:, children:)` and the field `initial` of `types.Tree`. A call without labels, such as `unit_context.describe("counter", 0, [...])`, does not change. Change only the label.
 
-##### 2.x: `unit_context.describe` with the label `seed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit_context.gleam#L115-L121"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `unit_context.describe` with the label `seed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit_context.gleam#L115-L121"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 pub fn describe(
@@ -1095,7 +1082,7 @@ pub fn tests() -> TestSuite {
 
 This change affects only code that has a `case` on a `types.AssertionResult`. The new variant `AssertionPending` is the result of a pending test (`unit.pending`). Add a branch for it. Its test status is `Pending`.
 
-##### 2.x: a `case` on `AssertionResult` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L2092-L2111"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a `case` on `AssertionResult` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L2092-L2111"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn assertion_to_status_and_failures(
@@ -1169,23 +1156,31 @@ A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context se
 
 In 2.x, a failed `after_all`, `after_each_suite` or `after_all_suites` hook added a fake test to the results, with a name such as `<after_all>`. The test count grew by one, and the later hooks of the same kind did not run. In 3.0.0, every hook runs. `types.report_hook_failures(report)` has one `HookFailure` for each failure.
 
-##### 2.x: look for the fake `<after_all>` test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L1857-L1866"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
+No file at the 2.1.3 tag looks for the fake test. The 2.1.3 runner code below makes it. At the first failed hook, it adds a `Failed` result with the name `<after_all>`, and it does not run the rest of the hooks.
+
+##### 2.x: a failed `after_all` hook gives a fake `<after_all>` test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L1851-L1870"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
-fn stop_database() -> Result(Nil, String) {
-  Error("the database did not stop")
-}
-
-fn database_suite() {
-  describe("Database", [
-    after_all(stop_database),
-    it("reads a row", fn() { Ok(succeed()) }),
-  ])
-}
-
-fn after_all_failed(results: List(TestResult)) -> Bool {
-  list.any(results, fn(result) { result.name == "<after_all>" })
-}
+  case hooks {
+    [] -> acc_rev
+    [hook, ..rest] ->
+      case run_hook_teardown(config, scope, context, hook) {
+        Ok(_) -> run_after_all_chain(config, scope, context, rest, acc_rev)
+        Error(message) -> {
+          let result =
+            TestResult(
+              name: "<after_all>",
+              full_name: list.append(scope, ["<after_all>"]),
+              status: Failed,
+              duration_ms: 0,
+              tags: [],
+              failures: [hook_failure("after_all", message)],
+              kind: Unit,
+            )
+          [result, ..acc_rev]
+        }
+      }
+  }
 ```
 
 ##### 3.0.0: read the hook failures of the report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_failures.gleam#L10-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
@@ -1219,23 +1214,42 @@ A failed `after_each` or `after_each_test` hook also keeps the status of its tes
 
 In 2.x, the tests of a failed `before_all`, `before_each_suite` or `before_all_suites` hook were `Failed`. In 3.0.0, they are `SetupFailed`. A test body that runs past its timeout is `TimedOut`, with the failure `timeout: test timed out`. In 2.x, a sequential run gave `Failed` for a timeout. Code that counts or matches statuses must handle `SetupFailed` and `TimedOut`.
 
-##### 2.x: count the broken tests by `Failed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L597-L631"><img align="right" alt="2.x, not compiled" src="https://img.shields.io/badge/2.x-not_compiled-lightgrey.svg?style=flat-square"></a>
+No file at the 2.1.3 tag counts the broken tests. The 2.1.3 runner code below gives the status `Failed` to each test of a failed `before_all` hook, so code that counted `Failed` results counted these tests too.
+
+##### 2.x: the tests of a failed `before_all` hook are `Failed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/parallel.gleam#L610-L641"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
-fn start_database() -> Result(Nil, String) {
-  Error("the database did not start")
-}
-
-fn broken_database_suite() {
-  describe("Broken database", [
-    before_all(start_database),
-    it("reads a row", fn() { Ok(succeed()) }),
-    it("writes a row", fn() { Ok(succeed()) }),
-  ])
-}
-
-fn count_broken(results: List(TestResult)) -> Int {
-  list.count(results, fn(result) { result.status == Failed })
+fn fail_test_nodes(
+  scope: List(String),
+  inherited_tags: List(String),
+  nodes: List(Node(context)),
+  failures_rev: List(AssertionFailure),
+  acc_rev: List(TestResult),
+) -> List(TestResult) {
+  case nodes {
+    [] -> acc_rev
+    [Test(name, tags, kind, _run, _timeout_ms, _source), ..rest] -> {
+      let full_name = list.append(scope, [name])
+      let all_tags = list.append(inherited_tags, tags)
+      let failures = list.reverse(failures_rev)
+      let result =
+        TestResult(
+          name: name,
+          full_name: full_name,
+          status: Failed,
+          duration_ms: 0,
+          tags: all_tags,
+          failures: failures,
+          kind: kind,
+        )
+      fail_test_nodes(scope, inherited_tags, rest, failures_rev, [
+        result,
+        ..acc_rev
+      ])
+    }
+    [_other, ..rest] ->
+      fail_test_nodes(scope, inherited_tags, rest, failures_rev, acc_rev)
+  }
 }
 ```
 
@@ -1302,7 +1316,7 @@ When a test ends, its process exits with reason `shutdown`. A process that the t
 
 These functions take a `types.RunReport` in place of `List(TestResult)`: `bdd.render`, `bdd.format`, `bdd.report`, `bdd.format_summary_only`, `json.render`, `json.format`, `json.format_pretty`, `json.report`, `json.report_pretty`, `gherkin.format` and `gherkin.report`. The `report` functions return the report. To format a list of results that you made, use `types.run_report(tests: results, hook_failures: [], reporter_crashes: [])`.
 
-##### 2.x: format a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/bdd_formatting.gleam#L1-L31"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: format a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/bdd_formatting.gleam#L1-L31"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{match_snapshot, or_fail_with, should}
@@ -1394,7 +1408,7 @@ The Gherkin reporter also heads other results by their groups:
 | A unit test `sums` in the groups `math` and `add`, given to `gherkin.format` | `Feature: math` | `math > add` |
 | A result with no groups and no Feature, for example a result built by hand | `Feature: <test name>` | no heading line: the scenario line prints alone, for example `Scenario: alone ✓` |
 
-##### 2.x: a Gherkin result with only the id <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L6-L18"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a Gherkin result with only the id <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/gherkin_formatting.gleam#L6-L18"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn sample_results() -> List(types.TestResult) {
@@ -1442,7 +1456,7 @@ The summary line of the BDD and Gherkin reporters lists the extra counts in a ne
 
 The progress event API is removed: `reporters/types.ReporterEvent`, `HookKind`, `HookOutcome` and `progress.handle_event`. Use `progress.line(reporter, event)` with a `progress.ProgressEvent`: `RunStartedProgress`, `TestFinishedProgress` or `RunFinishedProgress`. `progress.line` returns the text, not an `Option`. `progress.render` also takes a `progress.ProgressEvent`.
 
-##### 2.x: `progress.handle_event` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/progress_handle_event.gleam#L1-L38"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `progress.handle_event` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/progress_handle_event.gleam#L1-L38"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/file
@@ -1530,7 +1544,7 @@ In 2.x, `runner.results_reporters` took only the built-in reporters. A custom re
 
 `reporters/types.ResultsReporter` has a new variant: `Custom(render:)`. In 2.x it had only `Bdd` and `Json`. A `case` on a `ResultsReporter` needs a branch for `Custom`, or the code does not compile. Code that only builds reporters with `bdd.new()` and `json.new()` needs no change.
 
-##### 2.x: a `case` on `ResultsReporter` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/runner.gleam#L1494-L1502"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a `case` on `ResultsReporter` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/runner.gleam#L1494-L1502"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn render_results_reporter(
@@ -1568,7 +1582,7 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
 - The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.
 
-##### 2.x: JSON from a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/json_api_format.gleam#L6-L15"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: JSON from a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/json_api_format.gleam#L6-L15"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 fn example_suite() {
@@ -1611,7 +1625,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
 - `StepKeyword` has a new variant, `Asterisk`. A `case` on `StepKeyword` needs a branch for it.
 - `resolve_keyword` is removed. Use `resolve_phase`.
 
-##### 2.x: `resolve_keyword` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L24-L29"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `resolve_keyword` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L24-L29"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("resolve_keyword turns And/But into the previous keyword", fn() {
@@ -1633,7 +1647,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-##### 2.x: a `Step` with `argument` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L30-L35"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a `Step` with `argument` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L30-L35"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("Step can be constructed", fn() {
@@ -1665,7 +1679,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-##### 2.x: a `Feature` with no `rules` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L79-L103"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a `Feature` with no `rules` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L79-L103"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("Feature can be constructed", fn() {
@@ -1741,7 +1755,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-##### 2.x: a `ScenarioOutline` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L104-L122"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a `ScenarioOutline` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/gherkin_types.gleam#L104-L122"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("ScenarioOutline can be constructed", fn() {
@@ -1811,7 +1825,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
 
 `parser.parse_string` returns `Result(Feature, ParseError)`. `parser.parse_file` returns `Result(Feature, FeatureFileError)`. `discover.LoadResult.errors` is a `List(parser.FeatureFileError)`. In 2.x, each error was a `String`. Use `parser.parse_error_to_string` or `parser.feature_file_error_to_string` to get the text. A `parse_error_to_string` message starts with `line N:`. A `feature_file_error_to_string` message starts with the path for a parse error, for example `test/cart.feature: line 3: ...`. For the other errors it starts with `Failed to read feature file:`, `No feature files match the pattern` or `Cannot search for feature files with the pattern`.
 
-##### 2.x: a parse error is a `String` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/parser.gleam#L8-L22"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: a parse error is a `String` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/gherkin/parser.gleam#L8-L22"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
     it("parse_string parses a minimal feature", fn() {
@@ -1889,7 +1903,7 @@ The parser follows the official Gherkin grammar. A `.feature` file that 2.x read
 
 `sandbox.run_isolated` takes the function and its input as two arguments: `run_isolated(config, run, input)`. A function with no data takes `Nil`.
 
-##### 2.x: `run_isolated` with a closure <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/sandboxing.gleam#L1-L51"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `run_isolated` with a closure <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/sandboxing.gleam#L1-L51"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -2021,7 +2035,7 @@ pub fn tests() {
 
 No test ever had the kind `Integration`. To mark integration tests, give them a tag, and filter on the tag:
 
-##### 2.x: the `Integration` kind, never given to a test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L118-L130"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: the `Integration` kind, never given to a test <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/types.gleam#L118-L130"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 /// The kind/category of a test.
@@ -2079,7 +2093,7 @@ pub fn main() {
 
 `dream_test/context` held a list of failures (`TestContext`, `new`, `failures`, `add_failure`) that the runner never used. Keep such a list in your own code if you need it.
 
-##### 2.x: `dream_test/context` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/context_helpers.gleam#L1-L32"><img align="right" alt="2.x code, from tag 2.1.3" src="https://img.shields.io/badge/2.x_code-from_tag_2.1.3-lightgrey.svg?style=flat-square"></a>
+##### 2.x: `dream_test/context` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/context_helpers.gleam#L1-L32"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/context

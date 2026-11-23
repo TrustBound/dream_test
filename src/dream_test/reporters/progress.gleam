@@ -20,7 +20,21 @@
 ////
 //// ## Example
 ////
+//// ### Show a progress bar during the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/reporters/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
+//// import dream_test/matchers.{succeed}
+//// import dream_test/reporters/progress
+//// import dream_test/runner
+//// import dream_test/unit.{describe, it}
+////
+//// pub fn tests() {
+////   describe("Progress reporter", [
+////     it("passes", fn() { Ok(succeed()) }),
+////     it("also passes", fn() { Ok(succeed()) }),
+////   ])
+//// }
+////
 //// pub fn main() {
 ////   runner.new([tests()])
 ////   |> runner.progress_reporter(progress.new())
@@ -43,6 +57,30 @@ pub opaque type ProgressReporter {
 }
 
 /// Create a new progress reporter.
+///
+/// ## Example
+///
+/// ### Show a progress bar during the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/progress/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/progress
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///       it("adds an item", fn() { Ok(succeed()) }),
+///       it("removes an item", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.run()
+/// }
+/// ```
 pub fn new() -> ProgressReporter {
   ProgressReporter
 }
@@ -61,20 +99,29 @@ pub fn new() -> ProgressReporter {
 ///
 /// ## Example
 ///
+/// ### End the bar when the run finishes <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/progress/progress_event.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// progress.line(
-///   progress.new(),
-///   progress.RunFinishedProgress(
-///     completed: 4,
-///     total: 4,
-///     teardown_failed: 0,
-///     setup_stopped: 0,
-///   ),
-/// )
-/// |> string.ends_with("\n")
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("expected the last line to end the bar")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/progress
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/string
+///
+/// pub fn finished_line_ends_the_bar() -> Result(AssertionResult, String) {
+///   progress.line(
+///     progress.new(),
+///     progress.RunFinishedProgress(
+///       completed: 4,
+///       total: 4,
+///       teardown_failed: 0,
+///       setup_stopped: 0,
+///     ),
+///   )
+///   |> string.ends_with("\n")
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("expected the last line to end the bar")
+/// }
 /// ```
 pub type ProgressEvent {
   RunStartedProgress(total: Int)
@@ -104,12 +151,21 @@ pub type ProgressEvent {
 ///
 /// ## Example
 ///
+/// ### Start with an empty bar <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/progress/line.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// progress.line(progress.new(), progress.RunStartedProgress(total: 4))
-/// |> string.starts_with("\r0/4 [")
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("expected an empty bar for 4 tests")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/progress
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/string
+///
+/// pub fn started_line_shows_an_empty_bar() -> Result(AssertionResult, String) {
+///   progress.line(progress.new(), progress.RunStartedProgress(total: 4))
+///   |> string.starts_with("\r0/4 [")
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("expected an empty bar for 4 tests")
+/// }
 /// ```
 pub fn line(
   reporter reporter: ProgressReporter,
@@ -147,11 +203,19 @@ pub fn line(
 ///
 /// ## Example
 ///
+/// ### Render an empty bar <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/progress/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// progress.render(30, progress.RunStartedProgress(total: 10))
-/// |> should
-/// |> be_equal("0/10 [░░░░░░░░░░░░░░░░░░░] 0% ")
-/// |> or_fail_with("expected an empty bar for 10 tests")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/progress
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn started_render_is_an_empty_bar() -> Result(AssertionResult, String) {
+///   progress.render(30, progress.RunStartedProgress(total: 10))
+///   |> should
+///   |> be_equal("0/10 [░░░░░░░░░░░░░░░░░░░] 0% ")
+///   |> or_fail_with("expected an empty bar for 10 tests")
+/// }
 /// ```
 pub fn render(columns columns: Int, event event: ProgressEvent) -> String {
   let width = clamp_min(columns, 20)

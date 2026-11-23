@@ -17,15 +17,19 @@
 ////
 //// ## Example
 ////
+//// ### Run suites with a progress bar and a BDD report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import dream_test/parallel
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("Example", [
 ////     it("works", fn() {
 ////       1 + 1
@@ -36,7 +40,13 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn db_tests() -> TestSuite {
+////   describe("Database", [
+////     it("connects", fn() { Ok(succeed()) }),
+////   ])
+//// }
+////
+//// pub fn main() -> RunReport {
 ////   let db_config =
 ////     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
 ////
@@ -92,13 +102,14 @@ pub type TestInfo =
 ///
 /// ## Example
 ///
+/// ### Build and run a runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -168,13 +179,14 @@ pub type Output {
 ///
 /// ## Example
 ///
+/// ### Create a runner for one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -234,11 +246,33 @@ pub fn new(suites suites: List(TestSuite)) -> RunBuilder {
 ///
 /// ## Example
 ///
+/// ### Add two suites one after the other <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/add_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// runner.new([])
-/// |> runner.add_suites([unit_suite()])
-/// |> runner.add_suites([integration_suite()])
-/// |> runner.run()
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn unit_suite() -> TestSuite {
+///   describe("Unit", [
+///     it("adds", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn integration_suite() -> TestSuite {
+///   describe("Integration", [
+///     it("connects", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn run_unit_and_integration_suites() -> RunReport {
+///   runner.new([])
+///   |> runner.add_suites([unit_suite()])
+///   |> runner.add_suites([integration_suite()])
+///   |> runner.run()
+/// }
 /// ```
 pub fn add_suites(
   builder builder: RunBuilder,
@@ -259,18 +293,39 @@ pub fn add_suites(
 ///
 /// ## Example
 ///
+/// ### Run the database suite one test at a time <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/add_suites_with_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/parallel
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 ///
-/// let db_config =
-///   parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+/// pub fn unit_suite() -> TestSuite {
+///   describe("Unit", [
+///     it("adds", fn() { Ok(succeed()) }),
+///   ])
+/// }
 ///
-/// runner.new([])
-/// |> runner.add_suites([unit_suite()])
-/// |> runner.add_suites_with_config(db_config, [db_suite()])
-/// |> runner.max_concurrency(50)
-/// |> runner.default_timeout_ms(5_000)
-/// |> runner.run()
+/// pub fn db_suite() -> TestSuite {
+///   describe("Database", [
+///     it("connects", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn run_database_suite_alone() -> RunReport {
+///   let db_config =
+///     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+///
+///   runner.new([])
+///   |> runner.add_suites([unit_suite()])
+///   |> runner.add_suites_with_config(db_config, [db_suite()])
+///   |> runner.max_concurrency(50)
+///   |> runner.default_timeout_ms(5000)
+///   |> runner.run()
+/// }
 /// ```
 pub fn add_suites_with_config(
   builder builder: RunBuilder,
@@ -295,13 +350,14 @@ pub fn add_suites_with_config(
 ///
 /// ## Example
 ///
+/// ### Run the tests one at a time <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/sequential_execution.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Sequential tests", [
@@ -365,13 +421,14 @@ pub fn max_concurrency(
 ///
 /// ## Example
 ///
+/// ### Set the concurrency and the timeout <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Runner config demo", [
@@ -452,13 +509,14 @@ pub fn default_timeout_ms(
 ///
 /// ## Example
 ///
+/// ### Exit with status 1 when the run fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -495,6 +553,28 @@ pub fn exit_on_failure(builder builder: RunBuilder) -> RunBuilder {
 ///
 /// This reporter is driven by `TestFinished` events in completion order.
 /// It is intended for a single in-place progress bar UI.
+///
+/// ## Example
+///
+/// ### Attach a progress bar to the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/progress
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.run()
+/// }
+/// ```
 pub fn progress_reporter(
   builder builder: RunBuilder,
   reporter reporter: progress.ProgressReporter,
@@ -507,6 +587,28 @@ pub fn progress_reporter(
 /// Each results reporter gets the run report once, after the run ends. Its
 /// tests are in traversal order, so the output is the same under parallel
 /// execution.
+///
+/// ## Example
+///
+/// ### Print two reports at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/results_reporters.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new(), bdd.new() |> bdd.summary_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn results_reporters(
   builder builder: RunBuilder,
   reporters reporters: List(reporter_types.ResultsReporter),
@@ -521,13 +623,25 @@ pub fn results_reporters(
 ///
 /// ## Example
 ///
+/// ### Send the output to stdout and stderr <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/output.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// pub fn main() {
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
-///   |> runner.output(runner.Output(out: io.print, error: io.eprint))
+///   |> runner.output(runner.Output(out: io.print, error: io.print_error))
 ///   |> runner.run()
 /// }
 /// ```
@@ -552,12 +666,24 @@ pub fn output(
 ///
 /// ## Example
 ///
+/// ### Measure coverage in every run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/coverage.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/coverage
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 ///
-/// pub fn main() {
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.coverage(coverage.new())
@@ -607,12 +733,24 @@ pub fn coverage(
 ///
 /// ## Example
 ///
+/// ### Measure coverage when the environment asks for it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/coverage_from_environment.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/coverage
+/// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 ///
-/// pub fn main() {
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.results_reporters([bdd.new()])
 ///   |> runner.coverage_from_environment(coverage.new())
@@ -621,15 +759,8 @@ pub fn coverage(
 /// }
 /// ```
 ///
-/// Then, in CI (GitHub Actions):
-///
-/// ```yaml
-/// - run: gleam test
-///   env:
-///     DREAM_TEST_COVERAGE: "1"
-/// ```
-///
-/// A local `gleam test` runs without coverage, and
+/// Then, in CI, set `DREAM_TEST_COVERAGE: "1"` in the `env` of the step
+/// that runs `gleam test`. A local `gleam test` runs without coverage, and
 /// `DREAM_TEST_COVERAGE=1 gleam test` runs with it.
 pub fn coverage_from_environment(
   builder builder: RunBuilder,
@@ -651,6 +782,31 @@ pub fn coverage_from_environment(
 ///   reporter that crashed
 /// - a coverage error, for example a total below
 ///   `coverage.minimum_percent`, or coverage that did not complete
+///
+/// ## Example
+///
+/// ### Run without output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/silent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.silent()
+///   |> runner.run()
+/// }
+/// ```
 pub fn silent(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, output: Some(silent_output()))
 }
@@ -666,13 +822,14 @@ pub fn silent(builder builder: RunBuilder) -> RunBuilder {
 ///
 /// ## Example
 ///
+/// ### Run only the smoke tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/filter_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner.{type TestInfo}
 /// import dream_test/unit.{describe, it, with_tags}
-/// import gleam/io
 /// import gleam/list
 ///
 /// pub fn tests() {
@@ -727,19 +884,30 @@ pub fn filter_tests(
 ///
 /// ## Example
 ///
+/// ### Log the name of each test before it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_each_test.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/runner
-/// import dream_test/types.{type TestInfo}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport, type TestInfo}
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 /// import gleam/string
 ///
-/// fn log_test(info: TestInfo) -> Result(Nil, String) {
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn log_test(info: TestInfo) -> Result(Nil, String) {
 ///   let name = string.join(types.full_name(info.groups, info.name), " > ")
 ///   io.println("starting " <> name)
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.before_each_test(log_test)
 ///   |> runner.run()
@@ -764,6 +932,33 @@ pub fn before_each_test(
 /// runs, also after one fails. If it returns `Error("...")` or crashes, the
 /// status of the test does not change: the run report gets a
 /// `types.TeardownFailed` with hook `AfterEachTestHook`, and the run fails.
+///
+/// ## Example
+///
+/// ### Log each test after it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_each_test.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type TestInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_each_test(log_finished_test)
+///   |> runner.run()
+/// }
+///
+/// fn log_finished_test(info: TestInfo) -> Result(Nil, String) {
+///   io.println("finished " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_each_test(
   builder builder: RunBuilder,
   hook hook: fn(types.TestInfo) -> Result(Nil, String),
@@ -785,6 +980,33 @@ pub fn after_each_test(
 /// still runs.
 ///
 /// The hook does not run for a suite that has no test after filtering.
+///
+/// ## Example
+///
+/// ### Log each suite before it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_each_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.before_each_suite(log_suite_start)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_start(info: SuiteInfo) -> Result(Nil, String) {
+///   io.println("starting suite " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn before_each_suite(
   builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -807,6 +1029,33 @@ pub fn before_each_suite(
 /// and the suite name in `path`, and the run fails.
 ///
 /// The hook does not run for a suite that has no test after filtering.
+///
+/// ## Example
+///
+/// ### Log each suite after it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_each_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_each_suite(log_suite_end)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_end(info: SuiteInfo) -> Result(Nil, String) {
+///   io.println("finished suite " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_each_suite(
   builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
@@ -827,6 +1076,38 @@ pub fn after_each_suite(
 /// `SetupFailed`, no suite runs, and `after_all_suites` still runs.
 ///
 /// The hook does not run when the run has no test after filtering.
+///
+/// ## Example
+///
+/// ### Count the suites before the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_all_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/int
+/// import gleam/io
+/// import gleam/list
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///     describe("Orders", [
+///       it("lists no orders", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.before_all_suites(log_suite_count)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_count(suites: List(SuiteInfo)) -> Result(Nil, String) {
+///   io.println("running " <> int.to_string(list.length(suites)) <> " suites")
+///   Ok(Nil)
+/// }
+/// ```
 pub fn before_all_suites(
   builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
@@ -849,6 +1130,38 @@ pub fn before_all_suites(
 /// and `path: []`, and the run fails.
 ///
 /// The hook does not run when the run has no test after filtering.
+///
+/// ## Example
+///
+/// ### Count the suites after the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_all_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/int
+/// import gleam/io
+/// import gleam/list
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///     describe("Orders", [
+///       it("lists no orders", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_all_suites(log_suites_run)
+///   |> runner.run()
+/// }
+///
+/// fn log_suites_run(suites: List(SuiteInfo)) -> Result(Nil, String) {
+///   io.println("ran " <> int.to_string(list.length(suites)) <> " suites")
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_all_suites(
   builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
@@ -878,6 +1191,8 @@ pub fn after_all_suites(
 /// also ends the program with exit status 1.
 ///
 /// ## Example
+///
+/// ### Run the suites and report the results <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}

@@ -25,8 +25,16 @@
 ////
 //// If you're writing custom matchers, you'll work with `MatchResult(a)`:
 ////
+//// ### Write a custom matcher <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// pub fn be_even(result) {
+//// import dream_test/types.{
+////   type MatchResult, AssertionFailure, CustomMatcherFailure, MatchFailed, MatchOk,
+//// }
+//// import gleam/int
+//// import gleam/option.{Some}
+////
+//// pub fn be_even(result: MatchResult(Int)) -> MatchResult(Int) {
 ////   case result {
 ////     // If already failed, propagate the failure
 ////     MatchFailed(failure) -> MatchFailed(failure)
@@ -35,7 +43,7 @@
 ////   }
 //// }
 ////
-//// fn check_even(value) {
+//// fn check_even(value: Int) -> MatchResult(Int) {
 ////   case value % 2 == 0 {
 ////     True -> MatchOk(value)
 ////     False ->
@@ -98,18 +106,30 @@ import gleam/option.{type Option}
 /// `after_all` and the suite-level teardown hooks) gives a
 /// `TeardownFailed` in the run report, and the test keeps its status.
 ///
+/// ### Fail a before_all hook <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/status.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// describe("Handles failures", [
-///   before_all(fn() {
-///     case connect_to_database() {
-///       Ok(_) -> Ok(Nil)
-///       Error(e) -> Error("Database connection failed: " <> e)
-///     }
-///   }),
-///   // If before_all fails, these tests are marked SetupFailed (not run)
-///   it("test1", fn() { Ok(succeed()) }),
-///   it("test2", fn() { Ok(succeed()) }),
-/// ])
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{before_all, describe, it}
+///
+/// fn connect_to_database() -> Result(Nil, String) {
+///   Error("connection refused")
+/// }
+///
+/// pub fn handles_failures() -> TestSuite {
+///   describe("Handles failures", [
+///     before_all(fn() {
+///       case connect_to_database() {
+///         Ok(_) -> Ok(Nil)
+///         Error(reason) -> Error("Database connection failed: " <> reason)
+///       }
+///     }),
+///     // If before_all fails, these tests are marked SetupFailed (not run)
+///     it("test1", fn() { Ok(succeed()) }),
+///     it("test2", fn() { Ok(succeed()) }),
+///   ])
+/// }
 /// ```
 ///
 /// The failing hook message is recorded on the `TestResult.failures` list so
@@ -235,11 +255,18 @@ pub type AssertionFailure {
 ///
 /// Most users won't construct this directly. It's returned by `or_fail_with`:
 ///
+/// ### Make an AssertionResult with an assertion chain <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/assertion_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 2 + 3
-/// |> should
-/// |> be_equal(5)
-/// |> or_fail_with("2 + 3 should equal 5")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn two_plus_three_is_five() -> Result(AssertionResult, String) {
+///   2 + 3
+///   |> should
+///   |> be_equal(5)
+///   |> or_fail_with("2 + 3 should equal 5")
+/// }
 /// ```
 ///
 pub type AssertionResult {
@@ -256,12 +283,20 @@ pub type AssertionResult {
 ///
 /// ## How Chaining Works
 ///
+/// ### Chain matchers through MatchResult <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/match_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Some(42)
-/// |> should
-/// |> be_some()
-/// |> be_equal(42)
-/// |> or_fail_with("expected Some(42)")
+/// import dream_test/matchers.{be_equal, be_some, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/option.{Some}
+///
+/// pub fn some_holds_forty_two() -> Result(AssertionResult, String) {
+///   Some(42)
+///   |> should
+///   |> be_some()
+///   |> be_equal(42)
+///   |> or_fail_with("expected Some(42)")
+/// }
 /// ```
 ///
 /// If any matcher fails, the `MatchFailed` propagates through the rest of
@@ -288,11 +323,18 @@ pub type MatchResult(a) {
 ///
 /// ## Example
 ///
+/// ### Convert MatchOk to AssertionOk <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/to_assertion_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.to_assertion_result(types.MatchOk(1))
-/// |> should
-/// |> be_equal(types.AssertionOk)
-/// |> or_fail_with("expected MatchOk -> AssertionOk")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn match_ok_becomes_assertion_ok() -> Result(AssertionResult, String) {
+///   types.to_assertion_result(types.MatchOk(1))
+///   |> should
+///   |> be_equal(types.AssertionOk)
+///   |> or_fail_with("expected MatchOk -> AssertionOk")
+/// }
 /// ```
 ///
 pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
@@ -322,11 +364,24 @@ pub fn to_assertion_result(result result: MatchResult(a)) -> AssertionResult {
 ///
 /// After running suites, the run report has one of these for each test:
 ///
+/// ### Read the test results of a run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/test_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let results =
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type TestResult}
+/// import dream_test/unit.{describe, it}
+///
+/// fn example_suite() -> TestSuite {
+///   describe("Example", [it("passes", fn() { Ok(succeed()) })])
+/// }
+///
+/// pub fn read_the_test_results() -> List(TestResult) {
 ///   runner.new([example_suite()])
 ///   |> runner.run()
 ///   |> types.report_tests
+/// }
 /// ```
 ///
 pub type TestResult {
@@ -392,17 +447,24 @@ pub type SuiteInfo {
 ///
 /// ## Example
 ///
+/// ### Build a tree with one test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/tree.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.Tree(initial: Nil, name: "math", tags: [], children: [
-///   types.Test(
-///     name: "adds",
-///     tags: [],
-///     kind: types.Unit,
-///     run: types.WithInput(fn(_context) { Ok(types.AssertionOk) }),
-///     timeout_ms: None,
-///     source: None,
-///   ),
-/// ])
+/// import dream_test/types
+/// import gleam/option.{None}
+///
+/// pub fn math_tree() -> types.Tree(Nil) {
+///   types.Tree(initial: Nil, name: "math", tags: [], children: [
+///     types.Test(
+///       name: "adds",
+///       tags: [],
+///       kind: types.Unit,
+///       run: types.WithInput(fn(_context) { Ok(types.AssertionOk) }),
+///       timeout_ms: None,
+///       source: None,
+///     ),
+///   ])
+/// }
 /// ```
 pub type Tree(context) {
   Tree(
@@ -447,15 +509,22 @@ pub type Node(context) {
 ///
 /// ## Example
 ///
+/// ### Call a NoInput callback <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/callback.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
 /// fn setup() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// types.call(types.NoInput(setup), Nil)
-/// |> should
-/// |> be_equal(Ok(Nil))
-/// |> or_fail_with("a NoInput callback should ignore the input")
+/// pub fn no_input_ignores_the_input() -> Result(AssertionResult, String) {
+///   types.call(types.NoInput(setup), Nil)
+///   |> should
+///   |> be_equal(Ok(Nil))
+///   |> or_fail_with("a NoInput callback should ignore the input")
+/// }
 /// ```
 pub type Callback(input, output) {
   /// A function with no argument. The input is not given to it.
@@ -478,15 +547,22 @@ pub type Callback(input, output) {
 ///
 /// ## Example
 ///
+/// ### Call a WithInput callback <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/call.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
 /// fn double(number: Int) -> Int {
 ///   number * 2
 /// }
 ///
-/// types.call(types.WithInput(double), 21)
-/// |> should
-/// |> be_equal(42)
-/// |> or_fail_with("a WithInput callback should get the input")
+/// pub fn with_input_gets_the_input() -> Result(AssertionResult, String) {
+///   types.call(types.WithInput(double), 21)
+///   |> should
+///   |> be_equal(42)
+///   |> or_fail_with("a WithInput callback should get the input")
+/// }
 /// ```
 pub fn call(
   callback callback: Callback(input, output),
@@ -536,6 +612,18 @@ pub type SuiteContext(context) {
 /// ## Returns
 ///
 /// A `Tree(context)` with the name, no tags, and the children.
+///
+/// ## Example
+///
+/// ### Build a tree with no children <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/tree_function.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/types.{type Tree}
+///
+/// pub fn empty_math_tree() -> Tree(Int) {
+///   types.tree(name: "math", initial: 0, children: [])
+/// }
+/// ```
 pub fn tree(
   name name: String,
   initial initial: context,
@@ -564,11 +652,18 @@ pub fn tree(
 ///
 /// ## Example
 ///
+/// ### Make the full name of a test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/full_name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.full_name(["Cart", "totals"], "adds tax")
-/// |> should
-/// |> be_equal(["Cart", "totals", "adds tax"])
-/// |> or_fail_with("expected the group names, then the test name")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn groups_then_test_name() -> Result(AssertionResult, String) {
+///   types.full_name(["Cart", "totals"], "adds tax")
+///   |> should
+///   |> be_equal(["Cart", "totals", "adds tax"])
+///   |> or_fail_with("expected the group names, then the test name")
+/// }
 /// ```
 pub fn full_name(
   groups groups: List(String),
@@ -595,11 +690,18 @@ pub fn full_name(
 ///
 /// ## Example
 ///
+/// ### Get Passed for no failures <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/status_from_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.status_from_failures([])
-/// |> should
-/// |> be_equal(types.Passed)
-/// |> or_fail_with("expected Passed for empty failures")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn no_failures_means_passed() -> Result(AssertionResult, String) {
+///   types.status_from_failures([])
+///   |> should
+///   |> be_equal(types.Passed)
+///   |> or_fail_with("expected Passed for empty failures")
+/// }
 /// ```
 ///
 pub fn status_from_failures(
@@ -631,11 +733,18 @@ pub fn status_from_failures(
 ///
 /// ## Example
 ///
+/// ### Check that SetupFailed is a failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/is_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.is_failure(types.SetupFailed)
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("SetupFailed should be a failure")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn setup_failed_is_a_failure() -> Result(AssertionResult, String) {
+///   types.is_failure(types.SetupFailed)
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("SetupFailed should be a failure")
+/// }
 /// ```
 pub fn is_failure(status status: Status) -> Bool {
   case status {
@@ -683,11 +792,18 @@ pub type TeardownHook {
 ///
 /// ## Example
 ///
+/// ### Get the builder name of a teardown hook <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/teardown_hook_name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.teardown_hook_name(types.AfterEachSuiteHook)
-/// |> should
-/// |> be_equal("after_each_suite")
-/// |> or_fail_with("expected the builder name")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn after_each_suite_builder_name() -> Result(AssertionResult, String) {
+///   types.teardown_hook_name(types.AfterEachSuiteHook)
+///   |> should
+///   |> be_equal("after_each_suite")
+///   |> or_fail_with("expected the builder name")
+/// }
 /// ```
 pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
   case hook {
@@ -735,11 +851,18 @@ pub type SetupHook {
 ///
 /// ## Example
 ///
+/// ### Get the builder name of a setup hook <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/setup_hook_name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.setup_hook_name(types.BeforeAllSuitesHook)
-/// |> should
-/// |> be_equal("before_all_suites")
-/// |> or_fail_with("expected the builder name")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn before_all_suites_builder_name() -> Result(AssertionResult, String) {
+///   types.setup_hook_name(types.BeforeAllSuitesHook)
+///   |> should
+///   |> be_equal("before_all_suites")
+///   |> or_fail_with("expected the builder name")
+/// }
 /// ```
 pub fn setup_hook_name(hook hook: SetupHook) -> String {
   case hook {
@@ -788,12 +911,18 @@ pub fn setup_hook_name(hook hook: SetupHook) -> String {
 ///
 /// ## Example
 ///
+/// ### Make a teardown failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.TeardownFailed(
-///   hook: types.AfterAllHook,
-///   path: ["Database"],
-///   message: "could not drop the test schema",
-/// )
+/// import dream_test/types
+///
+/// pub fn drop_schema_failure() -> types.HookFailure {
+///   types.TeardownFailed(
+///     hook: types.AfterAllHook,
+///     path: ["Database"],
+///     message: "could not drop the test schema",
+///   )
+/// }
 /// ```
 pub type HookFailure {
   TeardownFailed(hook: TeardownHook, path: List(String), message: String)
@@ -825,8 +954,14 @@ pub type HookFailure {
 ///
 /// ## Example
 ///
+/// ### Make a reporter crash <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/reporter_crash.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.ReporterCrash(position: 2, reason: "error:badarith")
+/// import dream_test/types
+///
+/// pub fn second_reporter_crash() -> types.ReporterCrash {
+///   types.ReporterCrash(position: 2, reason: "error:badarith")
+/// }
 /// ```
 pub type ReporterCrash {
   ReporterCrash(position: Int, reason: String)
@@ -867,12 +1002,19 @@ pub opaque type RunReport {
 ///
 /// ## Example
 ///
+/// ### Make an empty run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/run_report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
-/// |> types.failed
-/// |> should
-/// |> be_equal(False)
-/// |> or_fail_with("an empty run should not fail")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn empty_run_does_not_fail() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.failed
+///   |> should
+///   |> be_equal(False)
+///   |> or_fail_with("an empty run should not fail")
+/// }
 /// ```
 pub fn run_report(
   tests tests: List(TestResult),
@@ -898,12 +1040,19 @@ pub fn run_report(
 ///
 /// ## Example
 ///
+/// ### Read the tests of a run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/report_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
-/// |> types.report_tests
-/// |> should
-/// |> be_equal([])
-/// |> or_fail_with("an empty run should have no tests")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn empty_run_has_no_tests() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.report_tests
+///   |> should
+///   |> be_equal([])
+///   |> or_fail_with("an empty run should have no tests")
+/// }
 /// ```
 pub fn report_tests(report report: RunReport) -> List(TestResult) {
   report.tests
@@ -923,12 +1072,19 @@ pub fn report_tests(report report: RunReport) -> List(TestResult) {
 ///
 /// ## Example
 ///
+/// ### Read the hook failures of a run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/report_hook_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
-/// |> types.report_hook_failures
-/// |> should
-/// |> be_equal([])
-/// |> or_fail_with("an empty run should have no hook failures")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn empty_run_has_no_hook_failures() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.report_hook_failures
+///   |> should
+///   |> be_equal([])
+///   |> or_fail_with("an empty run should have no hook failures")
+/// }
 /// ```
 pub fn report_hook_failures(report report: RunReport) -> List(HookFailure) {
   report.hook_failures
@@ -954,12 +1110,19 @@ pub fn report_hook_failures(report report: RunReport) -> List(HookFailure) {
 ///
 /// ## Example
 ///
+/// ### Read the crashed reporters of a run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/report_reporter_crashes.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
-/// |> types.report_reporter_crashes
-/// |> should
-/// |> be_equal([])
-/// |> or_fail_with("an empty run should have no crashed reporters")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn empty_run_has_no_crashed_reporters() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.report_reporter_crashes
+///   |> should
+///   |> be_equal([])
+///   |> or_fail_with("an empty run should have no crashed reporters")
+/// }
 /// ```
 pub fn report_reporter_crashes(
   report report: RunReport,
@@ -985,22 +1148,29 @@ pub fn report_reporter_crashes(
 ///
 /// ## Example
 ///
+/// ### Fail a run with a teardown failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/failed.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// types.run_report(
-///   tests: [],
-///   hook_failures: [
-///     types.TeardownFailed(
-///       hook: types.AfterAllSuitesHook,
-///       path: [],
-///       message: "could not stop the pool",
-///     ),
-///   ],
-///   reporter_crashes: [],
-/// )
-/// |> types.failed
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("a teardown failure should fail the run")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn teardown_failure_fails_the_run() -> Result(AssertionResult, String) {
+///   types.run_report(
+///     tests: [],
+///     hook_failures: [
+///       types.TeardownFailed(
+///         hook: types.AfterAllSuitesHook,
+///         path: [],
+///         message: "could not stop the pool",
+///       ),
+///     ],
+///     reporter_crashes: [],
+///   )
+///   |> types.failed
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("a teardown failure should fail the run")
+/// }
 /// ```
 pub fn failed(report report: RunReport) -> Bool {
   !list.is_empty(report.hook_failures)

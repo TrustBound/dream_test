@@ -19,15 +19,19 @@
 ////
 //// ## Example
 ////
+//// ### Write a suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 //// import gleam/string
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("String utilities", [
 ////     it("trims whitespace", fn() {
 ////       "  hello  "
@@ -46,7 +50,7 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([tests()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([bdd.new()])
@@ -80,15 +84,19 @@ pub type UnitNode =
 ///
 /// ## Example
 ///
+/// ### Write a suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/string
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("String utilities", [
 ///     it("trims whitespace", fn() {
 ///       "  hello  "
@@ -107,7 +115,7 @@ pub type UnitNode =
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -138,15 +146,18 @@ pub fn describe(
 ///
 /// ## Example
 ///
+/// ### Group tests inside a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, group, it}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Calculator", [
 ///     group("addition", [
 ///       it("adds small numbers", fn() {
@@ -173,7 +184,7 @@ pub fn describe(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -202,16 +213,19 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Write tests with it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 /// import gleam/string
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("String utilities", [
 ///     it("trims whitespace", fn() {
 ///       "  hello  "
@@ -230,7 +244,7 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -275,15 +289,18 @@ fn skipped_test_run() -> Result(AssertionResult, String) {
 ///
 /// ## Example
 ///
+/// ### Skip a test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/skip.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it, skip}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Skipping tests", [
 ///     it("runs normally", fn() {
 ///       2 + 3
@@ -307,7 +324,7 @@ fn skipped_test_run() -> Result(AssertionResult, String) {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -361,17 +378,20 @@ pub fn skip(
 ///
 /// ## Example
 ///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -404,23 +424,23 @@ pub fn skip(
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -450,17 +470,20 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -493,23 +516,23 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -541,17 +564,20 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -584,23 +610,23 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -631,17 +657,20 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -674,23 +703,23 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -717,15 +746,18 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Tag tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/with_tags.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it, with_tags}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Tagged tests", [
 ///     it("fast", fn() { Ok(succeed()) })
 ///       |> with_tags(["unit", "fast"]),
@@ -734,7 +766,7 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -785,12 +817,25 @@ pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Add pending tests to a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/pending.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// describe("Cart", [
-///   it("adds an item", adds_an_item),
-///   pending("removes an item"),
-///   pending("empties the cart"),
-/// ])
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it, pending}
+///
+/// fn adds_an_item() -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn cart_suite() -> TestSuite {
+///   describe("Cart", [
+///     it("adds an item", adds_an_item),
+///     pending("removes an item"),
+///     pending("empties the cart"),
+///   ])
+/// }
 /// ```
 pub fn pending(name name: String) -> UnitNode {
   Test(

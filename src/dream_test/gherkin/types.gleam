@@ -8,11 +8,19 @@
 ////
 //// Use this when building BDD suites (e.g. in a snippet `tests()` function).
 ////
+//// ### Turn a step keyword into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/keyword_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// keyword_to_string(Given)
-//// |> should
-//// |> be_equal("Given")
-//// |> or_fail_with("expected Given")
+//// import dream_test/gherkin/types.{Given, keyword_to_string}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/types as dream_types
+////
+//// pub fn given_reads_as_given() -> Result(dream_types.AssertionResult, String) {
+////   keyword_to_string(Given)
+////   |> should
+////   |> be_equal("Given")
+////   |> or_fail_with("expected Given")
+//// }
 //// ```
 
 import gleam/option.{type Option}
@@ -53,11 +61,23 @@ pub type StepKeyword {
 ///
 /// ## Example
 ///
+/// ### Resolve the phase of an And step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/resolve_phase.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// resolve_phase(keyword: And, previous: Some(GivenPhase))
-/// |> should
-/// |> be_equal(Ok(GivenPhase))
-/// |> or_fail_with("expected And after Given to be a Given step")
+/// import dream_test/gherkin/types.{And, GivenPhase, resolve_phase}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{Some}
+///
+/// pub fn and_after_given_is_a_given_step() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   resolve_phase(keyword: And, previous: Some(GivenPhase))
+///   |> should
+///   |> be_equal(Ok(GivenPhase))
+///   |> or_fail_with("expected And after Given to be a Given step")
+/// }
 /// ```
 ///
 pub type StepPhase {
@@ -77,14 +97,23 @@ pub type StepPhase {
 ///
 /// ## Example
 ///
+/// ### Build a DocString <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/doc_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// DocString(content: "{\"name\":\"example\"}", content_type: Some("json"))
-/// |> should
-/// |> be_equal(DocString(
-///   content: "{\"name\":\"example\"}",
-///   content_type: Some("json"),
-/// ))
-/// |> or_fail_with("expected DocString to be constructible")
+/// import dream_test/gherkin/types.{DocString}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{Some}
+///
+/// pub fn doc_string_holds_json() -> Result(dream_types.AssertionResult, String) {
+///   DocString(content: "{\"name\":\"example\"}", content_type: Some("json"))
+///   |> should
+///   |> be_equal(DocString(
+///     content: "{\"name\":\"example\"}",
+///     content_type: Some("json"),
+///   ))
+///   |> or_fail_with("expected DocString to be constructible")
+/// }
 /// ```
 ///
 pub type DocString {
@@ -97,13 +126,19 @@ pub type DocString {
 ///
 /// ## Example
 ///
+/// ### Build a DataTable <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/data_table.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]])
-/// |> should
-/// |> be_equal(
-///   DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]]),
-/// )
-/// |> or_fail_with("expected DataTable to be constructible")
+/// import dream_test/gherkin/types.{DataTable}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn data_table_holds_rows() -> Result(dream_types.AssertionResult, String) {
+///   DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]])
+///   |> should
+///   |> be_equal(DataTable(rows: [["name", "email"], ["Alice", "alice@test.com"]]))
+///   |> or_fail_with("expected DataTable to be constructible")
+/// }
 /// ```
 ///
 pub type DataTable {
@@ -124,21 +159,30 @@ pub type DataTable {
 ///
 /// ## Example
 ///
+/// ### Build a step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/step.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Step(
-///   keyword: Given,
-///   text: "I have 1 item",
-///   doc_string: None,
-///   data_table: None,
-/// )
-/// |> should
-/// |> be_equal(Step(
-///   keyword: Given,
-///   text: "I have 1 item",
-///   doc_string: None,
-///   data_table: None,
-/// ))
-/// |> or_fail_with("expected Step to be constructible")
+/// import dream_test/gherkin/types.{Given, Step}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
+///
+/// pub fn step_holds_its_text() -> Result(dream_types.AssertionResult, String) {
+///   Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   )
+///   |> should
+///   |> be_equal(Step(
+///     keyword: Given,
+///     text: "I have 1 item",
+///     doc_string: None,
+///     data_table: None,
+///   ))
+///   |> or_fail_with("expected Step to be constructible")
+/// }
 /// ```
 ///
 pub type Step {
@@ -166,11 +210,23 @@ pub type Step {
 ///
 /// ## Example
 ///
+/// ### Make an empty background <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/empty_background.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// empty_background()
-/// |> should
-/// |> be_equal(Background(name: "", description: None, steps: []))
-/// |> or_fail_with("expected empty background")
+/// import dream_test/gherkin/types.{Background, empty_background}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
+///
+/// pub fn empty_background_has_no_steps() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   empty_background()
+///   |> should
+///   |> be_equal(Background(name: "", description: None, steps: []))
+///   |> or_fail_with("expected empty background")
+/// }
 /// ```
 ///
 pub type Background {
@@ -195,11 +251,22 @@ pub type Background {
 ///
 /// ## Example
 ///
+/// ### Build an examples table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/examples_table.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]])
-/// |> should
-/// |> be_equal(ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]]))
-/// |> or_fail_with("expected ExamplesTable to be constructible")
+/// import dream_test/gherkin/types.{ExamplesTable}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn examples_table_holds_rows() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]])
+///   |> should
+///   |> be_equal(ExamplesTable(headers: ["quantity"], rows: [["1"], ["5"]]))
+///   |> or_fail_with("expected ExamplesTable to be constructible")
+/// }
 /// ```
 pub type ExamplesTable {
   ExamplesTable(
@@ -218,18 +285,27 @@ pub type ExamplesTable {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let table = ExamplesTable(headers: ["quantity"], rows: [["1"]])
+/// ### Build an Examples section <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/examples.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// Examples(name: "Small", description: None, tags: ["fast"], table: Some(table))
-/// |> should
-/// |> be_equal(Examples(
-///   name: "Small",
-///   description: None,
-///   tags: ["fast"],
-///   table: Some(table),
-/// ))
-/// |> or_fail_with("expected Examples to be constructible")
+/// ```gleam
+/// import dream_test/gherkin/types.{Examples, ExamplesTable}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None, Some}
+///
+/// pub fn examples_hold_a_table() -> Result(dream_types.AssertionResult, String) {
+///   let table = ExamplesTable(headers: ["quantity"], rows: [["1"]])
+///
+///   Examples(name: "Small", description: None, tags: ["fast"], table: Some(table))
+///   |> should
+///   |> be_equal(Examples(
+///     name: "Small",
+///     description: None,
+///     tags: ["fast"],
+///     table: Some(table),
+///   ))
+///   |> or_fail_with("expected Examples to be constructible")
+/// }
 /// ```
 ///
 pub type Examples {
@@ -258,11 +334,24 @@ pub type Examples {
 ///
 /// ## Example
 ///
+/// ### Turn a Scenario Outline keyword into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/scenario_keyword.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// scenario_keyword_to_string(KeywordScenarioOutline)
-/// |> should
-/// |> be_equal("Scenario Outline")
-/// |> or_fail_with("expected Scenario Outline")
+/// import dream_test/gherkin/types.{
+///   KeywordScenarioOutline, scenario_keyword_to_string,
+/// }
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn scenario_outline_reads_as_scenario_outline() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   scenario_keyword_to_string(KeywordScenarioOutline)
+///   |> should
+///   |> be_equal("Scenario Outline")
+///   |> or_fail_with("expected Scenario Outline")
+/// }
 /// ```
 ///
 pub type ScenarioKeyword {
@@ -284,28 +373,37 @@ pub type ScenarioKeyword {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let step =
-///   Step(
-///     keyword: Given,
-///     text: "I have 1 item",
-///     doc_string: None,
-///     data_table: None,
-///   )
-/// let scenario =
-///   Scenario(
-///     keyword: KeywordScenario,
-///     name: "Example scenario",
-///     description: None,
-///     tags: [],
-///     steps: [step],
-///     examples: [],
-///   )
+/// ### Build a scenario <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/scenario.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// scenario.name
-/// |> should
-/// |> be_equal("Example scenario")
-/// |> or_fail_with("expected Scenario to be constructible")
+/// ```gleam
+/// import dream_test/gherkin/types.{Given, KeywordScenario, Scenario, Step}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
+///
+/// pub fn scenario_holds_its_name() -> Result(dream_types.AssertionResult, String) {
+///   let step =
+///     Step(
+///       keyword: Given,
+///       text: "I have 1 item",
+///       doc_string: None,
+///       data_table: None,
+///     )
+///   let scenario =
+///     Scenario(
+///       keyword: KeywordScenario,
+///       name: "Example scenario",
+///       description: None,
+///       tags: [],
+///       steps: [step],
+///       examples: [],
+///     )
+///
+///   scenario.name
+///   |> should
+///   |> be_equal("Example scenario")
+///   |> or_fail_with("expected Scenario to be constructible")
+/// }
 /// ```
 ///
 pub type Scenario {
@@ -336,17 +434,34 @@ pub type Scenario {
 ///
 /// ## Example
 ///
+/// ### Build a rule <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/rule.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Rule(name: "Stock", description: None, tags: [], background: None, scenarios: [])
-/// |> should
-/// |> be_equal(Rule(
-///   name: "Stock",
-///   description: None,
-///   tags: [],
-///   background: None,
-///   scenarios: [],
-/// ))
-/// |> or_fail_with("expected Rule to be constructible")
+/// import dream_test/gherkin/types.{Rule}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
+///
+/// pub fn rule_holds_its_name() -> Result(dream_types.AssertionResult, String) {
+///   Rule(
+///     name: "Stock",
+///     description: None,
+///     tags: [],
+///     background: None,
+///     scenarios: [],
+///   )
+///   |> should
+///   |> be_equal(
+///     Rule(
+///       name: "Stock",
+///       description: None,
+///       tags: [],
+///       background: None,
+///       scenarios: [],
+///     ),
+///   )
+///   |> or_fail_with("expected Rule to be constructible")
+/// }
 /// ```
 ///
 pub type Rule {
@@ -381,39 +496,48 @@ pub type Rule {
 ///
 /// ## Example
 ///
+/// ### Build a feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/feature.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let step =
-///   Step(
-///     keyword: Given,
-///     text: "I have 1 item",
-///     doc_string: None,
-///     data_table: None,
-///   )
-/// let scenario =
-///   Scenario(
-///     keyword: KeywordScenario,
-///     name: "Example scenario",
-///     description: None,
-///     tags: [],
-///     steps: [step],
-///     examples: [],
-///   )
+/// import dream_test/gherkin/types.{Feature, Given, KeywordScenario, Scenario, Step}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
 ///
-/// let feature =
-///   Feature(
-///     name: "Example feature",
-///     source: None,
-///     description: None,
-///     tags: [],
-///     background: None,
-///     scenarios: [scenario],
-///     rules: [],
-///   )
+/// pub fn feature_holds_its_name() -> Result(dream_types.AssertionResult, String) {
+///   let step =
+///     Step(
+///       keyword: Given,
+///       text: "I have 1 item",
+///       doc_string: None,
+///       data_table: None,
+///     )
+///   let scenario =
+///     Scenario(
+///       keyword: KeywordScenario,
+///       name: "Example scenario",
+///       description: None,
+///       tags: [],
+///       steps: [step],
+///       examples: [],
+///     )
 ///
-/// feature.name
-/// |> should
-/// |> be_equal("Example feature")
-/// |> or_fail_with("expected Feature to be constructible")
+///   let feature =
+///     Feature(
+///       name: "Example feature",
+///       source: None,
+///       description: None,
+///       tags: [],
+///       background: None,
+///       scenarios: [scenario],
+///       rules: [],
+///     )
+///
+///   feature.name
+///   |> should
+///   |> be_equal("Example feature")
+///   |> or_fail_with("expected Feature to be constructible")
+/// }
 /// ```
 ///
 pub type Feature {
@@ -444,11 +568,19 @@ pub type Feature {
 ///
 /// ## Example
 ///
+/// ### Turn an Example keyword into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/scenario_keyword_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// scenario_keyword_to_string(KeywordExample)
-/// |> should
-/// |> be_equal("Example")
-/// |> or_fail_with("expected Example")
+/// import dream_test/gherkin/types.{KeywordExample, scenario_keyword_to_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn example_reads_as_example() -> Result(dream_types.AssertionResult, String) {
+///   scenario_keyword_to_string(KeywordExample)
+///   |> should
+///   |> be_equal("Example")
+///   |> or_fail_with("expected Example")
+/// }
 /// ```
 ///
 pub fn scenario_keyword_to_string(keyword keyword: ScenarioKeyword) -> String {
@@ -464,11 +596,19 @@ pub fn scenario_keyword_to_string(keyword keyword: ScenarioKeyword) -> String {
 ///
 /// ## Example
 ///
+/// ### Turn a step keyword into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/keyword_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// keyword_to_string(Given)
-/// |> should
-/// |> be_equal("Given")
-/// |> or_fail_with("expected Given")
+/// import dream_test/gherkin/types.{Given, keyword_to_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn given_reads_as_given() -> Result(dream_types.AssertionResult, String) {
+///   keyword_to_string(Given)
+///   |> should
+///   |> be_equal("Given")
+///   |> or_fail_with("expected Given")
+/// }
 /// ```
 ///
 pub fn keyword_to_string(keyword keyword: StepKeyword) -> String {
@@ -488,11 +628,20 @@ pub fn keyword_to_string(keyword keyword: StepKeyword) -> String {
 ///
 /// ## Example
 ///
+/// ### Read a step keyword from text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/keyword_from_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// keyword_from_string("Then")
-/// |> should
-/// |> be_equal(Some(Then))
-/// |> or_fail_with("expected Some(Then)")
+/// import dream_test/gherkin/types.{Then, keyword_from_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{Some}
+///
+/// pub fn then_text_reads_as_then() -> Result(dream_types.AssertionResult, String) {
+///   keyword_from_string("Then")
+///   |> should
+///   |> be_equal(Some(Then))
+///   |> or_fail_with("expected Some(Then)")
+/// }
 /// ```
 ///
 pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
@@ -517,11 +666,23 @@ pub fn keyword_from_string(text text: String) -> Option(StepKeyword) {
 ///
 /// ## Example
 ///
+/// ### Resolve the phase of an And step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/resolve_phase.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// resolve_phase(keyword: And, previous: Some(GivenPhase))
-/// |> should
-/// |> be_equal(Ok(GivenPhase))
-/// |> or_fail_with("expected And after Given to be a Given step")
+/// import dream_test/gherkin/types.{And, GivenPhase, resolve_phase}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{Some}
+///
+/// pub fn and_after_given_is_a_given_step() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   resolve_phase(keyword: And, previous: Some(GivenPhase))
+///   |> should
+///   |> be_equal(Ok(GivenPhase))
+///   |> or_fail_with("expected And after Given to be a Given step")
+/// }
 /// ```
 ///
 pub fn resolve_phase(
@@ -542,11 +703,19 @@ pub fn resolve_phase(
 ///
 /// ## Example
 ///
+/// ### Turn a phase into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/phase_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// phase_to_string(WhenPhase)
-/// |> should
-/// |> be_equal("When")
-/// |> or_fail_with("expected When")
+/// import dream_test/gherkin/types.{WhenPhase, phase_to_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn when_phase_reads_as_when() -> Result(dream_types.AssertionResult, String) {
+///   phase_to_string(WhenPhase)
+///   |> should
+///   |> be_equal("When")
+///   |> or_fail_with("expected When")
+/// }
 /// ```
 ///
 pub fn phase_to_string(phase phase: StepPhase) -> String {
@@ -563,11 +732,22 @@ pub fn phase_to_string(phase phase: StepPhase) -> String {
 ///
 /// ## Example
 ///
+/// ### Make an empty examples table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/empty_examples.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// empty_examples()
-/// |> should
-/// |> be_equal(ExamplesTable(headers: [], rows: []))
-/// |> or_fail_with("expected empty examples table")
+/// import dream_test/gherkin/types.{ExamplesTable, empty_examples}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+///
+/// pub fn empty_examples_have_no_rows() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   empty_examples()
+///   |> should
+///   |> be_equal(ExamplesTable(headers: [], rows: []))
+///   |> or_fail_with("expected empty examples table")
+/// }
 /// ```
 ///
 pub fn empty_examples() -> ExamplesTable {
@@ -580,11 +760,23 @@ pub fn empty_examples() -> ExamplesTable {
 ///
 /// ## Example
 ///
+/// ### Make an empty background <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/types/empty_background.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// empty_background()
-/// |> should
-/// |> be_equal(Background(name: "", description: None, steps: []))
-/// |> or_fail_with("expected empty background")
+/// import dream_test/gherkin/types.{Background, empty_background}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/option.{None}
+///
+/// pub fn empty_background_has_no_steps() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   empty_background()
+///   |> should
+///   |> be_equal(Background(name: "", description: None, steps: []))
+///   |> or_fail_with("expected empty background")
+/// }
 /// ```
 ///
 pub fn empty_background() -> Background {

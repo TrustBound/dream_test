@@ -6,11 +6,16 @@
 //// the summary line. Use this module in a custom reporter to show the same
 //// section.
 ////
+//// ### Format the hook failure section <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/hook_failures/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/reporters/hook_failures
+//// import dream_test/types.{type RunReport}
 ////
-//// hook_failures.format(types.report_hook_failures(report))
-//// // -> "Setup and teardown failures:\n  after_all in Database\n    could not drop the schema\n"
+//// pub fn hook_failure_section(report: RunReport) -> String {
+////   hook_failures.format(types.report_hook_failures(report))
+////   // -> "Setup and teardown failures:\n  after_all in Database\n    could not drop the schema\n"
+//// }
 //// ```
 
 import dream_test/reporters/ansi
@@ -42,16 +47,23 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Format a setup that stopped <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/hook_failures/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// hook_failures.format([
-///   types.SetupStopped(
-///     setup: types.BeforeAllHook,
-///     path: ["root"],
-///     reason: "Boom",
-///     not_run: [["root", "b"], ["root", "c"]],
-///   ),
-/// ])
-/// // -> "Setup and teardown failures:\n  before_all in \"root\" stopped: the process that keeps its setup alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
+/// import dream_test/reporters/hook_failures
+/// import dream_test/types
+///
+/// pub fn stopped_setup_section() -> String {
+///   hook_failures.format([
+///     types.SetupStopped(
+///       setup: types.BeforeAllHook,
+///       path: ["root"],
+///       reason: "Boom",
+///       not_run: [["root", "b"], ["root", "c"]],
+///     ),
+///   ])
+///   // -> "Setup and teardown failures:\n  before_all in \"root\" stopped: the process that keeps its setup alive exited with Boom.\n    These tests had not started and were not run:\n      root > b\n      root > c\n"
+/// }
 /// ```
 pub fn format(failures failures: List(HookFailure)) -> String {
   format_section(failures, False)
@@ -73,8 +85,16 @@ pub fn format(failures failures: List(HookFailure)) -> String {
 ///
 /// ## Example
 ///
+/// ### Print the hook failures in color <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/hook_failures/format_in_color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// io.print(hook_failures.format_in_color(types.report_hook_failures(report)))
+/// import dream_test/reporters/hook_failures
+/// import dream_test/types.{type RunReport}
+/// import gleam/io
+///
+/// pub fn print_hook_failures_in_color(report: RunReport) -> Nil {
+///   io.print(hook_failures.format_in_color(types.report_hook_failures(report)))
+/// }
 /// ```
 pub fn format_in_color(failures failures: List(HookFailure)) -> String {
   format_section(failures, True)

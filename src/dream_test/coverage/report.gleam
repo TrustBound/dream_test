@@ -6,6 +6,8 @@
 ////
 //// ## Reading a report
 ////
+//// ### Print the line counts of each file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/report
 //// import gleam/int
@@ -58,8 +60,16 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the report types <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/report.{type CoverageReport, LineCoverage}
+////
+//// pub fn cart_report() -> CoverageReport {
+////   report.new([
+////     report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)]),
+////   ])
+//// }
 //// ```
 
 import gleam/int
@@ -124,8 +134,19 @@ pub opaque type ExcludedFile {
 ///
 /// ## Example
 ///
+/// ### Build an ignored range with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/ignored_range.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.ignored_range(first_line: 40, last_line: 44, reason: Some("debug only"))
+/// import dream_test/coverage/report.{type IgnoredRange}
+/// import gleam/option.{Some}
+///
+/// pub fn debug_only_range() -> IgnoredRange {
+///   report.ignored_range(
+///     first_line: 40,
+///     last_line: 44,
+///     reason: Some("debug only"),
+///   )
+/// }
 /// ```
 pub fn ignored_range(
   first_line first_line: Int,
@@ -139,10 +160,17 @@ pub fn ignored_range(
 ///
 /// ## Example
 ///
+/// ### Read the first line of a range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/ignored_first_line.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.ignored_range(first_line: 40, last_line: 44, reason: None)
-/// |> report.ignored_first_line()
-/// // -> 40
+/// import dream_test/coverage/report
+/// import gleam/option.{None}
+///
+/// pub fn range_starts_at_line_forty() -> Int {
+///   report.ignored_range(first_line: 40, last_line: 44, reason: None)
+///   |> report.ignored_first_line()
+///   // -> 40
+/// }
 /// ```
 pub fn ignored_first_line(range range: IgnoredRange) -> Int {
   range.first_line
@@ -153,10 +181,17 @@ pub fn ignored_first_line(range range: IgnoredRange) -> Int {
 ///
 /// ## Example
 ///
+/// ### Read the last line of a range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/ignored_last_line.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.ignored_range(first_line: 40, last_line: 44, reason: None)
-/// |> report.ignored_last_line()
-/// // -> 44
+/// import dream_test/coverage/report
+/// import gleam/option.{None}
+///
+/// pub fn range_ends_at_line_forty_four() -> Int {
+///   report.ignored_range(first_line: 40, last_line: 44, reason: None)
+///   |> report.ignored_last_line()
+///   // -> 44
+/// }
 /// ```
 pub fn ignored_last_line(range range: IgnoredRange) -> Int {
   range.last_line
@@ -167,10 +202,21 @@ pub fn ignored_last_line(range range: IgnoredRange) -> Int {
 ///
 /// ## Example
 ///
+/// ### Read the reason of a range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/ignored_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.ignored_range(first_line: 40, last_line: 44, reason: Some("debug only"))
-/// |> report.ignored_reason()
-/// // -> Some("debug only")
+/// import dream_test/coverage/report
+/// import gleam/option.{type Option, Some}
+///
+/// pub fn range_reason_is_debug_only() -> Option(String) {
+///   report.ignored_range(
+///     first_line: 40,
+///     last_line: 44,
+///     reason: Some("debug only"),
+///   )
+///   |> report.ignored_reason()
+///   // -> Some("debug only")
+/// }
 /// ```
 pub fn ignored_reason(range range: IgnoredRange) -> Option(String) {
   range.reason
@@ -195,12 +241,19 @@ pub fn ignored_reason(range range: IgnoredRange) -> Option(String) {
 ///
 /// ## Example
 ///
+/// ### Build an excluded file with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/excluded_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.excluded_file(
-///   source_path: "src/app/generated/db.gleam",
-///   pattern: "src/app/generated/**",
-///   reason: Some("generated code"),
-/// )
+/// import dream_test/coverage/report.{type ExcludedFile}
+/// import gleam/option.{Some}
+///
+/// pub fn generated_database_file() -> ExcludedFile {
+///   report.excluded_file(
+///     source_path: "src/app/generated/db.gleam",
+///     pattern: "src/app/generated/**",
+///     reason: Some("generated code"),
+///   )
+/// }
 /// ```
 pub fn excluded_file(
   source_path source_path: String,
@@ -214,14 +267,21 @@ pub fn excluded_file(
 ///
 /// ## Example
 ///
+/// ### Read the path of an excluded file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/excluded_source_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.excluded_file(
-///   source_path: "src/app/generated/db.gleam",
-///   pattern: "src/app/generated/**",
-///   reason: None,
-/// )
-/// |> report.excluded_source_path()
-/// // -> "src/app/generated/db.gleam"
+/// import dream_test/coverage/report
+/// import gleam/option.{None}
+///
+/// pub fn excluded_path_is_generated_database() -> String {
+///   report.excluded_file(
+///     source_path: "src/app/generated/db.gleam",
+///     pattern: "src/app/generated/**",
+///     reason: None,
+///   )
+///   |> report.excluded_source_path()
+///   // -> "src/app/generated/db.gleam"
+/// }
 /// ```
 pub fn excluded_source_path(file file: ExcludedFile) -> String {
   file.source_path
@@ -231,14 +291,21 @@ pub fn excluded_source_path(file file: ExcludedFile) -> String {
 ///
 /// ## Example
 ///
+/// ### Read the pattern of an excluded file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/excluded_pattern.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.excluded_file(
-///   source_path: "src/app/generated/db.gleam",
-///   pattern: "src/app/generated/**",
-///   reason: None,
-/// )
-/// |> report.excluded_pattern()
-/// // -> "src/app/generated/**"
+/// import dream_test/coverage/report
+/// import gleam/option.{None}
+///
+/// pub fn excluded_pattern_is_generated_folder() -> String {
+///   report.excluded_file(
+///     source_path: "src/app/generated/db.gleam",
+///     pattern: "src/app/generated/**",
+///     reason: None,
+///   )
+///   |> report.excluded_pattern()
+///   // -> "src/app/generated/**"
+/// }
 /// ```
 pub fn excluded_pattern(file file: ExcludedFile) -> String {
   file.pattern
@@ -249,14 +316,21 @@ pub fn excluded_pattern(file file: ExcludedFile) -> String {
 ///
 /// ## Example
 ///
+/// ### Read the reason of an excluded file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/excluded_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.excluded_file(
-///   source_path: "src/app/generated/db.gleam",
-///   pattern: "src/app/generated/**",
-///   reason: Some("generated code"),
-/// )
-/// |> report.excluded_reason()
-/// // -> Some("generated code")
+/// import dream_test/coverage/report
+/// import gleam/option.{type Option, Some}
+///
+/// pub fn excluded_reason_is_generated_code() -> Option(String) {
+///   report.excluded_file(
+///     source_path: "src/app/generated/db.gleam",
+///     pattern: "src/app/generated/**",
+///     reason: Some("generated code"),
+///   )
+///   |> report.excluded_reason()
+///   // -> Some("generated code")
+/// }
 /// ```
 pub fn excluded_reason(file file: ExcludedFile) -> Option(String) {
   file.reason
@@ -276,10 +350,16 @@ pub type LineCoverage {
 ///
 /// ## Example
 ///
+/// ### Build a report with one file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([
-///   report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)]),
-/// ])
+/// import dream_test/coverage/report.{type CoverageReport, LineCoverage}
+///
+/// pub fn report_with_one_file() -> CoverageReport {
+///   report.new([
+///     report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)]),
+///   ])
+/// }
 /// ```
 pub fn new(files files: List(FileCoverage)) -> CoverageReport {
   CoverageReport(files: files, excluded_files: [], inexact_line_files: [])
@@ -292,12 +372,18 @@ pub fn new(files files: List(FileCoverage)) -> CoverageReport {
 ///
 /// ## Example
 ///
+/// ### Build a file with unsorted lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/app/cart.gleam", [
-///   LineCoverage(line: 4, calls: 0),
-///   LineCoverage(line: 3, calls: 2),
-/// ])
-/// // lines are stored as line 3, then line 4
+/// import dream_test/coverage/report.{type FileCoverage, LineCoverage}
+///
+/// pub fn cart_file_with_sorted_lines() -> FileCoverage {
+///   report.file("src/app/cart.gleam", [
+///     LineCoverage(line: 4, calls: 0),
+///     LineCoverage(line: 3, calls: 2),
+///   ])
+///   // lines are stored as line 3, then line 4
+/// }
 /// ```
 pub fn file(
   source_path source_path: String,
@@ -331,15 +417,22 @@ fn compare_lines(left: LineCoverage, right: LineCoverage) -> Order {
 ///
 /// ## Example
 ///
+/// ### Ignore lines of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/add_ignored_ranges.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
-/// |> report.add_ignored_ranges([
-///   report.ignored_range(
-///     first_line: 40,
-///     last_line: 44,
-///     reason: Some("debug only"),
-///   ),
-/// ])
+/// import dream_test/coverage/report.{type FileCoverage, LineCoverage}
+/// import gleam/option.{Some}
+///
+/// pub fn cart_file_with_debug_lines_ignored() -> FileCoverage {
+///   report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
+///   |> report.add_ignored_ranges([
+///     report.ignored_range(
+///       first_line: 40,
+///       last_line: 44,
+///       reason: Some("debug only"),
+///     ),
+///   ])
+/// }
 /// ```
 pub fn add_ignored_ranges(
   file file: FileCoverage,
@@ -366,13 +459,20 @@ fn compare_ranges(left: IgnoredRange, right: IgnoredRange) -> Order {
 ///
 /// ## Example
 ///
+/// ### Read the ignored ranges of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/ignored_ranges.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/app/cart.gleam", [])
-/// |> report.add_ignored_ranges([
-///   report.ignored_range(first_line: 71, last_line: 71, reason: None),
-/// ])
-/// |> report.ignored_ranges()
-/// // -> [report.ignored_range(first_line: 71, last_line: 71, reason: None)]
+/// import dream_test/coverage/report.{type IgnoredRange}
+/// import gleam/option.{None}
+///
+/// pub fn ignored_ranges_of_cart_file() -> List(IgnoredRange) {
+///   report.file("src/app/cart.gleam", [])
+///   |> report.add_ignored_ranges([
+///     report.ignored_range(first_line: 71, last_line: 71, reason: None),
+///   ])
+///   |> report.ignored_ranges()
+///   // -> [report.ignored_range(first_line: 71, last_line: 71, reason: None)]
+/// }
 /// ```
 pub fn ignored_ranges(file file: FileCoverage) -> List(IgnoredRange) {
   file.ignored_ranges
@@ -394,15 +494,24 @@ pub fn ignored_ranges(file file: FileCoverage) -> List(IgnoredRange) {
 ///
 /// ## Example
 ///
+/// ### Exclude a generated file from a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/add_excluded_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([cart_file])
-/// |> report.add_excluded_files([
-///   report.excluded_file(
-///     source_path: "src/app/generated/db.gleam",
-///     pattern: "src/app/generated/**",
-///     reason: Some("generated code"),
-///   ),
-/// ])
+/// import dream_test/coverage/report.{type CoverageReport, LineCoverage}
+/// import gleam/option.{Some}
+///
+/// pub fn report_with_generated_file_excluded() -> CoverageReport {
+///   let cart_file =
+///     report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
+///   report.new([cart_file])
+///   |> report.add_excluded_files([
+///     report.excluded_file(
+///       source_path: "src/app/generated/db.gleam",
+///       pattern: "src/app/generated/**",
+///       reason: Some("generated code"),
+///     ),
+///   ])
+/// }
 /// ```
 pub fn add_excluded_files(
   report report: CoverageReport,
@@ -420,11 +529,24 @@ pub fn add_excluded_files(
 ///
 /// ## Example
 ///
+/// ### Read the excluded files of a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/excluded_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([])
-/// |> report.add_excluded_files([generated_file])
-/// |> report.excluded_files()
-/// // -> [generated_file]
+/// import dream_test/coverage/report.{type ExcludedFile}
+/// import gleam/option.{None}
+///
+/// pub fn excluded_files_of_report() -> List(ExcludedFile) {
+///   let generated_file =
+///     report.excluded_file(
+///       source_path: "src/app/generated/db.gleam",
+///       pattern: "src/app/generated/**",
+///       reason: None,
+///     )
+///   report.new([])
+///   |> report.add_excluded_files([generated_file])
+///   |> report.excluded_files()
+///   // -> [generated_file]
+/// }
 /// ```
 pub fn excluded_files(report report: CoverageReport) -> List(ExcludedFile) {
   report.excluded_files
@@ -448,9 +570,17 @@ pub fn excluded_files(report report: CoverageReport) -> List(ExcludedFile) {
 ///
 /// ## Example
 ///
+/// ### Mark a file as having inexact lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/add_inexact_line_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([cart_file])
-/// |> report.add_inexact_line_files(["src/app/cart.gleam"])
+/// import dream_test/coverage/report.{type CoverageReport, LineCoverage}
+///
+/// pub fn report_with_inexact_cart_lines() -> CoverageReport {
+///   let cart_file =
+///     report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
+///   report.new([cart_file])
+///   |> report.add_inexact_line_files(["src/app/cart.gleam"])
+/// }
 /// ```
 pub fn add_inexact_line_files(
   report report: CoverageReport,
@@ -471,11 +601,17 @@ pub fn add_inexact_line_files(
 ///
 /// ## Example
 ///
+/// ### Read the files with inexact lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/inexact_line_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([])
-/// |> report.add_inexact_line_files(["src/app/cart.gleam"])
-/// |> report.inexact_line_files()
-/// // -> ["src/app/cart.gleam"]
+/// import dream_test/coverage/report
+///
+/// pub fn inexact_line_files_of_report() -> List(String) {
+///   report.new([])
+///   |> report.add_inexact_line_files(["src/app/cart.gleam"])
+///   |> report.inexact_line_files()
+///   // -> ["src/app/cart.gleam"]
+/// }
 /// ```
 pub fn inexact_line_files(report report: CoverageReport) -> List(String) {
   report.inexact_line_files
@@ -485,10 +621,18 @@ pub fn inexact_line_files(report report: CoverageReport) -> List(String) {
 ///
 /// ## Example
 ///
+/// ### Read the files of a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([cart_file])
-/// |> report.files()
-/// // -> [cart_file]
+/// import dream_test/coverage/report.{type FileCoverage, LineCoverage}
+///
+/// pub fn files_of_report() -> List(FileCoverage) {
+///   let cart_file =
+///     report.file("src/app/cart.gleam", [LineCoverage(line: 3, calls: 1)])
+///   report.new([cart_file])
+///   |> report.files()
+///   // -> [cart_file]
+/// }
 /// ```
 pub fn files(report report: CoverageReport) -> List(FileCoverage) {
   report.files
@@ -498,10 +642,16 @@ pub fn files(report report: CoverageReport) -> List(FileCoverage) {
 ///
 /// ## Example
 ///
+/// ### Read the path of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/source_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/app/cart.gleam", [])
-/// |> report.source_path()
-/// // -> "src/app/cart.gleam"
+/// import dream_test/coverage/report
+///
+/// pub fn source_path_of_cart_file() -> String {
+///   report.file("src/app/cart.gleam", [])
+///   |> report.source_path()
+///   // -> "src/app/cart.gleam"
+/// }
 /// ```
 pub fn source_path(file file: FileCoverage) -> String {
   file.source_path
@@ -511,10 +661,16 @@ pub fn source_path(file file: FileCoverage) -> String {
 ///
 /// ## Example
 ///
+/// ### Read the lines of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/lines.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [LineCoverage(line: 3, calls: 1)])
-/// |> report.lines()
-/// // -> [LineCoverage(line: 3, calls: 1)]
+/// import dream_test/coverage/report.{type LineCoverage, LineCoverage}
+///
+/// pub fn lines_of_file() -> List(LineCoverage) {
+///   report.file("src/a.gleam", [LineCoverage(line: 3, calls: 1)])
+///   |> report.lines()
+///   // -> [LineCoverage(line: 3, calls: 1)]
+/// }
 /// ```
 pub fn lines(file file: FileCoverage) -> List(LineCoverage) {
   file.lines
@@ -535,15 +691,21 @@ pub fn lines(file file: FileCoverage) -> List(LineCoverage) {
 ///
 /// ## Example
 ///
+/// ### Find the missed line ranges <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/missed_ranges.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [
-///   LineCoverage(line: 1, calls: 0),
-///   LineCoverage(line: 2, calls: 0),
-///   LineCoverage(line: 3, calls: 1),
-///   LineCoverage(line: 5, calls: 0),
-/// ])
-/// |> report.missed_ranges()
-/// // -> [#(1, 2), #(5, 5)]
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn missed_ranges_of_file() -> List(#(Int, Int)) {
+///   report.file("src/a.gleam", [
+///     LineCoverage(line: 1, calls: 0),
+///     LineCoverage(line: 2, calls: 0),
+///     LineCoverage(line: 3, calls: 1),
+///     LineCoverage(line: 5, calls: 0),
+///   ])
+///   |> report.missed_ranges()
+///   // -> [#(1, 2), #(5, 5)]
+/// }
 /// ```
 pub fn missed_ranges(file file: FileCoverage) -> List(#(Int, Int)) {
   file.lines
@@ -584,13 +746,19 @@ fn merge_ranges(
 ///
 /// ## Example
 ///
+/// ### Count the lines that ran <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/hit_line_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [
-///   LineCoverage(line: 1, calls: 3),
-///   LineCoverage(line: 2, calls: 0),
-/// ])
-/// |> report.hit_line_count()
-/// // -> 1
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn one_line_was_hit() -> Int {
+///   report.file("src/a.gleam", [
+///     LineCoverage(line: 1, calls: 3),
+///     LineCoverage(line: 2, calls: 0),
+///   ])
+///   |> report.hit_line_count()
+///   // -> 1
+/// }
 /// ```
 pub fn hit_line_count(file file: FileCoverage) -> Int {
   list.count(file.lines, line_was_hit)
@@ -607,13 +775,19 @@ fn line_was_hit(line: LineCoverage) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Count the executable lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/executable_line_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [
-///   LineCoverage(line: 1, calls: 3),
-///   LineCoverage(line: 2, calls: 0),
-/// ])
-/// |> report.executable_line_count()
-/// // -> 2
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn two_lines_are_executable() -> Int {
+///   report.file("src/a.gleam", [
+///     LineCoverage(line: 1, calls: 3),
+///     LineCoverage(line: 2, calls: 0),
+///   ])
+///   |> report.executable_line_count()
+///   // -> 2
+/// }
 /// ```
 pub fn executable_line_count(file file: FileCoverage) -> Int {
   list.length(file.lines)
@@ -623,9 +797,23 @@ pub fn executable_line_count(file file: FileCoverage) -> Int {
 ///
 /// ## Example
 ///
+/// ### Count the lines that ran in all files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/total_hit_line_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([cart_file, types_file])
-/// |> report.total_hit_line_count()
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn hit_lines_in_all_files() -> Int {
+///   let cart_file =
+///     report.file("src/app/cart.gleam", [
+///       LineCoverage(line: 3, calls: 1),
+///       LineCoverage(line: 4, calls: 0),
+///     ])
+///   let types_file =
+///     report.file("src/app/types.gleam", [LineCoverage(line: 1, calls: 2)])
+///   report.new([cart_file, types_file])
+///   |> report.total_hit_line_count()
+///   // -> 2
+/// }
 /// ```
 pub fn total_hit_line_count(report report: CoverageReport) -> Int {
   list.fold(report.files, 0, add_hit_lines)
@@ -639,9 +827,23 @@ fn add_hit_lines(total: Int, file: FileCoverage) -> Int {
 ///
 /// ## Example
 ///
+/// ### Count the executable lines in all files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/report/total_executable_line_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([cart_file, types_file])
-/// |> report.total_executable_line_count()
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn executable_lines_in_all_files() -> Int {
+///   let cart_file =
+///     report.file("src/app/cart.gleam", [
+///       LineCoverage(line: 3, calls: 1),
+///       LineCoverage(line: 4, calls: 0),
+///     ])
+///   let types_file =
+///     report.file("src/app/types.gleam", [LineCoverage(line: 1, calls: 2)])
+///   report.new([cart_file, types_file])
+///   |> report.total_executable_line_count()
+///   // -> 3
+/// }
 /// ```
 pub fn total_executable_line_count(report report: CoverageReport) -> Int {
   list.fold(report.files, 0, add_executable_lines)

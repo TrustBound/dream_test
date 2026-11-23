@@ -15,11 +15,19 @@
 ////
 //// ## Example
 ////
+//// ### Format one and a half seconds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/timing/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// timing.format_duration_ms(1500)
-//// |> should
-//// |> be_equal("1.5s")
-//// |> or_fail_with("expected 1.5s")
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/timing
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn formats_one_and_a_half_seconds() -> Result(AssertionResult, String) {
+////   timing.format_duration_ms(1500)
+////   |> should
+////   |> be_equal("1.5s")
+////   |> or_fail_with("expected 1.5s")
+//// }
 //// ```
 
 import gleam/float
@@ -39,15 +47,23 @@ import gleam/int
 ///
 /// ## Example
 ///
-/// ```gleam
-/// // Arrange & Act
-/// let ms = timing.format_duration_ms(42)
+/// ### Format a duration in milliseconds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/timing/format_duration_ms.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// // Assert
-/// ms
-/// |> should
-/// |> be_equal("42ms")
-/// |> or_fail_with("expected 42ms")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/timing
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn formats_forty_two_milliseconds() -> Result(AssertionResult, String) {
+///   // Arrange & Act
+///   let formatted = timing.format_duration_ms(42)
+///
+///   // Assert
+///   formatted
+///   |> should
+///   |> be_equal("42ms")
+///   |> or_fail_with("expected 42ms")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -84,11 +100,19 @@ pub fn format_duration_ms(duration_ms duration_ms: Int) -> String {
 ///
 /// ## Examples
 ///
+/// ### Format a duration in microseconds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/timing/format_duration_us.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// timing.format_duration_us(500)
-/// |> should
-/// |> be_equal("0.5ms")
-/// |> or_fail_with("expected 0.5ms")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/timing
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn formats_half_a_millisecond() -> Result(AssertionResult, String) {
+///   timing.format_duration_us(500)
+///   |> should
+///   |> be_equal("0.5ms")
+///   |> or_fail_with("expected 0.5ms")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -119,15 +143,23 @@ pub fn format_duration_us(duration_us duration_us: Int) -> String {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let t1 = timing.now_ms()
-/// let t2 = timing.now_ms()
-/// let ok = t2 >= t1
+/// ### Read the monotonic clock in milliseconds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/timing/now_ms.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// ok
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("expected now_ms to be monotonic")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/timing
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn now_ms_never_goes_back() -> Result(AssertionResult, String) {
+///   let first = timing.now_ms()
+///   let second = timing.now_ms()
+///   let is_monotonic = second >= first
+///
+///   is_monotonic
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("expected now_ms to be monotonic")
+/// }
 /// ```
 ///
 /// ## Returns
@@ -143,15 +175,23 @@ pub fn now_ms() -> Int {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let t1 = timing.now_us()
-/// let t2 = timing.now_us()
-/// let ok = t2 >= t1
+/// ### Read the monotonic clock in microseconds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/timing/now_us.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// ok
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("expected now_us to be monotonic")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/timing
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn now_us_never_goes_back() -> Result(AssertionResult, String) {
+///   let first = timing.now_us()
+///   let second = timing.now_us()
+///   let is_monotonic = second >= first
+///
+///   is_monotonic
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("expected now_us to be monotonic")
+/// }
 /// ```
 ///
 /// ## Returns

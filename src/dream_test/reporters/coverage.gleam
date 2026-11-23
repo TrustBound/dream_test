@@ -9,34 +9,46 @@
 //// coverage with `coverage.start` and `coverage.finish`, for example from
 //// another test runner.
 ////
-//// ```gleam
-//// import dream_test/coverage
-//// import dream_test/reporters/coverage as coverage_reporter
+//// ### Measure coverage around your own test run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/coverage/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// let config = coverage.new()
-//// let assert Ok(session) = coverage.start(config)
-//// run_my_tests()
-//// let assert Ok(coverage_report) = coverage.finish(session)
-//// io.print(coverage_reporter.render(report: coverage_report, config: config))
+//// ```gleam
+//// import dream_test/coverage.{type CoverageError}
+//// import dream_test/reporters/coverage as coverage_reporter
+//// import gleam/io
+//// import gleam/result
+////
+//// pub fn print_coverage_table(
+////   run_my_tests: fn() -> Nil,
+//// ) -> Result(Nil, CoverageError) {
+////   let config = coverage.new()
+////   use session <- result.try(coverage.start(config))
+////   run_my_tests()
+////   use coverage_report <- result.map(coverage.finish(session))
+////   io.print(coverage_reporter.render(report: coverage_report, config: config))
+//// }
 //// ```
 ////
 //// ## Example output
 ////
+//// ### A coverage table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_with_empty_file.txt#L1-L6"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
 //// Coverage
-//// File                      Lines  Cover
-//// src/app/cart.gleam        18/20  90.0%
-//// src/app/types.gleam       0/0    -
-//// Total                     18/20  90.0%
+//// File                 Lines  Cover
+//// src/app/cart.gleam   18/20  90.0%
+//// src/app/types.gleam  0/0    -
+//// Total                18/20  90.0%
 //// LCOV: build/coverage/lcov.info
 //// ```
 ////
 //// With `coverage.show_missing()`, a `Missing` column lists the lines that
 //// did not run, as ranges:
 ////
+//// ### The Missing column <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_missing.txt#L2-L3"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
-//// File                      Lines  Cover  Missing
-//// src/app/cart.gleam        18/20  90.0%  12-13
+//// File                Lines  Cover  Missing
+//// src/app/cart.gleam  18/20  90.0%  12-13
 //// ```
 ////
 //// When a pattern excludes a file or a marker ignores a line, an `Excluded:`
@@ -44,10 +56,12 @@
 //// `Excluded` column lists the ignored lines with their reasons, and a row
 //// names each excluded file with its pattern and reason:
 ////
+//// ### The Excluded column <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_excluded.txt#L2-L6"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
 //// File                        Lines  Cover  Excluded
 //// src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71
-//// src/app/generated/db.gleam  excluded: matches src/app/generated/**
+//// src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)
 //// Total                       18/20  90.0%
 //// Excluded: 1 file, 6 lines in 1 file
 //// ```
@@ -55,6 +69,8 @@
 //// `coverage.sort_by_coverage()` lists the lowest coverage first.
 //// `coverage.hide_complete()` leaves out the files where every line ran and
 //// says how many it left out:
+////
+//// ### The table with the complete files hidden <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_hidden.txt#L2-L5"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```text
 //// File                Lines  Cover
@@ -72,10 +88,12 @@
 //// the table names the file, because its line numbers may be off. The
 //// warning does not fail the run:
 ////
+//// ### The warning about line numbers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_inexact_lines.txt#L7-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
 //// Warning: coverage line numbers may be off in files that a Gleam version before 1.19 built:
 ////   src/app/cart.gleam
-////   Reason: before 1.19, Gleam maps only the first line of each function ...
+////   Reason: before 1.19, Gleam maps only the first line of each function to its source line, so other lines in a function can show the wrong number in the Missing column, the LCOV file and coverage:ignore markers.
 ////   Fix: build and test with Gleam 1.19 or later (`gleam --version` shows the version).
 //// ```
 ////
@@ -245,20 +263,28 @@ const missing_column_width = 60
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let coverage_report =
-///   report.new([
-///     report.file("src/a.gleam", [
-///       LineCoverage(line: 1, calls: 1),
-///       LineCoverage(line: 2, calls: 0),
-///     ]),
-///   ])
+/// ### Render the table of one file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/coverage/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// coverage_reporter.render(
-///   report: coverage_report,
-///   config: coverage.new() |> coverage.no_lcov(),
-/// )
-/// // -> "\nCoverage\nFile         Lines  Cover\nsrc/a.gleam  1/2    50.0%\nTotal        1/2    50.0%\n"
+/// ```gleam
+/// import dream_test/coverage
+/// import dream_test/coverage/report.{LineCoverage}
+/// import dream_test/reporters/coverage as coverage_reporter
+///
+/// pub fn table_of_one_file() -> String {
+///   let coverage_report =
+///     report.new([
+///       report.file("src/a.gleam", [
+///         LineCoverage(line: 1, calls: 1),
+///         LineCoverage(line: 2, calls: 0),
+///       ]),
+///     ])
+///
+///   coverage_reporter.render(
+///     report: coverage_report,
+///     config: coverage.new() |> coverage.no_lcov(),
+///   )
+///   // -> "\nCoverage\nFile         Lines  Cover\nsrc/a.gleam  1/2    50.0%\nTotal        1/2    50.0%\n"
+/// }
 /// ```
 pub fn render(
   report coverage_report: CoverageReport,
@@ -704,23 +730,30 @@ fn render_inexact_line_warning(source_paths: List(String)) -> String {
 ///
 /// ## Example
 ///
+/// ### Render a coverage failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/coverage/render_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage_reporter.render_failure(
-///   error: NoSourceFiles("lib"),
-///   outcome: RunOutcome(
-///     passed: 3,
-///     failed: 0,
-///     teardown_failed: 0,
-///     setup_stopped: 0,
-///     reporters_crashed: 0,
-///     exit_on_failure: True,
-///   ),
-/// )
-/// // -> "\nCoverage failed\n"
-/// //    <> "  Found no .gleam or .erl files in the source directory \"lib\".\n"
-/// //    <> "  Reason: the directory exists, but coverage has nothing in it to measure.\n"
-/// //    <> "  Fix: set the directory that holds your code with coverage.source_directory(...).\n"
-/// //    <> "\nTests: 3 passed. Exit status 1, because coverage was requested and did not complete.\n"
+/// import dream_test/coverage.{NoSourceFiles}
+/// import dream_test/reporters/coverage.{RunOutcome} as coverage_reporter
+///
+/// pub fn no_source_files_block() -> String {
+///   coverage_reporter.render_failure(
+///     error: NoSourceFiles("lib"),
+///     outcome: RunOutcome(
+///       passed: 3,
+///       failed: 0,
+///       teardown_failed: 0,
+///       setup_stopped: 0,
+///       reporters_crashed: 0,
+///       exit_on_failure: True,
+///     ),
+///   )
+///   // -> "\nCoverage failed\n"
+///   //    <> "  Found no .gleam or .erl files in the source directory \"lib\".\n"
+///   //    <> "  Reason: the directory exists, but coverage has nothing in it to measure.\n"
+///   //    <> "  Fix: set the directory that holds your code with coverage.source_directory(...).\n"
+///   //    <> "\nTests: 3 passed. Exit status 1, because coverage was requested and did not complete.\n"
+/// }
 /// ```
 pub fn render_failure(
   error error: CoverageError,

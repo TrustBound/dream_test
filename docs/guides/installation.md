@@ -20,15 +20,13 @@ Why dev-dependency? Tests are a build-time concern. Keeping it in `[dev-dependen
 
 In your own project, run:
 
+#### Run the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/check.sh#L9"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```sh
 gleam test
 ```
 
-Only the Dream Test repository has a Makefile, in its top folder. The example projects have none. In the repository, `make examples` runs the tests of each example project, and `make test` runs `gleam test`:
-
-```sh
-make test
-```
+Only the Dream Test repository has a Makefile, in its top folder. The example projects have none. In the repository, `make test` runs `gleam test`, `make snippets` runs the tests of the snippets project, and `make examples` runs the tests of the other example projects.
 
 **Note:** `gleam test` runs the test runner module at `test/{project_name}_test.gleam` (where `project_name` matches the `name` in your `gleam.toml`). This file must define `pub fn main()`. See the `gleeunit` docs for the standard runner shape. ([hexdocs.pm/gleeunit](https://hexdocs.pm/gleeunit/index.html))
 

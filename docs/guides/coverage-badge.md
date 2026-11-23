@@ -47,7 +47,7 @@ Save this file as `.github/workflows/coverage.yml`, or copy these three parts in
 
 Replace `OWNER/REPO` with your repository. Change `main` if your default branch has a different name.
 
-```yaml
+```yaml illustration
 name: Coverage
 
 on:
@@ -206,7 +206,7 @@ The comparison uses the exact line counts, like `coverage.check_minimum`. The ba
 
 Replace `OWNER/REPO` again:
 
-```text
+```markdown
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OWNER/REPO/badges/coverage.json)](https://github.com/OWNER/REPO/actions/workflows/coverage.yml?query=branch%3Amain)
 ```
 
@@ -218,7 +218,7 @@ The link opens the runs of the workflow on `main`. Add `&style=flat-square` (or 
 2. Open the `coverage-badge` job in the Actions tab. The last line is `Coverage badge published: 80.0% (yellow)`, or `Coverage badge unchanged: 80.0%` when the total did not change.
 3. Read the file from the branch:
 
-   ```sh
+   ```sh illustration
    git fetch origin badges
    git show origin/badges:coverage.json
    ```

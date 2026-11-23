@@ -14,12 +14,17 @@
 ////
 //// Coverage is opt-in. Turn it on from your test `main`:
 ////
+//// ### Turn on coverage in the test main <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_with_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage
 //// import dream_test/reporters/bdd
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
+//// import dream_test/unit.{describe}
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([tests()])
 ////   |> runner.results_reporters([bdd.new()])
 ////   |> runner.coverage(
@@ -30,12 +35,18 @@
 ////   |> runner.exit_on_failure()
 ////   |> runner.run()
 //// }
+////
+//// fn tests() -> TestSuite {
+////   describe("app", [])
+//// }
 //// ```
 ////
 //// To measure coverage only in some runs (for example in CI), use
 //// `runner.coverage_from_environment` in place of `runner.coverage`. It turns
 //// coverage on only when the `DREAM_TEST_COVERAGE` environment variable is
 //// `1` or `true`:
+////
+//// ### Run with coverage from the environment <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/examples.sh#L23"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```sh
 //// DREAM_TEST_COVERAGE=1 gleam test
@@ -48,12 +59,27 @@
 //// `dream_test/reporters/coverage`, or read it with
 //// `dream_test/coverage/report`.
 ////
+//// ### Measure coverage around your own test run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_without_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// let config = coverage.new()
-//// let assert Ok(session) = coverage.start(config)
-//// run_my_tests()
-//// let assert Ok(coverage_report) = coverage.finish(session)
-//// io.print(coverage_reporter.render(report: coverage_report, config: config))
+//// import app/cart
+//// import dream_test/coverage
+//// import dream_test/reporters/coverage as coverage_reporter
+//// import gleam/bool
+//// import gleam/io
+////
+//// pub fn measure_and_print_coverage() -> Nil {
+////   let config = coverage.new()
+////   let assert Ok(session) = coverage.start(config)
+////   let tests_passed = run_my_tests()
+////   let assert Ok(coverage_report) = coverage.finish(session)
+////   io.println("Tests passed: " <> bool.to_string(tests_passed))
+////   io.print(coverage_reporter.render(report: coverage_report, config: config))
+//// }
+////
+//// fn run_my_tests() -> Bool {
+////   cart.total([10, 20]) == 30
+//// }
 //// ```
 ////
 //// ## What is measured
@@ -96,7 +122,12 @@
 //// marker on its own line. `gleam format` moves a comment at the end of a
 //// code line to the next line, so a marker after code is not supported.
 ////
+//// ### Leave lines out with ignore markers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_ignore_markers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
+//// import gleam/io
+//// import gleam/string
+////
 //// pub fn log(message: String) -> Nil {
 ////   // coverage:ignore
 ////   io.println(message)
@@ -106,6 +137,7 @@
 //// pub fn dump(value: a) -> a {
 ////   echo value
 //// }
+////
 //// // coverage:ignore-end
 ////
 //// // coverage:ignore-function only old callers use this
@@ -151,12 +183,16 @@
 //// An exclusion is never silent. When a pattern excludes a file or a marker
 //// ignores a line, a count line follows the total:
 ////
+//// ### The count line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_excluded.txt#L6"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
 //// Excluded: 1 file, 6 lines in 1 file
 //// ```
 ////
 //// `coverage.show_excluded` adds an `Excluded` column with the ignored lines
 //// and their reasons, and a row for each excluded file:
+////
+//// ### The Excluded column <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_excluded.txt#L2-L6"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```text
 //// File                        Lines  Cover  Excluded
@@ -182,6 +218,8 @@
 //// - `coverage.hide_complete()` leaves out files where every line ran. The
 ////   total still counts them, and a line says how many were left out:
 ////
+//// ### The table with the complete files hidden <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_hidden.txt#L2-L5"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```text
 //// File                Lines  Cover
 //// src/app/cart.gleam  18/20  90.0%
@@ -194,13 +232,19 @@
 //// Coverage always writes LCOV unless `coverage.no_lcov()` is set. It can
 //// also write the same report in other formats when it finishes:
 ////
+//// ### Write the report in every format <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_other_formats.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// coverage.new()
-//// |> coverage.json_path("build/coverage/coverage.json")
-//// |> coverage.cobertura_path("build/coverage/cobertura.xml")
-//// |> coverage.markdown_path("build/coverage/coverage.md")
-//// |> coverage.html_path("build/coverage/html")
-//// |> coverage.html_file("build/coverage/all.html")
+//// import dream_test/coverage.{type CoverageConfig}
+////
+//// pub fn write_every_format() -> CoverageConfig {
+////   coverage.new()
+////   |> coverage.json_path("build/coverage/coverage.json")
+////   |> coverage.cobertura_path("build/coverage/cobertura.xml")
+////   |> coverage.markdown_path("build/coverage/coverage.md")
+////   |> coverage.html_path("build/coverage/html")
+////   |> coverage.html_file("build/coverage/all.html")
+//// }
 //// ```
 ////
 //// - JSON: a summary per file, with missing lines, ignored lines and
@@ -229,37 +273,82 @@
 //// `finish` in its stop path, before the BEAM halts. `finish` writes the
 //// LCOV file:
 ////
+//// ### Measure a server and write its LCOV file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_server.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// pub fn main() {
+//// import app/cart
+//// import dream_test/coverage
+//// import gleam/int
+//// import gleam/io
+//// import gleam/list
+////
+//// pub fn main() -> Nil {
 ////   let config =
 ////     coverage.new()
 ////     |> coverage.lcov_path("build/coverage/servers/app.info")
 ////   let assert Ok(session) = coverage.start(config)
-////   serve_until_stop_requested()
+////   serve_requests([[10, 20], [5]])
 ////   let assert Ok(_) = coverage.finish(session)
+////   Nil
+//// }
+////
+//// fn serve_requests(requests: List(List(Int))) -> Nil {
+////   list.each(requests, fn(prices) {
+////     io.println("Cart total: " <> int.to_string(cart.total(prices)))
+////   })
 //// }
 //// ```
 ////
 //// In the test run, delete the old file before the server starts, stop the
 //// server before the tests end, and merge the file:
 ////
-//// ```gleam
-//// describe("app", [
-////   before_all(fn() {
-////     file.delete("build/coverage/servers/app.info")
-////     |> result.map_error(file.error_to_string)
-////   }),
-////   before_all(start_server),
-////   after_all(stop_server_and_wait_for_exit),
-////   it("serves the home page", get_home_page),
-//// ])
+//// ### Merge the server LCOV file into the test run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_test_run.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// runner.new([app_tests()])
-//// |> runner.coverage(
-////   coverage.new()
-////   |> coverage.merge_lcov("build/coverage/servers/*.info"),
-//// )
-//// |> runner.run()
+//// ```gleam
+//// import dream_test/coverage
+//// import dream_test/file
+//// import dream_test/matchers.{succeed}
+//// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult, type RunReport}
+//// import dream_test/unit.{after_all, before_all, describe, it}
+//// import gleam/result
+////
+//// pub fn app_tests() -> TestSuite {
+////   describe("app", [
+////     before_all(fn() {
+////       file.delete("build/coverage/servers/app.info")
+////       |> result.map_error(file.error_to_string)
+////     }),
+////     before_all(start_server),
+////     after_all(stop_server_and_wait_for_exit),
+////     it("serves the home page", get_home_page),
+////   ])
+//// }
+////
+//// pub fn main() -> RunReport {
+////   runner.new([app_tests()])
+////   |> runner.coverage(
+////     coverage.new()
+////     |> coverage.merge_lcov("build/coverage/servers/*.info"),
+////   )
+////   |> runner.run()
+//// }
+////
+//// fn start_server() -> Result(Nil, String) {
+////   // Start the server as a separate OS process here.
+////   Ok(Nil)
+//// }
+////
+//// fn stop_server_and_wait_for_exit() -> Result(Nil, String) {
+////   // Send the stop request and wait until the server has exited here.
+////   Ok(Nil)
+//// }
+////
+//// fn get_home_page() -> Result(AssertionResult, String) {
+////   // Request the home page and check the response here.
+////   Ok(succeed())
+//// }
 //// ```
 ////
 //// - Start the server from the project root, the same directory the tests
@@ -330,8 +419,14 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the coverage module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/module_import.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage
+////
+//// pub fn default_settings() -> coverage.CoverageConfig {
+////   coverage.new()
+//// }
 //// ```
 
 import dream_test/coverage/cobertura
@@ -661,10 +756,24 @@ pub type AnalysisCause {
 ///
 /// ## Example
 ///
+/// ### Run the tests with default coverage <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// runner.new([tests()])
-/// |> runner.coverage(coverage.new())
-/// |> runner.run()
+/// import dream_test/coverage
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe}
+///
+/// pub fn run_tests_with_default_coverage() -> RunReport {
+///   runner.new([tests()])
+///   |> runner.coverage(coverage.new())
+///   |> runner.run()
+/// }
+///
+/// fn tests() -> TestSuite {
+///   describe("app", [])
+/// }
 /// ```
 pub fn new() -> CoverageConfig {
   CoverageConfig(
@@ -705,9 +814,15 @@ pub fn new() -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### Measure a folder inside src <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/source_directory.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.source_directory("src/app")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn measure_the_app_folder() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.source_directory("src/app")
+/// }
 /// ```
 pub fn source_directory(
   config config: CoverageConfig,
@@ -731,9 +846,15 @@ pub fn source_directory(
 ///
 /// ## Example
 ///
+/// ### Write the LCOV file to another path <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/lcov_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.lcov_path("build/coverage/unit.lcov")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_lcov_to_unit_file() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.lcov_path("build/coverage/unit.lcov")
+/// }
 /// ```
 pub fn lcov_path(
   config config: CoverageConfig,
@@ -759,9 +880,15 @@ pub fn lcov_path(
 ///
 /// ## Example
 ///
+/// ### Write a JSON summary <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.json_path("build/coverage/coverage.json")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_json_summary() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.json_path("build/coverage/coverage.json")
+/// }
 /// ```
 pub fn json_path(
   config config: CoverageConfig,
@@ -788,9 +915,15 @@ pub fn json_path(
 ///
 /// ## Example
 ///
+/// ### Write Cobertura XML <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/cobertura_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_cobertura_xml() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.cobertura_path("build/coverage/cobertura.xml")
+/// }
 /// ```
 pub fn cobertura_path(
   config config: CoverageConfig,
@@ -817,9 +950,15 @@ pub fn cobertura_path(
 ///
 /// ## Example
 ///
+/// ### Write a Markdown table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/markdown_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.markdown_path("build/coverage/coverage.md")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_markdown_table() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.markdown_path("build/coverage/coverage.md")
+/// }
 /// ```
 pub fn markdown_path(
   config config: CoverageConfig,
@@ -855,9 +994,15 @@ pub fn markdown_path(
 ///
 /// ## Example
 ///
+/// ### Write HTML pages to a directory <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.html_path("build/coverage/html")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_html_pages() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.html_path("build/coverage/html")
+/// }
 /// ```
 pub fn html_path(
   config config: CoverageConfig,
@@ -891,9 +1036,15 @@ pub fn html_path(
 ///
 /// ## Example
 ///
+/// ### Write one combined HTML page <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.html_file("build/coverage/all.html")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn write_one_html_page() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.html_file("build/coverage/all.html")
+/// }
 /// ```
 pub fn html_file(
   config config: CoverageConfig,
@@ -914,9 +1065,15 @@ pub fn html_file(
 ///
 /// ## Example
 ///
+/// ### Turn off the LCOV file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/no_lcov.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.no_lcov()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn skip_the_lcov_file() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.no_lcov()
+/// }
 /// ```
 pub fn no_lcov(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, lcov_path: None)
@@ -940,9 +1097,15 @@ pub fn no_lcov(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### List the lines that did not run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/show_missing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.show_missing()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn list_missing_lines() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.show_missing()
+/// }
 /// ```
 pub fn show_missing(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, show_missing: True)
@@ -969,9 +1132,15 @@ pub fn show_missing(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### Require 80 percent total coverage <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/minimum_percent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent(80.0)
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn require_eighty_percent() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.minimum_percent(80.0)
+/// }
 /// ```
 pub fn minimum_percent(
   config config: CoverageConfig,
@@ -1011,10 +1180,16 @@ pub fn minimum_percent(
 ///
 /// ## Example
 ///
+/// ### Require a minimum for each file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/minimum_percent_per_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent(90.0)
-/// |> coverage.minimum_percent_per_file(70.0)
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn require_seventy_percent_in_each_file() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.minimum_percent(90.0)
+///   |> coverage.minimum_percent_per_file(70.0)
+/// }
 /// ```
 pub fn minimum_percent_per_file(
   config config: CoverageConfig,
@@ -1055,9 +1230,15 @@ pub fn minimum_percent_per_file(
 ///
 /// ## Example
 ///
+/// ### Merge the LCOV files of servers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/merge_lcov.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.merge_lcov("build/coverage/servers/*.info")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn merge_server_coverage() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.merge_lcov("build/coverage/servers/*.info")
+/// }
 /// ```
 pub fn merge_lcov(
   config config: CoverageConfig,
@@ -1102,10 +1283,16 @@ pub fn merge_lcov(
 ///
 /// ## Example
 ///
+/// ### Exclude generated and FFI files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/exclude.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.exclude("src/app/generated/**")
-/// |> coverage.exclude("src/**/*_ffi.erl")
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn exclude_generated_and_ffi_files() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.exclude("src/app/generated/**")
+///   |> coverage.exclude("src/**/*_ffi.erl")
+/// }
 /// ```
 pub fn exclude(
   config config: CoverageConfig,
@@ -1137,12 +1324,18 @@ pub fn exclude(
 ///
 /// ## Example
 ///
+/// ### Exclude generated code with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/exclude_with_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.exclude_with_reason(
-///   pattern: "src/app/generated/**",
-///   reason: "generated from the database schema",
-/// )
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn exclude_generated_code_with_reason() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.exclude_with_reason(
+///     pattern: "src/app/generated/**",
+///     reason: "generated from the database schema",
+///   )
+/// }
 /// ```
 pub fn exclude_with_reason(
   config config: CoverageConfig,
@@ -1195,9 +1388,15 @@ fn non_empty_text(text: String) -> Option(String) {
 ///
 /// ## Example
 ///
+/// ### List what coverage left out <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/show_excluded.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.show_excluded()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn list_excluded_files_and_lines() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.show_excluded()
+/// }
 /// ```
 pub fn show_excluded(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, show_excluded: True)
@@ -1231,13 +1430,19 @@ pub fn show_excluded(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### Require a reason for each exclusion <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/require_exclusion_reasons.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.exclude_with_reason(
-///   pattern: "src/app/generated/**",
-///   reason: "generated code",
-/// )
-/// |> coverage.require_exclusion_reasons()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn require_a_reason_for_each_exclusion() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.exclude_with_reason(
+///     pattern: "src/app/generated/**",
+///     reason: "generated code",
+///   )
+///   |> coverage.require_exclusion_reasons()
+/// }
 /// ```
 pub fn require_exclusion_reasons(
   config config: CoverageConfig,
@@ -1264,10 +1469,16 @@ pub fn require_exclusion_reasons(
 ///
 /// ## Example
 ///
+/// ### Print the table in colour <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.show_missing()
-/// |> coverage.color()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn print_missing_lines_in_colour() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.show_missing()
+///   |> coverage.color()
+/// }
 /// ```
 pub fn color(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, color: True)
@@ -1291,9 +1502,15 @@ pub fn color(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### List the lowest coverage first <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/sort_by_coverage.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.sort_by_coverage()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn list_lowest_coverage_first() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.sort_by_coverage()
+/// }
 /// ```
 pub fn sort_by_coverage(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, sort_by_coverage: True)
@@ -1317,9 +1534,15 @@ pub fn sort_by_coverage(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### Hide fully covered files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/hide_complete.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.hide_complete()
+/// import dream_test/coverage.{type CoverageConfig}
+///
+/// pub fn hide_fully_covered_files() -> CoverageConfig {
+///   coverage.new()
+///   |> coverage.hide_complete()
+/// }
 /// ```
 pub fn hide_complete(config config: CoverageConfig) -> CoverageConfig {
   CoverageConfig(..config, hide_complete: True)
@@ -1335,11 +1558,17 @@ pub fn hide_complete(config config: CoverageConfig) -> CoverageConfig {
 ///
 /// ## Example
 ///
+/// ### Read the show_missing setting <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/shows_missing.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.show_missing()
-/// |> coverage.shows_missing()
-/// // -> True
+/// import dream_test/coverage
+///
+/// pub fn show_missing_is_on() -> Bool {
+///   coverage.new()
+///   |> coverage.show_missing()
+///   |> coverage.shows_missing()
+///   // -> True
+/// }
 /// ```
 pub fn shows_missing(config config: CoverageConfig) -> Bool {
   config.show_missing
@@ -1351,11 +1580,17 @@ pub fn shows_missing(config config: CoverageConfig) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Read the show_excluded setting <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/shows_excluded.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.show_excluded()
-/// |> coverage.shows_excluded()
-/// // -> True
+/// import dream_test/coverage
+///
+/// pub fn show_excluded_is_on() -> Bool {
+///   coverage.new()
+///   |> coverage.show_excluded()
+///   |> coverage.shows_excluded()
+///   // -> True
+/// }
 /// ```
 pub fn shows_excluded(config config: CoverageConfig) -> Bool {
   config.show_excluded
@@ -1367,11 +1602,17 @@ pub fn shows_excluded(config config: CoverageConfig) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Read the color setting <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/uses_color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.color()
-/// |> coverage.uses_color()
-/// // -> True
+/// import dream_test/coverage
+///
+/// pub fn color_is_on() -> Bool {
+///   coverage.new()
+///   |> coverage.color()
+///   |> coverage.uses_color()
+///   // -> True
+/// }
 /// ```
 pub fn uses_color(config config: CoverageConfig) -> Bool {
   config.color
@@ -1383,11 +1624,17 @@ pub fn uses_color(config config: CoverageConfig) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Read the sort_by_coverage setting <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/sorts_by_coverage.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.sort_by_coverage()
-/// |> coverage.sorts_by_coverage()
-/// // -> True
+/// import dream_test/coverage
+///
+/// pub fn sort_by_coverage_is_on() -> Bool {
+///   coverage.new()
+///   |> coverage.sort_by_coverage()
+///   |> coverage.sorts_by_coverage()
+///   // -> True
+/// }
 /// ```
 pub fn sorts_by_coverage(config config: CoverageConfig) -> Bool {
   config.sort_by_coverage
@@ -1400,11 +1647,17 @@ pub fn sorts_by_coverage(config config: CoverageConfig) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Read the hide_complete setting <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/hides_complete.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.hide_complete()
-/// |> coverage.hides_complete()
-/// // -> True
+/// import dream_test/coverage
+///
+/// pub fn hide_complete_is_on() -> Bool {
+///   coverage.new()
+///   |> coverage.hide_complete()
+///   |> coverage.hides_complete()
+///   // -> True
+/// }
 /// ```
 pub fn hides_complete(config config: CoverageConfig) -> Bool {
   config.hide_complete
@@ -1425,11 +1678,18 @@ pub fn hides_complete(config config: CoverageConfig) -> Bool {
 ///
 /// ## Example
 ///
+/// ### Read the total minimum <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/minimum.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent(80.0)
-/// |> coverage.minimum()
-/// // -> Some(80.0)
+/// import dream_test/coverage
+/// import gleam/option.{type Option}
+///
+/// pub fn minimum_is_eighty() -> Option(Float) {
+///   coverage.new()
+///   |> coverage.minimum_percent(80.0)
+///   |> coverage.minimum()
+///   // -> Some(80.0)
+/// }
 /// ```
 pub fn minimum(config config: CoverageConfig) -> Option(Float) {
   config.minimum_percent
@@ -1451,11 +1711,18 @@ pub fn minimum(config config: CoverageConfig) -> Option(Float) {
 ///
 /// ## Example
 ///
+/// ### Read the minimum for each file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/minimum_per_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent_per_file(70.0)
-/// |> coverage.minimum_per_file()
-/// // -> Some(70.0)
+/// import dream_test/coverage
+/// import gleam/option.{type Option}
+///
+/// pub fn minimum_per_file_is_seventy() -> Option(Float) {
+///   coverage.new()
+///   |> coverage.minimum_percent_per_file(70.0)
+///   |> coverage.minimum_per_file()
+///   // -> Some(70.0)
+/// }
 /// ```
 pub fn minimum_per_file(config config: CoverageConfig) -> Option(Float) {
   config.minimum_percent_per_file
@@ -1465,10 +1732,17 @@ pub fn minimum_per_file(config config: CoverageConfig) -> Option(Float) {
 ///
 /// ## Example
 ///
+/// ### Read the default LCOV file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/lcov_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.lcov_file()
-/// // -> Some("build/coverage/lcov.info")
+/// import dream_test/coverage
+/// import gleam/option.{type Option}
+///
+/// pub fn default_lcov_file() -> Option(String) {
+///   coverage.new()
+///   |> coverage.lcov_file()
+///   // -> Some("build/coverage/lcov.info")
+/// }
 /// ```
 pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
   config.lcov_path
@@ -1498,11 +1772,17 @@ pub fn lcov_file(config config: CoverageConfig) -> Option(String) {
 ///
 /// ## Example
 ///
+/// ### Start coverage in a missing directory <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/start.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.source_directory("src/does_not_exist")
-/// |> coverage.start()
-/// // -> Error(SourceDirectoryNotFound("src/does_not_exist"))
+/// import dream_test/coverage.{type CoverageError, type CoverageSession}
+///
+/// pub fn start_in_missing_directory() -> Result(CoverageSession, CoverageError) {
+///   coverage.new()
+///   |> coverage.source_directory("src/does_not_exist")
+///   |> coverage.start()
+///   // -> Error(SourceDirectoryNotFound("src/does_not_exist"))
+/// }
 /// ```
 pub fn start(
   config config: CoverageConfig,
@@ -1907,10 +2187,23 @@ fn erlang_module_name(relative_path: String) -> String {
 ///
 /// ## Example
 ///
+/// ### Finish coverage after the tests run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/finish.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let assert Ok(session) = coverage.start(coverage.new())
-/// run_my_tests()
-/// let assert Ok(coverage_report) = coverage.finish(session)
+/// import app/cart
+/// import dream_test/coverage
+/// import dream_test/coverage/report.{type CoverageReport}
+///
+/// pub fn measure_my_tests() -> #(Bool, CoverageReport) {
+///   let assert Ok(session) = coverage.start(coverage.new())
+///   let tests_passed = run_my_tests()
+///   let assert Ok(coverage_report) = coverage.finish(session)
+///   #(tests_passed, coverage_report)
+/// }
+///
+/// fn run_my_tests() -> Bool {
+///   cart.total([10, 20]) == 30
+/// }
 /// ```
 pub fn finish(
   session session: CoverageSession,
@@ -3414,12 +3707,21 @@ fn render_lcov_line(line: LineCoverage) -> String {
 ///
 /// ## Example
 ///
+/// ### Check the total against 80 percent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/check_minimum.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent(80.0)
-/// |> coverage.check_minimum(coverage_report)
-/// // -> Error(BelowMinimumPercent(hit: 1567, total: 2230,
-/// //      minimum_percent: 80.0, lines_needed: 1784))
+/// import dream_test/coverage.{type CoverageError}
+/// import dream_test/coverage/report.{type CoverageReport}
+///
+/// pub fn check_total_against_eighty_percent(
+///   coverage_report: CoverageReport,
+/// ) -> Result(Nil, CoverageError) {
+///   coverage.new()
+///   |> coverage.minimum_percent(80.0)
+///   |> coverage.check_minimum(coverage_report)
+///   // -> Error(BelowMinimumPercent(hit: 1567, total: 2230,
+///   //      minimum_percent: 80.0, lines_needed: 1784))
+/// }
 /// ```
 pub fn check_minimum(
   config config: CoverageConfig,
@@ -3480,14 +3782,23 @@ fn check_counts_against_minimum(
 ///
 /// ## Example
 ///
+/// ### Check each file against 50 percent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/check_minimum_per_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.new()
-/// |> coverage.minimum_percent_per_file(50.0)
-/// |> coverage.check_minimum_per_file(coverage_report)
-/// // -> Error(FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
-/// //      coverage.file_below_minimum(source_path: "src/app/cart.gleam",
-/// //        hit: 3, total: 10, lines_needed: 5),
-/// //    ]))
+/// import dream_test/coverage.{type CoverageError}
+/// import dream_test/coverage/report.{type CoverageReport}
+///
+/// pub fn check_each_file_against_fifty_percent(
+///   coverage_report: CoverageReport,
+/// ) -> Result(Nil, CoverageError) {
+///   coverage.new()
+///   |> coverage.minimum_percent_per_file(50.0)
+///   |> coverage.check_minimum_per_file(coverage_report)
+///   // -> Error(FilesBelowMinimumPercent(minimum_percent: 50.0, files: [
+///   //      coverage.file_below_minimum(source_path: "src/app/cart.gleam",
+///   //        hit: 3, total: 10, lines_needed: 5),
+///   //    ]))
+/// }
 /// ```
 pub fn check_minimum_per_file(
   config config: CoverageConfig,
@@ -3580,13 +3891,19 @@ fn compare_file_paths(
 ///
 /// ## Example
 ///
+/// ### Build a file below the minimum <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/file_below_minimum.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.file_below_minimum(
-///   source_path: "src/app/cart.gleam",
-///   hit: 3,
-///   total: 10,
-///   lines_needed: 5,
-/// )
+/// import dream_test/coverage.{type FileBelowMinimum}
+///
+/// pub fn cart_below_minimum() -> FileBelowMinimum {
+///   coverage.file_below_minimum(
+///     source_path: "src/app/cart.gleam",
+///     hit: 3,
+///     total: 10,
+///     lines_needed: 5,
+///   )
+/// }
 /// ```
 pub fn file_below_minimum(
   source_path source_path: String,
@@ -3606,15 +3923,21 @@ pub fn file_below_minimum(
 ///
 /// ## Example
 ///
+/// ### Read the source path <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/below_minimum_source_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.file_below_minimum(
-///   source_path: "src/app/cart.gleam",
-///   hit: 3,
-///   total: 10,
-///   lines_needed: 5,
-/// )
-/// |> coverage.below_minimum_source_path()
-/// // -> "src/app/cart.gleam"
+/// import dream_test/coverage
+///
+/// pub fn cart_source_path() -> String {
+///   coverage.file_below_minimum(
+///     source_path: "src/app/cart.gleam",
+///     hit: 3,
+///     total: 10,
+///     lines_needed: 5,
+///   )
+///   |> coverage.below_minimum_source_path()
+///   // -> "src/app/cart.gleam"
+/// }
 /// ```
 pub fn below_minimum_source_path(file file: FileBelowMinimum) -> String {
   file.source_path
@@ -3624,15 +3947,21 @@ pub fn below_minimum_source_path(file file: FileBelowMinimum) -> String {
 ///
 /// ## Example
 ///
+/// ### Read the lines that ran <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/below_minimum_hit.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.file_below_minimum(
-///   source_path: "src/app/cart.gleam",
-///   hit: 3,
-///   total: 10,
-///   lines_needed: 5,
-/// )
-/// |> coverage.below_minimum_hit()
-/// // -> 3
+/// import dream_test/coverage
+///
+/// pub fn cart_hit_lines() -> Int {
+///   coverage.file_below_minimum(
+///     source_path: "src/app/cart.gleam",
+///     hit: 3,
+///     total: 10,
+///     lines_needed: 5,
+///   )
+///   |> coverage.below_minimum_hit()
+///   // -> 3
+/// }
 /// ```
 pub fn below_minimum_hit(file file: FileBelowMinimum) -> Int {
   file.hit
@@ -3642,15 +3971,21 @@ pub fn below_minimum_hit(file file: FileBelowMinimum) -> Int {
 ///
 /// ## Example
 ///
+/// ### Read the executable lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/below_minimum_total.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.file_below_minimum(
-///   source_path: "src/app/cart.gleam",
-///   hit: 3,
-///   total: 10,
-///   lines_needed: 5,
-/// )
-/// |> coverage.below_minimum_total()
-/// // -> 10
+/// import dream_test/coverage
+///
+/// pub fn cart_total_lines() -> Int {
+///   coverage.file_below_minimum(
+///     source_path: "src/app/cart.gleam",
+///     hit: 3,
+///     total: 10,
+///     lines_needed: 5,
+///   )
+///   |> coverage.below_minimum_total()
+///   // -> 10
+/// }
 /// ```
 pub fn below_minimum_total(file file: FileBelowMinimum) -> Int {
   file.total
@@ -3663,15 +3998,21 @@ pub fn below_minimum_total(file file: FileBelowMinimum) -> Int {
 ///
 /// ## Example
 ///
+/// ### Read the lines needed <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/below_minimum_lines_needed.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// coverage.file_below_minimum(
-///   source_path: "src/app/cart.gleam",
-///   hit: 3,
-///   total: 10,
-///   lines_needed: 5,
-/// )
-/// |> coverage.below_minimum_lines_needed()
-/// // -> 5
+/// import dream_test/coverage
+///
+/// pub fn cart_lines_needed() -> Int {
+///   coverage.file_below_minimum(
+///     source_path: "src/app/cart.gleam",
+///     hit: 3,
+///     total: 10,
+///     lines_needed: 5,
+///   )
+///   |> coverage.below_minimum_lines_needed()
+///   // -> 5
+/// }
 /// ```
 pub fn below_minimum_lines_needed(file file: FileBelowMinimum) -> Int {
   file.lines_needed

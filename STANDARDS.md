@@ -27,20 +27,22 @@ This document defines the coding conventions for Dream Test. These are **project
 
 **Why**: Nested pattern matches are hard to read, test, and debug. Named helpers make control flow explicit and improve stack traces.
 
-❌ **Don't**
+#### ❌ Don't: a nested `case` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/nested_case_dont.gleam#L10-L19"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-case value1 {
-  Some(x) ->
-    case value2 {
-      Ok(y) -> do_something(x, y)
-      Error(e) -> handle_error(e)
-    }
-  None -> handle_none()
+pub fn handle(value1, value2) {
+  case value1 {
+    Some(x) ->
+      case value2 {
+        Ok(y) -> do_something(x, y)
+        Error(e) -> handle_error(e)
+      }
+    None -> handle_none()
+  }
 }
 ```
 
-✅ **Do**
+#### ✅ Do: a named helper <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/nested_case_do.gleam#L9-L21"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn handle(value1, value2) {
@@ -66,7 +68,7 @@ fn handle_with_value(x, value2) {
 
 **Why**: Closures hide dependencies. Explicit parameters make data flow obvious and simplify testing.
 
-❌ **Don't**
+#### ❌ Don't: a closure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/closure_dont.gleam#L7-L9"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn make_checker(limit) {
@@ -74,7 +76,7 @@ fn make_checker(limit) {
 }
 ```
 
-✅ **Do**
+#### ✅ Do: an explicit parameter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/closure_do.gleam#L6-L8"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn is_less_than(limit, value) {
@@ -99,23 +101,37 @@ Do not write a closure only to change the shape of a user function. A hook or a 
 
 **Why**: A new BEAM process gets its start data only through the function it runs. A stored callback must have the one shape of its record field, and a callback that needs captured data has no other way to get it. No named function can do these two jobs. A body that is one named call keeps the logic named, searchable and visible in stack traces, and the closure only moves data.
 
-❌ **Don't**
+#### ❌ Don't: logic in the closure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/process_start_dont.gleam#L12-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-spawn_unlinked(fn() {
-  case show_crash_reports {
-    True -> send(result_subject, TestCompleted(run(input)))
-    False -> send(result_subject, caught_message(run_catching(run, input)))
-  }
-})
+pub fn start_worker(
+  result_subject: Subject(WorkerMessage(a)),
+  run: fn(input) -> a,
+  input: input,
+  show_crash_reports: Bool,
+) -> Pid {
+  spawn_unlinked(fn() {
+    case show_crash_reports {
+      True -> send(result_subject, TestCompleted(run(input)))
+      False -> send(result_subject, caught_message(run_catching(run, input)))
+    }
+  })
+}
 ```
 
-✅ **Do**
+#### ✅ Do: one named call in the closure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/process_start_do.gleam#L11-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-spawn_unlinked(fn() {
-  run_worker(result_subject, run, input, show_crash_reports)
-})
+pub fn start_worker(
+  result_subject: Subject(WorkerMessage(a)),
+  run: fn(input) -> a,
+  input: input,
+  show_crash_reports: Bool,
+) -> Pid {
+  spawn_unlinked(fn() {
+    run_worker(result_subject, run, input, show_crash_reports)
+  })
+}
 
 fn run_worker(
   result_subject: Subject(WorkerMessage(a)),
@@ -140,20 +156,22 @@ Erlang FFI follows the same rule: use a list comprehension or `fun name/arity`, 
 
 **Why**: Named functions appear in stack traces, are searchable, and encourage reuse. Anonymous functions encourage "inline cleverness."
 
-❌ **Don't**
+#### ❌ Don't: an anonymous test body <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/anonymous_test_dont.gleam#L9-L18"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-describe("math", [
-  it("adds numbers", fn() {
-    1 + 2
-    |> should
-    |> be_equal(3)
-    |> or_fail_with("1 + 2 should be 3")
-  }),
-])
+pub fn math_tests() -> TestSuite {
+  describe("math", [
+    it("adds numbers", fn() {
+      1 + 2
+      |> should
+      |> be_equal(3)
+      |> or_fail_with("1 + 2 should be 3")
+    }),
+  ])
+}
 ```
 
-✅ **Do**
+#### ✅ Do: a named test function <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/anonymous_test_do.gleam#L9-L20"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn math_tests() -> TestSuite {
@@ -189,7 +207,7 @@ fn adds_numbers_test() -> Result(AssertionResult, String) {
 | `msg`    | `message` |
 | `val`    | `value`   |
 
-❌ **Don't**
+#### ❌ Don't: an abbreviated name <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/abbreviation_dont.gleam#L8-L13"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn status_from_failures(fs: List(AssertionFailure)) -> Status {
@@ -200,7 +218,7 @@ pub fn status_from_failures(fs: List(AssertionFailure)) -> Status {
 }
 ```
 
-✅ **Do**
+#### ✅ Do: a full name <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/abbreviation_do.gleam#L7-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn status_from_failures(
@@ -228,14 +246,12 @@ pub fn status_from_failures(
 
 **Module path conventions**:
 
-```text
-dream_test/suite           # Test suites
-dream_test/matchers        # Matcher API
-dream_test/types           # Shared data types
-dream_test/runner          # Test execution
-dream_test/unit            # describe/it DSL
-dream_test/reporters/bdd    # Output formatting
-```
+- `dream_test/suite`: Test suites
+- `dream_test/matchers`: Matcher API
+- `dream_test/types`: Shared data types
+- `dream_test/runner`: Test execution
+- `dream_test/unit`: describe/it DSL
+- `dream_test/reporters/bdd`: Output formatting
 
 ---
 
@@ -245,21 +261,40 @@ dream_test/reporters/bdd    # Output formatting
 
 **Why**: Pipe-first code is idiomatic Gleam. Avoiding currying keeps APIs straightforward.
 
-❌ **Don't** (fluent/curried)
+#### ❌ Don't: a fluent, curried matcher <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/compile_errors/fluent_builder.gleam#L8-L12"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-value
-|> should.be_equal(expected)
-|> or_fail_with("message")
+pub fn check(value: Int, expected: Int) {
+  value
+  |> should.be_equal(expected)
+  |> or_fail_with("message")
+}
 ```
 
-✅ **Do** (pipe-first)
+Dream Test has no `should` module, so this code does not even compile. A test of the snippets project compiles it and checks what the compiler says:
+
+#### The compiler error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/compile_error_fluent_builder.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+error: Unknown module
+   ┌─ build/compile_errors/fluent_builder/src/fluent_builder.gleam:10:6
+   │
+10 │   |> should.be_equal(expected)
+   │      ^^^^^^
+
+No module has been found with the name `should`.
+
+```
+
+#### ✅ Do: pipe-first <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/pipe_first_do.gleam#L7-L12"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-value
-|> should
-|> be_equal(expected)
-|> or_fail_with("message")
+pub fn check(value: Int, expected: Int) -> Result(AssertionResult, String) {
+  value
+  |> should
+  |> be_equal(expected)
+  |> or_fail_with("message")
+}
 ```
 
 ---
@@ -272,11 +307,17 @@ value
 
 ### Importing values
 
+#### ✅ Good: unqualified DSL imports <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_values_good.gleam#L1-L3"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 // ✅ Good: Unqualified for pipe-friendly DSL
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/unit.{describe, it}
-import dream_test/matchers.{should, be_equal, or_fail_with}
+```
 
+#### ❌ Bad: a redundant alias <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_values_bad.gleam#L1-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
 // ❌ Bad: Redundant alias
 import dream_test/matchers as should
 ```
@@ -285,10 +326,16 @@ import dream_test/matchers as should
 
 Use the `type` keyword to import types (not constructors):
 
+#### ✅ Good: an explicit type import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_types_good.gleam#L1-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 // ✅ Good: Explicit type import
-import dream_test/types.{type TestResult, type Status}
+import dream_test/types.{type Status, type TestResult}
+```
 
+#### ❌ Bad: a constructor import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_types_bad.gleam#L1-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
 // ❌ Bad: This imports constructors, not types
 import dream_test/types.{TestResult}
 ```
@@ -296,6 +343,8 @@ import dream_test/types.{TestResult}
 ### Mixed imports
 
 You can import both types and values:
+
+#### A type and a value from one module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_mixed.gleam#L1"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/types.{type TestResult, full_name}
@@ -312,40 +361,72 @@ When two modules have the same final name (e.g., `dream_test/types` and `dream_t
 - The module most relevant to the file's purpose gets unqualified imports
 - Secondary/supporting modules: alias conflicting types inline, alias the module for qualified access
 
-```gleam
-// Primary module: unqualified imports
-import some/primary/module.{type Feature, type Scenario}
-
-// Secondary module: alias conflicting types, alias module for qualified access
-import some/other/module.{
-  type Feature as OtherFeature, type Step,
-} as other_module
-
-// Now you can use:
-let feature: Feature = ...           // from primary
-let other: OtherFeature = ...        // aliased type from secondary
-let step: Step = ...                 // non-conflicting from secondary
-let thing = other_module.something() // qualified access to secondary
-```
+For example, with `import some/primary/module.{type Feature, type Scenario}` and `import some/other/module.{type Feature as OtherFeature, type Step} as other_module`, `Feature` is the type of the primary module, `OtherFeature` is the aliased type of the secondary module, `Step` is a type of the secondary module with no conflict, and `other_module.something()` reaches the rest of the secondary module.
 
 **Real example in a gherkin module**:
 
+#### Two modules named `types` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_conflict.gleam#L6-L59"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 // Gherkin is the primary subject → unqualified
-import dream_test/gherkin/steps.{Group, Scenarios}
+import dream_test/gherkin/steps.{type SuiteChild, Group, Scenarios}
 import dream_test/gherkin/types.{type Feature, type Scenario}
 
 // Core test types are supporting → alias the conflicting `Group`,
 // alias the module (both modules are named `types`)
 import dream_test/types.{type Node, Group as NodeGroup} as test_types
 
-let feature: Feature = ...
-let child = Group(name: "Checkout", tags: [], children: [Scenarios(feature)])
-let node: Node(Nil) = NodeGroup(name: "plain", tags: [], children: [])
-let kind = test_types.Unit
+pub fn checkout_group(feature: Feature) -> SuiteChild(Nil) {
+  Group(name: "Checkout", tags: [], children: [Scenarios(feature)])
+}
+
+pub fn plain_group() -> Node(Nil) {
+  NodeGroup(name: "plain", tags: [], children: [])
+}
+
+pub fn first_scenarios(feature: Feature) -> List(Scenario) {
+  list.take(feature.scenarios, 1)
+}
+
+pub fn kind() -> test_types.TestKind {
+  test_types.Unit
+}
+
+pub fn tests() {
+  describe("STANDARDS.md rule 7: two modules named types", [
+    it("builds a Gherkin group, a test tree group and a kind", fn() {
+      // Arrange
+      let feature =
+        types.Feature(
+          name: "Shop",
+          source: None,
+          description: None,
+          tags: [],
+          background: None,
+          scenarios: [],
+          rules: [],
+        )
+
+      // Act
+      let values = #(checkout_group(feature), plain_group(), kind())
+
+      // Assert
+      values
+      |> should
+      |> be_equal(#(
+        Group(name: "Checkout", tags: [], children: [Scenarios(feature)]),
+        NodeGroup(name: "plain", tags: [], children: []),
+        test_types.Unit,
+      ))
+      |> or_fail_with("both groups and the kind should be made")
+    }),
+  ])
+}
 ```
 
 If there are no conflicting names, you can use unqualified imports from both without aliasing:
+
+#### No conflicting names <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/import_no_conflict.gleam#L1-L5"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // ✅ No conflicts: unqualified from both
@@ -365,22 +446,35 @@ import dream_test/suite.{type TestSuite}
 
 ❌ **Don't** use fully qualified references when unqualified would work:
 
+#### ❌ Don't: noisy qualified references <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/qualified_references_bad.gleam#L9-L19"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 // Bad: Noisy qualified references
-let tree =
-  dream_types.Tree(initial: Nil, name: name, tags: [], children: [
-    dream_types.Group(name: "nested", tags: [], children: nested),
-  ])
+pub fn nested_tree(
+  name: String,
+  nested: List(dream_types.Node(Nil)),
+) -> dream_types.Tree(Nil) {
+  let tree =
+    dream_types.Tree(initial: Nil, name: name, tags: [], children: [
+      dream_types.Group(name: "nested", tags: [], children: nested),
+    ])
+  tree
+}
 ```
 
 ✅ **Do** use unqualified imports:
 
+#### ✅ Do: unqualified references <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/qualified_references_good.gleam#L7-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
 // Good: Clean unqualified usage
-let tree =
-  Tree(initial: Nil, name: name, tags: [], children: [
-    Group(name: "nested", tags: [], children: nested),
-  ])
+pub fn nested_tree(name: String, nested: List(Node(Nil))) -> Tree(Nil) {
+  let tree =
+    Tree(initial: Nil, name: name, tags: [], children: [
+      Group(name: "nested", tags: [], children: nested),
+    ])
+  tree
+}
 ```
 
 ---
@@ -391,19 +485,23 @@ let tree =
 
 **Why**: Named fields are self-documenting. They prevent argument reordering mistakes and make refactoring safer.
 
-❌ **Don't**
+#### ❌ Don't: two `Int` parameters side by side <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/config_record_dont.gleam#L25-L28"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-// Two Ints side by side: a caller can swap them and still compile
-run_tree_parallel(4, 5000, tree)
+pub fn run_example(tree: Tree(Nil)) -> RunReport {
+  // Two Ints side by side: a caller can swap them and still compile
+  run_tree_parallel(4, 5000, tree)
+}
 ```
 
-✅ **Do**
+#### ✅ Do: a config record <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/config_record_do.gleam#L10-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-let config = ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
+pub fn run_example(tree: Tree(Nil)) -> RunReport {
+  let config = ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 
-run_tree_parallel(config: config, tree: tree)
+  run_tree_parallel(config: config, tree: tree)
+}
 ```
 
 **Threshold**: If a function has 3+ parameters, or 2+ parameters of the same type, consider a config record.
@@ -416,16 +514,23 @@ run_tree_parallel(config: config, tree: tree)
 
 In `case` expressions, multi-expression branches need curly braces:
 
+#### A branch with curly braces <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/standards/case_blocks.gleam#L26-L40"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```gleam
-case node {
-  Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
+fn names_of_node(
+  name_prefix: List(String),
+  node: Node(Nil),
+) -> List(List(String)) {
+  case node {
+    Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-  Group(name: name, children: children, ..) -> {
-    let new_prefix = list.append(name_prefix, [name])
-    collect_test_names(new_prefix, children, [])
+    Group(name: name, children: children, ..) -> {
+      let new_prefix = list.append(name_prefix, [name])
+      collect_test_names(new_prefix, children, [])
+    }
+
+    _ -> []
   }
-
-  _ -> []
 }
 ```
 

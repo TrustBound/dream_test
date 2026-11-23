@@ -22,7 +22,7 @@ pub fn main() {
 
 After the results, the runner prints a table and writes an LCOV file to `build/coverage/lcov.info`:
 
-### The coverage table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L73-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The coverage table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_missing.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Coverage
@@ -50,6 +50,7 @@ pub fn main() {
 }
 ```
 
+#### Run with coverage from the environment <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/examples.sh#L23"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```sh
 DREAM_TEST_COVERAGE=1 gleam test
@@ -87,7 +88,7 @@ fn coverage_config() {
 ```
 
 
-#### The table with exclusions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L88-L102"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The table with exclusions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/coverage_table_excluded.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Coverage

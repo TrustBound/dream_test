@@ -5,11 +5,15 @@
 //// way. A custom
 //// reporter can use them to match that text.
 ////
+//// ### Write a percent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/format
 ////
-//// format.percent(hit: 18, total: 20)
-//// // -> "90.0%"
+//// pub fn ninety_percent() -> String {
+////   format.percent(hit: 18, total: 20)
+////   // -> "90.0%"
+//// }
 //// ```
 ////
 //// Percents round down, so `100.0%` means every line ran.
@@ -25,8 +29,15 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the format module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/format
+////
+//// pub fn all_lines_ran() -> String {
+////   format.percent(hit: 20, total: 20)
+////   // -> "100.0%"
+//// }
 //// ```
 
 import dream_test/coverage/report.{
@@ -53,9 +64,15 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Write a percent that rounds down <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/percent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// format.percent(hit: 58, total: 60)
-/// // -> "96.6%"
+/// import dream_test/coverage/format
+///
+/// pub fn percent_rounds_down() -> String {
+///   format.percent(hit: 58, total: 60)
+///   // -> "96.6%"
+/// }
 /// ```
 pub fn percent(hit hit: Int, total total: Int) -> String {
   case total {
@@ -81,9 +98,15 @@ fn tenths_text(tenths: Int) -> String {
 ///
 /// ## Example
 ///
+/// ### Write the line counts <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/line_counts.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// format.line_counts(hit: 18, total: 20)
-/// // -> "18/20"
+/// import dream_test/coverage/format
+///
+/// pub fn eighteen_of_twenty() -> String {
+///   format.line_counts(hit: 18, total: 20)
+///   // -> "18/20"
+/// }
 /// ```
 pub fn line_counts(hit hit: Int, total total: Int) -> String {
   int.to_string(hit) <> "/" <> int.to_string(total)
@@ -102,9 +125,15 @@ pub fn line_counts(hit hit: Int, total total: Int) -> String {
 ///
 /// ## Example
 ///
+/// ### Write a line range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/line_range.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// format.line_range(first: 12, last: 13)
-/// // -> "12-13"
+/// import dream_test/coverage/format
+///
+/// pub fn lines_twelve_to_thirteen() -> String {
+///   format.line_range(first: 12, last: 13)
+///   // -> "12-13"
+/// }
 /// ```
 pub fn line_range(first first: Int, last last: Int) -> String {
   case first == last {
@@ -125,14 +154,21 @@ pub fn line_range(first first: Int, last last: Int) -> String {
 ///
 /// ## Example
 ///
+/// ### Write the missed lines of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/missed_lines.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [
-///   LineCoverage(line: 12, calls: 0),
-///   LineCoverage(line: 13, calls: 0),
-///   LineCoverage(line: 20, calls: 0),
-/// ])
-/// |> format.missed_lines()
-/// // -> ["12-13", "20"]
+/// import dream_test/coverage/format
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn missed_lines_of_file() -> List(String) {
+///   report.file("src/a.gleam", [
+///     LineCoverage(line: 12, calls: 0),
+///     LineCoverage(line: 13, calls: 0),
+///     LineCoverage(line: 20, calls: 0),
+///   ])
+///   |> format.missed_lines()
+///   // -> ["12-13", "20"]
+/// }
 /// ```
 pub fn missed_lines(file file: FileCoverage) -> List(String) {
   list.map(report.missed_ranges(file), range_text)
@@ -154,10 +190,22 @@ fn range_text(range: #(Int, Int)) -> String {
 ///
 /// ## Example
 ///
+/// ### Write an ignored range with its reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/ignored_range.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.ignored_range(first_line: 40, last_line: 44, reason: Some("debug only"))
-/// |> format.ignored_range()
-/// // -> "40-44 (debug only)"
+/// import dream_test/coverage/format
+/// import dream_test/coverage/report
+/// import gleam/option.{Some}
+///
+/// pub fn debug_only_range_text() -> String {
+///   report.ignored_range(
+///     first_line: 40,
+///     last_line: 44,
+///     reason: Some("debug only"),
+///   )
+///   |> format.ignored_range()
+///   // -> "40-44 (debug only)"
+/// }
 /// ```
 pub fn ignored_range(range range: IgnoredRange) -> String {
   line_range(
@@ -180,14 +228,22 @@ pub fn ignored_range(range range: IgnoredRange) -> String {
 ///
 /// ## Example
 ///
+/// ### Write an excluded file with its reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/excluded_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.excluded_file(
-///   source_path: "src/app/generated/db.gleam",
-///   pattern: "src/app/generated/**",
-///   reason: Some("generated code"),
-/// )
-/// |> format.excluded_file()
-/// // -> "excluded: matches src/app/generated/** (generated code)"
+/// import dream_test/coverage/format
+/// import dream_test/coverage/report
+/// import gleam/option.{Some}
+///
+/// pub fn generated_file_text() -> String {
+///   report.excluded_file(
+///     source_path: "src/app/generated/db.gleam",
+///     pattern: "src/app/generated/**",
+///     reason: Some("generated code"),
+///   )
+///   |> format.excluded_file()
+///   // -> "excluded: matches src/app/generated/** (generated code)"
+/// }
 /// ```
 pub fn excluded_file(file file: ExcludedFile) -> String {
   "excluded: matches "
@@ -216,10 +272,18 @@ fn reason_suffix(reason: Option(String)) -> String {
 ///
 /// ## Example
 ///
+/// ### Write the summary of a report with no exclusions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/excluded_summary.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([])
-/// |> format.excluded_summary()
-/// // -> None
+/// import dream_test/coverage/format
+/// import dream_test/coverage/report
+/// import gleam/option.{type Option}
+///
+/// pub fn nothing_was_excluded() -> Option(String) {
+///   report.new([])
+///   |> format.excluded_summary()
+///   // -> None
+/// }
 /// ```
 pub fn excluded_summary(
   report coverage_report: CoverageReport,
@@ -267,9 +331,15 @@ fn lines_in_files_text(line_count: Int, files: Int) -> String {
 ///
 /// ## Example
 ///
+/// ### Write a file count <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/file_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// format.file_count(2)
-/// // -> "2 files"
+/// import dream_test/coverage/format
+///
+/// pub fn two_files() -> String {
+///   format.file_count(2)
+///   // -> "2 files"
+/// }
 /// ```
 pub fn file_count(count count: Int) -> String {
   count_text(count, "file")
@@ -299,9 +369,15 @@ fn count_text(count: Int, noun: String) -> String {
 ///
 /// ## Example
 ///
+/// ### Escape markup characters <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/format/escape_markup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// format.escape_markup("a < b && c")
-/// // -> "a &lt; b &amp;&amp; c"
+/// import dream_test/coverage/format
+///
+/// pub fn escaped_comparison() -> String {
+///   format.escape_markup("a < b && c")
+///   // -> "a &lt; b &amp;&amp; c"
+/// }
 /// ```
 pub fn escape_markup(text text: String) -> String {
   text

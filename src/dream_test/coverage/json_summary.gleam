@@ -4,11 +4,15 @@
 //// finishes. Call `render` yourself to get the text without a file, for
 //// example to send it to another service.
 ////
-//// ```gleam
-//// import dream_test/coverage
+//// ### Write the JSON summary to a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// coverage.new()
-//// |> coverage.json_path("build/coverage/coverage.json")
+//// ```gleam
+//// import dream_test/coverage.{type CoverageConfig}
+////
+//// pub fn write_json_summary() -> CoverageConfig {
+////   coverage.new()
+////   |> coverage.json_path("build/coverage/coverage.json")
+//// }
 //// ```
 ////
 //// ## Schema
@@ -16,7 +20,7 @@
 //// The keys are always in this order. A new key is only added at the end of
 //// an object, and `version` changes when a key changes meaning.
 ////
-//// ```text
+//// ```text illustration
 //// {
 ////   "version": 1,
 ////   "files": [
@@ -48,8 +52,15 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the JSON summary module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/json_summary
+////
+//// pub fn eighty_percent_minimum() -> json_summary.Options {
+////   json_summary.options()
+////   |> json_summary.minimum_percent(80.0)
+//// }
 //// ```
 
 import dream_test/coverage/report.{
@@ -79,8 +90,15 @@ pub opaque type Options {
 ///
 /// ## Example
 ///
+/// ### Render with no minimums <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/options.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// json_summary.render(report: coverage_report, options: json_summary.options())
+/// import dream_test/coverage/json_summary
+/// import dream_test/coverage/report.{type CoverageReport}
+///
+/// pub fn render_without_minimums(coverage_report: CoverageReport) -> String {
+///   json_summary.render(report: coverage_report, options: json_summary.options())
+/// }
 /// ```
 pub fn options() -> Options {
   Options(minimum_percent: None, minimum_percent_per_file: None)
@@ -99,9 +117,15 @@ pub fn options() -> Options {
 ///
 /// ## Example
 ///
+/// ### Set a minimum total percent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/minimum_percent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// json_summary.options()
-/// |> json_summary.minimum_percent(80.0)
+/// import dream_test/coverage/json_summary.{type Options}
+///
+/// pub fn total_minimum_of_eighty() -> Options {
+///   json_summary.options()
+///   |> json_summary.minimum_percent(80.0)
+/// }
 /// ```
 pub fn minimum_percent(
   options options: Options,
@@ -123,9 +147,15 @@ pub fn minimum_percent(
 ///
 /// ## Example
 ///
+/// ### Set a minimum percent for each file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/minimum_percent_per_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// json_summary.options()
-/// |> json_summary.minimum_percent_per_file(50.0)
+/// import dream_test/coverage/json_summary.{type Options}
+///
+/// pub fn file_minimum_of_fifty() -> Options {
+///   json_summary.options()
+///   |> json_summary.minimum_percent_per_file(50.0)
+/// }
 /// ```
 pub fn minimum_percent_per_file(
   options options: Options,
@@ -148,15 +178,22 @@ pub fn minimum_percent_per_file(
 ///
 /// ## Example
 ///
+/// ### Render a report as JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/json_summary/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([
-///   report.file("src/a.gleam", [
-///     LineCoverage(line: 1, calls: 1),
-///     LineCoverage(line: 2, calls: 0),
-///   ]),
-/// ])
-/// |> json_summary.render(options: json_summary.options())
-/// // -> "{\"version\":1,\"files\":[{\"path\":\"src/a.gleam\",\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0,\"missing\":[{\"first\":2,\"last\":2}],\"ignored\":[]}],\"excluded_files\":[],\"total\":{\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0},\"minimum_percent\":null,\"minimum_percent_per_file\":null}\n"
+/// import dream_test/coverage/json_summary
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn half_covered_json() -> String {
+///   report.new([
+///     report.file("src/a.gleam", [
+///       LineCoverage(line: 1, calls: 1),
+///       LineCoverage(line: 2, calls: 0),
+///     ]),
+///   ])
+///   |> json_summary.render(options: json_summary.options())
+///   // -> "{\"version\":1,\"files\":[{\"path\":\"src/a.gleam\",\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0,\"missing\":[{\"first\":2,\"last\":2}],\"ignored\":[]}],\"excluded_files\":[],\"total\":{\"lines_hit\":1,\"lines_total\":2,\"percent\":50.0},\"minimum_percent\":null,\"minimum_percent_per_file\":null}\n"
+/// }
 /// ```
 pub fn render(
   report coverage_report: CoverageReport,

@@ -1,0 +1,6 @@
+Coverage
+File                Lines  Cover
+src/app/cart.gleam  18/20  90.0%
+Total               58/60  96.6%
+Hidden: 2 files at 100.0%
+LCOV: build/coverage/lcov.info

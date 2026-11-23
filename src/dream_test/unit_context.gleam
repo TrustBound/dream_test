@@ -19,22 +19,26 @@
 ////
 //// ## Example
 ////
+//// ### Write a context suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit_context.{before_each, describe, it}
 ////
 //// pub type Context {
 ////   Context(counter: Int)
 //// }
 ////
-//// fn increment_counter(context: Context) {
+//// fn increment_counter(context: Context) -> Result(Context, String) {
 ////   Ok(Context(counter: context.counter + 1))
 //// }
 ////
-//// pub fn suite() {
+//// pub fn suite() -> TestSuite {
 ////   describe("Context-aware suite", Context(counter: 0), [
 ////     before_each(increment_counter),
 ////     it("receives the updated context", fn(context: Context) {
@@ -46,7 +50,7 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([suite()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([bdd.new()])
@@ -82,22 +86,26 @@ pub type ContextNode(context) =
 ///
 /// ## Example
 ///
+/// ### Write a context suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit_context.{before_each, describe, it}
 ///
 /// pub type Context {
 ///   Context(counter: Int)
 /// }
 ///
-/// fn increment_counter(context: Context) {
+/// fn increment_counter(context: Context) -> Result(Context, String) {
 ///   Ok(Context(counter: context.counter + 1))
 /// }
 ///
-/// pub fn suite() {
+/// pub fn suite() -> TestSuite {
 ///   describe("Context-aware suite", Context(counter: 0), [
 ///     before_each(increment_counter),
 ///     it("receives the updated context", fn(context: Context) {
@@ -109,7 +117,7 @@ pub type ContextNode(context) =
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([suite()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -143,23 +151,26 @@ pub fn describe(
 ///
 /// ## Example
 ///
+/// ### Group tests that share a context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit_context.{before_each, describe, group, it}
-/// import gleam/io
 ///
 /// pub type Context {
 ///   Context(counter: Int)
 /// }
 ///
-/// fn increment_counter(context: Context) {
+/// fn increment_counter(context: Context) -> Result(Context, String) {
 ///   Ok(Context(counter: context.counter + 1))
 /// }
 ///
-/// pub fn suite() {
+/// pub fn suite() -> TestSuite {
 ///   describe("Context-aware grouping", Context(counter: 0), [
 ///     // This outer hook applies everywhere under this describe, including groups.
 ///     before_each(increment_counter),
@@ -182,7 +193,7 @@ pub fn describe(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([suite()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -213,23 +224,26 @@ pub fn group(
 ///
 /// ## Example
 ///
+/// ### Write a test that gets the context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit_context.{before_each, describe, it}
-/// import gleam/io
 ///
 /// pub type Context {
 ///   Context(counter: Int)
 /// }
 ///
-/// fn increment_counter(context: Context) {
+/// fn increment_counter(context: Context) -> Result(Context, String) {
 ///   Ok(Context(counter: context.counter + 1))
 /// }
 ///
-/// pub fn suite() {
+/// pub fn suite() -> TestSuite {
 ///   describe("Context-aware suite", Context(counter: 0), [
 ///     before_each(increment_counter),
 ///     it("receives the updated context", fn(context: Context) {
@@ -241,7 +255,7 @@ pub fn group(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([suite()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -282,19 +296,22 @@ pub fn it(
 ///
 /// ## Example
 ///
+/// ### Skip a context test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/skip.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit_context.{describe, it, skip}
-/// import gleam/io
 ///
 /// pub type Context {
 ///   Context(counter: Int)
 /// }
 ///
-/// pub fn suite() {
+/// pub fn suite() -> TestSuite {
 ///   describe("Skipping context-aware tests", Context(counter: 0), [
 ///     skip("this test is skipped", fn(_context: Context) {
 ///       // This would pass if it ran, but Dream Test will mark it skipped.
@@ -309,7 +326,7 @@ pub fn it(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([suite()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -338,6 +355,28 @@ pub fn skip(
 /// returns `Error`, times out or crashes, all tests under this group become
 /// `SetupFailed`. It does not run for a group that has no test after
 /// filtering.
+///
+/// ## Example
+///
+/// ### Load the context once for all tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit_context.{before_all, describe, it}
+///
+/// pub fn suite() -> TestSuite {
+///   describe("Price list", [], [
+///     before_all(fn(_prices) { Ok([10, 20, 30]) }),
+///     it("has three prices", fn(prices: List(Int)) {
+///       prices
+///       |> should
+///       |> be_equal([10, 20, 30])
+///       |> or_fail_with("expected the prices that before_all loaded")
+///     }),
+///   ])
+/// }
+/// ```
 pub fn before_all(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
@@ -345,6 +384,34 @@ pub fn before_all(
 }
 
 /// Run before each test and transform the context for that test.
+///
+/// ## Example
+///
+/// ### Give each test a new context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/before_each.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit_context.{before_each, describe, it}
+///
+/// pub fn suite() -> TestSuite {
+///   describe("Counter", 0, [
+///     before_each(fn(count) { Ok(count + 1) }),
+///     it("starts at one", fn(count: Int) {
+///       count
+///       |> should
+///       |> be_equal(1)
+///       |> or_fail_with("expected before_each to add one")
+///     }),
+///     it("starts at one again", fn(count: Int) {
+///       count
+///       |> should
+///       |> be_equal(1)
+///       |> or_fail_with("expected a new count for each test")
+///     }),
+///   ])
+/// }
+/// ```
 pub fn before_each(
   setup setup: fn(context) -> Result(context, String),
 ) -> ContextNode(context) {
@@ -358,6 +425,33 @@ pub fn before_each(
 /// body times out or the test process stops, it still runs, in a new
 /// process, with the context after the last `before_each` hook that
 /// returned.
+///
+/// ## Example
+///
+/// ### Clean up after each test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/after_each.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit_context.{after_each, describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Session", "session-1", [
+///       after_each(close_session),
+///       it("is open", fn(_session: String) { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.run()
+/// }
+///
+/// fn close_session(session: String) -> Result(Nil, String) {
+///   io.println("closing " <> session)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_each(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
@@ -371,6 +465,34 @@ pub fn after_each(
 /// runs, also after one fails. A failure goes into the hook failures of
 /// the run report, and the run fails. It does not run for a group that has
 /// no test after filtering.
+///
+/// ## Example
+///
+/// ### Clean up once after all tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/after_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit_context.{after_all, describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Pool", "pool-1", [
+///       after_all(stop_pool),
+///       it("lends a connection", fn(_pool: String) { Ok(succeed()) }),
+///       it("takes it back", fn(_pool: String) { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.run()
+/// }
+///
+/// fn stop_pool(pool: String) -> Result(Nil, String) {
+///   io.println("stopping " <> pool)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_all(
   teardown teardown: fn(context) -> Result(Nil, String),
 ) -> ContextNode(context) {
@@ -393,19 +515,22 @@ pub fn after_all(
 ///
 /// ## Example
 ///
+/// ### Tag context tests and groups <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/with_tags.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit_context.{describe, group, it, with_tags}
-/// import gleam/io
 ///
 /// pub type Context {
 ///   Context(counter: Int)
 /// }
 ///
-/// pub fn suite() {
+/// pub fn suite() -> TestSuite {
 ///   describe("Tagging context-aware tests", Context(counter: 0), [
 ///     group("group tagged slow", [
 ///       it("inherits the group tag", fn(_context: Context) { Ok(succeed()) }),
@@ -417,7 +542,7 @@ pub fn after_all(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([suite()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -480,13 +605,41 @@ fn skipped_test_run(_context: a) -> Result(AssertionResult, String) {
 ///
 /// ## Example
 ///
+/// ### Get the context from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/describe_with_setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// describe_with_setup(
-///   "Server",
-///   setup: start_server,
-///   teardown: stop_server,
-///   children: [it("answers a ping", answers_a_ping)],
-/// )
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context.{describe_with_setup, it}
+///
+/// pub type Server {
+///   Server(port: Int)
+/// }
+///
+/// fn start_server() -> Result(Server, String) {
+///   Ok(Server(port: 8080))
+/// }
+///
+/// fn stop_server(_server: Server) -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// fn answers_a_ping(server: Server) -> Result(AssertionResult, String) {
+///   server.port
+///   |> should
+///   |> be_equal(8080)
+///   |> or_fail_with("expected the server on port 8080")
+/// }
+///
+/// pub fn server_suite() -> TestSuite {
+///   describe_with_setup(
+///     "Server",
+///     setup: start_server,
+///     teardown: stop_server,
+///     children: [it("answers a ping", answers_a_ping)],
+///   )
+/// }
 /// ```
 pub fn describe_with_setup(
   name name: String,
@@ -519,12 +672,25 @@ pub fn describe_with_setup(
 ///
 /// ## Example
 ///
+/// ### Add pending tests to a context suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit_context/pending.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// describe("Cart", [
-///   it("adds an item", adds_an_item),
-///   pending("removes an item"),
-///   pending("empties the cart"),
-/// ])
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context.{describe, it, pending}
+///
+/// fn adds_an_item(_items: List(String)) -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn cart_suite() -> TestSuite {
+///   describe("Cart", [], [
+///     it("adds an item", adds_an_item),
+///     pending("removes an item"),
+///     pending("empties the cart"),
+///   ])
+/// }
 /// ```
 pub fn pending(name name: String) -> ContextNode(context) {
   Test(

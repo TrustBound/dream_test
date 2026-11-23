@@ -5,13 +5,15 @@
 //// `coverage.markdown_path`. Call `render` yourself to get the text without
 //// a file, for example to post it as a pull request comment.
 ////
-//// ```gleam
-//// import dream_test/coverage
-//// import envoy
+//// ### Write the table to the job summary <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/markdown/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// let assert Ok(summary_path) = envoy.get("GITHUB_STEP_SUMMARY")
-//// coverage.new()
-//// |> coverage.markdown_path(summary_path)
+//// ```gleam
+//// import dream_test/coverage.{type CoverageConfig}
+////
+//// pub fn write_job_summary(summary_path: String) -> CoverageConfig {
+////   coverage.new()
+////   |> coverage.markdown_path(summary_path)
+//// }
 //// ```
 ////
 //// ## Example output
@@ -35,8 +37,15 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the Markdown module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/markdown/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/markdown
+//// import dream_test/coverage/report
+////
+//// pub fn empty_table() -> String {
+////   markdown.render(report.new([]))
+//// }
 //// ```
 
 import dream_test/coverage/format
@@ -60,15 +69,22 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Render a report as a Markdown table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/markdown/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([
-///   report.file("src/a.gleam", [
-///     LineCoverage(line: 1, calls: 1),
-///     LineCoverage(line: 2, calls: 0),
-///   ]),
-/// ])
-/// |> markdown.render()
-/// // -> "## Coverage\n\n| File | Lines | Cover | Missing | Excluded |\n| --- | ---: | ---: | --- | --- |\n| src/a.gleam | 1/2 | 50.0% | 2 |  |\n| Total | 1/2 | 50.0% |  |  |\n"
+/// import dream_test/coverage/markdown
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn half_covered_table() -> String {
+///   report.new([
+///     report.file("src/a.gleam", [
+///       LineCoverage(line: 1, calls: 1),
+///       LineCoverage(line: 2, calls: 0),
+///     ]),
+///   ])
+///   |> markdown.render()
+///   // -> "## Coverage\n\n| File | Lines | Cover | Missing | Excluded |\n| --- | ---: | ---: | --- | --- |\n| src/a.gleam | 1/2 | 50.0% | 2 |  |\n| Total | 1/2 | 50.0% |  |  |\n"
+/// }
 /// ```
 pub fn render(report coverage_report: CoverageReport) -> String {
   let hit = report.total_hit_line_count(coverage_report)

@@ -17,8 +17,8 @@
 ////   run when a block shows its `main`, because the check above runs that
 ////   `main`. A Gleam file of another example project must be in
 ////   `run_by_other_projects`.
-//// - Every Gleam block under a "2.x code, from tag 2.1.3" badge is the same
-////   as that line range at tag 2.1.3. This needs git and the tag; without
+//// - Every Gleam block under a "Code at 2.1.3" badge is the same as that
+////   file or line range at tag 2.1.3. This needs git and the tag; without
 ////   them the check is skipped, and its name says so.
 ////
 //// A check fails when a doc cannot be read, or when it finds no block to
@@ -160,7 +160,7 @@ fn old_code_test(tag: Result(String, Nil)) -> unit.UnitNode {
 type Code {
   /// Blocks with a "Tested snippet" badge: the current files.
   CurrentCode
-  /// Blocks with a "2.x code, from tag 2.1.3" badge: the files at the tag.
+  /// Blocks with a "Code at 2.1.3" badge: the files at the tag.
   OldCode
 }
 
@@ -509,10 +509,9 @@ type LinkedBlock {
 }
 
 fn block_code(link: Link) -> Option(Code) {
-  case link.version, link.alt {
-    _, "2.x, not compiled" -> None
-    "2.1.3", _ -> Some(OldCode)
-    _, _ -> Some(CurrentCode)
+  case link.version {
+    "2.1.3" -> Some(OldCode)
+    _ -> Some(CurrentCode)
   }
 }
 

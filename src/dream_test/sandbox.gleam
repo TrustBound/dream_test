@@ -34,11 +34,14 @@
 ////
 //// ## Example
 ////
+//// ### Run functions in an isolated process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_isolated.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/sandbox.{
 ////   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 //// }
+//// import dream_test/suite.{type TestSuite}
 //// import dream_test/unit.{describe, it}
 ////
 //// fn double(number: Int) -> Int {
@@ -53,7 +56,7 @@
 ////   panic as message
 //// }
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("Sandboxing", [
 ////     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
@@ -114,10 +117,14 @@ import gleam/string
 ///
 /// ## Example
 ///
-/// ```gleam
-/// import dream_test/sandbox.{SandboxConfig}
+/// ### Make a sandbox configuration <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/sandbox_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
+/// ```gleam
+/// import dream_test/sandbox.{type SandboxConfig, SandboxConfig}
+///
+/// pub fn one_second_config() -> SandboxConfig {
+///   SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -172,16 +179,19 @@ type WorkerMessage(a) {
 ///
 /// ## Example
 ///
+/// ### Catch a crash in the calling process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_catching.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
 /// fn double(number: Int) -> Int {
 ///   number * 2
 /// }
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("run_catching", [
 ///     it("returns the value of a function that returns", fn() {
 ///       sandbox.run_catching(double, 61)
@@ -218,11 +228,14 @@ pub fn run_catching(
 ///
 /// ## Example
 ///
+/// ### Run a function in an isolated process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_isolated.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox.{
 ///   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 /// }
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
 /// fn double(number: Int) -> Int {
@@ -237,7 +250,7 @@ pub fn run_catching(
 ///   panic as message
 /// }
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Sandboxing", [
 ///     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
@@ -377,14 +390,17 @@ fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
 ///
 /// ## Example
 ///
+/// ### Format an abnormal exit reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/format_exit_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 /// import gleam/dynamic
 /// import gleam/erlang/process
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Exit reasons", [
 ///     it("format_exit_reason shows an abnormal reason as Gleam text", fn() {
 ///       process.Abnormal(dynamic.string("boom"))
@@ -477,13 +493,16 @@ fn handle_timeout(
 ///
 /// ## Example
 ///
+/// ### Kill a process and wait until it is gone <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/kill_and_wait.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 /// import gleam/erlang/process
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("kill_and_wait", [
 ///     it("returns when the process is gone", fn() {
 ///       let pid = process.spawn_unlinked(process.sleep_forever)
@@ -526,6 +545,18 @@ pub fn kill_and_wait(pid pid: Pid) -> Nil {
 /// ## Parameters
 ///
 /// None.
+///
+/// ## Example
+///
+/// ### Use the default sandbox settings <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/default_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/sandbox.{type SandboxConfig}
+///
+/// pub fn config_for_most_tests() -> SandboxConfig {
+///   sandbox.default_config()
+/// }
+/// ```
 pub fn default_config() -> SandboxConfig {
   SandboxConfig(timeout_ms: 5000, show_crash_reports: False)
 }
@@ -536,8 +567,14 @@ pub fn default_config() -> SandboxConfig {
 ///
 /// ## Example
 ///
+/// ### Turn on crash reports <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/with_crash_reports.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let config = sandbox.default_config() |> sandbox.with_crash_reports()
+/// import dream_test/sandbox.{type SandboxConfig}
+///
+/// pub fn debugging_config() -> SandboxConfig {
+///   sandbox.default_config() |> sandbox.with_crash_reports()
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -654,9 +691,12 @@ type FinishEvent(output) {
 ///
 /// ## Example
 ///
+/// ### Run a function in a new setup process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_in_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -674,7 +714,7 @@ type FinishEvent(output) {
 ///   }
 /// }
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Setup processes", [
 ///     it("run_in_setup_process returns the value of the function", fn() {
 ///       sandbox.run_in_setup_process(None, 100, double, 21)
@@ -886,9 +926,12 @@ fn exit(reason: atom.Atom) -> Nil
 ///
 /// ## Example
 ///
+/// ### Check that a setup process is alive <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/check_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -896,13 +939,17 @@ fn exit(reason: atom.Atom) -> Nil
 ///   number * 2
 /// }
 ///
+/// fn is_alive(setup_process: sandbox.SetupProcess(Int, Int)) -> Bool {
+///   case sandbox.check_setup_process(setup_process) {
+///     Ok(_setup_process) -> True
+///     Error(_reason) -> False
+///   }
+/// }
+///
 /// fn still_alive(result: sandbox.SetupProcessResult(Int, Int)) -> Bool {
 ///   case result {
 ///     SetupProcessReturned(setup_process: setup_process, value: _) -> {
-///       let alive = case sandbox.check_setup_process(setup_process) {
-///         Ok(_setup_process) -> True
-///         Error(_reason) -> False
-///       }
+///       let alive = is_alive(setup_process)
 ///       sandbox.stop_setup_process(setup_process)
 ///       alive
 ///     }
@@ -910,7 +957,7 @@ fn exit(reason: atom.Atom) -> Nil
 ///   }
 /// }
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Setup processes", [
 ///     it("check_setup_process gives back a setup process that is alive", fn() {
 ///       sandbox.run_in_setup_process(None, 100, double, 21)
@@ -975,9 +1022,12 @@ fn format_down_reason(down: process.Down) -> String {
 ///
 /// ## Example
 ///
+/// ### Stop a setup process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/stop_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None}
 ///
@@ -995,7 +1045,7 @@ fn format_down_reason(down: process.Down) -> String {
 ///   }
 /// }
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Setup processes", [
 ///     it("stop_setup_process stops a setup process", fn() {
 ///       sandbox.run_in_setup_process(None, 100, double, 21)

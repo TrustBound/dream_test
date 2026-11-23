@@ -1,0 +1,8 @@
+error: Unknown module
+   ┌─ build/compile_errors/fluent_builder/src/fluent_builder.gleam:10:6
+   │
+10 │   |> should.be_equal(expected)
+   │      ^^^^^^
+
+No module has been found with the name `should`.
+

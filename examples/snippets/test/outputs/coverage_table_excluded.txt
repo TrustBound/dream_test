@@ -1,0 +1,6 @@
+Coverage
+File                        Lines  Cover  Excluded
+src/app/cart.gleam          18/20  90.0%  40-44 (debug only), 71
+src/app/generated/db.gleam  excluded: matches src/app/generated/** (generated code)
+Total                       18/20  90.0%
+Excluded: 1 file, 6 lines in 1 file

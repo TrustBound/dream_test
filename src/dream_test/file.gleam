@@ -8,18 +8,31 @@
 ////
 //// Use this in test code (for example inside a snippet `tests()` function).
 ////
+//// ### Write a file and read it back <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/read.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// let path = tmp_path()
+//// import dream_test/file.{error_to_string, read, write}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/process.{unique_port}
+//// import dream_test/types.{type AssertionResult}
+//// import gleam/int
+//// import gleam/result
 ////
-//// // Setup: create the file (no assertions during setup)
-//// use _ <- result.try(
-////   write(path, "hello") |> result.map_error(error_to_string),
-//// )
+//// fn temporary_path() -> String {
+////   "build/tmp/file_example_" <> int.to_string(unique_port()) <> ".txt"
+//// }
 ////
-//// read(path)
-//// |> should
-//// |> be_equal(Ok("hello"))
-//// |> or_fail_with("expected to read back written content")
+//// pub fn written_content_reads_back() -> Result(AssertionResult, String) {
+////   let path = temporary_path()
+////
+////   // Setup: create the file (no assertions during setup)
+////   use _ <- result.try(write(path, "hello") |> result.map_error(error_to_string))
+////
+////   read(path)
+////   |> should
+////   |> be_equal(Ok("hello"))
+////   |> or_fail_with("expected to read back written content")
+//// }
 //// ```
 
 // =============================================================================
@@ -43,11 +56,19 @@
 ///
 /// ## Example
 ///
+/// ### Format a NotFound error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/error_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// error_to_string(NotFound("/x"))
-/// |> should
-/// |> be_equal("File not found: /x")
-/// |> or_fail_with("expected NotFound formatting")
+/// import dream_test/file.{NotFound, error_to_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn not_found_names_the_path() -> Result(AssertionResult, String) {
+///   error_to_string(NotFound("/x"))
+///   |> should
+///   |> be_equal("File not found: /x")
+///   |> or_fail_with("expected NotFound formatting")
+/// }
 /// ```
 ///
 pub type FileError {
@@ -97,11 +118,19 @@ pub type FileError {
 ///
 /// ## Examples
 ///
+/// ### Format a NotFound error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/error_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// error_to_string(NotFound("/x"))
-/// |> should
-/// |> be_equal("File not found: /x")
-/// |> or_fail_with("expected NotFound formatting")
+/// import dream_test/file.{NotFound, error_to_string}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn not_found_names_the_path() -> Result(AssertionResult, String) {
+///   error_to_string(NotFound("/x"))
+///   |> should
+///   |> be_equal("File not found: /x")
+///   |> or_fail_with("expected NotFound formatting")
+/// }
 /// ```
 ///
 pub fn error_to_string(error error: FileError) -> String {
@@ -137,18 +166,31 @@ pub fn error_to_string(error error: FileError) -> String {
 ///
 /// ## Examples
 ///
+/// ### Write a file and read it back <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/read.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let path = tmp_path()
+/// import dream_test/file.{error_to_string, read, write}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process.{unique_port}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/int
+/// import gleam/result
 ///
-/// // Setup: create the file (no assertions during setup)
-/// use _ <- result.try(
-///   write(path, "hello") |> result.map_error(error_to_string),
-/// )
+/// fn temporary_path() -> String {
+///   "build/tmp/file_example_" <> int.to_string(unique_port()) <> ".txt"
+/// }
 ///
-/// read(path)
-/// |> should
-/// |> be_equal(Ok("hello"))
-/// |> or_fail_with("expected to read back written content")
+/// pub fn written_content_reads_back() -> Result(AssertionResult, String) {
+///   let path = temporary_path()
+///
+///   // Setup: create the file (no assertions during setup)
+///   use _ <- result.try(write(path, "hello") |> result.map_error(error_to_string))
+///
+///   read(path)
+///   |> should
+///   |> be_equal(Ok("hello"))
+///   |> or_fail_with("expected to read back written content")
+/// }
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "read_file")
@@ -174,13 +216,23 @@ pub fn read(path path: String) -> Result(String, FileError)
 ///
 /// ## Examples
 ///
-/// ```gleam
-/// let path = tmp_path()
+/// ### Write a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/write.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// // Setup: create the file (no assertions during setup)
-/// use _ <- result.try(
-///   write(path, "hello") |> result.map_error(error_to_string),
-/// )
+/// ```gleam
+/// import dream_test/file.{error_to_string, write}
+/// import dream_test/process.{unique_port}
+/// import gleam/int
+/// import gleam/result
+///
+/// fn temporary_path() -> String {
+///   "build/tmp/file_example_" <> int.to_string(unique_port()) <> ".txt"
+/// }
+///
+/// pub fn write_a_greeting() -> Result(Nil, String) {
+///   let path = temporary_path()
+///
+///   write(path, "hello") |> result.map_error(error_to_string)
+/// }
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "write_file")
@@ -207,19 +259,32 @@ pub fn write(
 ///
 /// ## Examples
 ///
+/// ### Delete a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/delete.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let path = tmp_path()
+/// import dream_test/file.{NotFound, delete, error_to_string, read, write}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process.{unique_port}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/int
+/// import gleam/result
 ///
-/// // Setup: create the file, then delete it (no assertions during setup)
-/// use _ <- result.try(
-///   write(path, "hello") |> result.map_error(error_to_string),
-/// )
-/// use _ <- result.try(delete(path) |> result.map_error(error_to_string))
+/// fn temporary_path() -> String {
+///   "build/tmp/file_example_" <> int.to_string(unique_port()) <> ".txt"
+/// }
 ///
-/// read(path)
-/// |> should
-/// |> be_equal(Error(NotFound(path)))
-/// |> or_fail_with("expected deleted file to be NotFound")
+/// pub fn deleted_file_is_not_found() -> Result(AssertionResult, String) {
+///   let path = temporary_path()
+///
+///   // Setup: create the file, then delete it (no assertions during setup)
+///   use _ <- result.try(write(path, "hello") |> result.map_error(error_to_string))
+///   use _ <- result.try(delete(path) |> result.map_error(error_to_string))
+///
+///   read(path)
+///   |> should
+///   |> be_equal(Error(NotFound(path)))
+///   |> or_fail_with("expected deleted file to be NotFound")
+/// }
 /// ```
 ///
 @external(erlang, "dream_test_file_ffi", "delete_file")
@@ -243,23 +308,38 @@ pub fn delete(path path: String) -> Result(Nil, FileError)
 ///
 /// ## Examples
 ///
+/// ### Delete the snapshot files of a directory <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/file/delete_files_matching.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let directory = "./test/tmp/file_helpers_" <> int.to_string(unique_port())
-/// let a = directory <> "/a.snap"
-/// let b = directory <> "/b.snap"
-/// let keep = directory <> "/keep.txt"
+/// import dream_test/file.{delete_files_matching, error_to_string, write}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process.{unique_port}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/int
+/// import gleam/result
 ///
-/// // Setup: create 2 matching files and 1 non-matching file
-/// use _ <- result.try(write(a, "a") |> result.map_error(error_to_string))
-/// use _ <- result.try(write(b, "b") |> result.map_error(error_to_string))
-/// use _ <- result.try(
-///   write(keep, "keep") |> result.map_error(error_to_string),
-/// )
+/// pub fn deletes_two_snapshots() -> Result(AssertionResult, String) {
+///   let directory = "build/tmp/file_example_" <> int.to_string(unique_port())
+///   let first_snapshot = directory <> "/a.snap"
+///   let second_snapshot = directory <> "/b.snap"
+///   let kept_file = directory <> "/keep.txt"
 ///
-/// delete_files_matching(directory, ".snap")
-/// |> should
-/// |> be_equal(Ok(2))
-/// |> or_fail_with("expected two deleted snapshots")
+///   // Setup: create 2 matching files and 1 non-matching file
+///   use _ <- result.try(
+///     write(first_snapshot, "a") |> result.map_error(error_to_string),
+///   )
+///   use _ <- result.try(
+///     write(second_snapshot, "b") |> result.map_error(error_to_string),
+///   )
+///   use _ <- result.try(
+///     write(kept_file, "keep") |> result.map_error(error_to_string),
+///   )
+///
+///   delete_files_matching(directory, ".snap")
+///   |> should
+///   |> be_equal(Ok(2))
+///   |> or_fail_with("expected two deleted snapshots")
+/// }
 /// ```
 ///
 /// ## Notes

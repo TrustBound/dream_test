@@ -4,9 +4,65 @@
 //// get. A suite keeps its typed tree and its context inside it, so one run
 //// can hold a `unit` suite, a `unit_context` suite and a Gherkin feature:
 ////
+//// ### Run suites of different contexts together <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// runner.new([plain_suite(), number_suite(), word_feature()])
-//// |> runner.run()
+//// import dream_test/gherkin/feature.{feature, given, scenario, then}
+//// import dream_test/gherkin/steps.{type StepContext}
+//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+//// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult, type RunReport}
+//// import dream_test/unit
+//// import dream_test/unit_context
+////
+//// fn plain_suite() -> TestSuite {
+////   unit.describe("Plain", [unit.it("passes", fn() { Ok(succeed()) })])
+//// }
+////
+//// fn number_suite() -> TestSuite {
+////   unit_context.describe("Numbers", 41, [
+////     unit_context.it("is 41", fn(number: Int) {
+////       number
+////       |> should
+////       |> be_equal(41)
+////       |> or_fail_with("expected 41")
+////     }),
+////   ])
+//// }
+////
+//// fn set_word(_word: String, _context: StepContext) -> Result(String, String) {
+////   Ok("hello")
+//// }
+////
+//// fn check_word(
+////   word: String,
+////   _context: StepContext,
+//// ) -> Result(AssertionResult, String) {
+////   word
+////   |> should
+////   |> be_equal("hello")
+////   |> or_fail_with("expected hello")
+//// }
+////
+//// fn word_feature() -> TestSuite {
+////   let steps =
+////     steps.new(initial: "")
+////     |> steps.given("the word hello", set_word)
+////     |> steps.then("the word is hello", check_word)
+////
+////   feature("Words", steps, [
+////     scenario("Keeping a word", [
+////       given("the word hello"),
+////       then("the word is hello"),
+////     ]),
+////   ])
+//// }
+////
+//// pub fn run_all_suites() -> RunReport {
+////   runner.new([plain_suite(), number_suite(), word_feature()])
+////   |> runner.run()
+//// }
 //// ```
 ////
 //// Most code does not use this module directly: `unit.describe`,
@@ -97,8 +153,24 @@ pub type RunInput {
 ///
 /// ## Example
 ///
+/// ### Make a suite from a tree <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/from_tree.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.from_tree(types.tree("numbers", 41, [unit_context.it("is 41", is_41)]))
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context
+///
+/// fn is_41(number: Int) -> Result(AssertionResult, String) {
+///   number
+///   |> should
+///   |> be_equal(41)
+///   |> or_fail_with("expected 41")
+/// }
+///
+/// pub fn numbers_suite() -> TestSuite {
+///   suite.from_tree(types.tree("numbers", 41, [unit_context.it("is 41", is_41)]))
+/// }
 /// ```
 pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
   new(
@@ -129,13 +201,41 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 ///
 /// ## Example
 ///
+/// ### Make a suite with a context from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.new(
-///   name: "server",
-///   tags: [],
-///   children: [unit_context.it("answers", answers)],
-///   context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
-/// )
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context
+///
+/// pub type Server {
+///   Server(port: Int)
+/// }
+///
+/// fn start_server() -> Result(Server, String) {
+///   Ok(Server(port: 8080))
+/// }
+///
+/// fn stop_server(_server: Server) -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// fn answers(server: Server) -> Result(AssertionResult, String) {
+///   server.port
+///   |> should
+///   |> be_equal(8080)
+///   |> or_fail_with("expected the server on port 8080")
+/// }
+///
+/// pub fn server_suite() -> TestSuite {
+///   suite.new(
+///     name: "server",
+///     tags: [],
+///     children: [unit_context.it("answers", answers)],
+///     context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
+///   )
+/// }
 /// ```
 pub fn new(
   name name: String,
@@ -152,9 +252,16 @@ pub fn new(
 ///
 /// ## Example
 ///
+/// ### Read the name of a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.name(unit.describe("Cart", []))
-/// // -> "Cart"
+/// import dream_test/suite
+/// import dream_test/unit
+///
+/// pub fn cart_name() -> String {
+///   suite.name(unit.describe("Cart", []))
+///   // -> "Cart"
+/// }
 /// ```
 pub fn name(suite suite: TestSuite) -> String {
   suite.name
@@ -168,10 +275,24 @@ pub fn name(suite suite: TestSuite) -> String {
 ///
 /// ## Example
 ///
+/// ### List the test names of a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/tests_of_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.tests(unit.describe("Cart", [unit.it("is empty", is_empty)]))
-/// |> list.map(fn(info) { info.name })
-/// // -> ["is empty"]
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit
+/// import gleam/list
+///
+/// fn is_empty() -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn cart_test_names() -> List(String) {
+///   suite.tests(unit.describe("Cart", [unit.it("is empty", is_empty)]))
+///   |> list.map(fn(info) { info.name })
+///   // -> ["is empty"]
+/// }
 /// ```
 pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
   list.flat_map(suite.parts, part_tests)
@@ -187,8 +308,32 @@ pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
 ///
 /// ## Example
 ///
+/// ### Put suites in one group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.group(name: "all", suites: [plain_suite(), number_suite()])
+/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+/// import dream_test/unit_context
+///
+/// fn plain_suite() -> TestSuite {
+///   unit.describe("Plain", [unit.it("passes", fn() { Ok(succeed()) })])
+/// }
+///
+/// fn number_suite() -> TestSuite {
+///   unit_context.describe("Numbers", 41, [
+///     unit_context.it("is 41", fn(number: Int) {
+///       number
+///       |> should
+///       |> be_equal(41)
+///       |> or_fail_with("expected 41")
+///     }),
+///   ])
+/// }
+///
+/// pub fn all_suites() -> TestSuite {
+///   suite.group(name: "all", suites: [plain_suite(), number_suite()])
+/// }
 /// ```
 pub fn group(name name: String, suites suites: List(TestSuite)) -> TestSuite {
   TestSuite(
@@ -205,8 +350,24 @@ pub fn group(name name: String, suites suites: List(TestSuite)) -> TestSuite {
 ///
 /// ## Example
 ///
+/// ### Join suites into one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/join.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.join(name: "checkout", suites: [cart_suite(), payment_suite()])
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+///
+/// fn cart_suite() -> TestSuite {
+///   unit.describe("Cart", [unit.it("starts empty", fn() { Ok(succeed()) })])
+/// }
+///
+/// fn payment_suite() -> TestSuite {
+///   unit.describe("Payment", [unit.it("takes a card", fn() { Ok(succeed()) })])
+/// }
+///
+/// pub fn checkout_suite() -> TestSuite {
+///   suite.join(name: "checkout", suites: [cart_suite(), payment_suite()])
+/// }
 /// ```
 pub fn join(name name: String, suites suites: List(TestSuite)) -> TestSuite {
   TestSuite(name: name, parts: list.flat_map(suites, suite_parts))
@@ -219,8 +380,20 @@ pub fn join(name name: String, suites suites: List(TestSuite)) -> TestSuite {
 ///
 /// ## Example
 ///
+/// ### Set the source of the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/with_source.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// suite.with_source(suite: tests(), source: "cart_test")
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+///
+/// pub fn tests() -> TestSuite {
+///   unit.describe("Cart", [unit.it("is empty", fn() { Ok(succeed()) })])
+/// }
+///
+/// pub fn cart_suite_with_source() -> TestSuite {
+///   suite.with_source(suite: tests(), source: "cart_test")
+/// }
 /// ```
 pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
   TestSuite(..suite, parts: set_source(suite.parts, source, []))
@@ -241,6 +414,43 @@ pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
 /// The results and the hook failures of the suite, in the order that
 /// they ran, the new count of completed tests, and the outer setups as
 /// the executor saw them last.
+///
+/// ## Example
+///
+/// ### Run one suite directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/run.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/parallel.{type RunTreeParallelWithReporterResult}
+/// import dream_test/suite.{RunInput}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// pub fn run_one_suite() -> RunTreeParallelWithReporterResult {
+///   let cart_suite =
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ])
+///   suite.run(
+///     suite: cart_suite,
+///     input: RunInput(
+///       config: parallel.default_config(),
+///       keep: None,
+///       progress_reporter: None,
+///       write: ignore_output,
+///       total: 1,
+///       completed: 0,
+///       before_each_test: [],
+///       after_each_test: [],
+///       outer_setups: [],
+///     ),
+///   )
+/// }
+///
+/// fn ignore_output(_text: String) -> Nil {
+///   Nil
+/// }
+/// ```
 pub fn run(
   suite suite: TestSuite,
   input input: RunInput,

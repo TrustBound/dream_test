@@ -59,6 +59,28 @@ pub type FormatIncrementalPartsResult {
 ///
 /// This reporter prints at the end of the run, using the traversal-ordered results
 /// provided by the runner.
+///
+/// ## Example
+///
+/// ### Print the bdd report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn new() -> reporter_types.ResultsReporter {
   reporter_types.Bdd(reporter_types.BddReporterConfig(
     color: False,
@@ -67,6 +89,28 @@ pub fn new() -> reporter_types.ResultsReporter {
 }
 
 /// Enable ANSI color output for the BDD report.
+///
+/// ## Example
+///
+/// ### Print the bdd report in colour <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.color()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn color(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -83,6 +127,29 @@ pub fn color(
 /// Print only the summary line at the end of the run, after the
 /// `Setup and teardown failures:` section when a teardown hook failed or
 /// a setup stopped.
+///
+/// ## Example
+///
+/// ### Print only the summary line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/summary_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///       it("adds an item", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.summary_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn summary_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -100,6 +167,34 @@ pub fn summary_only(
 /// (when there is one), and the summary line at the end of the run.
 /// A failed test here is one with the status `Failed`, `TimedOut` or
 /// `SetupFailed` (see `types.is_failure`).
+///
+/// ## Example
+///
+/// ### Print only the failed tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/failures_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///       it("counts two items", fn() {
+///         1
+///         |> should
+///         |> be_equal(2)
+///         |> or_fail_with("expected two items")
+///       }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.failures_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn failures_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -118,6 +213,42 @@ pub fn failures_only(
 /// The output has the test results, then the failures (full mode), then a
 /// `Setup and teardown failures:` section when a teardown hook failed or
 /// a setup stopped (all modes), then the summary line.
+///
+/// ## Example
+///
+/// ### Render the summary line of a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/types.{Passed, TestResult, Unit}
+///
+/// pub fn summary_of_one_passed_test() -> String {
+///   let report =
+///     types.run_report(
+///       tests: [
+///         TestResult(
+///           name: "starts empty",
+///           groups: ["Cart"],
+///           status: Passed,
+///           duration_ms: 3,
+///           tags: [],
+///           failures: [],
+///           kind: Unit,
+///         ),
+///       ],
+///       hook_failures: [],
+///       reporter_crashes: [],
+///     )
+///   bdd.render(
+///     config: reporter_types.BddReporterConfig(
+///       color: False,
+///       mode: reporter_types.BddSummaryOnly,
+///     ),
+///     report: report,
+///   )
+/// }
+/// ```
 pub fn render(
   config config: reporter_types.BddReporterConfig,
   report report: RunReport,
@@ -227,13 +358,44 @@ fn format_failures_header(color: Bool) -> String {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let report = bdd.format(sample_report())
+/// ### Format a report as text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// report
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_format_report.snap")
-/// |> or_fail_with("expected formatted report snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn report_lists_the_passing_test() -> Result(AssertionResult, String) {
+///   let report =
+///     bdd.format(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///     )
+///
+///   report
+///   |> should
+///   |> be_equal(
+///     "Example Suite\n  ✓ passes\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n",
+///   )
+///   |> or_fail_with("expected the formatted report")
+/// }
 /// ```
 ///
 pub fn format(report report: RunReport) -> String {
@@ -297,25 +459,53 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
 ///
 /// ## Example
 ///
+/// ### Write a report with a writer function <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// bdd.report(
-///   types.run_report(
-///     tests: [passing_result()],
-///     hook_failures: [],
-///     reporter_crashes: [],
-///   ),
-///   write_bdd_report_to_file,
-/// )
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+/// import gleam/erlang/process
+/// import gleam/result
 ///
-/// use text <- result.try(
-///   file.read("test/tmp/bdd_report.txt")
-///   |> result.map_error(file.error_to_string),
-/// )
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
 ///
-/// text
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_report_file_output.snap")
-/// |> or_fail_with("expected report output snapshot match")
+/// pub fn report_writes_the_text() -> Result(AssertionResult, String) {
+///   let subject = process.new_subject()
+///   let _report =
+///     bdd.report(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///       process.send(subject, _),
+///     )
+///
+///   use text <- result.try(
+///     process.receive(subject, within: 100)
+///     |> result.replace_error("expected the report to write its text"),
+///   )
+///
+///   text
+///   |> should
+///   |> be_equal(
+///     "Example Suite\n  ✓ passes\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n",
+///   )
+///   |> or_fail_with("expected the written report")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -357,16 +547,36 @@ pub fn report(
 ///
 /// ## Example
 ///
+/// ### Get the describe path of a result <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// use first <- result.try(first_result([passing_result()]))
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
 ///
-/// let bdd.FormatIncrementalResult(text: _text, new_path: new_path) =
-///   bdd.format_incremental(first, [])
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
 ///
-/// new_path
-/// |> should
-/// |> be_equal(["Example Suite"])
-/// |> or_fail_with("expected new_path to be the describe path")
+/// pub fn new_path_is_the_describe_path() -> Result(AssertionResult, String) {
+///   let bdd.FormatIncrementalResult(text: _text, new_path: new_path) =
+///     bdd.format_incremental(passing_result(), [])
+///
+///   new_path
+///   |> should
+///   |> be_equal(["Example Suite"])
+///   |> or_fail_with("expected new_path to be the describe path")
+/// }
 /// ```
 pub fn format_incremental(
   result result: TestResult,
@@ -393,17 +603,37 @@ pub fn format_incremental(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let result = passing_result()
-/// let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
-///   bdd.format_incremental_with_test_indent(result, [], 0)
+/// ### Format one result as it finishes <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental_with_test_indent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental output snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn first_result_prints_its_group() -> Result(AssertionResult, String) {
+///   let result = passing_result()
+///   let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
+///     bdd.format_incremental_with_test_indent(result, [], 0)
+///
+///   text
+///   |> should
+///   |> be_equal("Example Suite\n  ✓ passes\n")
+///   |> or_fail_with("expected the incremental output")
+/// }
 /// ```
 pub fn format_incremental_with_test_indent(
   result result: TestResult,
@@ -443,18 +673,43 @@ pub fn format_incremental_with_test_indent(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let result = passing_result()
-/// let text =
-///   bdd.format_incremental_parts_with_test_indent(result, [], 0)
-///   |> incremental_parts_text
+/// ### Format the header and the test line apart <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental_parts_with_test_indent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_parts_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental parts snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn parts_hold_the_header_and_the_test_line() -> Result(
+///   AssertionResult,
+///   String,
+/// ) {
+///   let result = passing_result()
+///   let bdd.FormatIncrementalPartsResult(
+///     headers: headers,
+///     test_line: test_line,
+///     new_path: _new_path,
+///   ) = bdd.format_incremental_parts_with_test_indent(result, [], 0)
+///
+///   #(headers, test_line)
+///   |> should
+///   |> be_equal(#("Example Suite\n", "  ✓ passes\n"))
+///   |> or_fail_with("expected the incremental parts")
+/// }
 /// ```
 pub fn format_incremental_parts_with_test_indent(
   result result: TestResult,
@@ -491,20 +746,42 @@ pub fn format_incremental_parts_with_test_indent(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let summary =
-///   bdd.format_summary_only(
-///     types.run_report(
-///       tests: [passing_result()],
-///       hook_failures: [],
-///       reporter_crashes: [],
-///     ),
-///   )
+/// ### Format only the summary line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_summary_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// summary
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_format_summary_only.snap")
-/// |> or_fail_with("expected summary snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn summary_counts_the_passing_test() -> Result(AssertionResult, String) {
+///   let summary =
+///     bdd.format_summary_only(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///     )
+///
+///   summary
+///   |> should
+///   |> be_equal("Summary: 1 run, 0 failed, 1 passed in 0ms\n")
+///   |> or_fail_with("expected the summary line")
+/// }
 /// ```
 pub fn format_summary_only(report report: RunReport) -> String {
   summary.format(report)

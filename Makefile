@@ -1,19 +1,36 @@
-# Simple Makefile for dream_test
+# Makefile for dream_test
 
-.PHONY: test examples all
+.PHONY: test build format snippets check-snippets examples check all
 
-# Run dream_test tests
+# Run the dream_test tests, with line coverage (fails below 100%)
 test:
 	gleam test
 
-# Run example project tests
-examples:
-	cd examples/snippets && gleam test
-	@echo ""
-	@echo "NOTE: failure_showcase is expected to fail (for reporter demo)."
-	cd examples/failure_showcase && gleam test || true
-	cd examples/shopping_cart && gleam test
-	cd examples/cache_app && gleam test
+# Compile only
+build:
+	gleam build
 
-# Run everything: examples first, then dream_test tests last
-all: examples test
+# Format the code
+format:
+	gleam format src test
+
+# Run the tests of the snippets project, which also check every code block
+# of the docs
+snippets:
+	cd examples/snippets && gleam test
+
+# Check every code block of the docs, and print each problem and the
+# summary line
+check-snippets:
+	cd examples/snippets && gleam run -m snippets/docs/docs_check
+
+# Run the tests of the other example projects
+examples:
+	sh scripts/examples.sh
+
+# Format check, build, tests, docs build and snippet tests (what CI runs)
+check:
+	sh scripts/check.sh
+
+# Run everything: what CI runs, then the other example projects
+all: check examples

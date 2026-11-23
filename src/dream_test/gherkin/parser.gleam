@@ -51,11 +51,19 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Describe a token kind <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/token_kind.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.token_kind_to_string(parser.ScenarioLine)
-/// |> should
-/// |> be_equal("a Scenario line")
-/// |> or_fail_with("expected the Scenario line description")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn scenario_line_has_a_description() -> Result(AssertionResult, String) {
+///   parser.token_kind_to_string(parser.ScenarioLine)
+///   |> should
+///   |> be_equal("a Scenario line")
+///   |> or_fail_with("expected the Scenario line description")
+/// }
 /// ```
 ///
 pub type TokenKind {
@@ -87,14 +95,28 @@ pub type TokenKind {
 ///
 /// ## Example
 ///
+/// ### Parse an And step with no step before it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/parse_problem.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.parse_string("Feature: F\n  Scenario: S\n    And a step\n")
-/// |> should
-/// |> be_equal(Error(parser.ParseError(
-///   line: 3,
-///   problem: parser.MissingPreviousStep(keyword: gherkin_types.And, text: "a step"),
-/// )))
-/// |> or_fail_with("expected a missing previous step error")
+/// import dream_test/gherkin/parser
+/// import dream_test/gherkin/types as gherkin_types
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn and_without_a_previous_step_fails() -> Result(AssertionResult, String) {
+///   parser.parse_string("Feature: F\n  Scenario: S\n    And a step\n")
+///   |> should
+///   |> be_equal(
+///     Error(parser.ParseError(
+///       line: 3,
+///       problem: parser.MissingPreviousStep(
+///         keyword: gherkin_types.And,
+///         text: "a step",
+///       ),
+///     )),
+///   )
+///   |> or_fail_with("expected a missing previous step error")
+/// }
 /// ```
 ///
 pub type ParseProblem {
@@ -132,14 +154,22 @@ pub type ParseProblem {
 ///
 /// ## Example
 ///
+/// ### Render a parse error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/parse_error.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.parse_error_to_string(parser.ParseError(
-///   line: 3,
-///   problem: parser.RepeatedDocString,
-/// ))
-/// |> should
-/// |> be_equal("line 3: Step cannot have more than one DocString")
-/// |> or_fail_with("expected the rendered parse error")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn parse_error_names_its_line() -> Result(AssertionResult, String) {
+///   parser.parse_error_to_string(parser.ParseError(
+///     line: 3,
+///     problem: parser.RepeatedDocString,
+///   ))
+///   |> should
+///   |> be_equal("line 3: Step cannot have more than one DocString")
+///   |> or_fail_with("expected the rendered parse error")
+/// }
 /// ```
 ///
 pub type ParseError {
@@ -150,13 +180,24 @@ pub type ParseError {
 ///
 /// ## Example
 ///
+/// ### Parse a file that does not exist <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/feature_file_error.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.parse_file("test/missing.feature")
-/// |> should
-/// |> be_equal(Error(parser.UnreadableFeatureFile(
-///   error: file.NotFound("test/missing.feature"),
-/// )))
-/// |> or_fail_with("expected an unreadable file error")
+/// import dream_test/file
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn missing_file_is_unreadable() -> Result(AssertionResult, String) {
+///   parser.parse_file("test/missing.feature")
+///   |> should
+///   |> be_equal(
+///     Error(
+///       parser.UnreadableFeatureFile(error: file.NotFound("test/missing.feature")),
+///     ),
+///   )
+///   |> or_fail_with("expected an unreadable file error")
+/// }
 /// ```
 ///
 pub type FeatureFileError {
@@ -195,8 +236,16 @@ pub type FeatureFileError {
 ///
 /// ## Example
 ///
+/// ### Parse a feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/parse_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/gherkin/parser
+/// import dream_test/gherkin/types.{type Feature}
+///
+/// pub fn cart_feature() -> Feature {
 ///   let assert Ok(feature) = parser.parse_file("test/cart.feature")
+///   feature
+/// }
 /// ```
 ///
 pub fn parse_file(path path: String) -> Result(Feature, FeatureFileError) {
@@ -229,20 +278,28 @@ fn parse_file_content(
 ///
 /// ## Example
 ///
+/// ### Parse a feature from a string <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/parse_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let content =
-///         "@smoke\n"
-///         <> "Feature: Demo\n"
-///         <> "\n"
-///         <> "  Scenario: One\n"
-///         <> "    Given a thing\n"
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
 ///
-///       let assert Ok(feature) = parser.parse_string(content)
+/// pub fn minimal_feature_is_named_demo() -> Result(AssertionResult, String) {
+///   let content =
+///     "@smoke\n"
+///     <> "Feature: Demo\n"
+///     <> "\n"
+///     <> "  Scenario: One\n"
+///     <> "    Given a thing\n"
 ///
-///       feature.name
-///       |> should
-///       |> be_equal("Demo")
-///       |> or_fail_with("expected feature name Demo")
+///   let assert Ok(feature) = parser.parse_string(content)
+///
+///   feature.name
+///   |> should
+///   |> be_equal("Demo")
+///   |> or_fail_with("expected feature name Demo")
+/// }
 /// ```
 ///
 pub fn parse_string(content content: String) -> Result(Feature, ParseError) {
@@ -255,11 +312,19 @@ pub fn parse_string(content content: String) -> Result(Feature, ParseError) {
 ///
 /// ## Example
 ///
+/// ### Describe the end of the file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/token_kind_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.token_kind_to_string(parser.EndOfFile)
-/// |> should
-/// |> be_equal("the end of the file")
-/// |> or_fail_with("expected the end of file description")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn end_of_file_has_a_description() -> Result(AssertionResult, String) {
+///   parser.token_kind_to_string(parser.EndOfFile)
+///   |> should
+///   |> be_equal("the end of the file")
+///   |> or_fail_with("expected the end of file description")
+/// }
 /// ```
 ///
 pub fn token_kind_to_string(kind kind: TokenKind) -> String {
@@ -281,11 +346,19 @@ pub fn token_kind_to_string(kind kind: TokenKind) -> String {
 ///
 /// ## Example
 ///
+/// ### Describe a parse problem <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/problem_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.problem_to_string(parser.RepeatedDocString)
-/// |> should
-/// |> be_equal("Step cannot have more than one DocString")
-/// |> or_fail_with("expected the repeated DocString message")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn repeated_doc_string_has_a_message() -> Result(AssertionResult, String) {
+///   parser.problem_to_string(parser.RepeatedDocString)
+///   |> should
+///   |> be_equal("Step cannot have more than one DocString")
+///   |> or_fail_with("expected the repeated DocString message")
+/// }
 /// ```
 ///
 pub fn problem_to_string(problem problem: ParseProblem) -> String {
@@ -327,14 +400,22 @@ pub fn problem_to_string(problem problem: ParseProblem) -> String {
 ///
 /// ## Example
 ///
+/// ### Render a missing Feature error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/parse_error_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.parse_error_to_string(parser.ParseError(
-///   line: 1,
-///   problem: parser.MissingFeature,
-/// ))
-/// |> should
-/// |> be_equal("line 1: No Feature found in content")
-/// |> or_fail_with("expected the rendered parse error")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn missing_feature_error_names_line_one() -> Result(AssertionResult, String) {
+///   parser.parse_error_to_string(parser.ParseError(
+///     line: 1,
+///     problem: parser.MissingFeature,
+///   ))
+///   |> should
+///   |> be_equal("line 1: No Feature found in content")
+///   |> or_fail_with("expected the rendered parse error")
+/// }
 /// ```
 ///
 pub fn parse_error_to_string(error error: ParseError) -> String {
@@ -354,14 +435,22 @@ pub fn parse_error_to_string(error error: ParseError) -> String {
 ///
 /// ## Example
 ///
+/// ### Render a feature file error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/parser/feature_file_error_to_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parser.feature_file_error_to_string(parser.InvalidFeatureFile(
-///   path: "test/cart.feature",
-///   error: parser.ParseError(line: 1, problem: parser.MissingFeature),
-/// ))
-/// |> should
-/// |> be_equal("test/cart.feature: line 1: No Feature found in content")
-/// |> or_fail_with("expected the rendered file error")
+/// import dream_test/gherkin/parser
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn file_error_names_the_path() -> Result(AssertionResult, String) {
+///   parser.feature_file_error_to_string(parser.InvalidFeatureFile(
+///     path: "test/cart.feature",
+///     error: parser.ParseError(line: 1, problem: parser.MissingFeature),
+///   ))
+///   |> should
+///   |> be_equal("test/cart.feature: line 1: No Feature found in content")
+///   |> or_fail_with("expected the rendered file error")
+/// }
 /// ```
 ///
 pub fn feature_file_error_to_string(error error: FeatureFileError) -> String {

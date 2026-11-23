@@ -13,6 +13,8 @@
 ////
 //// ## Example
 ////
+//// ### Run a tree and count the results <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 //// import dream_test/parallel
@@ -86,6 +88,8 @@ import gleam/string
 /// - `default_timeout_ms`: timeout used when a test does not set its own timeout
 ///
 /// ## Example
+///
+/// ### Run a tree with a custom config <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
@@ -528,6 +532,8 @@ type SetupProcesses(context) {
 ///
 /// ## Example
 ///
+/// ### Run a tree with the default config <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
 /// import dream_test/parallel
@@ -569,6 +575,8 @@ pub fn default_config() -> ParallelConfig {
 /// This does **not** drive a reporter.
 ///
 /// ## Example
+///
+/// ### Run a single tree <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{have_length, or_fail_with, should, succeed}
@@ -645,24 +653,26 @@ pub fn run_tree_parallel(
 ///
 /// ## Example
 ///
+/// ### Run a tree and get its results <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/parallel/run_tree_parallel_with_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/parallel
-/// import dream_test/types.{type Tree}
+/// import dream_test/types.{type TestResult, type Tree}
 /// import dream_test/unit.{it}
 /// import gleam/option.{None}
-/// 
+///
 /// pub fn tree() -> Tree(Nil) {
 ///   types.tree("suite", Nil, [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
-/// 
-/// fn ignore(_text: String) {
+///
+/// fn ignore(_text: String) -> Nil {
 ///   Nil
 /// }
-/// 
-/// pub fn main() {
+///
+/// pub fn main() -> List(TestResult) {
 ///   let total = 1
 ///   let completed = 0
 ///   let parallel_result =
@@ -756,22 +766,42 @@ pub fn run_tree_parallel_with_reporter(
 ///
 /// ## Example
 ///
+/// ### Run a tree inside a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/parallel/run_tree.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// parallel.run_tree(parallel.RunTreeConfig(
-///   config: parallel.default_config(),
-///   groups: ["all"],
-///   name: "suite",
-///   tags: [],
-///   children: [unit.it("passes", passes)],
-///   context: types.FixedContext(Nil),
-///   progress_reporter: None,
-///   write: ignore,
-///   total: 1,
-///   completed: 0,
-///   runner_before_each_test: [],
-///   runner_after_each_test: [],
-///   outer_setups: [],
-/// ))
+/// import dream_test/matchers.{succeed}
+/// import dream_test/parallel
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit
+/// import gleam/option.{None}
+///
+/// fn passes() -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// fn ignore(_text: String) -> Nil {
+///   Nil
+/// }
+///
+/// pub fn run_suite_in_group() -> parallel.RunTreeParallelWithReporterResult {
+///   parallel.run_tree(
+///     parallel.RunTreeConfig(
+///       config: parallel.default_config(),
+///       groups: ["all"],
+///       name: "suite",
+///       tags: [],
+///       children: [unit.it("passes", passes)],
+///       context: types.FixedContext(Nil),
+///       progress_reporter: None,
+///       write: ignore,
+///       total: 1,
+///       completed: 0,
+///       runner_before_each_test: [],
+///       runner_after_each_test: [],
+///       outer_setups: [],
+///     ),
+///   )
+/// }
 /// ```
 pub fn run_tree(
   config config: RunTreeConfig(context),

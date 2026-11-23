@@ -8,11 +8,18 @@
 ////
 //// ## Example
 ////
+//// ### Assert that a string starts with a prefix <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/string/start_with.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// "hello world"
-//// |> should
-//// |> start_with("hello")
-//// |> or_fail_with("expected string to start with \"hello\"")
+//// import dream_test/matchers.{or_fail_with, should, start_with}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn greeting_starts_with_hello() -> Result(AssertionResult, String) {
+////   "hello world"
+////   |> should
+////   |> start_with("hello")
+////   |> or_fail_with("expected string to start with \"hello\"")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -35,11 +42,18 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Assert that a string starts with a prefix <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/string/start_with.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// "hello world"
-/// |> should
-/// |> start_with("hello")
-/// |> or_fail_with("expected string to start with \"hello\"")
+/// import dream_test/matchers.{or_fail_with, should, start_with}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn greeting_starts_with_hello() -> Result(AssertionResult, String) {
+///   "hello world"
+///   |> should
+///   |> start_with("hello")
+///   |> or_fail_with("expected string to start with \"hello\"")
+/// }
 /// ```
 ///
 pub fn start_with(
@@ -85,11 +99,18 @@ fn check_starts_with(actual: String, prefix: String) -> MatchResult(String) {
 ///
 /// ## Example
 ///
+/// ### Assert that a string ends with a suffix <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/string/end_with.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// "hello.gleam"
-/// |> should
-/// |> end_with(".gleam")
-/// |> or_fail_with("expected .gleam suffix")
+/// import dream_test/matchers.{end_with, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn file_name_ends_with_gleam() -> Result(AssertionResult, String) {
+///   "hello.gleam"
+///   |> should
+///   |> end_with(".gleam")
+///   |> or_fail_with("expected .gleam suffix")
+/// }
 /// ```
 ///
 pub fn end_with(
@@ -135,11 +156,18 @@ fn check_ends_with(actual: String, suffix: String) -> MatchResult(String) {
 ///
 /// ## Example
 ///
+/// ### Assert that a string contains a substring <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/string/contain_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// "hello world"
-/// |> should
-/// |> contain_string("world")
-/// |> or_fail_with("expected substring match")
+/// import dream_test/matchers.{contain_string, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn greeting_contains_world() -> Result(AssertionResult, String) {
+///   "hello world"
+///   |> should
+///   |> contain_string("world")
+///   |> or_fail_with("expected substring match")
+/// }
 /// ```
 ///
 pub fn contain_string(
@@ -197,13 +225,18 @@ fn check_contains_string(
 ///
 /// ## Example
 ///
+/// ### Assert that a string matches a regular expression <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/string/match_regex.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{match_regex, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
 ///
-/// "user-123"
-/// |> should
-/// |> match_regex("^user-\\d+$")
-/// |> or_fail_with("expected an id like user-123")
+/// pub fn identifier_matches_pattern() -> Result(AssertionResult, String) {
+///   "user-123"
+///   |> should
+///   |> match_regex("^user-\\d+$")
+///   |> or_fail_with("expected an id like user-123")
+/// }
 /// ```
 pub fn match_regex(
   value_or_result value_or_result: MatchResult(String),

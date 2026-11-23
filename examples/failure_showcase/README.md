@@ -13,6 +13,8 @@ Use it to quickly inspect how Dream Test renders:
 
 ## Run it
 
+### Run the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/examples.sh#L9-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```bash
 cd examples/failure_showcase
 gleam test

@@ -76,7 +76,7 @@ Expected print order:
 
 #### Diagram: outer scope vs nested scope
 
-```mermaid
+```mermaid illustration
 sequenceDiagram
   participant Enclosing as Outer scope (surrounding describe/group)
   participant Nested as Nested scope (nested group)

@@ -4,7 +4,7 @@ This example demonstrates **Cucumber/Gherkin-style BDD testing** with Dream Test
 
 ## Project Structure
 
-```text
+```text illustration
 shopping_cart/
 ├── src/shopping_cart/
 │   ├── types.gleam             # Core domain types
@@ -130,6 +130,8 @@ pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
 
 ## Running
 
+### Run the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/examples.sh#L14-L15"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```bash
 cd examples/shopping_cart
 gleam test
@@ -139,20 +141,19 @@ gleam test
 
 While the tests run, a progress bar shows each test. Then the report shows:
 
-```text
-Shopping Cart — Gherkin BDD Example
-====================================
+#### The report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/shopping_cart/test/outputs/readme_report.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
+```text
 Feature: Shopping Cart (inline)
-  ✓ Scenario: Adding a single item to the cart (3ms)
-  ✓ Scenario: Adding multiple different items (3ms)
-  ✓ Scenario: Updating item quantity (3ms)
-  ✓ Scenario: Removing an item from the cart (3ms)
+  ✓ Scenario: Adding a single item to the cart
+  ✓ Scenario: Adding multiple different items
+  ✓ Scenario: Updating item quantity
+  ✓ Scenario: Removing an item from the cart
   ✓ Scenario: Applying a percentage discount
-  ✓ Scenario: Applying a fixed amount discount (1ms)
-  ✓ Scenario: Successful checkout (1ms)
-  ✓ Scenario: Cannot checkout an empty cart (1ms)
-  ✓ Scenario: Cannot add zero items (1ms)
+  ✓ Scenario: Applying a fixed amount discount
+  ✓ Scenario: Successful checkout
+  ✓ Scenario: Cannot checkout an empty cart
+  ✓ Scenario: Cannot add zero items
 Feature files
   Feature: Shopping Cart
     ✓ Scenario: Adding a single item to the cart
@@ -160,12 +161,12 @@ Feature files
     ✓ Scenario: Updating item quantity
     ✓ Scenario: Removing an item from the cart
     ✓ Scenario: Applying a percentage discount
-    ✓ Scenario: Applying a fixed amount discount (1ms)
+    ✓ Scenario: Applying a fixed amount discount
     ✓ Scenario: Successful checkout
     ✓ Scenario: Cannot checkout an empty cart
     ✓ Scenario: Cannot add zero items
 
-Summary: 18 run, 0 failed, 18 passed in 17ms
+Summary: 18 run, 0 failed, 18 passed in 0ms
 ```
 
-The times change from run to run. A test that takes less than 1 ms shows no time.
+In a real run, a test that takes 1 ms or more shows its time after its name, as in `(3ms)`, and the summary line shows the time of the run. `test/readme_output.gleam` checks this report: it runs the two features, sets every time to 0, and compares the report with the block above. `gleam run -m readme_output` runs it.

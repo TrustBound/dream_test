@@ -24,17 +24,29 @@
 ////
 //// ## Example
 ////
+//// ### Register cart steps <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// fn step_have_items(_count: Int, context: StepContext) {
+//// import dream_test/gherkin/steps.{
+////   type StepContext, type StepRegistry, get_int, given, new, then, when,
+//// }
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+//// import gleam/result
+////
+//// fn step_have_items(_count: Int, context: StepContext) -> Result(Int, String) {
 ////   get_int(context.captures, 0)
 //// }
 ////
-//// fn step_add_items(count: Int, context: StepContext) {
+//// fn step_add_items(count: Int, context: StepContext) -> Result(Int, String) {
 ////   use added <- result.try(get_int(context.captures, 0))
 ////   Ok(count + added)
 //// }
 ////
-//// fn step_should_have(count: Int, context: StepContext) {
+//// fn step_should_have(
+////   count: Int,
+////   context: StepContext,
+//// ) -> Result(AssertionResult, String) {
 ////   use expected <- result.try(get_int(context.captures, 0))
 ////   count
 ////   |> should
@@ -42,11 +54,12 @@
 ////   |> or_fail_with("Cart count mismatch")
 //// }
 ////
-//// let steps =
+//// pub fn cart_steps() -> StepRegistry(Int) {
 ////   new(initial: 0)
 ////   |> given("I have {int} items in my cart", step_have_items)
 ////   |> when("I add {int} more items", step_add_items)
 ////   |> then("I should have {int} items total", step_should_have)
+//// }
 //// ```
 ////
 //// ## Phases
@@ -117,8 +130,19 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Read the scenario id in a step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/step_context.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// fn step_order_name(_order: Order, context: StepContext) {
+/// import dream_test/gherkin/steps.{type StepContext}
+///
+/// pub type Order {
+///   Order(name: String)
+/// }
+///
+/// pub fn step_order_name(
+///   _order: Order,
+///   context: StepContext,
+/// ) -> Result(Order, String) {
 ///   Ok(Order(name: context.scenario_id))
 /// }
 /// ```
@@ -159,21 +183,47 @@ pub type StepContext {
 ///
 /// ## Example
 ///
+/// ### Check the kind of a found definition <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/step_definition.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let registry =
-///         steps.new(initial: 0)
-///         |> then("I should have {int} items", step_should_have)
+/// import dream_test/gherkin/steps.{
+///   type StepContext, Action, Check, find_step, get_int, then,
+/// }
+/// import dream_test/gherkin/types.{ThenPhase}
+/// import dream_test/matchers.{be_equal, fail_with, or_fail_with, should, succeed}
+/// import dream_test/types as dream_types
+/// import gleam/result
 ///
-///       use matched <- result.try(find_step(
-///         registry,
-///         ThenPhase,
-///         "I should have 3 items",
-///       ))
+/// fn step_should_have(
+///   count: Int,
+///   context: StepContext,
+/// ) -> Result(dream_types.AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   count
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
 ///
-///       case matched.handler {
-///         Action(_) -> Ok(fail_with("a Then definition is never an action"))
-///         Check(_) -> Ok(succeed())
-///       }
+/// pub fn then_definition_is_a_check() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   let registry =
+///     steps.new(initial: 0)
+///     |> then("I should have {int} items", step_should_have)
+///
+///   use matched <- result.try(find_step(
+///     registry,
+///     ThenPhase,
+///     "I should have 3 items",
+///   ))
+///
+///   case matched.handler {
+///     Action(_) -> Ok(fail_with("a Then definition is never an action"))
+///     Check(_) -> Ok(succeed())
+///   }
+/// }
 /// ```
 ///
 pub type StepDefinition(state) {
@@ -226,11 +276,36 @@ pub opaque type StepRegistry(state) {
 ///
 /// ## Example
 ///
+/// ### Make a registry with two steps <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let steps =
+/// import dream_test/gherkin/steps.{
+///   type StepContext, type StepRegistry, get_int, given, new, then,
+/// }
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
+///
+/// fn step_have_items(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
+///
+/// fn step_should_have(
+///   count: Int,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   count
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
+///
+/// pub fn item_steps() -> StepRegistry(Int) {
 ///   new(initial: 0)
 ///   |> given("I have {int} items", step_have_items)
 ///   |> then("I should have {int} items", step_should_have)
+/// }
 /// ```
 ///
 pub fn new(initial initial: state) -> StepRegistry(state) {
@@ -263,12 +338,60 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 ///
 /// ## Example
 ///
+/// ### Start each scenario from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/new_with_setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let steps =
+/// import dream_test/gherkin/steps.{
+///   type StepContext, type StepRegistry, get_string, given, new_with_setup, then,
+///   when,
+/// }
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
+///
+/// pub type Server {
+///   Server(running: Bool, reply: String)
+/// }
+///
+/// fn start_server() -> Result(Server, String) {
+///   Ok(Server(running: True, reply: ""))
+/// }
+///
+/// fn stop_server(_server: Server) -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// fn step_server_running(
+///   server: Server,
+///   _context: StepContext,
+/// ) -> Result(Server, String) {
+///   case server.running {
+///     True -> Ok(server)
+///     False -> Error("the server is not running")
+///   }
+/// }
+///
+/// fn step_ping(server: Server, _context: StepContext) -> Result(Server, String) {
+///   Ok(Server(..server, reply: "pong"))
+/// }
+///
+/// fn step_reply_is(
+///   server: Server,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_string(context.captures, 0))
+///   server.reply
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("unexpected reply")
+/// }
+///
+/// pub fn server_steps() -> StepRegistry(Server) {
 ///   new_with_setup(setup: start_server, teardown: stop_server)
 ///   |> given("the server is running", step_server_running)
 ///   |> when("I ping the server", step_ping)
 ///   |> then("the reply is {string}", step_reply_is)
+/// }
 /// ```
 ///
 pub fn new_with_setup(
@@ -330,14 +453,35 @@ pub type SuiteChild(state) {
 ///
 /// ## Example
 ///
+/// ### Combine features, groups and unit tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// to_suite(registry: steps, name: "Shop", tags: [], children: [
-///   Feature(cart),
-///   Group(name: "Billing", tags: ["billing"], children: [
-///     Feature(invoice),
-///   ]),
-///   Node(unit_context.it("the server answers", answers)),
-/// ])
+/// import dream_test/gherkin/steps.{
+///   type StepRegistry, Feature, Group, Node, to_suite,
+/// }
+/// import dream_test/gherkin/types as gherkin_types
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context
+///
+/// fn answers(_count: Int) -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn shop_suite(
+///   steps steps: StepRegistry(Int),
+///   cart cart: gherkin_types.Feature,
+///   invoice invoice: gherkin_types.Feature,
+/// ) -> TestSuite {
+///   to_suite(registry: steps, name: "Shop", tags: [], children: [
+///     Feature(cart),
+///     Group(name: "Billing", tags: ["billing"], children: [
+///       Feature(invoice),
+///     ]),
+///     Node(unit_context.it("the server answers", answers)),
+///   ])
+/// }
 /// ```
 ///
 pub fn to_suite(
@@ -395,16 +539,48 @@ pub fn to_suite(
 ///
 /// ## Example
 ///
+/// ### Run a parsed feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/feature_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let assert Ok(feature) = parser.parse_file("test/cart.feature")
+/// import dream_test/gherkin/parser
+/// import dream_test/gherkin/steps.{type StepContext, get_int}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
 ///
-/// let registry =
-///   steps.new(initial: 0)
-///   |> steps.given("the cart is empty", step_empty_cart)
-///   |> steps.when("I add {int} items", step_add_items)
-///   |> steps.then("the cart has {int} items", step_has_items)
+/// fn step_have_items(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
 ///
-/// steps.feature_suite(registry: registry, feature: feature)
+/// fn step_add_items(count: Int, context: StepContext) -> Result(Int, String) {
+///   use added <- result.try(get_int(context.captures, 0))
+///   Ok(count + added)
+/// }
+///
+/// fn step_should_have(
+///   count: Int,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   count
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
+///
+/// pub fn cart_feature_suite() -> TestSuite {
+///   let assert Ok(feature) =
+///     parser.parse_file("test/features/shopping_cart.feature")
+///
+///   let registry =
+///     steps.new(initial: 0)
+///     |> steps.given("I have {int} items in my cart", step_have_items)
+///     |> steps.when("I add {int} more items", step_add_items)
+///     |> steps.then("I should have {int} items total", step_should_have)
+///
+///   steps.feature_suite(registry: registry, feature: feature)
+/// }
 /// ```
 ///
 pub fn feature_suite(
@@ -475,9 +651,20 @@ fn child_to_nodes(
 ///
 /// ## Example
 ///
+/// ### Register a Given step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/given.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let registry =
-///         new(initial: 0) |> given("I have {int} items", step_count)
+/// import dream_test/gherkin/steps.{
+///   type StepContext, type StepRegistry, get_int, given, new,
+/// }
+///
+/// fn step_count(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
+///
+/// pub fn count_steps() -> StepRegistry(Int) {
+///   new(initial: 0) |> given("I have {int} items", step_count)
+/// }
 /// ```
 ///
 pub fn given(
@@ -506,9 +693,22 @@ pub fn given(
 ///
 /// ## Example
 ///
+/// ### Register a When step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/when.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let registry =
-///         new(initial: 0) |> when("I add {int} items", step_add)
+/// import dream_test/gherkin/steps.{
+///   type StepContext, type StepRegistry, get_int, new, when,
+/// }
+/// import gleam/result
+///
+/// fn step_add(count: Int, context: StepContext) -> Result(Int, String) {
+///   use added <- result.try(get_int(context.captures, 0))
+///   Ok(count + added)
+/// }
+///
+/// pub fn add_steps() -> StepRegistry(Int) {
+///   new(initial: 0) |> when("I add {int} items", step_add)
+/// }
 /// ```
 ///
 pub fn when(
@@ -538,10 +738,31 @@ pub fn when(
 ///
 /// ## Example
 ///
+/// ### Register a Then step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/then.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let registry =
-///         new(initial: 0)
-///         |> then("I should have {int} items", step_should_have)
+/// import dream_test/gherkin/steps.{
+///   type StepContext, type StepRegistry, get_int, new, then,
+/// }
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
+///
+/// fn step_should_have(
+///   count: Int,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   count
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
+///
+/// pub fn count_check_steps() -> StepRegistry(Int) {
+///   new(initial: 0)
+///   |> then("I should have {int} items", step_should_have)
+/// }
 /// ```
 ///
 pub fn then(
@@ -598,16 +819,28 @@ fn record_error(
 ///
 /// ## Example
 ///
+/// ### Find a duplicate step definition <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/validate.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       new(initial: 0)
-///       |> given("I have {int} items", step_count)
-///       |> given("I have {int} items", step_count)
-///       |> validate
-///       |> should
-///       |> be_equal(Error(
-///         "Duplicate step definition: Given \"I have {int} items\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
-///       ))
-///       |> or_fail_with("expected a duplicate step definition error")
+/// import dream_test/gherkin/steps.{type StepContext, get_int, given, new, validate}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// fn step_count(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
+///
+/// pub fn duplicate_pattern_is_an_error() -> Result(AssertionResult, String) {
+///   new(initial: 0)
+///   |> given("I have {int} items", step_count)
+///   |> given("I have {int} items", step_count)
+///   |> validate
+///   |> should
+///   |> be_equal(Error(
+///     "Duplicate step definition: Given \"I have {int} items\" is already defined. Each pattern can have one definition for each of Given, When and Then.",
+///   ))
+///   |> or_fail_with("expected a duplicate step definition error")
+/// }
 /// ```
 ///
 pub fn validate(registry registry: StepRegistry(state)) -> Result(Nil, String) {
@@ -656,16 +889,34 @@ pub fn validate(registry registry: StepRegistry(state)) -> Result(Nil, String) {
 ///
 /// ## Example
 ///
+/// ### Find the definition for a step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/find_step.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       let registry =
-///         new(initial: 0) |> given("I have {int} items", step_count)
+/// import dream_test/gherkin/steps.{
+///   type StepContext, capture_count, find_step, get_int, given, new,
+/// }
+/// import dream_test/gherkin/types.{GivenPhase}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/result
 ///
-///       use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
+/// fn step_count(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
 ///
-///       capture_count(matched.captures)
-///       |> should
-///       |> be_equal(1)
-///       |> or_fail_with("expected exactly one capture")
+/// pub fn item_count_step_has_one_capture() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   let registry = new(initial: 0) |> given("I have {int} items", step_count)
+///
+///   use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
+///
+///   capture_count(matched.captures)
+///   |> should
+///   |> be_equal(1)
+///   |> or_fail_with("expected exactly one capture")
+/// }
 /// ```
 ///
 pub fn find_step(
@@ -733,8 +984,12 @@ fn undefined_step_message(phase: StepPhase, text: String) -> String {
 ///
 /// ## Example
 ///
+/// ### Read an integer capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/get_int.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// fn step_int(_value: Int, context: StepContext) {
+/// import dream_test/gherkin/steps.{type StepContext, get_int}
+///
+/// pub fn step_int(_value: Int, context: StepContext) -> Result(Int, String) {
 ///   get_int(context.captures, 0)
 /// }
 /// ```
@@ -762,8 +1017,15 @@ pub fn get_int(
 ///
 /// ## Example
 ///
+/// ### Read a float capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/get_float.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// fn step_float(_value: Float, context: StepContext) {
+/// import dream_test/gherkin/steps.{type StepContext, get_float}
+///
+/// pub fn step_float(
+///   _value: Float,
+///   context: StepContext,
+/// ) -> Result(Float, String) {
 ///   get_float(context.captures, 0)
 /// }
 /// ```
@@ -791,8 +1053,15 @@ pub fn get_float(
 ///
 /// ## Example
 ///
+/// ### Read a string capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/get_string.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// fn step_string(_value: String, context: StepContext) {
+/// import dream_test/gherkin/steps.{type StepContext, get_string}
+///
+/// pub fn step_string(
+///   _value: String,
+///   context: StepContext,
+/// ) -> Result(String, String) {
 ///   get_string(context.captures, 0)
 /// }
 /// ```
@@ -821,8 +1090,15 @@ pub fn get_string(
 ///
 /// ## Example
 ///
+/// ### Read a word capture <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/get_word.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// fn step_word(_value: String, context: StepContext) {
+/// import dream_test/gherkin/steps.{type StepContext, get_word}
+///
+/// pub fn step_word(
+///   _value: String,
+///   context: StepContext,
+/// ) -> Result(String, String) {
 ///   get_word(context.captures, 0)
 /// }
 /// ```
@@ -849,11 +1125,34 @@ pub fn get_word(
 ///
 /// ## Example
 ///
+/// ### Count the captures of a match <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/find_step.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-///       capture_count(matched.captures)
-///       |> should
-///       |> be_equal(1)
-///       |> or_fail_with("expected exactly one capture")
+/// import dream_test/gherkin/steps.{
+///   type StepContext, capture_count, find_step, get_int, given, new,
+/// }
+/// import dream_test/gherkin/types.{GivenPhase}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types as dream_types
+/// import gleam/result
+///
+/// fn step_count(_count: Int, context: StepContext) -> Result(Int, String) {
+///   get_int(context.captures, 0)
+/// }
+///
+/// pub fn item_count_step_has_one_capture() -> Result(
+///   dream_types.AssertionResult,
+///   String,
+/// ) {
+///   let registry = new(initial: 0) |> given("I have {int} items", step_count)
+///
+///   use matched <- result.try(find_step(registry, GivenPhase, "I have 3 items"))
+///
+///   capture_count(matched.captures)
+///   |> should
+///   |> be_equal(1)
+///   |> or_fail_with("expected exactly one capture")
+/// }
 /// ```
 ///
 pub fn capture_count(captures captures: List(CapturedValue)) -> Int {

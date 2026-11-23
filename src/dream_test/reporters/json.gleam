@@ -55,14 +55,18 @@
 ////
 //// ## Usage
 ////
+//// ### Print a JSON report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{succeed}
 //// import dream_test/reporters/json
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("JSON Reporter", [
 ////     it("outputs JSON format", fn() {
 ////       // The json reporter prints machine-readable JSON at the end of the run.
@@ -75,7 +79,7 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([tests()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([json.new()])
@@ -104,11 +108,55 @@ import gleam/string
 // ============================================================================
 
 /// Create a JSON results reporter (printed at the end of the run).
+///
+/// ## Example
+///
+/// ### Print the JSON report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([json.new()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn new() -> reporter_types.ResultsReporter {
   reporter_types.Json(reporter_types.JsonReporterConfig(pretty: False))
 }
 
 /// Enable pretty-printed JSON output.
+///
+/// ## Example
+///
+/// ### Print pretty JSON at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([json.new() |> json.pretty()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn pretty(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -120,6 +168,23 @@ pub fn pretty(
 }
 
 /// Render JSON output for a completed run.
+///
+/// ## Example
+///
+/// ### Render a report as compact JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/reporters/json
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/types.{type RunReport}
+///
+/// pub fn render_compact_json(report: RunReport) -> String {
+///   json.render(
+///     config: reporter_types.JsonReporterConfig(pretty: False),
+///     report: report,
+///   )
+/// }
+/// ```
 pub fn render(
   config config: reporter_types.JsonReporterConfig,
   report report: RunReport,
@@ -145,19 +210,22 @@ pub fn render(
 ///
 /// ## Example
 ///
+/// ### Format a report as JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> String {
 ///   let report = runner.new([example_suite()]) |> runner.run()
 ///   json.format(report)
 /// }
@@ -184,19 +252,22 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Example
 ///
+/// ### Format a report as indented JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/format_pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> String {
 ///   let report = runner.new([example_suite()]) |> runner.run()
 ///   json.format_pretty(report)
 /// }
@@ -225,20 +296,24 @@ pub fn format_pretty(report report: RunReport) -> String {
 ///
 /// ## Example
 ///
+/// ### Print a report as JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let report = runner.new([example_suite()]) |> runner.run()
 ///   report |> json.report(io.print)
 /// }
@@ -266,20 +341,24 @@ pub fn report(
 ///
 /// ## Example
 ///
+/// ### Print a report as indented JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/report_pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let report = runner.new([example_suite()]) |> runner.run()
 ///   report |> json.report_pretty(io.print)
 /// }

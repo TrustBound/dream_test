@@ -5,11 +5,18 @@
 ////
 //// ## Example
 ////
+//// ### Assert that two values are equal <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/equality/be_equal.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// 2 + 3
-//// |> should
-//// |> be_equal(5)
-//// |> or_fail_with("2 + 3 should equal 5")
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn sum_equals_five() -> Result(AssertionResult, String) {
+////   2 + 3
+////   |> should
+////   |> be_equal(5)
+////   |> or_fail_with("2 + 3 should equal 5")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -25,11 +32,18 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Assert that two values are equal <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/equality/be_equal.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 2 + 3
-/// |> should
-/// |> be_equal(5)
-/// |> or_fail_with("2 + 3 should equal 5")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn sum_equals_five() -> Result(AssertionResult, String) {
+///   2 + 3
+///   |> should
+///   |> be_equal(5)
+///   |> or_fail_with("2 + 3 should equal 5")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -78,11 +92,18 @@ fn check_equal(actual: a, expected: a) -> MatchResult(a) {
 ///
 /// ## Example
 ///
+/// ### Assert that two values are not equal <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/equality/not_equal.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10 + 3
-/// |> should
-/// |> not_equal(3)
-/// |> or_fail_with("10 + 3 should not equal 3")
+/// import dream_test/matchers.{not_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn sum_does_not_equal_three() -> Result(AssertionResult, String) {
+///   10 + 3
+///   |> should
+///   |> not_equal(3)
+///   |> or_fail_with("10 + 3 should not equal 3")
+/// }
 /// ```
 ///
 /// ## Parameters

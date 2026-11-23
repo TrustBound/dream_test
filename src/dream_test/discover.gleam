@@ -15,13 +15,18 @@
 ////
 //// ## Example
 ////
+//// ### Discover test modules and run them <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/discover.{from_path, to_suites}
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
-//// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
+//// import dream_test/runner.{
+////   exit_on_failure, progress_reporter, results_reporters, run,
+//// }
+//// import dream_test/types.{type RunReport}
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   let suites =
 ////     discover.new()
 ////     |> from_path("snippets/unit/**.gleam")
@@ -61,9 +66,15 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Load the suites of a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/test_discovery.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.tests("snippets/unit/**.gleam")
-/// |> discover.load()
+/// import dream_test/discover.{type LoadResult}
+///
+/// pub fn load_unit_snippets() -> LoadResult {
+///   discover.tests("snippets/unit/**.gleam")
+///   |> discover.load()
+/// }
 /// ```
 pub opaque type TestDiscovery {
   TestDiscovery(patterns: List(String))
@@ -81,10 +92,18 @@ pub opaque type TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### Take the loaded suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/load_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let discover.LoadResult(suites: suites, errors: _errors) =
-///   discover.tests("snippets/**.gleam")
-///   |> discover.load()
+/// import dream_test/discover
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn loaded_suites() -> List(TestSuite) {
+///   let discover.LoadResult(suites: suites, errors: _errors) =
+///     discover.tests("snippets/**.gleam")
+///     |> discover.load()
+///   suites
+/// }
 /// ```
 pub type LoadResult {
   LoadResult(suites: List(TestSuite), errors: List(String))
@@ -104,14 +123,18 @@ pub type LoadResult {
 ///
 /// ## Example
 ///
+/// ### Start an empty discovery and add a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -143,14 +166,18 @@ pub fn new() -> TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### Add a pattern to a discovery <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -190,14 +217,18 @@ pub fn from_path(
 ///
 /// ## Example
 ///
+/// ### Discover the tests of one pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/tests_pattern.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.tests("snippets/unit/**.gleam")
 ///     |> discover.to_suites()
@@ -230,10 +261,12 @@ pub fn tests(pattern pattern: String) -> TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### List the discovered modules <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/list_modules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover
 ///
-/// pub fn main() {
+/// pub fn main() -> Result(List(String), String) {
 ///   discover.tests("snippets/unit/**.gleam")
 ///   |> discover.list_modules()
 /// }
@@ -277,10 +310,12 @@ pub fn list_modules(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// import dream_test/discover
+/// ### Load the suites and the errors <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/load.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// pub fn main() {
+/// ```gleam
+/// import dream_test/discover.{type LoadResult}
+///
+/// pub fn main() -> LoadResult {
 ///   discover.tests("snippets/unit/**.gleam")
 ///   |> discover.load()
 /// }
@@ -310,14 +345,18 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///
 /// ## Example
 ///
+/// ### Run the discovered suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -358,14 +397,18 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite) {
 ///
 /// ## Example
 ///
+/// ### Run the discovered suites as one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suite =
 ///     discover.tests("snippets/unit/**.gleam")
 ///     |> discover.to_suite("discovered tests")

@@ -761,7 +761,7 @@ Some features need a resource that lives for all their scenarios, for example a 
 
 With `discover.to_suite`, the setup runs one time for the scenarios of all the files. A parse error test does not need the setup, so it runs without it.
 
-#### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L13-L55"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L15-L57"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // A small server: a process that answers each ping with "pong".
@@ -809,7 +809,7 @@ fn answer(requests: Subject(Request)) -> Nil {
 }
 ```
 
-#### The steps with a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L57-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The steps with a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L59-L88"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // The steps. The setup starts the server once, before the first scenario.
@@ -844,7 +844,7 @@ fn reply_is(state: ServerState, context: StepContext) {
 }
 ```
 
-#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L88-L101"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L90-L103"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn server_feature() -> TestSuite {
@@ -865,7 +865,7 @@ pub fn server_feature() -> TestSuite {
 
 Each tree keeps its own context, so the feature runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
 
-#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L103-L132"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L105-L134"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // Suites whose trees have other contexts run in the same `runner.new`.
@@ -900,18 +900,20 @@ pub fn main() {
 }
 ```
 
-The run gives this output. The times change from run to run, and a test that takes less than 1ms shows no time:
+The run gives this output. The test of this example sets every time to 0, so the report is the same in every run. In a real run, a test that takes 1ms or more shows its time after its name, as in `(1ms)`, and the summary line shows the time of the run:
+
+#### The report of the three suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/gherkin_setup_report.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Feature: Server
-  ✓ Scenario: Ping the server (1ms)
-  ✓ Scenario: Ping it again (1ms)
+  ✓ Scenario: Ping the server
+  ✓ Scenario: Ping it again
 Math
   ✓ adds
 Counter
   ✓ starts at 41
 
-Summary: 4 run, 0 failed, 4 passed in 2ms
+Summary: 4 run, 0 failed, 4 passed in 0ms
 ```
 
 #### Several Features with one setup

@@ -38,11 +38,49 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Format a Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/gherkin/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// gherkin_reporter.format(sample_report())
-/// |> should
-/// |> match_snapshot("./test/snapshots/gherkin_format_report.snap")
-/// |> or_fail_with("expected formatted report snapshot match")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/gherkin as gherkin_reporter
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, GherkinScenario, Passed, TestResult,
+/// }
+/// import gleam/option.{None, Some}
+///
+/// pub fn scenario_result() -> TestResult {
+///   TestResult(
+///     name: "Adding items",
+///     groups: ["Shopping Cart"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: GherkinScenario(
+///       scenario_id: "cart",
+///       feature: Some("Shopping Cart"),
+///       rule: None,
+///     ),
+///   )
+/// }
+///
+/// pub fn report_shows_the_feature_and_scenario() -> Result(
+///   AssertionResult,
+///   String,
+/// ) {
+///   gherkin_reporter.format(
+///     types.run_report(
+///       tests: [scenario_result()],
+///       hook_failures: [],
+///       reporter_crashes: [],
+///     ),
+///   )
+///   |> should
+///   |> be_equal(
+///     "Feature: Shopping Cart\n  Scenario: Adding items ✓\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n",
+///   )
+///   |> or_fail_with("expected the formatted report")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -89,14 +127,17 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Example
 ///
+/// ### Format only the scenario lines <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/gherkin/format_scenarios.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/gherkin as gherkin_reporter
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/types.{GherkinScenario, Passed, TestResult}
 /// import dream_test/unit.{describe, it}
 /// import gleam/option.{None, Some}
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Gherkin scenario lines", [
 ///     it("format_scenarios gives the lines without a summary", fn() {
 ///       let result =
@@ -141,9 +182,27 @@ pub fn format_scenarios(results results: List(TestResult)) -> String {
 ///
 /// ## Example
 ///
+/// ### Print a Gherkin report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/gherkin/report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let report = runner.new([tests()]) |> runner.run()
-/// gherkin_reporter.report(report, io.print)
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/gherkin as gherkin_reporter
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Shopping Cart", [
+///     it("adds items", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
+///   let report = runner.new([tests()]) |> runner.run()
+///   gherkin_reporter.report(report, io.print)
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -169,11 +228,38 @@ pub fn report(
 ///
 /// ## Example
 ///
+/// ### Check that a result is a Gherkin scenario <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/gherkin/is_gherkin_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// gherkin_reporter.is_gherkin_result(gherkin_result())
-/// |> should
-/// |> be_equal(True)
-/// |> or_fail_with("expected True for gherkin results")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/gherkin as gherkin_reporter
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, GherkinScenario, Passed, TestResult,
+/// }
+/// import gleam/option.{None, Some}
+///
+/// pub fn scenario_result() -> TestResult {
+///   TestResult(
+///     name: "Adding items",
+///     groups: ["Shopping Cart"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: GherkinScenario(
+///       scenario_id: "cart",
+///       feature: Some("Shopping Cart"),
+///       rule: None,
+///     ),
+///   )
+/// }
+///
+/// pub fn scenario_is_a_gherkin_result() -> Result(AssertionResult, String) {
+///   gherkin_reporter.is_gherkin_result(scenario_result())
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("expected True for gherkin results")
+/// }
 /// ```
 ///
 /// ## Parameters

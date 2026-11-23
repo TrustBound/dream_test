@@ -1,0 +1,9 @@
+Feature: Server
+  ✓ Scenario: Ping the server
+  ✓ Scenario: Ping it again
+Math
+  ✓ adds
+Counter
+  ✓ starts at 41
+
+Summary: 4 run, 0 failed, 4 passed in 0ms

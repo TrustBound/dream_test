@@ -10,12 +10,19 @@
 ////
 //// ## Example
 ////
+//// ### Compare a string with a snapshot file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/snapshot/match_snapshot.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// let path = "./test/tmp/match_snapshot_example.snap"
-//// "hello"
-//// |> should
-//// |> match_snapshot(path)
-//// |> or_fail_with("expected snapshot match")
+//// import dream_test/matchers.{match_snapshot, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn hello_matches_snapshot() -> Result(AssertionResult, String) {
+////   let path = "./build/doc_examples/match_snapshot_example.snap"
+////   "hello"
+////   |> should
+////   |> match_snapshot(path)
+////   |> or_fail_with("expected snapshot match")
+//// }
 //// ```
 
 import dream_test/file
@@ -48,12 +55,19 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Compare a string with a snapshot file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/snapshot/match_snapshot.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let path = "./test/tmp/match_snapshot_example.snap"
-/// "hello"
-/// |> should
-/// |> match_snapshot(path)
-/// |> or_fail_with("expected snapshot match")
+/// import dream_test/matchers.{match_snapshot, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn hello_matches_snapshot() -> Result(AssertionResult, String) {
+///   let path = "./build/doc_examples/match_snapshot_example.snap"
+///   "hello"
+///   |> should
+///   |> match_snapshot(path)
+///   |> or_fail_with("expected snapshot match")
+/// }
 /// ```
 ///
 /// ## Returns
@@ -91,12 +105,20 @@ pub fn match_snapshot(
 ///
 /// ## Example
 ///
+/// ### Compare any value with a snapshot file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/snapshot/match_snapshot_inspect.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let path = "./test/tmp/match_snapshot_inspect_example.snap"
-/// Some(1)
-/// |> should
-/// |> match_snapshot_inspect(path)
-/// |> or_fail_with("expected inspect snapshot match")
+/// import dream_test/matchers.{match_snapshot_inspect, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/option.{Some}
+///
+/// pub fn some_one_matches_snapshot() -> Result(AssertionResult, String) {
+///   let path = "./build/doc_examples/match_snapshot_inspect_example.snap"
+///   Some(1)
+///   |> should
+///   |> match_snapshot_inspect(path)
+///   |> or_fail_with("expected inspect snapshot match")
+/// }
 /// ```
 ///
 /// ## Returns
@@ -135,18 +157,27 @@ pub fn match_snapshot_inspect(
 ///
 /// ## Example
 ///
+/// ### Delete one snapshot file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/snapshot/clear_snapshot.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let path = "./test/tmp/clear_snapshot_example.snap"
+/// import dream_test/file
+/// import dream_test/matchers.{be_equal, clear_snapshot, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
 ///
-/// // Setup: create a snapshot file (no assertions during setup)
-/// use _ <- result.try(
-///   file.write(path, "hello") |> result.map_error(file.error_to_string),
-/// )
+/// pub fn clear_snapshot_deletes_file() -> Result(AssertionResult, String) {
+///   let path = "./build/doc_examples/clear_snapshot_example.snap"
 ///
-/// clear_snapshot(path)
-/// |> should
-/// |> be_equal(Ok(Nil))
-/// |> or_fail_with("expected clear_snapshot to succeed")
+///   // Setup: create a snapshot file (no assertions during setup)
+///   use _ <- result.try(
+///     file.write(path, "hello") |> result.map_error(file.error_to_string),
+///   )
+///
+///   clear_snapshot(path)
+///   |> should
+///   |> be_equal(Ok(Nil))
+///   |> or_fail_with("expected clear_snapshot to succeed")
+/// }
 /// ```
 ///
 pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
@@ -172,23 +203,34 @@ pub fn clear_snapshot(snapshot_path: String) -> Result(Nil, String) {
 ///
 /// ## Example
 ///
+/// ### Delete all snapshot files in a directory <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/snapshot/clear_snapshots_in_directory.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let directory = "./test/tmp/clear_snapshots_in_directory_example"
-/// let a = directory <> "/a.snap"
-/// let b = directory <> "/b.snap"
+/// import dream_test/file
+/// import dream_test/matchers.{
+///   be_equal, clear_snapshots_in_directory, or_fail_with, should,
+/// }
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
 ///
-/// // Setup: create two snapshot files (no assertions during setup)
-/// use _ <- result.try(
-///   file.write(a, "a") |> result.map_error(file.error_to_string),
-/// )
-/// use _ <- result.try(
-///   file.write(b, "b") |> result.map_error(file.error_to_string),
-/// )
+/// pub fn clear_two_snapshots() -> Result(AssertionResult, String) {
+///   let directory = "./build/doc_examples/clear_snapshots_in_directory_example"
+///   let first_snapshot = directory <> "/a.snap"
+///   let second_snapshot = directory <> "/b.snap"
 ///
-/// clear_snapshots_in_directory(directory)
-/// |> should
-/// |> be_equal(Ok(2))
-/// |> or_fail_with("expected two deleted snapshots")
+///   // Setup: create two snapshot files (no assertions during setup)
+///   use _ <- result.try(
+///     file.write(first_snapshot, "a") |> result.map_error(file.error_to_string),
+///   )
+///   use _ <- result.try(
+///     file.write(second_snapshot, "b") |> result.map_error(file.error_to_string),
+///   )
+///
+///   clear_snapshots_in_directory(directory)
+///   |> should
+///   |> be_equal(Ok(2))
+///   |> or_fail_with("expected two deleted snapshots")
+/// }
 /// ```
 ///
 pub fn clear_snapshots_in_directory(directory: String) -> Result(Int, String) {

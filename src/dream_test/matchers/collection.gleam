@@ -8,11 +8,18 @@
 ////
 //// ## Example
 ////
+//// ### Assert the length of a list <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/collection/have_length.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// [1, 2, 3]
-//// |> should
-//// |> have_length(3)
-//// |> or_fail_with("expected list length 3")
+//// import dream_test/matchers.{have_length, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn list_has_three_items() -> Result(AssertionResult, String) {
+////   [1, 2, 3]
+////   |> should
+////   |> have_length(3)
+////   |> or_fail_with("expected list length 3")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -30,11 +37,18 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Assert that a list contains an item <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/collection/contain.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// [1, 2, 3]
-/// |> should
-/// |> contain(2)
-/// |> or_fail_with("expected list to contain 2")
+/// import dream_test/matchers.{contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_contains_two() -> Result(AssertionResult, String) {
+///   [1, 2, 3]
+///   |> should
+///   |> contain(2)
+///   |> or_fail_with("expected list to contain 2")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -88,11 +102,18 @@ fn check_contains(
 ///
 /// ## Example
 ///
+/// ### Assert that a list does not contain an item <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/collection/not_contain.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// ["a", "b", "c"]
-/// |> should
-/// |> not_contain("d")
-/// |> or_fail_with("expected list to not contain \"d\"")
+/// import dream_test/matchers.{not_contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_does_not_contain_d() -> Result(AssertionResult, String) {
+///   ["a", "b", "c"]
+///   |> should
+///   |> not_contain("d")
+///   |> or_fail_with("expected list to not contain \"d\"")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -146,11 +167,18 @@ fn check_not_contains(
 ///
 /// ## Example
 ///
+/// ### Assert the length of a list <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/collection/have_length.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// [1, 2, 3]
-/// |> should
-/// |> have_length(3)
-/// |> or_fail_with("expected list length 3")
+/// import dream_test/matchers.{have_length, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_has_three_items() -> Result(AssertionResult, String) {
+///   [1, 2, 3]
+///   |> should
+///   |> have_length(3)
+///   |> or_fail_with("expected list length 3")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -206,11 +234,18 @@ fn check_length(
 ///
 /// ## Example
 ///
+/// ### Assert that a list is empty <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/collection/be_empty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// []
-/// |> should
-/// |> be_empty()
-/// |> or_fail_with("expected empty list")
+/// import dream_test/matchers.{be_empty, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_is_empty() -> Result(AssertionResult, String) {
+///   []
+///   |> should
+///   |> be_empty()
+///   |> or_fail_with("expected empty list")
+/// }
 /// ```
 ///
 /// ## Parameters

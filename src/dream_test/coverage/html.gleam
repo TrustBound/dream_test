@@ -7,12 +7,16 @@
 //// both can be on. Call the functions here yourself to build the pages in
 //// a custom pipeline, for example to serve them from a development server.
 ////
-//// ```gleam
-//// import dream_test/coverage
+//// ### Write the HTML pages to files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// coverage.new()
-//// |> coverage.html_path("build/coverage/html")
-//// |> coverage.html_file("build/coverage/all.html")
+//// ```gleam
+//// import dream_test/coverage.{type CoverageConfig}
+////
+//// pub fn write_html_pages() -> CoverageConfig {
+////   coverage.new()
+////   |> coverage.html_path("build/coverage/html")
+////   |> coverage.html_file("build/coverage/all.html")
+//// }
 //// ```
 ////
 //// ## Pages
@@ -63,8 +67,15 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the HTML module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/html
+////
+//// pub fn page_of_cart_file() -> String {
+////   html.page_path("src/app/cart.gleam")
+////   // -> "files/src/app/cart.gleam.html"
+//// }
 //// ```
 
 import dream_test/coverage/format
@@ -92,12 +103,19 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Render the index page <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/index.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([
-///   report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
-/// ])
-/// |> html.index()
-/// // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// import dream_test/coverage/html
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn index_page() -> String {
+///   report.new([
+///     report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
+///   ])
+///   |> html.index()
+///   // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// }
 /// ```
 pub fn index(report coverage_report: CoverageReport) -> String {
   document(title: "Coverage", body: [
@@ -124,16 +142,24 @@ pub fn index(report coverage_report: CoverageReport) -> String {
 ///
 /// ## Example
 ///
+/// ### Render one page with all files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/combined.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let coverage_report =
-///   report.new([
-///     report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
-///   ])
-/// html.combined(
-///   report: coverage_report,
-///   sources: dict.from_list([#("src/a.gleam", "pub fn a() { 1 }\n")]),
-/// )
-/// // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// import dream_test/coverage/html
+/// import dream_test/coverage/report.{LineCoverage}
+/// import gleam/dict
+///
+/// pub fn combined_page() -> String {
+///   let coverage_report =
+///     report.new([
+///       report.file("src/a.gleam", [LineCoverage(line: 1, calls: 1)]),
+///     ])
+///   html.combined(
+///     report: coverage_report,
+///     sources: dict.from_list([#("src/a.gleam", "pub fn a() { 1 }\n")]),
+///   )
+///   // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// }
 /// ```
 pub fn combined(
   report coverage_report: CoverageReport,
@@ -234,10 +260,17 @@ fn summary_table(coverage_report: CoverageReport, links: FileLinks) -> String {
 ///
 /// ## Example
 ///
+/// ### Render the page of one file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/source_page.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.file("src/a.gleam", [LineCoverage(line: 1, calls: 2)])
-/// |> html.source_page(source: "pub fn a() { 1 }\n")
-/// // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// import dream_test/coverage/html
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn source_page_of_file() -> String {
+///   report.file("src/a.gleam", [LineCoverage(line: 1, calls: 2)])
+///   |> html.source_page(source: "pub fn a() { 1 }\n")
+///   // -> "<!DOCTYPE html>\n<html lang=\"en\">\n..."
+/// }
 /// ```
 pub fn source_page(file file: FileCoverage, source source: String) -> String {
   let source_path = report.source_path(file)
@@ -303,9 +336,15 @@ fn annotated_source(
 ///
 /// ## Example
 ///
+/// ### Find the page path of a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/html/page_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// html.page_path("src/app/my cart.gleam")
-/// // -> "files/src/app/my~20cart.gleam.html"
+/// import dream_test/coverage/html
+///
+/// pub fn page_path_with_space() -> String {
+///   html.page_path("src/app/my cart.gleam")
+///   // -> "files/src/app/my~20cart.gleam.html"
+/// }
 /// ```
 pub fn page_path(source_path source_path: String) -> String {
   let parts = string.split(source_path, "/")

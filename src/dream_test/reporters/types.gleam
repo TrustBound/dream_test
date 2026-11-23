@@ -66,19 +66,30 @@ pub type ResultsReporter {
   /// `runner.exit_on_failure()`, the program ends with exit status 1 after
   /// all the output is written.
   ///
+  /// ### Add a custom report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/types/custom.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+  ///
   /// ```gleam
+  /// import dream_test/matchers.{succeed}
   /// import dream_test/reporters/types as reporter_types
   /// import dream_test/runner
+  /// import dream_test/suite.{type TestSuite}
   /// import dream_test/types.{type RunReport}
+  /// import dream_test/unit.{describe, it}
   ///
-  /// fn my_report(report: RunReport) -> String {
+  /// pub fn tests() -> TestSuite {
+  ///   describe("Example", [
+  ///     it("works", fn() { Ok(succeed()) }),
+  ///   ])
+  /// }
+  ///
+  /// pub fn my_report(report: RunReport) -> String {
   ///   case types.failed(report) {
   ///     True -> "My report: failed\n"
   ///     False -> "My report: passed\n"
   ///   }
   /// }
   ///
-  /// pub fn main() {
+  /// pub fn main() -> RunReport {
   ///   runner.new([tests()])
   ///   |> runner.results_reporters([reporter_types.Custom(my_report)])
   ///   |> runner.exit_on_failure()

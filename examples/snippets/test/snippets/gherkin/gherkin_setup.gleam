@@ -2,6 +2,7 @@ import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import dream_test/matchers.{be_equal, be_false, or_fail_with, should}
 import dream_test/reporters/bdd
+import dream_test/reporters/types as reporter_types
 import dream_test/runner
 import dream_test/suite.{type TestSuite}
 import dream_test/types
@@ -9,6 +10,7 @@ import dream_test/unit
 import dream_test/unit_context
 import gleam/erlang/process.{type Subject}
 import gleam/result
+import snippets_outputs
 
 // A small server: a process that answers each ping with "pong".
 
@@ -142,5 +144,31 @@ pub fn tests() {
       |> be_false()
       |> or_fail_with("every suite should pass")
     }),
+    unit.it("prints the report that the guide shows", fn() {
+      // Act
+      let report =
+        runner.new([server_feature(), math_suite(), counter_suite()])
+        |> runner.silent()
+        |> runner.run()
+        |> snippets_outputs.without_durations()
+        |> render_as_bdd_new()
+
+      // Assert
+      Ok(report)
+      |> should
+      |> be_equal(snippets_outputs.read("gherkin_setup_report"))
+      |> or_fail_with("expected test/outputs/gherkin_setup_report.txt")
+    }),
   ])
+}
+
+/// The report as `bdd.new()` prints it: with no colour, every test.
+fn render_as_bdd_new(report: types.RunReport) -> String {
+  bdd.render(
+    config: reporter_types.BddReporterConfig(
+      color: False,
+      mode: reporter_types.BddFull,
+    ),
+    report: report,
+  )
 }

@@ -5,11 +5,15 @@
 //// XML to a file when coverage finishes. Call `render` yourself to get the
 //// text without a file.
 ////
-//// ```gleam
-//// import dream_test/coverage
+//// ### Write the Cobertura XML to a file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/cobertura/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// coverage.new()
-//// |> coverage.cobertura_path("build/coverage/cobertura.xml")
+//// ```gleam
+//// import dream_test/coverage.{type CoverageConfig}
+////
+//// pub fn write_cobertura_xml() -> CoverageConfig {
+////   coverage.new()
+////   |> coverage.cobertura_path("build/coverage/cobertura.xml")
+//// }
 //// ```
 ////
 //// ## Shape
@@ -29,8 +33,15 @@
 ////
 //// ## Import Style
 ////
+//// ### Import the Cobertura module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/cobertura/module_import_style.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/coverage/cobertura
+//// import dream_test/coverage/report
+////
+//// pub fn empty_report_xml() -> String {
+////   cobertura.render(report: report.new([]), timestamp: 0)
+//// }
 //// ```
 
 import dream_test/coverage/format
@@ -56,34 +67,41 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Render a report as Cobertura XML <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/coverage/cobertura/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// report.new([
-///   report.file("src/a.gleam", [
-///     LineCoverage(line: 1, calls: 1),
-///     LineCoverage(line: 2, calls: 0),
-///   ]),
-/// ])
-/// |> cobertura.render(timestamp: 0)
-/// // -> <?xml version="1.0" ?>
-/// //    <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-/// //    <coverage line-rate="0.5000" branch-rate="0" lines-covered="1" lines-valid="2" branches-covered="0" branches-valid="0" complexity="0" version="dream_test" timestamp="0">
-/// //      <sources>
-/// //        <source>.</source>
-/// //      </sources>
-/// //      <packages>
-/// //        <package name="src" line-rate="0.5000" branch-rate="0" complexity="0">
-/// //          <classes>
-/// //            <class name="a.gleam" filename="src/a.gleam" line-rate="0.5000" branch-rate="0" complexity="0">
-/// //              <methods/>
-/// //              <lines>
-/// //                <line number="1" hits="1"/>
-/// //                <line number="2" hits="0"/>
-/// //              </lines>
-/// //            </class>
-/// //          </classes>
-/// //        </package>
-/// //      </packages>
-/// //    </coverage>
+/// import dream_test/coverage/cobertura
+/// import dream_test/coverage/report.{LineCoverage}
+///
+/// pub fn half_covered_xml() -> String {
+///   report.new([
+///     report.file("src/a.gleam", [
+///       LineCoverage(line: 1, calls: 1),
+///       LineCoverage(line: 2, calls: 0),
+///     ]),
+///   ])
+///   |> cobertura.render(timestamp: 0)
+///   // -> <?xml version="1.0" ?>
+///   //    <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+///   //    <coverage line-rate="0.5000" branch-rate="0" lines-covered="1" lines-valid="2" branches-covered="0" branches-valid="0" complexity="0" version="dream_test" timestamp="0">
+///   //      <sources>
+///   //        <source>.</source>
+///   //      </sources>
+///   //      <packages>
+///   //        <package name="src" line-rate="0.5000" branch-rate="0" complexity="0">
+///   //          <classes>
+///   //            <class name="a.gleam" filename="src/a.gleam" line-rate="0.5000" branch-rate="0" complexity="0">
+///   //              <methods/>
+///   //              <lines>
+///   //                <line number="1" hits="1"/>
+///   //                <line number="2" hits="0"/>
+///   //              </lines>
+///   //            </class>
+///   //          </classes>
+///   //        </package>
+///   //      </packages>
+///   //    </coverage>
+/// }
 /// ```
 pub fn render(
   report coverage_report: CoverageReport,

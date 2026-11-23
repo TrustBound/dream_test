@@ -8,30 +8,40 @@
 ////
 //// ## Example
 ////
+//// ### Run all cart feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/gherkin/discover
 //// import dream_test/gherkin/steps.{type StepContext, get_int}
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult}
 //// import gleam/result
 ////
 //// pub type Cart {
 ////   Cart(server_running: Bool, items: Int)
 //// }
 ////
-//// fn step_server_running(cart: Cart, _context: StepContext) {
+//// fn step_server_running(
+////   cart: Cart,
+////   _context: StepContext,
+//// ) -> Result(Cart, String) {
 ////   Ok(Cart(..cart, server_running: True))
 //// }
 ////
-//// fn step_empty_cart(cart: Cart, _context: StepContext) {
+//// fn step_empty_cart(cart: Cart, _context: StepContext) -> Result(Cart, String) {
 ////   Ok(Cart(..cart, items: 0))
 //// }
 ////
-//// fn step_add_items(cart: Cart, context: StepContext) {
+//// fn step_add_items(cart: Cart, context: StepContext) -> Result(Cart, String) {
 ////   use added <- result.try(get_int(context.captures, 0))
 ////   Ok(Cart(..cart, items: cart.items + added))
 //// }
 ////
-//// fn step_verify_count(cart: Cart, context: StepContext) {
+//// fn step_verify_count(
+////   cart: Cart,
+////   context: StepContext,
+//// ) -> Result(AssertionResult, String) {
 ////   use expected <- result.try(get_int(context.captures, 0))
 ////   cart.items
 ////   |> should
@@ -39,7 +49,7 @@
 ////   |> or_fail_with("Cart count mismatch")
 //// }
 ////
-//// pub fn tests() {
+//// pub fn cart_features() -> TestSuite {
 ////   // Define the steps and the state each scenario starts from
 ////   let steps =
 ////     steps.new(initial: Cart(server_running: False, items: 0))
@@ -92,10 +102,19 @@ pub opaque type FeatureDiscovery {
 ///
 /// ## Example
 ///
+/// ### Build a suite from feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.features("test/*.feature")
-/// |> discover.with_registry(steps)
-/// |> discover.to_suite("cart_features")
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepRegistry}
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn cart_features(steps: StepRegistry(state)) -> TestSuite {
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
 /// ```
 ///
 /// This is opaque so callers can’t depend on internal fields that may change.
@@ -139,8 +158,14 @@ pub type LoadResult {
 ///
 /// ## Example
 ///
+/// ### Find feature files by a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/features.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.features("test/*.feature")
+/// import dream_test/gherkin/discover.{type FeatureDiscovery}
+///
+/// pub fn feature_files() -> FeatureDiscovery {
+///   discover.features("test/*.feature")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -163,19 +188,61 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// // Define the steps and the state each scenario starts from
-/// let steps =
-///   steps.new(initial: Cart(server_running: False, items: 0))
-///   |> steps.given("the server is running", step_server_running)
-///   |> steps.given("the cart is empty", step_empty_cart)
-///   |> steps.when("I add {int} items", step_add_items)
-///   |> steps.then("the cart should have {int} items", step_verify_count)
+/// ### Attach steps and build a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// // Discover and load all .feature files
-/// discover.features("test/*.feature")
-/// |> discover.with_registry(steps)
-/// |> discover.to_suite("cart_features")
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepContext, get_int}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
+///
+/// pub type Cart {
+///   Cart(server_running: Bool, items: Int)
+/// }
+///
+/// fn step_server_running(
+///   cart: Cart,
+///   _context: StepContext,
+/// ) -> Result(Cart, String) {
+///   Ok(Cart(..cart, server_running: True))
+/// }
+///
+/// fn step_empty_cart(cart: Cart, _context: StepContext) -> Result(Cart, String) {
+///   Ok(Cart(..cart, items: 0))
+/// }
+///
+/// fn step_add_items(cart: Cart, context: StepContext) -> Result(Cart, String) {
+///   use added <- result.try(get_int(context.captures, 0))
+///   Ok(Cart(..cart, items: cart.items + added))
+/// }
+///
+/// fn step_verify_count(
+///   cart: Cart,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   cart.items
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
+///
+/// pub fn cart_features() -> TestSuite {
+///   // Define the steps and the state each scenario starts from
+///   let steps =
+///     steps.new(initial: Cart(server_running: False, items: 0))
+///     |> steps.given("the server is running", step_server_running)
+///     |> steps.given("the cart is empty", step_empty_cart)
+///     |> steps.when("I add {int} items", step_add_items)
+///     |> steps.then("the cart should have {int} items", step_verify_count)
+///
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -210,11 +277,19 @@ pub fn with_registry(
 ///
 /// ## Example
 ///
+/// ### Build a suite from feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// // Discover and load all .feature files
-/// discover.features("test/*.feature")
-/// |> discover.with_registry(steps)
-/// |> discover.to_suite("cart_features")
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepRegistry}
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn cart_features(steps: StepRegistry(state)) -> TestSuite {
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -262,13 +337,21 @@ pub fn to_suite(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let result = discover.features("test/*.feature") |> discover.load()
+/// ### Load and parse feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/load.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// result.features
-/// |> should
-/// |> have_length(1)
-/// |> or_fail_with("expected one parsed feature")
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/matchers.{have_length, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn load_parses_one_feature() -> Result(AssertionResult, String) {
+///   let result = discover.features("test/*.feature") |> discover.load()
+///
+///   result.features
+///   |> should
+///   |> have_length(1)
+///   |> or_fail_with("expected one parsed feature")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -299,13 +382,21 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 ///
 /// ## Example
 ///
+/// ### List matching feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/list_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.features("test/*.feature")
-/// |> discover.list_files()
-/// |> should
-/// |> be_ok()
-/// |> contain("test/cart.feature")
-/// |> or_fail_with("expected list_files to include test/cart.feature")
+/// import dream_test/gherkin/discover
+/// import dream_test/matchers.{be_ok, contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_files_finds_the_cart_feature() -> Result(AssertionResult, String) {
+///   discover.features("test/*.feature")
+///   |> discover.list_files()
+///   |> should
+///   |> be_ok()
+///   |> contain("test/cart.feature")
+///   |> or_fail_with("expected list_files to include test/cart.feature")
+/// }
 /// ```
 ///
 /// ## Parameters
