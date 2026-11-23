@@ -134,6 +134,49 @@ What to notice in this example:
 - The state is an `Int`. Each scenario starts from `0`, so scenarios don’t leak into each other.
 - `context.captures` turns step text into typed values (via helpers like `get_int`).
 
+#### A shopping cart feature in Gleam
+
+The README shows this inline feature. It uses one step registry for the steps of a shopping cart.
+
+##### The shopping cart feature in Gleam <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_inline.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/gherkin/feature.{feature, given, scenario, then, when}
+import dream_test/gherkin/steps.{type StepContext, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import gleam/result
+
+pub fn tests() {
+  let steps =
+    steps.new(initial: 0)
+    |> steps.given("I have {int} items", fn(_cart: Int, context: StepContext) {
+      get_int(context.captures, 0)
+    })
+    |> steps.when("I add {int} more", fn(cart: Int, context: StepContext) {
+      use added <- result.try(get_int(context.captures, 0))
+      Ok(cart + added)
+    })
+    |> steps.then(
+      "I should have {int} items",
+      fn(cart: Int, context: StepContext) {
+        use expected <- result.try(get_int(context.captures, 0))
+        cart
+        |> should
+        |> be_equal(expected)
+        |> or_fail_with("Cart count mismatch")
+      },
+    )
+
+  feature("Shopping Cart", steps, [
+    scenario("Adding items", [
+      given("I have 3 items"),
+      when("I add 2 more"),
+      then("I should have 5 items"),
+    ]),
+  ])
+}
+```
+
 ### Placeholders (`{int}`, `{float}`, `{string}`, `{word}`)
 
 Placeholders let you capture values from the step text into `context.captures`.
@@ -397,6 +440,58 @@ pub fn main() {
   |> runner.results_reporters([bdd.new()])
   |> runner.exit_on_failure()
   |> runner.run()
+}
+```
+
+#### A feature file and its steps
+
+The README shows a shopping cart feature in a `.feature` file, and the Gleam steps that run it.
+
+##### The shopping cart feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/features/shopping_cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gherkin
+Feature: Shopping Cart
+  Scenario: Adding items
+    Given I have 3 items in my cart
+    When I add 2 more items
+    Then I should have 5 items total
+```
+
+##### The steps for the shopping cart feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/gherkin/parser
+import dream_test/gherkin/steps.{type StepContext, feature_suite, get_int}
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import gleam/result
+
+fn step_have_items(_cart: Int, context: StepContext) {
+  get_int(context.captures, 0)
+}
+
+fn step_add_items(cart: Int, context: StepContext) {
+  use added <- result.try(get_int(context.captures, 0))
+  Ok(cart + added)
+}
+
+fn step_verify_count(cart: Int, context: StepContext) {
+  use expected <- result.try(get_int(context.captures, 0))
+  cart
+  |> should
+  |> be_equal(expected)
+  |> or_fail_with("Cart count mismatch")
+}
+
+pub fn tests() {
+  let steps =
+    steps.new(initial: 0)
+    |> steps.given("I have {int} items in my cart", step_have_items)
+    |> steps.when("I add {int} more items", step_add_items)
+    |> steps.then("I should have {int} items total", step_verify_count)
+
+  let assert Ok(feature) =
+    parser.parse_file("test/features/shopping_cart.feature")
+  feature_suite(registry: steps, feature: feature)
 }
 ```
 
@@ -855,6 +950,6 @@ In this example, `types` is `dream_test/gherkin/types`. `parser.parse_file` and 
 
 ### What's Next?
 
-- Go back to [Snapshot testing](09-snapshot-testing.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Utilities](11-utilities.md)
+- Go back to [Snapshot testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Utilities](https://github.com/TrustBound/dream_test/blob/main/docs/guides/utilities.md)

@@ -4,7 +4,7 @@ Hooks are a power tool: they remove repetition, but they can also hide the story
 
 The goal of Dream Test’s hook design is to keep hooks **predictable and debuggable**, especially under parallel execution.
 
-For runner-level hooks (per-test/per-suite/per-run), see [Runner & execution](07-runner-and-execution.md).
+For runner-level hooks (per-test/per-suite/per-run), see [Runner & execution](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md).
 
 ### Mental model
 
@@ -256,7 +256,7 @@ pub fn main() {
 A hook fails when it returns `Error(message)` or crashes. What happens next depends on the kind of hook:
 
 - **Setup hook** (`before_all`, `before_each`, `before_each_test`, `before_each_suite`, `before_all_suites`): each test that it serves gets the status `SetupFailed`, and its body does not run. The teardown hooks of the levels that started still run.
-- **Teardown hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining teardown hooks still run. The run report keeps the failure in its own list (`types.report_hook_failures`), the reporters show it, and the run fails. With `runner.exit_on_failure`, a failed run ends with exit status 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
+- **Teardown hook** (`after_each`, `after_each_test`, `after_all`, `after_each_suite`, `after_all_suites`): the statuses of the tests do not change. All the remaining teardown hooks still run. The run report keeps the failure in its own list (`types.report_hook_failures`), the reporters show it, and the run fails. With `runner.exit_on_failure`, a failed run ends with exit status 1 (see [Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#exit-status-exit_on_failure)).
 
 #### Report a setup error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/hook_failure.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -361,7 +361,7 @@ The default timeout is `runner.default_timeout_ms` (5000 ms when you do not set 
   - `before_all`, `after_all`, `before_each`, `after_each`, `before_each_test` and `after_each_test`: `hook timed out in <groups>`, with the group names joined by ` > `
   - `before_each_suite` and `after_each_suite`: `hook timed out in <suite>`
   - `before_all_suites` and `after_all_suites`: `hook timed out`
-  - a context setup or teardown: `the context setup timed out in <groups>` or `the context teardown timed out in <groups>` (the setup of `describe_with_setup` or `steps.new_with_setup`, see [chapter 04](04-context-aware-tests.md#a-context-from-a-setup-describe_with_setup)).
+  - a context setup or teardown: `the context setup timed out in <groups>` or `the context teardown timed out in <groups>` (the setup of `describe_with_setup` or `steps.new_with_setup`, see [chapter 04](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#a-context-from-a-setup-describe_with_setup)).
 - A crash in a hook, or a crash of the process that runs it, does not stop the run. A hook that returns `Error` or crashes inside the hook is a failure of that hook (`hook crashed in <scope>: <reason>`). When the process that runs a setup hook (`before_all`, `before_each_suite`, `before_all_suites`) or the context setup exits, the setup stopped, as described below: no other setup hook of the scope runs. When the process that runs a teardown hook exits, the runner records a failure of that hook.
 - After a timeout or a crash of its setup process, the next hook of the scope runs in a new setup process.
 - If the process that keeps a setup alive exits while or after its setup hooks run, for example because a `before_all` hook killed it or a process that the hook linked to it crashed, the setup stopped. The run report gets a `types.SetupStopped(setup:, path:, reason:, not_run:)` failure. `not_run` is the full name of each test that the runner did not run because of it, recorded when the runner skipped the test. The reporters show it as `before_all in "<groups>" stopped: the process that keeps its setup alive exited with <reason>.`, then, when tests were not run, the line `These tests had not started and were not run:` and the full name of each test, for example `root > b`. The JSON reporter writes `not_run` as a list of `full_name` lists. The tests of the scope that did not start yet are not run: each one is `SetupFailed` with `not run: the setup from before_all in "<groups>" stopped (<reason>)`, `not run: the setup from before_each_suite in "<suite>" stopped (<reason>)` or `not run: the setup from before_all_suites stopped (<reason>)`. No hook of a group or suite under the stopped setup starts. The tests that started keep their results. The teardown hooks of the scope run in a new setup process. The runner checks the process of each setup around a test (the whole run, the suite and the groups) before each test and each group starts.
@@ -380,6 +380,6 @@ If your hooks touch shared external state (ports, filesystem paths, database sch
 
 ### What's Next?
 
-- Go back to [Assertions & matchers](05-assertions-and-matchers.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Runner & execution model](07-runner-and-execution.md)
+- Go back to [Assertions & matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md)

@@ -1,0 +1,51 @@
+## Dream Test Documentation
+
+This folder is a **guided series** for engineers adopting Dream Test. It’s written as narrative documentation: each chapter explains the problem it solves, the mental model you need to use it safely, and the rationale behind the API shape.
+
+If you want a complete “everything in one place” reference, see [Dream Test on Hexdocs](https://hexdocs.pm/dream_test/). This series is intentionally more opinionated: it’s meant to help you develop good instincts and avoid the common failure modes (flaky tests, hidden setup, unreadable failures).
+
+### Target support
+
+Dream Test targets the **BEAM (Erlang)**.
+
+### The 30-second mental model
+
+Dream Test tries to keep three ideas explicit:
+
+- **Suites are data**: you build each suite from one or more trees of groups and tests (unit suites or Gherkin features) rather than relying on hidden global test discovery.
+- **The runner is a policy decision**: your `main()` chooses output style, concurrency, timeouts, and CI behavior.
+- **Assertions are pipelines**: you start from a value, run matchers, then end with a failure message you’ll want to read at 2am.
+
+### Why the docs read like this
+
+Testing frameworks often optimize for “look how short this example is.” Dream Test optimizes for “why did this fail, and what do I do next?”
+
+That’s why you’ll see the same patterns repeated:
+
+- **Explicit runner module** instead of magic auto-discovery everywhere (with an opt-in discovery helper when you want it).
+- **Pipe-first assertions** instead of fluent builders or macros.
+- **Process isolation + timeouts** so a single bad test can’t hang or crash the whole run.
+
+### Recommended reading order (the full story)
+
+1. [Installation](https://github.com/TrustBound/dream_test/blob/main/docs/guides/installation.md) — get to a green run, and understand why `main()` exists.
+2. [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md) — the first “real” test, with two runner styles.
+3. [Writing unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md) — naming, structure, skipping, tags.
+4. [Context-aware unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md) — when “setup returns a value” and you need to pass it into tests.
+5. [Assertions & matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md) — how and why the `should` pipeline works.
+6. [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md) — power tools, and how to keep them from hiding meaning.
+7. [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md) — concurrency, timeouts, CI, reliability, and runner hooks.
+8. [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md) — humans vs machines, streaming vs post-run.
+9. [Snapshot testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md) — when snapshots make tests clearer (and when they make them worse).
+10. [Gherkin / BDD](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md) — scenario testing with a typed scenario state and placeholder captures.
+11. [Utilities](https://github.com/TrustBound/dream_test/blob/main/docs/guides/utilities.md) — small helpers that make tests less repetitive and more reliable.
+12. [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): turn on line coverage, set minimums, exclude files and write reports.
+13. [Coverage badge on GitHub](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md) — a live coverage badge from your own CI, with no outside service.
+14. [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md) — what to change in a project that uses Dream Test 2.x, with real 2.x and 3.0.0 code.
+
+### If you only need one thing…
+
+- **I want to get a test running**: start at [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md).
+- **I am upgrading from 2.x**: read [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md).
+- **My tests are flaky**: read [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md) and [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md).
+- **I need better CI integration**: jump to [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md) (JSON) and [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#exit-status-exit_on_failure) (exit status).

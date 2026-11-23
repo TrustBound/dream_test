@@ -163,7 +163,7 @@ Look for these in your code:
 - `steps.step`, `steps.when_` and `steps.then_`: use `steps.given`, `steps.when` or `steps.then`.
 - `result.unwrap` on a capture: use `result.try`. Then a wrong capture fails the scenario with a clear message.
 
-If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_setup`. Its setup runs one time, and each scenario starts from its value. To share one setup between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server).
+If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_setup`. Its setup runs one time, and each scenario starts from its value. To share one setup between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server).
 
 #### A record for more than one value
 
@@ -643,7 +643,7 @@ In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it a
 - the `render` function of a `reporter_types.Custom` reporter crashed
 - coverage failed
 
-[Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists every case.
+[Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#exit-status-exit_on_failure) lists every case.
 
 #### `runner.silent` still writes errors
 
@@ -1152,7 +1152,7 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 3.0.0 has one rule for every hook failure:
 
 - A failed setup hook gives `SetupFailed` to each test that it serves.
-- A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the hook failures of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure)).
+- A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the hook failures of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#exit-status-exit_on_failure)).
 
 A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that all the tests of a tree share, use `unit_context.describe_with_setup`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
 
@@ -1524,7 +1524,7 @@ pub fn tests() {
 
 #### Custom reports
 
-In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. The runner calls `render` in the process of the run, so `render` must return. See [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
+In 2.x, `runner.results_reporters` took only the built-in reporters. A custom report or a Gherkin report had to print after `runner.run()`, and `runner.exit_on_failure()` ended the program before it printed. In 3.0.0, give your formatter to the runner as `reporter_types.Custom(render)`, with `render` a `fn(RunReport) -> String`. The report prints at the end of the run, and `runner.exit_on_failure()` then gives exit status 1 when the run fails. The runner calls `render` in the process of the run, so `render` must return. See [Custom post-run reporter](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md#custom-post-run-reporter-format-a-runreport).
 
 #### `ResultsReporter` has the variant `Custom`
 
@@ -2130,10 +2130,10 @@ pub fn tests() {
 | `types.TestKind.Integration` | A tag, for example `unit.with_tags(["integration"])`, and `runner.filter_tests` |
 | `types.TestSuiteItem` | `types.Node` |
 | `dream_test/context` (`TestContext`, `new`, `failures`, `add_failure`) | Nothing. The runner never used it. |
-| `types.ModuleCoverage`, `types.CoverageSummary` | `dream_test/coverage`. Nothing in 2.x filled these types. See the Coverage section of the [main README](../README.md#coverage). |
+| `types.ModuleCoverage`, `types.CoverageSummary` | `dream_test/coverage`. Nothing in 2.x filled these types. See the Coverage section of the [main README](https://github.com/TrustBound/dream_test/blob/main/README.md#coverage). |
 
 ### What's Next?
 
-- Go back to [Coverage badge on GitHub](12-coverage-badge.md)
-- Go back to [Documentation README](README.md)
-- Read the full list of changes in the [CHANGELOG](../CHANGELOG.md)
+- Go back to [Coverage badge on GitHub](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Read the full list of changes in the [CHANGELOG](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)

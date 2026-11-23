@@ -296,6 +296,6 @@ pub fn main() {
 
 ### What's Next?
 
-- Go back to [Context-aware unit tests](04-context-aware-tests.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Lifecycle hooks](06-lifecycle-hooks.md)
+- Go back to [Context-aware unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)

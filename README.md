@@ -3,18 +3,10 @@
   <h1>Dream Test</h1>
   <p><strong>Feature-rich unit and integration testing for Gleam.</strong></p>
 
-  <a href="https://hex.pm/packages/dream_test">
-    <img src="https://img.shields.io/hexpm/v/dream_test?color=8e4bff&label=hex" alt="Hex.pm">
-  </a>
-  <a href="https://hexdocs.pm/dream_test/">
-    <img src="https://img.shields.io/badge/docs-hexdocs-8e4bff" alt="Documentation">
-  </a>
-  <a href="https://github.com/TrustBound/dream_test/actions/workflows/ci.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/TrustBound/dream_test/badges/coverage.json" alt="Coverage">
-  </a>
-  <a href="https://github.com/TrustBound/dream_test/blob/main/LICENSE.md">
-    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
-  </a>
+  <a href="https://hex.pm/packages/dream_test"><img src="https://img.shields.io/hexpm/v/dream_test?color=8e4bff&label=hex" alt="Hex.pm"></a>
+  <a href="https://hexdocs.pm/dream_test/"><img src="https://img.shields.io/badge/docs-hexdocs-8e4bff" alt="Documentation"></a>
+  <a href="https://github.com/TrustBound/dream_test/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/TrustBound/dream_test/badges/coverage.json" alt="Coverage"></a>
+  <a href="https://github.com/TrustBound/dream_test/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
 </div>
 
 <br>
@@ -97,23 +89,24 @@ Dream Test splits reporting into:
 
 ## Full Usage Guide
 
-1. [Installation](documentation/01-installation.md)
-2. [Quick Start](documentation/02-quick-start.md)
-3. [Writing Tests](documentation/03-writing-tests.md)
-4. [Context-Aware Tests](documentation/04-context-aware-tests.md)
-5. [Assertions & Matchers](documentation/05-assertions-and-matchers.md)
-6. [Lifecycle Hooks](documentation/06-lifecycle-hooks.md)
-7. [Runner & Execution](documentation/07-runner-and-execution.md) — includes runner hooks
-8. [Reporters](documentation/08-reporters.md)
-9. [Snapshot Testing](documentation/09-snapshot-testing.md)
-10. [Gherkin BDD](documentation/10-gherkin-bdd.md)
-11. [Utilities](documentation/11-utilities.md)
-12. [Coverage Badge on GitHub](documentation/12-coverage-badge.md)
-13. [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) — from Dream Test 2.x
+1. [Installation](https://github.com/TrustBound/dream_test/blob/main/docs/guides/installation.md)
+2. [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md)
+3. [Writing Tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md)
+4. [Context-Aware Tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md)
+5. [Assertions & Matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md)
+6. [Lifecycle Hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)
+7. [Runner & Execution](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md) — includes runner hooks
+8. [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md)
+9. [Snapshot Testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md)
+10. [Gherkin BDD](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)
+11. [Utilities](https://github.com/TrustBound/dream_test/blob/main/docs/guides/utilities.md)
+12. [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
+13. [Coverage Badge on GitHub](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+14. [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md) — from Dream Test 2.x
 
 ## Unit Tests
 
-### A unit test file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/unit_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A unit test file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/unit_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/quick-start.md#a-unit-test-file-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -144,11 +137,11 @@ pub fn main() {
 }
 ```
 
-<sub>📖 [Guide](documentation/02-quick-start.md)</sub>
+<sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md)</sub>
 
 ## Gherkin Integration Tests
 
-### The feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/features/shopping_cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/features/shopping_cart.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/gherkin-bdd.md#the-shopping-cart-feature-file-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gherkin
 Feature: Shopping Cart
@@ -158,7 +151,7 @@ Feature: Shopping Cart
     Then I should have 5 items total
 ```
 
-### The steps for the feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The steps for the feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/gherkin-bdd.md#the-steps-for-the-shopping-cart-feature-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/parser
@@ -196,11 +189,11 @@ pub fn tests() {
 }
 ```
 
-<sub>📖 [Guide](documentation/10-gherkin-bdd.md)</sub>
+<sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)</sub>
 
 ## Gherkin Syntax in Gleam
 
-### A feature in Gleam <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_inline.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A feature in Gleam <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/gherkin_inline.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/gherkin-bdd.md#the-shopping-cart-feature-in-gleam-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
@@ -239,13 +232,13 @@ pub fn tests() {
 }
 ```
 
-<sub>📖 [Guide](documentation/10-gherkin-bdd.md)</sub>
+<sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)</sub>
 
 ## Coverage
 
 Dream Test measures line coverage with the native line counters of the BEAM. They need Erlang/OTP 27 or later with the JIT (the default on x86-64 and ARM64). Coverage is opt-in. Turn it on in your test `main`:
 
-### Turn on coverage <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/runner_coverage.gleam#L19-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Turn on coverage <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/runner_coverage.gleam#L19-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#turn-on-coverage-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -265,7 +258,7 @@ pub fn main() {
 
 After the results, the runner prints a table and writes an LCOV file to `build/coverage/lcov.info`:
 
-### The coverage table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L73-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The coverage table <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L73-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#the-coverage-table-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```text
 Coverage
@@ -281,7 +274,7 @@ LCOV: build/coverage/lcov.info
 
 Use `runner.coverage_from_environment` in place of `runner.coverage`. Coverage then runs only when `DREAM_TEST_COVERAGE` is `1` or `true`, for example in CI. When the variable is not set, or is `0` or `false`, coverage is off. Any other value is a coverage error (`coverage.InvalidEnvironmentValue`), and the run fails:
 
-#### Coverage from the environment <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_environment.gleam#L24-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Coverage from the environment <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_environment.gleam#L24-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#coverage-from-the-environment-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 pub fn main() {
@@ -302,7 +295,7 @@ DREAM_TEST_COVERAGE=1 gleam test
 
 `coverage.minimum_percent` fails the run when the total is below the minimum. `coverage.minimum_percent_per_file` fails the run when one file is below its minimum. With `runner.exit_on_failure()`, the exit status is then 1.
 
-#### Set the minimums <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_minimum.gleam#L25-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Set the minimums <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_minimum.gleam#L25-L29"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#set-the-minimums-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -317,7 +310,7 @@ fn coverage_config() {
 
 `coverage.exclude` removes files that match a pattern, for example generated code. `coverage.exclude_with_reason` also records why. `coverage.require_exclusion_reasons()` fails the run when a pattern or a marker has no reason. An exclusion is never silent: a count line follows the total. `coverage.show_excluded()` adds an `Excluded` column with each reason.
 
-#### Exclude files with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_exclusions.gleam#L28-L34"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Exclude files with a reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_exclusions.gleam#L28-L34"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#exclude-files-with-a-reason-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -330,7 +323,7 @@ fn coverage_config() {
 ```
 
 
-#### The table with exclusions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L88-L102"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### The table with exclusions <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/coverage_output.gleam#L88-L102"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#the-table-with-exclusions-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```text
 Coverage
@@ -345,7 +338,7 @@ Excluded: 1 file, 6 lines in 1 file
 
 Put each marker on its own line. Text after a marker is its reason. In `.erl` files, write the marker after `%` or `%%`.
 
-#### Ignore a line, a range and a function <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_markers.gleam#L17-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Ignore a line, a range and a function <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_markers.gleam#L17-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#ignore-a-line-a-range-and-a-function-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 pub fn log(message: String) -> Nil {
@@ -375,7 +368,7 @@ pub fn convert_legacy(record: String) -> String {
 
 ### Table options
 
-#### Table settings <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_table.gleam#L31-L37"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Table settings <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_table.gleam#L31-L37"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#table-settings-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -396,7 +389,7 @@ fn coverage_config() {
 
 Coverage writes LCOV unless you set `coverage.no_lcov()`. It can also write JSON, Cobertura XML (for GitLab, Jenkins and Azure DevOps), Markdown (for `$GITHUB_STEP_SUMMARY` or a pull request comment) and HTML (an index page and one page for each source file, or one combined page with the same table and source):
 
-#### Write every format <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_outputs.gleam#L25-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Write every format <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_outputs.gleam#L25-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#write-every-format-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -421,7 +414,7 @@ Before it writes the HTML pages, coverage deletes the `files` folder in the HTML
 
 Code in another BEAM instance, for example an application server that integration tests start as an OS process, is not in the test run. The server measures itself with `coverage.start` and `coverage.finish` and writes an LCOV file when it stops. The test run adds that file with `coverage.merge_lcov`:
 
-#### A server that measures itself <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_server.gleam#L10-L47"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### A server that measures itself <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_server.gleam#L10-L47"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#a-server-that-measures-itself-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 // The server: it measures itself and writes an LCOV file when it stops.
@@ -474,7 +467,7 @@ pub fn main() {
 
 `coverage.start` and `coverage.finish` measure any code, for example under another test runner. `dream_test/reporters/coverage` renders the table, and `dream_test/coverage/report` reads the numbers:
 
-#### Measure without the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_start_finish.gleam#L19-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### Measure without the runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_start_finish.gleam#L19-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/coverage.md#measure-without-the-runner-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_table() -> String {
@@ -497,7 +490,7 @@ Every coverage error fails the run, so with `runner.exit_on_failure()` the exit 
 
 ### Coverage badge
 
-To show a live coverage badge in your README, see [Coverage badge on GitHub](documentation/12-coverage-badge.md). Your own CI writes the badge file to a `badges` branch, and shields.io draws it. No outside coverage service is needed.
+To show a live coverage badge in your README, see [Coverage badge on GitHub](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md). Your own CI writes the badge file to a `badges` branch, and shields.io draws it. No outside coverage service is needed.
 
 ### Line accuracy (Gleam 1.19)
 

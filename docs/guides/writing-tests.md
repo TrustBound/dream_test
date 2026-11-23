@@ -11,7 +11,7 @@ Dream Test’s unit DSL is built for that style, but there’s a deeper design g
 - **Your test module stays ordinary Gleam** (no hidden discovery side-effects).
 - **Failures should read well** (because tests are communication, not just verification).
 
-If you need setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](07-runner-and-execution.md).
+If you need setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md).
 
 ### `describe` + `it` (the core loop)
 
@@ -346,6 +346,6 @@ pub fn main() {
 
 ### What's Next?
 
-- Go back to [Quick Start](02-quick-start.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Context-aware unit tests](04-context-aware-tests.md) if your setup produces a value you want to pass into every test (DB handle, client, scenario state).
+- Go back to [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Context-aware unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md) if your setup produces a value you want to pass into every test (DB handle, client, scenario state).

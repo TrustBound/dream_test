@@ -72,12 +72,12 @@ pub fn suites() {
 
 ### What you just set up
 
-- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](07-runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
+- `discover` turns files into suites (a convenience). Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
 - The pattern names files under `test/`. `snippets/unit/**.gleam` is the folder of this repository's examples. In your project, use your own folder, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
 - `runner` executes suites with isolation, timeouts, and configurable parallelism.
 - `reporters` decide how results are rendered (human output vs JSON vs more).
 
 ### What's Next?
 
-- Go back to [Documentation README](README.md)
-- Continue to [Quick Start](02-quick-start.md) to write a first passing test and see the output you’ll build on.
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md) to write a first passing test and see the output you’ll build on.

@@ -242,7 +242,7 @@ The link opens the runs of the workflow on `main`. Add `&style=flat-square` (or 
 
 ### What's Next?
 
-- Go back to [Utilities](11-utilities.md)
-- Go back to [Documentation README](README.md)
-- Read the Coverage section of the [main README](../README.md#coverage)
-- Continue to [Upgrading to 3.0.0](13-upgrading-to-3.md)
+- Go back to [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Read the Coverage section of the [main README](https://github.com/TrustBound/dream_test/blob/main/README.md#coverage)
+- Continue to [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)

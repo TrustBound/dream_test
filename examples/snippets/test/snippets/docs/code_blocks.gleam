@@ -42,7 +42,7 @@ const root = "../.."
 
 /// The Markdown files whose code blocks are checked.
 const doc_patterns = [
-  "README.md", "CHANGELOG.md", "documentation/*.md", "releases/*.md",
+  "README.md", "CHANGELOG.md", "docs/guides/*.md", "releases/*.md",
   "examples/*/README.md",
 ]
 

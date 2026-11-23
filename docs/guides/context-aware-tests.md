@@ -39,7 +39,7 @@ This is the right tool when:
 
 If you don’t need an explicit context, prefer `dream_test/unit` — it’s simpler.
 
-For setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](07-runner-and-execution.md).
+For setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md).
 
 ### The idea: context flows through the suite
 
@@ -134,7 +134,7 @@ pub fn tests() {
 
 ### Context suites run with other suites
 
-The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for a run with all three kinds.
+The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for a run with all three kinds.
 
 ### A minimal example: counter context
 
@@ -269,6 +269,6 @@ Prefer `dream_test/unit` when:
 
 ### What's Next?
 
-- Go back to [Writing unit tests](03-writing-tests.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Assertions & matchers](05-assertions-and-matchers.md)
+- Go back to [Writing unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Assertions & matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md)

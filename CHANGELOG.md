@@ -11,7 +11,7 @@ Dream Test 3.0.0 adds built-in line coverage. It also gives the hooks of
 each scope one setup process, follows the official Gherkin grammar, and
 gives each Gherkin scenario one typed state value in place of the `world`
 store. This release has breaking changes. Read
-[Upgrading to 3.0.0](documentation/13-upgrading-to-3.md) before you update.
+[Upgrading to 3.0.0](docs/guides/upgrading-to-3.md) before you update.
 
 ### Breaking changes
 
@@ -301,7 +301,7 @@ store. This release has breaking changes. Read
 
 ### Upgrading from 2.x
 
-Read [Upgrading to 3.0.0](documentation/13-upgrading-to-3.md). It shows 2.x
+Read [Upgrading to 3.0.0](docs/guides/upgrading-to-3.md). It shows 2.x
 code and the same code for 3.0.0 for each change below. Some 2.x examples
 are copies of files at tag 2.1.3. The others use only the 2.1.3 API, and
 the guide labels them.
@@ -500,7 +500,7 @@ the guide labels them.
     function to its source line. The warning does not fail the run
 
 - **Coverage badge** (`.github/workflows/ci.yml`, `README.md`,
-  `documentation/12-coverage-badge.md`)
+  `docs/guides/coverage-badge.md`)
 
   - A push to `main` publishes the coverage total to `coverage.json` on the
     `badges` branch. The README shows it as a shields.io badge, with the
@@ -732,6 +732,15 @@ the guide labels them.
     Scenario, is description text. Before, a `Given`, `When`, `Then`,
     `And` or `But` line there was dropped. A `* ` list item in a
     description stays description text
+
+- **Guides** (`docs/guides/`, `README.md`, `gleam.toml`)
+
+  - The guides moved from `documentation/NN-name.md` to
+    `docs/guides/name.md`, with no number in the name, for example
+    `docs/guides/writing-tests.md`. A new `docs/guides/coverage.md` guide
+    holds the coverage examples of the README. Each README example has a
+    guide badge that links to the guide section with the same example.
+    HexDocs shows the guides as pages
 
 ### Removed
 

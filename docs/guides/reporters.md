@@ -284,7 +284,7 @@ pub fn render_my_report(report: RunReport) -> String {
 
 Then give the formatter to the runner as `reporter_types.Custom(render_my_report)`. At the end of the run, the runner calls the formatter one time and writes the text that it returns. The runner adds no newline, so end the text with `"\n"`. The runner calls the formatter in the process of the run, so the formatter must return. An abnormal exit signal sent to the process of the run, for example from a linked process that the formatter starts, is not caught and ends the run. The reports print in list order, with `bdd` and `json` reports in the same list.
 
-The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. [Exit status](07-runner-and-execution.md#exit-status-exit_on_failure) lists when the run fails.
+The runner writes every report before it checks coverage. Thus `runner.exit_on_failure()` is safe here: the report prints first, then the program ends with exit status 1 when the run fails. [Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#exit-status-exit_on_failure) lists when the run fails.
 
 If the formatter crashes, the runner writes a `Results reporter failed` error to the error output, with the position of the reporter in the list and the crash. The first reporter in the list is at position 1, and every reporter counts, `bdd` and `json` included. The error shows the crash on one line: the lines of the crash, each without the spaces at its start, joined with one space. When that line is longer than 200 characters, the error shows the first 200 characters and then ` ... (cut at 200 characters, and types.report_reporter_crashes has the full reason)`. Then the runner goes on with the next reporter and with coverage. The crash makes the run fail: the report that `runner.run` returns has the crash, so `types.failed` is `True`. `types.report_reporter_crashes` gives the position and the full reason of each crash. A silent run (`runner.silent`) drops the reports, but still writes this error to the standard error stream.
 
@@ -371,6 +371,6 @@ pub fn main() {
 
 ### What's Next?
 
-- Go back to [Runner & execution model](07-runner-and-execution.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Snapshot testing](09-snapshot-testing.md)
+- Go back to [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Snapshot testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md)

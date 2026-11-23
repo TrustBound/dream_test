@@ -12,7 +12,7 @@ That explicitness is the source of most of Dream Test’s reliability: when a te
 
 If you’re looking for a mental model of “how does the runner find my tests?”: in Dream Test, **`main()` chooses what runs** by passing suites to the runner. You can list suites explicitly, or generate the list via discovery.
 
-If you need setup/teardown that spans multiple suites, see the runner-level hooks section in [Runner & execution model](07-runner-and-execution.md).
+If you need setup/teardown that spans multiple suites, see the runner-level hooks section in [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md).
 
 ### Choose your first runner style
 
@@ -52,7 +52,7 @@ pub fn suites() {
 What’s happening here (in English):
 
 - `from_path("snippets/unit/**.gleam")` finds test modules on disk, relative to `test/`. `snippets/unit` is the folder of this repository's examples. Use your own folder, for example `unit/**_test.gleam`.
-- Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](07-runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
+- Each discovered module must define `pub fn tests()` that returns a `TestSuite`. [Runner & execution](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#suites-with-different-contexts-in-one-run) tells what discovery does with other modules, and lists its errors.
 - `to_suites()` turns them into suite values. A module can return any suite: a `unit` suite, a `unit_context` suite with its own context, or a Gherkin feature.
 - The runner executes those suites and streams output via a reporter.
 
@@ -98,6 +98,41 @@ pub fn main() {
 }
 ```
 
+### One file with tests and a runner
+
+A small project can keep the tests and the runner `main` in one module. This is the unit test example of the README.
+
+#### A unit test file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/unit_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/reporters/bdd
+import dream_test/reporters/progress
+import dream_test/runner
+import dream_test/unit.{describe, it}
+import gleam/string
+
+pub fn tests() {
+  describe("String utilities", [
+    it("trims whitespace", fn() {
+      "  hello  "
+      |> string.trim()
+      |> should
+      |> be_equal("hello")
+      |> or_fail_with("Should remove surrounding whitespace")
+    }),
+  ])
+}
+
+pub fn main() {
+  runner.new([tests()])
+  |> runner.progress_reporter(progress.new())
+  |> runner.results_reporters([bdd.new()])
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
 ### Why this shape?
 
 - **`tests()` is your suite**: it describes behavior. It should be boring to call and easy to reuse.
@@ -108,6 +143,6 @@ If you only copy one idea from Dream Test, copy this one: always end an assertio
 
 ### What's Next?
 
-- Go back to [Installation](01-installation.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Writing unit tests](03-writing-tests.md) to get comfortable with `describe`, `it`, grouping, skipping, and tags.
+- Go back to [Installation](https://github.com/TrustBound/dream_test/blob/main/docs/guides/installation.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Writing unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md) to get comfortable with `describe`, `it`, grouping, skipping, and tags.

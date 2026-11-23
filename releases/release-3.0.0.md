@@ -40,7 +40,7 @@ dream_test measures itself this way: its own tests cover 100% of the lines in
 - `coverage.merge_lcov` adds LCOV files from other BEAM instances, for
   example an application server that measures itself with `coverage.start`
   and `coverage.finish`.
-- A new guide, `documentation/12-coverage-badge.md`, shows how to publish a
+- A new guide, `docs/guides/coverage-badge.md`, shows how to publish a
   live coverage badge from GitHub Actions to a `badges` branch, with no
   outside service.
 
@@ -107,6 +107,14 @@ assertion. The compiler now checks the type of the state in every step. For
 example, `fn step_add(cart: Int, _context: StepContext) -> Result(Int, String)`
 is a `when` step for a scenario whose state is an `Int`.
 
+### Guides
+
+The guides moved from `documentation/` to `docs/guides/`. Their file names
+have no number now, for example `docs/guides/writing-tests.md`. A new
+Coverage guide shows the coverage examples of the README. Each example in
+the README has a guide badge. The badge links to the guide section that
+shows the same example. HexDocs shows each guide as a page.
+
 ## Testing
 
 - 1175 tests run, 0 failed, in about 23 seconds of wall time, with 100.0% line coverage of `src` (3764 of 3764 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
@@ -138,7 +146,7 @@ gleam deps update dream_test
 ### Migration Guide
 
 Each item that needs a code change has a 2.x and a 3.0.0 example in
-[Upgrading to 3.0.0](../documentation/13-upgrading-to-3.md).
+[Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/upgrading-to-3.md).
 
 - `runner.run` and `parallel.run_tree_parallel` return `types.RunReport`, and
   the reporter functions that format a whole run take one.
@@ -241,12 +249,17 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   returns a `Result`.
 - A `types.Tree` (in 2.x `types.Root`) is no longer a `TestSuite`. Pass it
   to `suite.from_tree`.
+- Docs: a link to a guide under `documentation/` no longer works. Link to
+  the guide under `docs/guides/` with no number, for example
+  `docs/guides/writing-tests.md` in place of
+  `documentation/03-writing-tests.md`.
 
 ## Documentation
 
 - [dream_test](https://hexdocs.pm/dream_test) - v3.0.0
-- [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/documentation/13-upgrading-to-3.md)
-- [Coverage badge](https://github.com/TrustBound/dream_test/blob/main/documentation/12-coverage-badge.md)
+- [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
+- [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
+- [Coverage badge](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
 - [Changelog](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)
 
 ## Community

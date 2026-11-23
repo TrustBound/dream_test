@@ -112,7 +112,7 @@ pub fn main() {
 
 ### Suites with different contexts in one run
 
-`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a setup for all scenarios](10-gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for an example.
+`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for an example.
 
 To make a suite from a `types.Tree` that you build yourself, use `suite.from_tree`.
 
@@ -243,7 +243,7 @@ pub fn main() {
 }
 ```
 
-To print your own report after the run and still end with exit status 1, see [Custom post-run reporter](08-reporters.md#custom-post-run-reporter-format-a-runreport).
+To print your own report after the run and still end with exit status 1, see [Custom post-run reporter](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md#custom-post-run-reporter-format-a-runreport).
 
 ### Runner hooks (test/suite/run)
 
@@ -275,7 +275,7 @@ about what is running.
 
 - A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
 - A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining teardown hooks still run, the failure goes into `types.report_hook_failures(report)`, and the run fails.
-- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](06-lifecycle-hooks.md#where-hooks-run)).
+- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md#where-hooks-run)).
 
 `source` is best-effort:
 
@@ -372,6 +372,6 @@ pub fn tests() {
 
 ### What's Next?
 
-- Go back to [Lifecycle hooks](06-lifecycle-hooks.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Reporters](08-reporters.md)
+- Go back to [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md)

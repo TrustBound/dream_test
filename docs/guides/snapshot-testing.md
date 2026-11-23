@@ -127,6 +127,6 @@ pub fn tests() {
 
 ### What's Next?
 
-- Go back to [Reporters](08-reporters.md)
-- Go back to [Documentation README](README.md)
-- Continue to [Gherkin / BDD testing](10-gherkin-bdd.md)
+- Go back to [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
+- Continue to [Gherkin / BDD testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)

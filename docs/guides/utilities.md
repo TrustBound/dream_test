@@ -273,8 +273,8 @@ The module has more functions. See [`dream_test/sandbox` on HexDocs](https://hex
 
 ### What's Next?
 
-- Go back to [Gherkin / BDD testing](10-gherkin-bdd.md)
-- Go on to [Coverage badge on GitHub](12-coverage-badge.md)
-- Go back to [Documentation README](README.md)
+- Go back to [Gherkin / BDD testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)
+- Go on to [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
+- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
 - Jump to the API reference on Hexdocs: [Dream Test on Hexdocs](https://hexdocs.pm/dream_test/)
 
