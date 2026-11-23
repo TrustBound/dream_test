@@ -1,15 +1,23 @@
 # Dream Test 3.0.0 Release Notes
 
-**Release Date:** 2026-11-18
+**Release Date:** not released yet (draft)
 
 Dream Test 3.0.0 adds line coverage to the runner. It also runs the hooks of
 each scope in a process that keeps their resources alive, follows the official
 Gherkin grammar, and gives each Gherkin scenario one typed state value. This
-is a major release: read the breaking changes below before you update.
+is a major release: read the Migration Guide before you update.
 
-## Highlights
+## Key Highlights
 
-### 📈 Built-in line coverage
+- **Built-in line coverage**: `runner.coverage(coverage.new())` measures `src` with the line counters of the BEAM, prints a table and writes an LCOV file
+- **A new hook process model**: the hooks of each scope run in one process that keeps their resources alive while the tests run
+- **One suite type (breaking)**: one `TestSuite` type, with a setup and a teardown for a whole tree
+- **Gherkin conformance**: the parser follows the official Gherkin grammar
+- **Typed step state (breaking)**: each Gherkin scenario has one typed state value, and `world` is removed
+
+## What's New
+
+### Built-in Line Coverage
 
 `runner.coverage(coverage.new())` measures the modules in `src` with the
 native line counters of the BEAM. After the test results, the runner prints a
@@ -36,7 +44,7 @@ dream_test measures itself this way: its own tests cover 100% of the lines in
   live coverage badge from GitHub Actions to a `badges` branch, with no
   outside service.
 
-### 🧵 A new hook process model
+### A New Hook Process Model
 
 The `before_all` and `after_all` hooks of a group run in one setup process
 that lives while the tests of the group run. A pool, a supervisor or an ETS table that a `before_all`
@@ -55,7 +63,7 @@ hook starts now lives for the tests of its group. A test runs its
   the run.
 - A test body past its timeout is `TimedOut`, not `Failed`.
 
-### 🧺 One suite type, and setups for a whole tree
+### One Suite Type, and Setups for a Whole Tree
 
 - Every suite has one type, `suite.TestSuite` in the new module
   `dream_test/suite`, whatever context its tests get. One `runner.new`
@@ -76,7 +84,7 @@ hook starts now lives for the tests of its group. A test runs its
   a test with a name and no body, for a test skeleton. The reporters show
   it as pending, and the run still passes.
 
-### 🥒 Gherkin conformance
+### Gherkin Conformance
 
 The parser follows the official Gherkin grammar and passes the official
 Gherkin test files (37 good files, 12 bad files, and 8 good files that
@@ -90,7 +98,7 @@ dream_test rejects on purpose).
 - Typed parse errors (`parser.ParseError`, `parser.FeatureFileError`) with the
   line of each problem.
 
-### 🧩 Typed step state
+### Typed Step State
 
 The `world` key/value store is gone. Each scenario starts from the state that
 you give to `steps.new(initial:)`. A `given` or `when` step gets the state and
@@ -99,7 +107,35 @@ assertion. The compiler now checks the type of the state in every step. For
 example, `fn step_add(cart: Int, _context: StepContext) -> Result(Int, String)`
 is a `when` step for a scenario whose state is an `Int`.
 
-## Breaking changes
+## Testing
+
+- 1175 tests run, 0 failed, in about 23 seconds of wall time, with 100.0% line coverage of `src` (3764 of 3764 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
+
+## Upgrading
+
+Update your dependencies:
+
+```toml
+[dev-dependencies]
+dream_test = ">= 3.0.0 and < 4.0.0"
+```
+
+Then run:
+
+```bash
+gleam deps update dream_test
+```
+
+### Requirements
+
+- Gleam 1.19 or later for exact coverage line numbers. Older Gleam versions
+  map only the first line of each function, and the coverage table warns
+  about it.
+- Erlang/OTP 27 or later with the JIT (the default on x86-64 and ARM64) for
+  coverage. On another runtime, `coverage.start` fails with
+  `NativeCoverageUnsupported`.
+
+### Migration Guide
 
 Each item that needs a code change has a 2.x and a 3.0.0 example in
 [Upgrading to 3.0.0](../documentation/13-upgrading-to-3.md).
@@ -206,24 +242,15 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - A `types.Tree` (in 2.x `types.Root`) is no longer a `TestSuite`. Pass it
   to `suite.from_tree`.
 
-## Requirements
+## Documentation
 
-- Gleam 1.19 or later for exact coverage line numbers. Older Gleam versions
-  map only the first line of each function, and the coverage table warns
-  about it.
-- Erlang/OTP 27 or later with the JIT (the default on x86-64 and ARM64) for
-  coverage. On another runtime, `coverage.start` fails with
-  `NativeCoverageUnsupported`.
+- [dream_test](https://hexdocs.pm/dream_test) - v3.0.0
+- [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/documentation/13-upgrading-to-3.md)
+- [Coverage badge](https://github.com/TrustBound/dream_test/blob/main/documentation/12-coverage-badge.md)
+- [Changelog](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)
 
-## Files of interest
+## Community
 
-- `src/dream_test/coverage.gleam`
-- `src/dream_test/runner.gleam`
-- `src/dream_test/parallel.gleam`
-- `src/dream_test/sandbox.gleam`
-- `src/dream_test/types.gleam`
-- `src/dream_test/gherkin/parser.gleam`
-- `src/dream_test/gherkin/steps.gleam`
-- `documentation/12-coverage-badge.md`
-- `documentation/13-upgrading-to-3.md`
-- `CHANGELOG.md`
+- [Discussions](https://github.com/TrustBound/dream/discussions)
+- [Report Issues](https://github.com/TrustBound/dream_test/issues)
+- [Contributing](https://github.com/TrustBound/dream_test/blob/main/README.md#contributing)
