@@ -152,6 +152,7 @@ pub type DataTable {
 /// - Text describing the action
 /// - An optional DocString
 /// - An optional DataTable
+/// - Its line in the feature text, when a parser read it
 ///
 /// A step can have both a DocString and a DataTable, in either order, as
 /// in the official Gherkin grammar. A step handler gets them as
@@ -173,6 +174,7 @@ pub type DataTable {
 ///     text: "I have 1 item",
 ///     doc_string: None,
 ///     data_table: None,
+///     line: None,
 ///   )
 ///   |> should
 ///   |> be_equal(Step(
@@ -180,6 +182,7 @@ pub type DataTable {
 ///     text: "I have 1 item",
 ///     doc_string: None,
 ///     data_table: None,
+///     line: None,
 ///   ))
 ///   |> or_fail_with("expected Step to be constructible")
 /// }
@@ -195,6 +198,10 @@ pub type Step {
     doc_string: Option(DocString),
     /// The DataTable after the step, if any
     data_table: Option(DataTable),
+    /// The line of the step in the feature text, from the parser. `None`
+    /// for a step that no parser read, such as an inline step. A failure
+    /// in the step names this line in the report.
+    line: Option(Int),
   )
 }
 
@@ -388,6 +395,7 @@ pub type ScenarioKeyword {
 ///       text: "I have 1 item",
 ///       doc_string: None,
 ///       data_table: None,
+///       line: None,
 ///     )
 ///   let scenario =
 ///     Scenario(
@@ -511,6 +519,7 @@ pub type Rule {
 ///       text: "I have 1 item",
 ///       doc_string: None,
 ///       data_table: None,
+///       line: None,
 ///     )
 ///   let scenario =
 ///     Scenario(

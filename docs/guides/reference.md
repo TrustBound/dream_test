@@ -13,6 +13,7 @@ This page collects the lists and the exact rules that the guides link to: every 
 - [Gherkin keywords](#gherkin-keywords)
 - [Gherkin step matching](#gherkin-step-matching)
 - [Gherkin test names and tags](#gherkin-test-names-and-tags)
+- [Gherkin step failures](#gherkin-step-failures)
 - [Gherkin parse errors](#gherkin-parse-errors)
 - [File helpers](#file-helpers)
 - [Process helpers](#process-helpers)
@@ -141,6 +142,15 @@ pub fn tests() {
 | `Pending` | `~` | The test is a `pending`, with no body. |
 
 `types.is_failure(status)` is `True` for `Failed`, `SetupFailed` and `TimedOut`. A run fails when a test has one of these, when a teardown hook failed, when a setup stopped, when a custom results reporter crashed, or when coverage failed. The summary line lists, after `N passed`, the counts that aren't 0, in this order: skipped, pending, timed out, setup failed, teardown failed, setup stopped.
+
+### How a failure shows
+
+- A failure shows its operator, then its `Message:`, then the details of its payload. An `Expected:` and an `Actual:` line show two values of one line.
+- When the expected or the actual text has more than one line, or the two texts differ only in whitespace at their ends, the BDD and Gherkin reporters show a line diff in place of the two lines: `Diff (- expected, + actual):`, then `- ` for a line of the expected text only, `+ ` for a line of the actual text only, and two spaces for a line in both. Removed lines come before added lines.
+- The diff is a longest common subsequence of the lines, after the common first and last lines. When the other lines make more than 1,000,000 pairs, they show as removed, then added, with a note.
+- Same lines more than 3 lines from a change show as one `... N unchanged lines` line. At most 100 diff lines show, then `... N more lines of the diff`.
+- A changed line shows trailing spaces as `·`, tabs as `→` and carriage returns as `␍`. When only one text ends with a newline, `\ No newline at end of text` follows the last line of the other text. `match_snapshot` ignores newlines at the end of both texts, and its failure holds the two texts that it compared.
+- With colour, `-` lines are green and `+` lines are red. The JSON report holds the whole `expected` and `actual` texts and no diff. `dream_test/reporters/diff` gives the diff to a reporter of your own.
 
 ## Runner settings
 
@@ -277,6 +287,14 @@ If the most specific word leads to no match for the rest of the step, lookup tri
 - A scenario with no `Examples` section runs one time, also when its keyword is `Scenario Outline`. An `Examples` section with no rows makes no tests. A scenario with no steps runs no Background steps.
 - The tags of a test are the Feature tags, then the Rule tags, then the scenario tags, then the `Examples` tags. Tag filters see all of them.
 - The result kind of a scenario is `GherkinScenario(scenario_id:, feature:, rule:)`. `feature` is `Some("<feature>")` for a scenario in the group of its Feature (with `steps.feature_suite`, `steps.Feature`, the `feature.feature` builders and `discover.to_suite`), and `None` for one of `steps.Scenarios`. `rule` is `Some("Rule: <name>")` inside a Rule, and `None` outside one. The Gherkin reporter prints the Rule heading from this field, so a Feature named `Rule: refunds` prints as `Feature: Rule: refunds`.
+
+## Gherkin step failures
+
+- A scenario stops at its first step that fails. Its failure has the payload `types.StepFailure(keyword:, text:, file:, line:, cause:)`: the step as the feature writes it, the path of the `.feature` file (`None` for an inline feature or `parser.parse_string`), the line of the step (`None` for an inline step), and the payload of the failure inside the step.
+- The reporters print `Step: <keyword> <text>` after the operator, with ` (<file>:<line>)`, ` (line N)` or nothing after it. In an Examples row, the text has the values of the row.
+- A check that fails keeps its matcher as the operator, for example `be_equal`, and its message and values. A step function that returns `Error(message)`, an undefined step and a step that starts with `And`, `But` or `*` with no step before it give the operator `step`. A step function that crashes gives the operator `crash`, with the crash reason as the message.
+- A failure that is not in one step, such as a duplicate step definition, has no `Step:` line. A scenario that times out fails with `timeout` and no step.
+- The JSON report has the step as a `step` object with `keyword`, `text`, `file` and `line`, before the fields of the failure inside the step.
 
 ## Gherkin parse errors
 

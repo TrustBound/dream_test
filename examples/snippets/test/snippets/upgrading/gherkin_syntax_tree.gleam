@@ -22,6 +22,7 @@ pub fn tests() {
         text: "I have 1 item",
         doc_string: None,
         data_table: None,
+        line: None,
       )
       |> should
       |> be_equal(Step(
@@ -29,6 +30,7 @@ pub fn tests() {
         text: "I have 1 item",
         doc_string: None,
         data_table: None,
+        line: None,
       ))
       |> or_fail_with("expected Step to be constructible")
     }),
@@ -39,6 +41,7 @@ pub fn tests() {
           text: "I have 1 item",
           doc_string: None,
           data_table: None,
+          line: None,
         )
       let scenario =
         Scenario(
@@ -80,6 +83,7 @@ pub fn tests() {
           text: "I have <count> items",
           doc_string: None,
           data_table: None,
+          line: None,
         )
       let examples =
         Examples(

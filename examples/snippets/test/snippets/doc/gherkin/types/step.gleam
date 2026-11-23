@@ -9,6 +9,7 @@ pub fn step_holds_its_text() -> Result(dream_types.AssertionResult, String) {
     text: "I have 1 item",
     doc_string: None,
     data_table: None,
+    line: None,
   )
   |> should
   |> be_equal(Step(
@@ -16,6 +17,7 @@ pub fn step_holds_its_text() -> Result(dream_types.AssertionResult, String) {
     text: "I have 1 item",
     doc_string: None,
     data_table: None,
+    line: None,
   ))
   |> or_fail_with("expected Step to be constructible")
 }

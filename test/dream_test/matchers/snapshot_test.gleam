@@ -122,6 +122,38 @@ pub fn tests() {
       |> or_fail_with("match_snapshot should report the mismatch")
     }),
 
+    it(
+      "match_snapshot reports the texts it compared, with no final newline",
+      fn() {
+        // Arrange
+        let path = "./test/tmp/snapshots/match_snapshot_compared_texts.snap"
+        let _ = file.write(path, "a\nb\n")
+
+        // Act
+        let result =
+          "a\nc\n"
+          |> should
+          |> snapshot.match_snapshot(path)
+
+        // Assert
+        result
+        |> should
+        |> be_equal(
+          MatchFailed(AssertionFailure(
+            operator: "match_snapshot",
+            message: "",
+            payload: Some(SnapshotFailure(
+              actual: "a\nc",
+              expected: "a\nb",
+              snapshot_path: path,
+              is_missing: False,
+            )),
+          )),
+        )
+        |> or_fail_with("the payload should hold the compared texts")
+      },
+    ),
+
     it("match_snapshot reports a snapshot path it cannot read", fn() {
       let path = "./test/tmp/snapshots/match_snapshot_directory.snap"
       let _ = file.write(path <> "/inner.txt", "")

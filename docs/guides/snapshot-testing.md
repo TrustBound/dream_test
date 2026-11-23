@@ -22,7 +22,7 @@ In this guide you'll:
 
 - Snapshot a rendered receipt as text, and a list as its Gleam form.
 - Read the snapshot files the first run writes.
-- Change the receipt and read the failure, with the old and the new text.
+- Change the receipt and read the failure: a line diff of the old and the new text.
 - Update the snapshot after a change you meant.
 - Check that a missing snapshot can't make CI pass without checking anything.
 
@@ -161,13 +161,12 @@ Receipt
     match_snapshot
       Message: the receipt should match the snapshot
       Snapshot: ./test/snapshots/guide_receipt.snap
-      Expected: coffee...... 3.50
-croissant... 2.75
-TOTAL 6.25
-      Actual:   coffee...... 3.50
-croissant... 2.95
-TOTAL 6.45
-
+      Diff (- expected, + actual):
+          coffee...... 3.50
+        - croissant... 2.75
+        - TOTAL 6.25
+        + croissant... 2.95
+        + TOTAL 6.45
 
 Failures:
 Receipt
@@ -175,18 +174,19 @@ Receipt
     match_snapshot
       Message: the receipt should match the snapshot
       Snapshot: ./test/snapshots/guide_receipt.snap
-      Expected: coffee...... 3.50
-croissant... 2.75
-TOTAL 6.25
-      Actual:   coffee...... 3.50
-croissant... 2.95
-TOTAL 6.45
-
+      Diff (- expected, + actual):
+          coffee...... 3.50
+        - croissant... 2.75
+        - TOTAL 6.25
+        + croissant... 2.95
+        + TOTAL 6.45
 
 Summary: 1 run, 1 failed, 0 passed in 0ms
 ```
 
-The failure names the snapshot file, then shows the text of the file under `Expected` and the new text under `Actual`. Each text starts on the line of its label and goes on at the start of the next lines, so compare them line by line: here the second and third lines differ.
+The failure names the snapshot file, then shows a line diff of the text of the file against the new text. A line that starts with `-` is in the snapshot only, a line that starts with `+` is in the new text only, and a line that starts with two spaces is in both. Here the second and third lines changed.
+
+The diff shows the lines around each change and hides the rest: a run of more than 3 unchanged lines away from a change shows as one `... N unchanged lines` line, and a long diff stops after 100 lines with `... N more lines of the diff`. A changed line shows its trailing spaces as `·`, tabs as `→` and carriage returns as `␍`, so a change of whitespace only is visible too. The snapshot comparison ignores newlines at the end of both texts, so the diff never shows them. A snapshot of one line keeps the `Expected:` and `Actual:` lines. `bdd.color()` shows the `-` lines in green and the `+` lines in red.
 
 Now decide. If the change is a bug, fix the code. If you meant it, update the snapshot.
 

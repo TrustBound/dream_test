@@ -6,6 +6,7 @@ import dream_test/runner
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{describe, it}
 import snippets/guides/gherkin_cart_steps
+import snippets/guides/gherkin_file_failures
 import snippets/guides/gherkin_step_tests
 import snippets/readme/gherkin_inline
 import snippets_outputs
@@ -40,6 +41,17 @@ pub fn tests() -> TestSuite {
       |> should
       |> be_equal(snippets_outputs.expected("guide_gherkin_failures"))
       |> or_fail_with("expected test/outputs/guide_gherkin_failures.txt")
+    }),
+    it("each failure of a feature file names its step and line", fn() {
+      // Act
+      let report =
+        gherkin_report([gherkin_file_failures.failing_feature_file()])
+
+      // Assert
+      Ok(report)
+      |> should
+      |> be_equal(snippets_outputs.expected("guide_gherkin_file_failures"))
+      |> or_fail_with("expected test/outputs/guide_gherkin_file_failures.txt")
     }),
     it("the step tests pass", fn() {
       // Act

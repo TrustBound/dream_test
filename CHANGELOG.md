@@ -161,6 +161,16 @@ store. This release has breaking changes. Read
   `reporters/types.HookKind`, `reporters/types.HookOutcome` and
   `progress.handle_event`. `progress.render` takes a
   `progress.ProgressEvent`.
+- `types.FailurePayload` has the new variant
+  `StepFailure(keyword:, text:, file:, line:, cause:)`. A failure in a
+  Gherkin step has it as its payload, with the payload of the failure
+  inside the step as `cause`, so a `case` on a `FailurePayload` needs a
+  branch for it, and the payload of a failed check in a scenario is a
+  `StepFailure`, not the matcher payload itself. The JSON report gives
+  the step as a `step` object before the fields of `cause`.
+- A failure whose expected or actual text has more than one line, such
+  as a changed snapshot, shows a line diff in the BDD and Gherkin reports
+  in place of the `Expected:` and `Actual:` lines.
 
 #### Gherkin step definitions
 
@@ -266,7 +276,9 @@ store. This release has breaking changes. Read
 - `gherkin/types.Feature` has a new field, `rules: List(Rule)`.
 - `gherkin/types.Step` holds `doc_string: Option(DocString)` and
   `data_table: Option(DataTable)` in place of
-  `argument: Option(StepArgument)`. The `StepArgument` type is removed.
+  `argument: Option(StepArgument)`, and the new field
+  `line: Option(Int)`, the line of the step that the parser read (`None`
+  for an inline step). The `StepArgument` type is removed.
 - `gherkin/types.StepKeyword` has a new variant, `Asterisk`.
 - `gherkin/types.resolve_keyword` is removed. Use
   `gherkin/types.resolve_phase`.
@@ -351,6 +363,43 @@ the guide labels them.
   `dream_test/context` are removed.
 
 ### Added
+
+- **Line diffs in failure reports** (`dream_test/reporters/diff`)
+
+  - A failure whose expected or actual text has more than one line, or
+    whose two texts differ only in whitespace at their ends, shows as a
+    line diff in the BDD report (full and failures-only) and the Gherkin
+    report: `Diff (- expected, + actual):`, then `- ` for a line of the
+    expected text only, `+ ` for a line of the actual text only, and two
+    spaces for a line in both, indented under the failure. A value of one
+    line keeps the `Expected:` and `Actual:` lines
+  - The diff is a longest common subsequence of the lines after the
+    common first and last lines. When the other lines make more than
+    1,000,000 pairs, they show as removed, then added, with a note
+  - Same lines more than 3 lines from a change show as one
+    `... N unchanged lines` line, and at most 100 diff lines show, then
+    `... N more lines of the diff`
+  - A changed line shows trailing spaces as `·`, tabs as `→` and carriage
+    returns as `␍`. `\ No newline at end of text` marks a last line that
+    has no newline when the other text has one
+  - With colour, `-` lines are green and `+` lines are red, as the
+    `Expected` and `Actual` values. The `-` and `+` marks keep the text
+    clear with no colour
+  - `diff.lines`, `diff.format` and `diff.should_diff` give the diff to a
+    reporter of your own. The JSON report keeps the whole `expected` and
+    `actual` texts and has no diff
+
+- **The failed step in Gherkin reports** (`dream_test/gherkin/steps`)
+
+  - A failure in a Gherkin step names the step: the BDD and Gherkin
+    reports print `Step: <keyword> <text>` after the operator, with
+    ` (<file>:<line>)` for a `.feature` file and ` (line N)` for
+    `parser.parse_string`, for example
+    `Step: Then I should have 5 items total (test/cart.feature:5)`
+  - A failed check, an `Error` from a step function, an undefined step
+    and a step that crashes read alike. A crash in a step function stops
+    the scenario at that step with the operator `crash`; before, the
+    whole scenario crashed and no step was named
 
 - **Suites with different contexts in one run** (`dream_test/suite`)
 
@@ -774,6 +823,13 @@ the guide labels them.
 
 ### Fixed
 
+- The failure of a changed snapshot holds the two texts that
+  `match_snapshot` compared, both with no newlines at their ends. Before,
+  its `actual` kept the newlines at the end of the value, so the report
+  showed a difference that the comparison ignores.
+- A failure in the Gherkin report shows the details of a snapshot
+  failure. Before, it showed only the `Expected` and `Actual` of
+  `be_equal`.
 - A number with a comma, such as `1,000` or `1,5`, does not match
   `{float}`. Before, `total 1,000` matched `total {float}` with the value
   `1.0`, and `1,5` gave `1.5`.

@@ -95,8 +95,8 @@ import dream_test/types.{
   type Status, type TestKind, type TestResult, BooleanFailure, CollectionFailure,
   ComparisonFailure, CustomMatcherFailure, EqualityFailure, Failed,
   GherkinScenario, OptionFailure, Passed, Pending, ResultFailure, SetupFailed,
-  SetupStopped, Skipped, SnapshotFailure, StringMatchFailure, TeardownFailed,
-  TimedOut, Unit,
+  SetupStopped, Skipped, SnapshotFailure, StepFailure, StringMatchFailure,
+  TeardownFailed, TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -545,6 +545,18 @@ fn build_payload_fields(
     Some(CustomMatcherFailure(actual, description)) -> [
       #("actual", json.string(actual)),
       #("description", json.string(description)),
+    ]
+    Some(StepFailure(keyword:, text:, file:, line:, cause:)) -> [
+      #(
+        "step",
+        json.object([
+          #("keyword", json.string(keyword)),
+          #("text", json.string(text)),
+          #("file", json.nullable(file, json.string)),
+          #("line", json.nullable(line, json.int)),
+        ]),
+      ),
+      ..build_payload_fields(cause)
     ]
   }
 }

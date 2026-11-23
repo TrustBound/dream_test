@@ -44,6 +44,7 @@ Feature: Demo
                       text: "a thing",
                       doc_string: None,
                       data_table: None,
+                      line: Some(5),
                     ),
                   ],
                   examples: [],
@@ -176,14 +177,14 @@ Scenario: S
         parser.parse_string("Feature: F\r\n  Scenario: S\r\n    Given a\r\n")
         |> result.map(first_scenario_steps)
         |> should
-        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None)]))
+        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None, Some(3))]))
         |> or_fail_with("expected the step text without a carriage return")
       }),
       it("parse_string reads a file without a final newline", fn() {
         parser.parse_string("\nFeature: F\n  Scenario: S\n    Given a")
         |> result.map(first_scenario_steps)
         |> should
-        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None)]))
+        |> be_equal(Ok([gtypes.Step(gtypes.Given, "a", None, None, Some(4))]))
         |> or_fail_with("expected the last step")
       }),
       it("parse_string skips comments between steps", fn() {
@@ -194,8 +195,8 @@ Scenario: S
         |> should
         |> be_equal(
           Ok([
-            gtypes.Step(gtypes.Given, "a", None, None),
-            gtypes.Step(gtypes.Then, "b", None, None),
+            gtypes.Step(gtypes.Given, "a", None, None, Some(3)),
+            gtypes.Step(gtypes.Then, "b", None, None, Some(5)),
           ]),
         )
         |> or_fail_with("expected two steps")
@@ -213,6 +214,7 @@ Scenario: S
               "a",
               None,
               Some(gtypes.DataTable([["a|b", "c\\d", "e\nf", "\\x"]])),
+              Some(3),
             ),
           ]),
         )
@@ -266,7 +268,7 @@ Scenario: S
               gtypes.Background(
                 name: "Setup",
                 description: Some("    Some words"),
-                steps: [gtypes.Step(gtypes.Given, "a", None, None)],
+                steps: [gtypes.Step(gtypes.Given, "a", None, None, Some(4))],
               ),
             ),
           ),
@@ -295,7 +297,7 @@ Scenario: S
               tags: ["slow"],
               background: Some(
                 gtypes.Background(name: "", description: None, steps: [
-                  gtypes.Step(gtypes.Given, "stock", None, None),
+                  gtypes.Step(gtypes.Given, "stock", None, None, Some(6)),
                 ]),
               ),
               scenarios: [
@@ -304,7 +306,9 @@ Scenario: S
                   name: "Sell",
                   description: None,
                   tags: [],
-                  steps: [gtypes.Step(gtypes.When, "I sell", None, None)],
+                  steps: [
+                    gtypes.Step(gtypes.When, "I sell", None, None, Some(8)),
+                  ],
                   examples: [],
                 ),
               ],
@@ -567,6 +571,7 @@ Scenario: S
               "a",
               None,
               Some(gtypes.DataTable([["x", "", "y"]])),
+              Some(3),
             ),
           ]),
         )
@@ -591,6 +596,7 @@ Scenario: S
               "a",
               Some(gtypes.DocString("{}", Some("json"))),
               None,
+              Some(3),
             ),
           ]),
         )
@@ -707,6 +713,7 @@ Scenario: S
                 "text",
                 Some(gtypes.DocString("hello", None)),
                 Some(gtypes.DataTable([["a"]])),
+                Some(3),
               ),
             ]),
           )
@@ -735,6 +742,7 @@ Scenario: S
                 "text",
                 Some(gtypes.DocString("hello", None)),
                 Some(gtypes.DataTable([["a"]])),
+                Some(3),
               ),
             ]),
           )
@@ -871,6 +879,7 @@ Scenario: S
                 "text",
                 Some(gtypes.DocString("  deeper\nshallow\na \"\"\" b", None)),
                 None,
+                Some(3),
               ),
             ]),
           )
@@ -896,6 +905,7 @@ Scenario: S
               "text",
               Some(gtypes.DocString("a ``` b ``` c", None)),
               None,
+              Some(3),
             ),
           ]),
         )

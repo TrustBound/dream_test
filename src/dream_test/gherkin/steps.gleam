@@ -22,6 +22,16 @@
 //// The state is an immutable value, so two scenarios cannot share it, and
 //// nothing needs cleanup after a scenario.
 ////
+//// ## When a step fails
+////
+//// A scenario stops at its first step that fails: a check that fails, an
+//// `Error` from a step function, an undefined step, or a crash in a step
+//// function (the operator `crash`). The failure has the payload
+//// `types.StepFailure`, which names the step, its `.feature` file and its
+//// line when the parser read them, and holds the payload of the failure
+//// inside the step as `cause`. The reporters print the step on a `Step:`
+//// line.
+////
 //// ## Example
 ////
 //// ### Register cart steps <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/steps/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
@@ -109,6 +119,7 @@ import dream_test/gherkin/step_trie.{
 import dream_test/gherkin/types.{
   type StepPhase, GivenPhase, ThenPhase, WhenPhase,
 }
+import dream_test/sandbox
 import dream_test/suite.{type TestSuite}
 import dream_test/types as dream_types
 import gleam/float
@@ -1390,7 +1401,15 @@ fn scenario_node(
       rule: scope.rule_group,
     ),
     run: dream_types.WithInput(fn(start) {
-      execute_scenario(scenario_id, all_steps, registry, start)
+      execute_scenario(
+        ScenarioExecution(
+          scenario_id: scenario_id,
+          source: scope.source,
+          registry: registry,
+        ),
+        all_steps,
+        start,
+      )
     }),
     timeout_ms: None,
     source: scope.source,
@@ -1516,6 +1535,7 @@ fn substitute_step(
     text: substitute_placeholders(step.text, substitutions),
     doc_string: substitute_doc_string(step.doc_string, substitutions),
     data_table: substitute_data_table(step.data_table, substitutions),
+    line: step.line,
   )
 }
 
@@ -1603,37 +1623,36 @@ fn substitute_placeholders(
 // ============================================================================
 
 fn execute_scenario(
-  scenario_id: String,
+  execution: ScenarioExecution(state),
   steps: List(types.Step),
-  registry: StepRegistry(state),
   start: state,
 ) -> Result(dream_types.AssertionResult, String) {
-  case validate(registry) {
-    Ok(Nil) -> Ok(resolve_and_execute(scenario_id, steps, registry, start))
+  case validate(execution.registry) {
+    Ok(Nil) -> Ok(resolve_and_execute(execution, steps, start))
     Error(message) -> Ok(step_failure(message))
   }
 }
 
 fn resolve_and_execute(
-  scenario_id: String,
+  execution: ScenarioExecution(state),
   steps: List(types.Step),
-  registry: StepRegistry(state),
   start: state,
 ) -> dream_types.AssertionResult {
   case resolve_phases(steps, None, []) {
-    Ok(phased_steps) ->
-      execute_steps(
-        ScenarioExecution(scenario_id: scenario_id, registry: registry),
-        phased_steps,
-        start,
-      )
-    Error(message) -> step_failure(message)
+    Ok(phased_steps) -> execute_steps(execution, phased_steps, start)
+    Error(#(step, message)) ->
+      in_step(step_failure(message), execution.source, step)
   }
 }
 
-/// The data that stays the same for every step of one scenario.
+/// The data that stays the same for every step of one scenario. `source`
+/// is the path of the `.feature` file, when the scenario came from one.
 type ScenarioExecution(state) {
-  ScenarioExecution(scenario_id: String, registry: StepRegistry(state))
+  ScenarioExecution(
+    scenario_id: String,
+    source: Option(String),
+    registry: StepRegistry(state),
+  )
 }
 
 /// The result of one step: run the next step with this state, or stop the
@@ -1647,7 +1666,7 @@ fn resolve_phases(
   steps: List(types.Step),
   previous: Option(types.StepPhase),
   phased_newest_first: List(#(types.Step, types.StepPhase)),
-) -> Result(List(#(types.Step, types.StepPhase)), String) {
+) -> Result(List(#(types.Step, types.StepPhase)), #(types.Step, String)) {
   case steps {
     [] -> Ok(list.reverse(phased_newest_first))
     [step, ..rest] ->
@@ -1660,11 +1679,11 @@ fn resolve_step_phase(
   rest: List(types.Step),
   previous: Option(types.StepPhase),
   phased_newest_first: List(#(types.Step, types.StepPhase)),
-) -> Result(List(#(types.Step, types.StepPhase)), String) {
+) -> Result(List(#(types.Step, types.StepPhase)), #(types.Step, String)) {
   case types.resolve_phase(step.keyword, previous) {
     Ok(phase) ->
       resolve_phases(rest, Some(phase), [#(step, phase), ..phased_newest_first])
-    Error(Nil) -> Error(no_previous_step_message(step))
+    Error(Nil) -> Error(#(step, no_previous_step_message(step)))
   }
 }
 
@@ -1718,16 +1737,84 @@ fn execute_step(
       )
     Error(message) -> Stop(step_failure(message))
   }
+  |> located(execution.source, step)
 }
 
+/// Run a step definition. A crash of the step function stops the scenario
+/// with the operator `crash`, so the failure can name the step.
 fn run_definition(
   definition: StepDefinition(state),
   context: StepContext,
   state: state,
 ) -> StepOutcome(state) {
-  case definition {
-    Action(run) -> action_outcome(run(state, context))
-    Check(run) -> check_outcome(run(state, context), state)
+  case
+    sandbox.run_catching(
+      call_definition,
+      DefinitionCall(definition, context, state),
+    )
+  {
+    Ok(outcome) -> outcome
+    Error(reason) ->
+      Stop(
+        dream_types.AssertionFailed(dream_types.AssertionFailure(
+          operator: "crash",
+          message: reason,
+          payload: None,
+        )),
+      )
+  }
+}
+
+/// A step definition with the context and the state to call it with.
+type DefinitionCall(state) {
+  DefinitionCall(
+    definition: StepDefinition(state),
+    context: StepContext,
+    state: state,
+  )
+}
+
+fn call_definition(call: DefinitionCall(state)) -> StepOutcome(state) {
+  case call.definition {
+    Action(run) -> action_outcome(run(call.state, call.context))
+    Check(run) -> check_outcome(run(call.state, call.context), call.state)
+  }
+}
+
+/// The outcome with the step named in its failure, if it failed.
+fn located(
+  outcome: StepOutcome(state),
+  source: Option(String),
+  step: types.Step,
+) -> StepOutcome(state) {
+  case outcome {
+    Stop(result) -> Stop(in_step(result, source, step))
+    Continue(_) -> outcome
+  }
+}
+
+/// A failed result with the step in its payload: a `StepFailure` that holds
+/// the payload of the failure. Other results stay the same.
+fn in_step(
+  result: dream_types.AssertionResult,
+  source: Option(String),
+  step: types.Step,
+) -> dream_types.AssertionResult {
+  case result {
+    dream_types.AssertionFailed(failure) ->
+      dream_types.AssertionFailed(
+        dream_types.AssertionFailure(
+          ..failure,
+          payload: Some(dream_types.StepFailure(
+            keyword: types.keyword_to_string(step.keyword),
+            text: step.text,
+            file: source,
+            line: step.line,
+            cause: failure.payload,
+          )),
+        ),
+      )
+    _ -> result
   }
 }
 

@@ -22,7 +22,7 @@ pub fn tests() -> TestSuite {
       |> be_equal(snippets_outputs.expected("guide_snapshot_first"))
       |> or_fail_with("expected test/outputs/guide_snapshot_first.txt")
     }),
-    it("a changed receipt fails with both texts", fn() {
+    it("a changed receipt fails with a line diff", fn() {
       // Act
       let report =
         snippets_outputs.bdd_report([snapshot_changed.changed_receipt_tests()])

@@ -900,7 +900,13 @@ fn parse_steps(
   case skip_ignored(stream) {
     Next(Token(kind: StepToken(keyword, text), line: line, ..), rest) ->
       check_first_step(
-        Step(keyword: keyword, text: text, doc_string: None, data_table: None),
+        Step(
+          keyword: keyword,
+          text: text,
+          doc_string: None,
+          data_table: None,
+          line: Some(line),
+        ),
         line,
         has_previous_step || steps_newest_first != [],
       )

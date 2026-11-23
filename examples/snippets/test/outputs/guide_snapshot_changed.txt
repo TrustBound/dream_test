@@ -3,13 +3,12 @@ Receipt
     match_snapshot
       Message: the receipt should match the snapshot
       Snapshot: ./test/snapshots/guide_receipt.snap
-      Expected: coffee...... 3.50
-croissant... 2.75
-TOTAL 6.25
-      Actual:   coffee...... 3.50
-croissant... 2.95
-TOTAL 6.45
-
+      Diff (- expected, + actual):
+          coffee...... 3.50
+        - croissant... 2.75
+        - TOTAL 6.25
+        + croissant... 2.95
+        + TOTAL 6.45
 
 Failures:
 Receipt
@@ -17,12 +16,11 @@ Receipt
     match_snapshot
       Message: the receipt should match the snapshot
       Snapshot: ./test/snapshots/guide_receipt.snap
-      Expected: coffee...... 3.50
-croissant... 2.75
-TOTAL 6.25
-      Actual:   coffee...... 3.50
-croissant... 2.95
-TOTAL 6.45
-
+      Diff (- expected, + actual):
+          coffee...... 3.50
+        - croissant... 2.75
+        - TOTAL 6.25
+        + croissant... 2.95
+        + TOTAL 6.45
 
 Summary: 1 run, 1 failed, 0 passed in 0ms

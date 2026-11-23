@@ -61,6 +61,7 @@ pub fn tests() {
           text: "a step",
           doc_string: None,
           data_table: None,
+          line: None,
         )
       Ok(test_types.AssertionOk)
     }),

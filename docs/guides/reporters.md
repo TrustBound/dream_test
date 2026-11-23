@@ -118,6 +118,8 @@ Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 
 The marks: `✓` passed, `✗` failed, `!` timed out, `⚠` setup failed, `-` skipped and `~` pending. The summary line counts each status, and shows a count only when it isn't 0, in this order after `passed`: skipped, pending, timed out, setup failed, teardown failed, setup stopped.
 
+A failure whose expected or actual text has more than one line, such as a snapshot, shows a line diff in place of `Expected:` and `Actual:`: a line that starts with `-` is in the expected text only, and a line that starts with `+` is in the actual text only. [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md) shows one. A failure in a Gherkin step has a `Step:` line that names the step, before the message.
+
 With `bdd.color()`, the marks and the summary get ANSI colours. Leave colour off when the output goes to a file or a tool that doesn't read ANSI codes.
 
 ## Step 2: Make the report short for CI
@@ -250,8 +252,9 @@ What each key holds:
 | `duration_ms` | The sum of the test durations. |
 | `system` | `os`, `otp_version`, and `gleam_stdlib_version`, the version of the `gleam_stdlib` package the tests ran with, or `"unknown"` when that application isn't loaded. The Gleam compiler version isn't in the report, because the compiled code doesn't record it. |
 | `summary` | The counts by status: `total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`, then `teardown_failed`, the teardown hooks that failed, and `setup_stopped`, the setups whose process stopped. |
-| `tests` | One object for each test: `name`, `full_name` (the group names, then the test name), `status`, `duration_ms`, `tags`, `kind` and `failures`. Each failure has `operator` and `message`, plus the details of its kind, such as `expected` and `actual`. |
+| `tests` | One object for each test: `name`, `full_name` (the group names, then the test name), `status`, `duration_ms`, `tags`, `kind` and `failures`. Each failure has `operator` and `message`, plus the details of its kind, such as `expected` and `actual`. The `expected` and `actual` texts are whole: the JSON report has no diff. |
 | `tests[].kind` | `"unit"`, or `"gherkin:<scenario id>"` for a scenario. The scenario id ends with a number that changes between runs, so compare Gherkin tests by `full_name`, not by `kind`. |
+| `tests[].failures[].step` | Only on a failure in a Gherkin step: `keyword` and `text`, the step as the feature writes it, `file`, the path of the `.feature` file or `null`, and `line`, the line of the step or `null` for an inline step. The details of the failure inside the step, such as `expected` and `actual`, follow it. |
 | `tests[].feature`, `tests[].rule` | Only on a Gherkin test, after `kind`. `feature` is the name of its Feature, or `null` for a scenario in no Feature group. `rule` is the name of its Rule group, such as `"Rule: Stock"`, or `null` outside a Rule. |
 | `hook_failures` | One object for each teardown hook that failed and each setup that stopped, in the order they happened, each with `kind`, `hook`, `path` and `message`. |
 
@@ -407,6 +410,7 @@ The formatters of the built-in reporters are plain functions, so you can use the
 - `progress.line(progress.new(), event)` and `progress.render(columns, event)` give the text of the progress line for one `progress.ProgressEvent`, for a runner of your own.
 - `bdd.format_incremental(result, previous_path)` and `bdd.format_incremental_with_test_indent` print one result at a time, with the group lines it needs, for a reporter that prints while the run goes. `bdd.format_incremental_parts_with_test_indent` gives the group lines and the test line apart.
 - `gherkin.format(report)` and `gherkin.report(report, write)` give the Gherkin report. `gherkin.format_scenarios(results)` formats a list of results, and `gherkin.is_gherkin_result(result)` tells a scenario from a unit test.
+- `diff.lines(expected:, actual:)` gives the line diff of two texts as `diff.DiffLine` values, `diff.format(expected:, actual:, indent:, color:)` gives it as the text that the BDD and Gherkin reporters show, and `diff.should_diff(expected:, actual:)` tells when they show it. A failure in a Gherkin step has the payload `types.StepFailure`, with the step, its file and line, and the payload of the failure inside it as `cause`.
 - `summary.format(report)` and `summary.format_in_color(report)` give the summary line alone, and `hook_failures.format(types.report_hook_failures(report))` and `hook_failures.format_in_color` the `Setup and teardown failures:` section.
 
 ## Test your code

@@ -128,6 +128,7 @@ pub fn tests() {
           text: "the server is running",
           doc_string: None,
           data_table: None,
+          line: None,
         ),
       ])
       |> or_fail_with(

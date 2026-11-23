@@ -1,3 +1,4 @@
+import dream_test/file
 import dream_test/gherkin/feature as gfeature
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps
@@ -412,7 +413,13 @@ pub fn tests() {
           test_types.AssertionFailure(
             operator: "step",
             message: "Undefined step: Given missing",
-            payload: None,
+            payload: Some(test_types.StepFailure(
+              keyword: "Given",
+              text: "missing",
+              file: None,
+              line: None,
+              cause: None,
+            )),
           ),
         ],
       ])
@@ -442,11 +449,162 @@ pub fn tests() {
           test_types.AssertionFailure(
             operator: "step",
             message: "boom",
-            payload: None,
+            payload: Some(test_types.StepFailure(
+              keyword: "Given",
+              text: "it breaks",
+              file: None,
+              line: None,
+              cause: None,
+            )),
           ),
         ],
       ])
       |> or_fail_with("a handler Error should fail the scenario")
+    }),
+
+    it("a failed check names its step and keeps the matcher failure", fn() {
+      // Arrange
+      let suite =
+        gfeature.feature("F", counter_registry(), [
+          gfeature.scenario("S", [
+            gfeature.given("the count is 3"),
+            gfeature.then("the count should be 5"),
+          ]),
+        ])
+
+      // Act
+      let failures = list.flat_map(run_suites([suite]), result_failures)
+
+      // Assert
+      failures
+      |> should
+      |> be_equal([
+        test_types.AssertionFailure(
+          operator: "be_equal",
+          message: "the count should match",
+          payload: Some(test_types.StepFailure(
+            keyword: "Then",
+            text: "the count should be 5",
+            file: None,
+            line: None,
+            cause: Some(test_types.EqualityFailure(actual: "3", expected: "5")),
+          )),
+        ),
+      ])
+      |> or_fail_with("the check failure should name its step")
+    }),
+
+    it("a check that returns pending stops the scenario as pending", fn() {
+      // Arrange
+      let registry =
+        steps.new(initial: Nil)
+        |> steps.then("it is not written yet", gherkin_check_pending)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.then("it is not written yet")]),
+        ])
+
+      // Act
+      let statuses = list.map(run_suites([suite]), result_status)
+
+      // Assert
+      statuses
+      |> should
+      |> be_equal([test_types.Pending])
+      |> or_fail_with("a pending check should make the scenario pending")
+    }),
+
+    it("a step that crashes fails with crash and names its step", fn() {
+      // Arrange
+      let registry =
+        steps.new(initial: Nil)
+        |> steps.given("it blows up", gherkin_step_crash)
+      let suite =
+        gfeature.feature("F", registry, [
+          gfeature.scenario("S", [gfeature.given("it blows up")]),
+        ])
+
+      // Act
+      let failures = list.flat_map(run_suites([suite]), result_failures)
+
+      // Assert
+      list.map(failures, crash_summary)
+      |> should
+      |> be_equal([
+        #(
+          "crash",
+          True,
+          Some(test_types.StepFailure(
+            keyword: "Given",
+            text: "it blows up",
+            file: None,
+            line: None,
+            cause: None,
+          )),
+        ),
+      ])
+      |> or_fail_with("the crash should name its step")
+    }),
+
+    it("a parsed step names its line, also in a Background", fn() {
+      // Act
+      let failures =
+        run_parsed(
+          "Feature: F\n  Background:\n    Given missing\n  Scenario: S\n    Then x\n",
+          steps.new(initial: Nil),
+        )
+        |> list.flat_map(result_failures)
+
+      // Assert
+      failures
+      |> should
+      |> be_equal([
+        test_types.AssertionFailure(
+          operator: "step",
+          message: "Undefined step: Given missing",
+          payload: Some(test_types.StepFailure(
+            keyword: "Given",
+            text: "missing",
+            file: None,
+            line: Some(3),
+            cause: None,
+          )),
+        ),
+      ])
+      |> or_fail_with("the Background step should name line 3")
+    }),
+
+    it("a step of a feature file names the file and the line", fn() {
+      // Arrange
+      let path = "test/tmp/features/step_place.feature"
+      let _ =
+        file.write(
+          path,
+          "Feature: F\n\n  Scenario Outline: S\n    When I add <n>\n    Examples:\n      | n |\n      | 2 |\n",
+        )
+
+      // Act
+      let failures =
+        run_file_at(path, steps.new(initial: Nil))
+        |> list.flat_map(result_failures)
+
+      // Assert
+      failures
+      |> should
+      |> be_equal([
+        test_types.AssertionFailure(
+          operator: "step",
+          message: "Undefined step: When I add 2",
+          payload: Some(test_types.StepFailure(
+            keyword: "When",
+            text: "I add 2",
+            file: Some(path),
+            line: Some(4),
+            cause: None,
+          )),
+        ),
+      ])
+      |> or_fail_with("the step should name the file and line 4")
     }),
 
     it("a scenario fails with the message of a capture error", fn() {
@@ -657,7 +815,13 @@ pub fn tests() {
           test_types.AssertionFailure(
             operator: "step",
             message: "\"And a base\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
-            payload: None,
+            payload: Some(test_types.StepFailure(
+              keyword: "And",
+              text: "a base",
+              file: None,
+              line: None,
+              cause: None,
+            )),
           ),
         ],
       ])
@@ -686,7 +850,13 @@ pub fn tests() {
           test_types.AssertionFailure(
             operator: "step",
             message: "\"But a base\" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.",
-            payload: None,
+            payload: Some(test_types.StepFailure(
+              keyword: "But",
+              text: "a base",
+              file: None,
+              line: None,
+              cause: None,
+            )),
           ),
         ],
       ])
@@ -1274,4 +1444,43 @@ fn without_number(id: String) -> String {
   let parts = string.split(id, "#")
   list.take(parts, list.length(parts) - 1)
   |> string.join("#")
+}
+
+/// The operator, whether the message has the panic text, and the payload.
+fn crash_summary(
+  failure: test_types.AssertionFailure,
+) -> #(String, Bool, option.Option(test_types.FailurePayload)) {
+  #(
+    failure.operator,
+    string.contains(failure.message, "the step blew up"),
+    failure.payload,
+  )
+}
+
+fn gherkin_step_crash(
+  _state: Nil,
+  _context: steps.StepContext,
+) -> Result(Nil, String) {
+  panic as "the step blew up"
+}
+
+fn run_file_at(
+  path: String,
+  registry: steps.StepRegistry(Nil),
+) -> List(test_types.TestResult) {
+  case parser.parse_file(path) {
+    Ok(feature) ->
+      runner.new([steps.feature_suite(registry: registry, feature: feature)])
+      |> runner.silent
+      |> runner.run()
+      |> test_types.report_tests
+    Error(_) -> []
+  }
+}
+
+fn gherkin_check_pending(
+  _state: Nil,
+  _context: steps.StepContext,
+) -> Result(test_types.AssertionResult, String) {
+  Ok(test_types.AssertionPending)
 }

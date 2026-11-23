@@ -29,7 +29,7 @@ In this guide you'll:
 - Run the same feature from a `.feature` file, then every `.feature` file of a folder.
 - Use a Background, Rules and Examples tables, and see the test names they give.
 - Start a server once for all scenarios, and run it next to other suites.
-- Read the report of a failing check, an undefined step and a parse error.
+- Read the report of a failing check, an undefined step, a step that crashes and a parse error, with the step and its line.
 - Test your step functions on their own.
 
 ## Before you start
@@ -665,17 +665,90 @@ pub fn failing_feature() -> TestSuite {
 Feature: Shopping Cart
   Scenario: Adding items ✗
       ✗ be_equal
+        Step: Then I should have 5 items total
         Message: the cart should hold the expected number of items
         Expected: 5
         Actual:   4
   Scenario: Removing items ✗
       ✗ step
+        Step: When I remove 1 item
         Message: Undefined step: When I remove 1 item
 
 Summary: 2 run, 2 failed, 0 passed in 0ms
 ```
 
-The first scenario ran every step, and the Then check failed with the values. The second stopped at `When I remove 1 item`: no When definition matches it, so the scenario fails with `Undefined step:` and the step, and the steps after it don't run. Add the definition, or fix the text of the step.
+Each failure starts with its operator. Then the `Step:` line names the step that failed, with its keyword and text as the feature writes them. The first scenario ran every step, and the check of `Then I should have 5 items total` failed with the values. The second stopped at `When I remove 1 item`: no When definition matches it, so the scenario fails with the operator `step` and `Undefined step:` and the step, and the steps after it don't run. Add the definition, or fix the text of the step.
+
+### Find the failing step in a feature file
+
+When the scenarios come from a `.feature` file, the `Step:` line also names the file and the line of the step. This file holds the two failing scenarios, and a third scenario with a step that crashes:
+
+#### The failing feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/features/shopping_cart_failures.feature"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gherkin
+Feature: Shopping Cart
+  Scenario: Adding items
+    Given I have 3 items in my cart
+    When I add 1 more items
+    Then I should have 5 items total
+
+  Scenario: Removing items
+    Given I have 3 items in my cart
+    When I remove 1 item
+    Then I should have 2 items total
+
+  Scenario: Breaking the cart
+    Given I have 3 items in my cart
+    When the cart breaks
+    Then I should have 3 items total
+```
+
+The registry adds a When step that panics:
+
+#### Load the failing feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/gherkin_file_failures.gleam#L15-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn failing_feature_file() -> TestSuite {
+  let registry =
+    cart_steps()
+    |> steps.when("the cart breaks", break_cart)
+  let assert Ok(feature) =
+    parser.parse_file("test/features/shopping_cart_failures.feature")
+  steps.feature_suite(registry: registry, feature: feature)
+}
+
+fn break_cart(_cart: Int, _context: StepContext) -> Result(Int, String) {
+  panic as "the cart broke"
+}
+```
+
+#### The Gherkin report of the feature file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_gherkin_file_failures.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+Feature: Shopping Cart
+  Scenario: Adding items ✗
+      ✗ be_equal
+        Step: Then I should have 5 items total (test/features/shopping_cart_failures.feature:5)
+        Message: the cart should hold the expected number of items
+        Expected: 5
+        Actual:   4
+  Scenario: Removing items ✗
+      ✗ step
+        Step: When I remove 1 item (test/features/shopping_cart_failures.feature:9)
+        Message: Undefined step: When I remove 1 item
+  Scenario: Breaking the cart ✗
+      ✗ crash
+        Step: When the cart breaks (test/features/shopping_cart_failures.feature:14)
+        Message: error:#{function => <<"break_cart">>,line => 25,
+        message => <<"the cart broke">>,
+        module => <<"snippets/guides/gherkin_file_failures">>,
+        file => <<"test/snippets/guides/gherkin_file_failures.gleam">>,
+        gleam_error => panic}
+
+Summary: 3 run, 3 failed, 0 passed in 0ms
+```
+
+The three failures read alike: the operator (`be_equal` for the check, `step` for the undefined step, `crash` for the step that crashed), the step with `(<file>:<line>)`, then the message. A crash in a step stops the scenario at that step, and its message is the crash reason. An inline feature has no file, and a feature from `parser.parse_string` gives `(line N)`. The BDD reporter shows the same `Step:` line, and the JSON report has the step as a `step` object in the failure.
 
 ## When a feature doesn't parse
 

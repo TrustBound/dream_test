@@ -836,5 +836,241 @@ pub fn tests() {
           )
       }
     }),
+    group("diffs and steps", [
+      it("shows a line diff for a snapshot of more than one line", fn() {
+        // Arrange
+        let report =
+          report_of([
+            result_of(
+              ["s"],
+              "renders",
+              types.Failed,
+              [
+                failure(
+                  "the receipt should match",
+                  types.SnapshotFailure(
+                    actual: "a\nB\nc",
+                    expected: "a\nb\nc",
+                    snapshot_path: "r.snap",
+                    is_missing: False,
+                  ),
+                ),
+              ],
+              types.Unit,
+            ),
+          ])
+
+        // Act
+        let text = bdd.format(report)
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "s\n"
+          <> "  ✗ renders\n"
+          <> "    check\n"
+          <> "      Message: the receipt should match\n"
+          <> "      Snapshot: r.snap\n"
+          <> "      Diff (- expected, + actual):\n"
+          <> "          a\n"
+          <> "        - b\n"
+          <> "        + B\n"
+          <> "          c\n"
+          <> "\n"
+          <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+        )
+        |> or_fail_with("expected the diff under the snapshot path")
+      }),
+      it(
+        "shows a line diff for an equality failure of more than one line",
+        fn() {
+          // Arrange
+          let report =
+            report_of([
+              result_of(
+                ["s"],
+                "compares",
+                types.Failed,
+                [
+                  failure(
+                    "",
+                    types.EqualityFailure(actual: "x\nz", expected: "x\ny"),
+                  ),
+                ],
+                types.Unit,
+              ),
+            ])
+
+          // Act
+          let text = bdd.format(report)
+
+          // Assert
+          text
+          |> should
+          |> be_equal(
+            "s\n"
+            <> "  ✗ compares\n"
+            <> "    check\n"
+            <> "      Diff (- expected, + actual):\n"
+            <> "          x\n"
+            <> "        - y\n"
+            <> "        + z\n"
+            <> "\n"
+            <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+          )
+          |> or_fail_with("expected the diff in place of Expected and Actual")
+        },
+      ),
+      it("names the step, its file and its line before the message", fn() {
+        // Arrange
+        let report =
+          report_of([
+            result_of(
+              ["s"],
+              "checks",
+              types.Failed,
+              [
+                failure(
+                  "the total should match",
+                  types.StepFailure(
+                    keyword: "Then",
+                    text: "the total is 15.00",
+                    file: Some("test/cart.feature"),
+                    line: Some(7),
+                    cause: Some(types.EqualityFailure(
+                      actual: "14.0",
+                      expected: "15.0",
+                    )),
+                  ),
+                ),
+              ],
+              types.Unit,
+            ),
+          ])
+
+        // Act
+        let text = bdd.format(report)
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "s\n"
+          <> "  ✗ checks\n"
+          <> "    check\n"
+          <> "      Step: Then the total is 15.00 (test/cart.feature:7)\n"
+          <> "      Message: the total should match\n"
+          <> "      Expected: 15.0\n"
+          <> "      Actual:   14.0\n"
+          <> "\n"
+          <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+        )
+        |> or_fail_with("expected the step line first")
+      }),
+      it("names the step with the place that is known", fn() {
+        // Arrange
+        let step_failure = fn(file, line) {
+          failure(
+            "Undefined step: When I pay",
+            types.StepFailure(
+              keyword: "When",
+              text: "I pay",
+              file: file,
+              line: line,
+              cause: None,
+            ),
+          )
+        }
+        let report =
+          report_of([
+            result_of(
+              ["s"],
+              "pays",
+              types.Failed,
+              [
+                step_failure(None, Some(4)),
+                step_failure(Some("pay.feature"), None),
+                step_failure(None, None),
+              ],
+              types.Unit,
+            ),
+          ])
+
+        // Act
+        let text = bdd.format(report)
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "s\n"
+          <> "  ✗ pays\n"
+          <> "    check\n"
+          <> "      Step: When I pay (line 4)\n"
+          <> "      Message: Undefined step: When I pay\n"
+          <> "    check\n"
+          <> "      Step: When I pay (pay.feature)\n"
+          <> "      Message: Undefined step: When I pay\n"
+          <> "    check\n"
+          <> "      Step: When I pay\n"
+          <> "      Message: Undefined step: When I pay\n"
+          <> "\n"
+          <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+        )
+        |> or_fail_with("expected the line, the file, then no place")
+      }),
+      it("colours the step line and the diff", fn() {
+        // Arrange
+        let report =
+          report_of([
+            result_of(
+              ["s"],
+              "checks",
+              types.Failed,
+              [
+                failure(
+                  "",
+                  types.StepFailure(
+                    keyword: "Then",
+                    text: "the receipt matches",
+                    file: None,
+                    line: Some(9),
+                    cause: Some(types.SnapshotFailure(
+                      actual: "a\nc",
+                      expected: "a\nb",
+                      snapshot_path: "r.snap",
+                      is_missing: False,
+                    )),
+                  ),
+                ),
+              ],
+              types.Unit,
+            ),
+          ])
+
+        // Act
+        let text =
+          bdd.render(config(True, reporter_types.BddFailuresOnly), report)
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[31m✗\u{001B}[0m \u{001B}[31mchecks\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Step: \u{001B}[0m\u{001B}[36mThen the receipt matches (line 9)\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Snapshot: \u{001B}[0m\u{001B}[36mr.snap\u{001B}[0m\n"
+          <> "      \u{001B}[2mDiff (- expected, + actual):\u{001B}[0m\n"
+          <> "          a\n"
+          <> "        \u{001B}[32m- b\u{001B}[0m\n"
+          <> "        \u{001B}[31m+ c\u{001B}[0m\n"
+          <> "\n"
+          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m1\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m0\u{001B}[0m passed in \u{001B}[36m0ms\u{001B}[0m\n",
+        )
+        |> or_fail_with("expected the step line in cyan and the diff in colour")
+      }),
+    ]),
   ])
 }

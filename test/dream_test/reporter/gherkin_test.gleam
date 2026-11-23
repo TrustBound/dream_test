@@ -297,5 +297,182 @@ Rule: D
         |> or_fail_with("a slow scenario should show its duration")
       }),
     ]),
+    group("step failures", [
+      it("names the step, its file and its line before the message", fn() {
+        // Arrange
+        let failed =
+          types.AssertionFailure(
+            operator: "be_equal",
+            message: "the total should match",
+            payload: Some(types.StepFailure(
+              keyword: "Then",
+              text: "the total is 15.00",
+              file: Some("test/cart.feature"),
+              line: Some(7),
+              cause: Some(types.EqualityFailure(
+                actual: "14.0",
+                expected: "15.0",
+              )),
+            )),
+          )
+
+        // Act
+        let text =
+          gherkin.format_scenarios([
+            scenario(["Cart"], "totals", types.Failed, [failed]),
+          ])
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: totals ✗\n"
+          <> "      ✗ be_equal\n"
+          <> "        Step: Then the total is 15.00 (test/cart.feature:7)\n"
+          <> "        Message: the total should match\n"
+          <> "        Expected: 15.0\n"
+          <> "        Actual:   14.0\n",
+        )
+        |> or_fail_with("expected the step line first")
+      }),
+      it("names the step with the place that is known", fn() {
+        // Arrange
+        let step_failure = fn(file, line) {
+          types.AssertionFailure(
+            operator: "step",
+            message: "Undefined step: When I pay",
+            payload: Some(types.StepFailure(
+              keyword: "When",
+              text: "I pay",
+              file: file,
+              line: line,
+              cause: None,
+            )),
+          )
+        }
+
+        // Act
+        let text =
+          gherkin.format_scenarios([
+            scenario(["Cart"], "pays", types.Failed, [
+              step_failure(None, Some(4)),
+              step_failure(Some("pay.feature"), None),
+              step_failure(None, None),
+            ]),
+          ])
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: pays ✗\n"
+          <> "      ✗ step\n"
+          <> "        Step: When I pay (line 4)\n"
+          <> "        Message: Undefined step: When I pay\n"
+          <> "      ✗ step\n"
+          <> "        Step: When I pay (pay.feature)\n"
+          <> "        Message: Undefined step: When I pay\n"
+          <> "      ✗ step\n"
+          <> "        Step: When I pay\n"
+          <> "        Message: Undefined step: When I pay\n",
+        )
+        |> or_fail_with("expected the line, the file, then no place")
+      }),
+      it("shows a snapshot of more than one line as a diff", fn() {
+        // Arrange
+        let failed =
+          failure(
+            "the receipt should match",
+            Some(types.SnapshotFailure(
+              actual: "a\nB",
+              expected: "a\nb",
+              snapshot_path: "r.snap",
+              is_missing: False,
+            )),
+          )
+
+        // Act
+        let text =
+          gherkin.format_scenarios([
+            scenario(["Cart"], "prints", types.Failed, [failed]),
+          ])
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: prints ✗\n"
+          <> "      ✗ check\n"
+          <> "        Message: the receipt should match\n"
+          <> "        Snapshot: r.snap\n"
+          <> "        Diff (- expected, + actual):\n"
+          <> "            a\n"
+          <> "          - b\n"
+          <> "          + B\n",
+        )
+        |> or_fail_with("expected the diff under the snapshot path")
+      }),
+      it("names a missing snapshot", fn() {
+        // Arrange
+        let failed =
+          failure(
+            "",
+            Some(types.SnapshotFailure(
+              actual: "",
+              expected: "",
+              snapshot_path: "r.snap",
+              is_missing: True,
+            )),
+          )
+
+        // Act
+        let text =
+          gherkin.format_scenarios([
+            scenario(["Cart"], "prints", types.Failed, [failed]),
+          ])
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: prints ✗\n"
+          <> "      ✗ check\n"
+          <> "        Snapshot missing: r.snap\n",
+        )
+        |> or_fail_with("expected the path of the missing snapshot")
+      }),
+      it("shows an equality failure of more than one line as a diff", fn() {
+        // Arrange
+        let failed =
+          failure(
+            "",
+            Some(types.EqualityFailure(actual: "x\nz", expected: "x\ny")),
+          )
+
+        // Act
+        let text =
+          gherkin.format_scenarios([
+            scenario(["Cart"], "compares", types.Failed, [failed]),
+          ])
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: compares ✗\n"
+          <> "      ✗ check\n"
+          <> "        Diff (- expected, + actual):\n"
+          <> "            x\n"
+          <> "          - y\n"
+          <> "          + z\n",
+        )
+        |> or_fail_with("expected the diff in place of Expected and Actual")
+      }),
+    ]),
   ])
 }

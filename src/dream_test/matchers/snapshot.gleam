@@ -46,7 +46,9 @@ import gleam/string
 ///
 /// - **Snapshot doesn't exist**: Creates it and the test **passes**
 /// - **Snapshot exists and matches**: Test **passes**
-/// - **Snapshot exists but differs**: Test **fails** with detailed diff
+/// - **Snapshot exists but differs**: Test **fails**. The failure holds
+///   the two texts it compared, with no newlines at their ends, and the
+///   reporters show a line diff of them when either has more than one line
 ///
 /// ## Parameters
 ///
@@ -285,11 +287,13 @@ fn compare_snapshot(
   snapshot_path: String,
 ) -> MatchResult(String) {
   // Normalize both sides so trailing newlines in either the snapshot file
-  // or the produced output don't create noisy, meaningless mismatches.
+  // or the produced output don't create noisy, meaningless mismatches. The
+  // failure holds the two texts that were compared, so its diff shows no
+  // trailing newline difference that the comparison ignores.
   let normalized_actual = normalize_snapshot_expected(actual)
   case normalized_actual == expected {
     True -> MatchOk(actual)
-    False -> make_mismatch_failure(actual, expected, snapshot_path)
+    False -> make_mismatch_failure(normalized_actual, expected, snapshot_path)
   }
 }
 

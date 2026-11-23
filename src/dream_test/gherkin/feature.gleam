@@ -416,6 +416,7 @@ fn inline_to_parsed_step(inline: InlineStep) -> gherkin_types.Step {
     text: inline.text,
     doc_string: None,
     data_table: None,
+    line: None,
   )
 }
 

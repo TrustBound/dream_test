@@ -194,6 +194,11 @@ pub type TestKind {
 /// - `StringMatchFailure` - For `start_with`/`end_with`/`contain_string`
 /// - `SnapshotFailure` - For `match_snapshot` comparisons
 /// - `CustomMatcherFailure` - For user-defined matchers
+/// - `StepFailure` - For a failure in a Gherkin step: it names the step and
+///   holds the payload of the failure inside the step
+///
+/// The reporters show a line diff in place of `Expected` and `Actual` when
+/// either text has more than one line; see `dream_test/reporters/diff`.
 ///
 pub type FailurePayload {
   EqualityFailure(actual: String, expected: String)
@@ -210,6 +215,27 @@ pub type FailurePayload {
     is_missing: Bool,
   )
   CustomMatcherFailure(actual: String, description: String)
+  /// A Gherkin step failed. The failure is the failure of the step: a
+  /// matcher in a `then` step, an `Error` from the step function, an
+  /// undefined step, or a crash.
+  ///
+  /// - `keyword` and `text` are the step as written, for example `"Then"`
+  ///   and `"the cart total is 15.00"`. In a row of an Examples table,
+  ///   `text` has the values of the row.
+  /// - `file` is the path of the `.feature` file, from
+  ///   `parser.parse_file`, and `None` for an inline feature or a parsed
+  ///   string.
+  /// - `line` is the line of the step in the feature text, from the parser,
+  ///   and `None` for an inline step.
+  /// - `cause` is the payload of the failure inside the step, for example
+  ///   `Some(EqualityFailure(..))` for a failed `be_equal`, or `None`.
+  StepFailure(
+    keyword: String,
+    text: String,
+    file: Option(String),
+    line: Option(Int),
+    cause: Option(FailurePayload),
+  )
 }
 
 /// Complete information about a failed assertion.

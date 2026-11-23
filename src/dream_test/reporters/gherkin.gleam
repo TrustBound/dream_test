@@ -11,14 +11,16 @@
 //// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
+import dream_test/reporters/diff
 import dream_test/reporters/hook_failures
 import dream_test/reporters/summary
 import dream_test/timing
 import dream_test/types.{
   type AssertionFailure, type RunReport, type Status, type TestResult,
   EqualityFailure, Failed, GherkinScenario, Passed, Pending, SetupFailed,
-  Skipped, TimedOut,
+  Skipped, SnapshotFailure, StepFailure, TimedOut,
 }
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
@@ -436,9 +438,48 @@ fn format_all_failures(
 
 fn format_one_failure(failure: AssertionFailure) -> String {
   let header = string.concat(["      ✗ ", failure.operator, "\n"])
+  let step_text = format_step_line(failure.payload)
   let message_text = format_failure_message(failure.message)
-  let payload_text = format_failure_payload(failure.payload)
-  string.concat([header, message_text, payload_text])
+  let payload_text = format_failure_payload(step_cause(failure.payload))
+  string.concat([header, step_text, message_text, payload_text])
+}
+
+/// The `Step:` line of a failure in a Gherkin step, or `""`.
+fn format_step_line(payload: Option(types.FailurePayload)) -> String {
+  case payload {
+    Some(StepFailure(keyword:, text:, file:, line:, ..)) ->
+      string.concat([
+        "        Step: ",
+        keyword,
+        " ",
+        text,
+        step_place(file, line),
+        "\n",
+      ])
+    _ -> ""
+  }
+}
+
+/// The place of a step after its text: ` (file:line)`, ` (file)`,
+/// ` (line N)`, or `""` when neither is known.
+fn step_place(file: Option(String), line: Option(Int)) -> String {
+  case file, line {
+    Some(file), Some(line) -> " (" <> file <> ":" <> int.to_string(line) <> ")"
+    Some(file), None -> " (" <> file <> ")"
+    None, Some(line) -> " (line " <> int.to_string(line) <> ")"
+    None, None -> ""
+  }
+}
+
+/// The payload to show under the message: the payload inside a step
+/// failure, or the payload itself.
+fn step_cause(
+  payload: Option(types.FailurePayload),
+) -> Option(types.FailurePayload) {
+  case payload {
+    Some(StepFailure(cause:, ..)) -> cause
+    _ -> payload
+  }
 }
 
 fn format_failure_message(message: String) -> String {
@@ -453,6 +494,30 @@ fn format_failure_payload(
 ) -> String {
   case payload {
     Some(EqualityFailure(actual, expected)) ->
+      format_expected_actual(expected, actual)
+    Some(SnapshotFailure(snapshot_path:, is_missing: True, ..)) ->
+      "        Snapshot missing: " <> snapshot_path <> "\n"
+    Some(SnapshotFailure(actual:, expected:, snapshot_path:, is_missing: False)) ->
+      "        Snapshot: "
+      <> snapshot_path
+      <> "\n"
+      <> format_expected_actual(expected, actual)
+    _ -> ""
+  }
+}
+
+/// `Expected:` and `Actual:` lines, or a line diff when either text has more
+/// than one line.
+fn format_expected_actual(expected: String, actual: String) -> String {
+  case diff.should_diff(expected: expected, actual: actual) {
+    True ->
+      diff.format(
+        expected: expected,
+        actual: actual,
+        indent: "        ",
+        color: False,
+      )
+    False ->
       string.concat([
         "        Expected: ",
         expected,
@@ -461,6 +526,5 @@ fn format_failure_payload(
         actual,
         "\n",
       ])
-    _ -> ""
   }
 }

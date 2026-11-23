@@ -56,7 +56,7 @@ Most projects need only Steps 1 to 4. Do the steps in order. The first ones affe
 | Gherkin steps | Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` and `FeatureConfig` are removed: use `steps.feature_suite`. | [Step 3](#step-3-port-the-gherkin-step-definitions) |
 | Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
 | Hooks | A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. | [Step 5](#step-5-check-the-hook-failures) |
-| Reporters | The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`. | [Step 6](#step-6-update-the-reporters) |
+| Reporters | The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`, and `FailurePayload` the new variant `StepFailure`. | [Step 6](#step-6-update-the-reporters) |
 | The JSON report | The JSON report has schema version `2.0`. | [Step 7](#step-7-update-the-tools-that-read-the-json-report) |
 | The Gherkin parser and syntax tree, `.feature` files | The parser follows the official Gherkin grammar, and parse errors are typed. | [Step 8](#step-8-update-parser-code-and-feature-files) |
 | `sandbox` | `sandbox.run_isolated` takes the function and its input. | [Step 9](#step-9-update-sandbox-calls) |
@@ -1705,6 +1705,75 @@ pub fn reporter_name(reporter: reporter_types.ResultsReporter) -> String {
 }
 ```
 
+### `FailurePayload` has the variant `StepFailure`
+
+`types.FailurePayload` has a new variant: `StepFailure(keyword:, text:, file:, line:, cause:)`. A failure in a Gherkin step has it as its payload: it names the step, its `.feature` file and its line, and holds the payload of the failure inside the step as `cause`. A `case` on a `FailurePayload` needs a branch for it, or the code does not compile. Code that reads the payload of a failed scenario, for example the `EqualityFailure` of a failed check, reads it from `cause`.
+
+#### 2.x: a `case` on `FailurePayload` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/reporters/json.gleam#L317-L364"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
+
+```gleam
+fn build_payload_fields(
+  payload: Option(FailurePayload),
+) -> List(#(String, Json)) {
+  case payload {
+    None -> []
+    Some(EqualityFailure(actual, expected)) -> [
+      #("expected", json.string(expected)),
+      #("actual", json.string(actual)),
+    ]
+    Some(BooleanFailure(actual, expected)) -> [
+      #("expected", json.bool(expected)),
+      #("actual", json.bool(actual)),
+    ]
+    Some(OptionFailure(actual, expected_some)) -> [
+      #("expected_some", json.bool(expected_some)),
+      #("actual", json.string(actual)),
+    ]
+    Some(ResultFailure(actual, expected_ok)) -> [
+      #("expected_ok", json.bool(expected_ok)),
+      #("actual", json.string(actual)),
+    ]
+    Some(CollectionFailure(actual, expected, operation)) -> [
+      #("expected", json.string(expected)),
+      #("actual", json.string(actual)),
+      #("operation", json.string(operation)),
+    ]
+    Some(ComparisonFailure(actual, expected, operator)) -> [
+      #("expected", json.string(expected)),
+      #("actual", json.string(actual)),
+      #("comparison_operator", json.string(operator)),
+    ]
+    Some(StringMatchFailure(actual, pattern, operation)) -> [
+      #("pattern", json.string(pattern)),
+      #("actual", json.string(actual)),
+      #("operation", json.string(operation)),
+    ]
+    Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) -> [
+      #("expected", json.string(expected)),
+      #("actual", json.string(actual)),
+      #("snapshot_path", json.string(snapshot_path)),
+      #("is_missing", json.bool(is_missing)),
+    ]
+    Some(CustomMatcherFailure(actual, description)) -> [
+      #("actual", json.string(actual)),
+      #("description", json.string(description)),
+    ]
+  }
+}
+```
+
+#### 3.0.0: a `case` with a branch for `StepFailure` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/failure_payload_case.gleam#L8-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn expected_value(payload: Option(FailurePayload)) -> Option(String) {
+  case payload {
+    Some(EqualityFailure(expected:, ..)) -> Some(expected)
+    Some(StepFailure(cause:, ..)) -> expected_value(cause)
+    _ -> None
+  }
+}
+```
+
 ## Step 7: Update the tools that read the JSON report
 
 The JSON report has schema version `2.0`. The Gleam call changes only because `json.format` takes the run report. A tool that reads the JSON must accept the new version and the new fields:
@@ -1716,6 +1785,7 @@ The JSON report has schema version `2.0`. The Gleam call changes only because `j
 - A Gherkin test object has `feature` and `rule` after `kind`. `feature` is the name of the Feature, or `null` for a scenario of `steps.Scenarios`. `rule` is the name of its Rule group, for example `"Rule: Stock"`, or `null` for a scenario outside a Rule. Other tests do not have `feature` or `rule`.
 - The `system` object has `gleam_stdlib_version` in place of `gleam_version`. The value is the same: the version of the `gleam_stdlib` package, not the version of the Gleam compiler.
 - The text ends with a newline, also in compact form. A tool that compares the whole text must expect it.
+- A failure in a Gherkin step has a `step` object with `keyword`, `text`, `file` and `line`, before the fields of the failure inside the step, such as `expected` and `actual`. `file` and `line` are `null` when they are not known.
 
 #### 2.x: JSON from a list of results <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/reporters/json_api_format.gleam#L6-L15"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1753,7 +1823,7 @@ pub fn main() {
 
 This change affects only code that builds or reads `gherkin/types` values directly. Step definitions do not change. They still read `context.table` and `context.doc_string`.
 
-- `Step` holds `doc_string` and `data_table` in place of `argument`. The `StepArgument` type is removed.
+- `Step` holds `doc_string` and `data_table` in place of `argument`, and the new field `line`: the line of the step that the parser read, or `None` for an inline step. The `StepArgument` type is removed.
 - `Scenario` is one record with `keyword`, `description` and `examples`. The `ScenarioOutline` variant is removed: an outline is a `Scenario` with `Examples`. A `case` on `Scenario` has one branch.
 - `Background` holds `name` and `description`.
 - `Feature` has a new field, `rules`.
@@ -1793,7 +1863,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-#### 3.0.0: a `Step` with `doc_string` and `data_table` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L19-L34"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: a `Step` with `doc_string`, `data_table` and `line` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L19-L36"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("Step can be constructed", fn() {
@@ -1802,6 +1872,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
         text: "I have 1 item",
         doc_string: None,
         data_table: None,
+        line: None,
       )
       |> should
       |> be_equal(Step(
@@ -1809,6 +1880,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
         text: "I have 1 item",
         doc_string: None,
         data_table: None,
+        line: None,
       ))
       |> or_fail_with("expected Step to be constructible")
     }),
@@ -1844,7 +1916,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-#### 3.0.0: a `Feature` with `rules` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L35-L75"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: a `Feature` with `rules` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L37-L78"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("Feature can be constructed", fn() {
@@ -1854,6 +1926,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
           text: "I have 1 item",
           doc_string: None,
           data_table: None,
+          line: None,
         )
       let scenario =
         Scenario(
@@ -1914,7 +1987,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-#### 3.0.0: a `Scenario` with `Examples` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L76-L112"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: a `Scenario` with `Examples` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L79-L116"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("a Scenario Outline is a Scenario with Examples", fn() {
@@ -1924,6 +1997,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
           text: "I have <count> items",
           doc_string: None,
           data_table: None,
+          line: None,
         )
       let examples =
         Examples(
@@ -1980,7 +2054,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-#### 3.0.0: turn a `ParseError` into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L113-L130"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: turn a `ParseError` into text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L117-L134"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("parse_string parses a minimal feature", fn() {
@@ -2003,7 +2077,7 @@ This change affects only code that builds or reads `gherkin/types` values direct
     }),
 ```
 
-#### 3.0.0: the text of a parse error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L131-L140"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: the text of a parse error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/gherkin_syntax_tree.gleam#L135-L144"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("a parse error names its line", fn() {

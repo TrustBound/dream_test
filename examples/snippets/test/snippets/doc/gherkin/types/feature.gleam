@@ -10,6 +10,7 @@ pub fn feature_holds_its_name() -> Result(dream_types.AssertionResult, String) {
       text: "I have 1 item",
       doc_string: None,
       data_table: None,
+      line: None,
     )
   let scenario =
     Scenario(

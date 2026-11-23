@@ -14,6 +14,7 @@ is a major release: read the Migration Guide before you update.
 - **One suite type (breaking)**: one `TestSuite` type, with a setup and a teardown for a whole tree
 - **Gherkin conformance**: the parser follows the official Gherkin grammar
 - **Typed step state (breaking)**: each Gherkin scenario has one typed state value, and `world` is removed
+- **Clearer failure reports**: a failure of more than one line, such as a changed snapshot, shows as a line diff, and a failure in a Gherkin step names the step, its file and its line
 
 ## What's New
 
@@ -107,6 +108,34 @@ assertion. The compiler now checks the type of the state in every step. For
 example, `fn step_add(cart: Int, _context: StepContext) -> Result(Int, String)`
 is a `when` step for a scenario whose state is an `Int`.
 
+### Clearer Failure Reports
+
+A changed snapshot, or any failure whose expected or actual text has more
+than one line, shows as a line diff under the failure in the BDD and
+Gherkin reports: `Diff (- expected, + actual):`, then `- ` for a line of
+the expected text only, `+ ` for a line of the actual text only, and two
+spaces for a line in both. Before, the report printed both whole texts,
+with their second and later lines at the start of the line.
+
+The diff is a longest common subsequence of the lines. It hides same
+lines more than 3 lines from a change, shows at most 100 lines, makes
+trailing whitespace and a missing final newline visible, and has a size
+limit: above 1,000,000 line pairs, the changed lines show as removed, then
+added. A value of one line keeps the `Expected:` and `Actual:` lines.
+`dream_test/reporters/diff` gives the same diff to a reporter of your own.
+[Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/snapshot-testing.md)
+shows a real report.
+
+A failure in a Gherkin step names the step on a `Step:` line, with its
+keyword and text as the feature writes them, and with its file and line
+for a `.feature` file, for example
+`Step: Then I should have 5 items total (test/features/shopping_cart_failures.feature:5)`.
+A failed check, an `Error` from a step function, an undefined step and a
+step that crashes read alike. The failure has the new payload
+`types.StepFailure`, so the JSON report has the step too, as a `step`
+object. [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/gherkin-bdd.md)
+shows a real report.
+
 ### Guides
 
 The guides moved from `documentation/` to `docs/guides/`. Their file names
@@ -125,7 +154,7 @@ example. HexDocs shows each guide as a page.
 
 ## Testing
 
-- 1175 tests run, 0 failed, in about 23 seconds of wall time, with 100.0% line coverage of `src` (3764 of 3764 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
+- 1220 tests run, 0 failed, in about 48 seconds of wall time (measured with a load average of about 4 from other programs), with 100.0% line coverage of `src` (3926 of 3926 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
 
 ## Upgrading
 
@@ -227,6 +256,14 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - Module discovery keeps the context of a suite with a context; in 2.x its
   tests got `Nil`.
 - `types.AssertionResult` has the new variant `AssertionPending`.
+- `types.FailurePayload` has the new variant `StepFailure(keyword:, text:,
+  file:, line:, cause:)`. A `case` on a `FailurePayload` needs a branch for
+  it. A failure in a Gherkin step has it as its payload, with the payload
+  of the failure inside the step as `cause`: code that reads the payload
+  of a failed scenario, such as an `EqualityFailure`, reads it from
+  `cause`.
+- Gherkin: `gherkin/types.Step` has the new field `line: Option(Int)`. Code
+  that builds a `Step` gives `line: None`, or the line of the step.
 - The progress event API changed: `progress.handle_event` and the reporter
   event types are removed; use `progress.line` with a
   `progress.ProgressEvent`.

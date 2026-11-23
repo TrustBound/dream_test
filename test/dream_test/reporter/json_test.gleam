@@ -394,6 +394,52 @@ pub fn tests() {
         |> or_fail_with("each payload should have its own fields")
       }),
 
+      it(
+        "writes the step of a step failure, then the fields of its cause",
+        fn() {
+          // Arrange
+          let report =
+            report_of([
+              result_of(
+                "steps",
+                types.Failed,
+                [
+                  failure(types.StepFailure(
+                    keyword: "Then",
+                    text: "the total is 2",
+                    file: Some("cart.feature"),
+                    line: Some(3),
+                    cause: Some(types.EqualityFailure(
+                      actual: "1",
+                      expected: "2",
+                    )),
+                  )),
+                  failure(types.StepFailure(
+                    keyword: "When",
+                    text: "I pay",
+                    file: None,
+                    line: None,
+                    cause: None,
+                  )),
+                ],
+                types.Unit,
+              ),
+            ])
+
+          // Act
+          let text = json.format(report)
+
+          // Assert
+          text
+          |> after("\"failures\":")
+          |> should
+          |> be_equal(
+            "[{\"operator\":\"check\",\"message\":\"m\",\"step\":{\"keyword\":\"Then\",\"text\":\"the total is 2\",\"file\":\"cart.feature\",\"line\":3},\"expected\":\"2\",\"actual\":\"1\"},{\"operator\":\"check\",\"message\":\"m\",\"step\":{\"keyword\":\"When\",\"text\":\"I pay\",\"file\":null,\"line\":null}}]}],\"hook_failures\":[]}\n",
+          )
+          |> or_fail_with("expected the step object before the cause fields")
+        },
+      ),
+
       it("keeps escaped characters in pretty output", fn() {
         json.format_pretty(
           report_of([
