@@ -1,0 +1,6 @@
+
+Results reporter failed
+  The Custom results reporter at position 2 in runner.results_reporters crashed: error:#{function => <<"broken_report">>,line => 20, message => <<"the report template is missing">>, module => <<"snippets/guides/reporters_crash">>, file => <<"test/snippets/guides/reporters_crash.gl ... (cut at 200 characters, and types.report_reporter_crashes has the full reason)
+  Reason: its render function crashed, so this reporter wrote no report.
+  Fix: make the render function return a String for every RunReport.
+

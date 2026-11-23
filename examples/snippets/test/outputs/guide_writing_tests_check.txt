@@ -1,0 +1,5 @@
+The cart filters
+  ✓ keep only the smoke test
+  ✓ leave out the integration group
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

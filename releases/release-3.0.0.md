@@ -110,10 +110,18 @@ is a `when` step for a scenario whose state is an `Int`.
 ### Guides
 
 The guides moved from `documentation/` to `docs/guides/`. Their file names
-have no number now, for example `docs/guides/writing-tests.md`. A new
-Coverage guide shows the coverage examples of the README. Each example in
-the README has a guide badge. The badge links to the guide section that
-shows the same example. HexDocs shows each guide as a page.
+have no number now, for example `docs/guides/writing-tests.md`. They are
+rewritten by reader task: 13 guides and one reference page. Each guide
+starts with a table of contents, walks through numbered steps with the
+real output of each one, passing and failing, and ends with its failure
+cases, a "Test your code" section and common pitfalls. A test compares
+each output that a guide shows with the real output of the code. New
+guides: "Write and run your first test" (`getting-started.md`), "Write
+your own matcher" (`custom-matchers.md`), and the reference page
+(`reference.md`) with every matcher, the runner settings, the rules of
+hook processes and the Gherkin rules. Each example in the README has a
+guide badge. The badge links to the guide section that shows the same
+example. HexDocs shows each guide as a page.
 
 ## Testing
 
@@ -146,7 +154,7 @@ gleam deps update dream_test
 ### Migration Guide
 
 Each item that needs a code change has a 2.x and a 3.0.0 example in
-[Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/upgrading-to-3.md).
+[Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/upgrading-to-3.md).
 
 - `runner.run` and `parallel.run_tree_parallel` return `types.RunReport`, and
   the reporter functions that format a whole run take one.
@@ -257,9 +265,11 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 ## Documentation
 
 - [dream_test](https://hexdocs.pm/dream_test) - v3.0.0
-- [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
-- [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
-- [Coverage badge](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+- [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md)
+- [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
+- [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
+- [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+- [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md)
 - [Changelog](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)
 
 ## Community

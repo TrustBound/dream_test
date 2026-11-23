@@ -1,0 +1,11 @@
+Cart
+  total
+    ✓ is 0 for an empty cart
+    ✓ adds the prices
+  discounts
+    ~ takes 10% off above 100.00
+    ~ never goes below 0
+  checkout
+    - charges the card
+
+Summary: 5 run, 0 failed, 2 passed, 1 skipped, 2 pending in 0ms

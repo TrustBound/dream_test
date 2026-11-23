@@ -1,301 +1,347 @@
-## Assertions & matchers (the `should` pipeline)
+# Check values with matchers
 
-If you’ve used Jest/RSpec style assertions before, this is the Dream Test equivalent — but pipe-first and composable.
+A test is only as good as its assertion, and an assertion is only as good as the failure it prints. When a test breaks at 2 a.m. on CI, you want one look at the log to tell you what was wrong: which check, which value, and what you expected. This guide shows how to write assertions in Dream Test, how to pick the matcher that fits your value, and what each kind of failure looks like in the report.
 
-Dream Test assertions are designed around a single, composable pattern:
+## Table of Contents
 
-### An assertion pipeline <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/equality.gleam#L7-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+- [What you'll build](#what-youll-build)
+- [Before you start](#before-you-start)
+- [How an assertion reads](#how-an-assertion-reads)
+- [Which matcher to use](#which-matcher-to-use)
+- [Step 1: Compare a value](#step-1-compare-a-value)
+- [Step 2: Unwrap a Result or an Option, then check what's inside](#step-2-unwrap-a-result-or-an-option-then-check-whats-inside)
+- [Step 3: Check lists, strings and numbers](#step-3-check-lists-strings-and-numbers)
+- [Step 4: Decide in your own code](#step-4-decide-in-your-own-code)
+- [Step 5: Read the failures](#step-5-read-the-failures)
+- [Test your code](#test-your-code)
+- [Common pitfalls](#common-pitfalls)
+- [Where to go next](#where-to-go-next)
 
-```gleam
-      2 + 3
-      |> should
-      |> be_equal(5)
-      |> or_fail_with("2 + 3 should equal 5")
+## What you'll build
+
+In this guide you'll:
+
+- Write assertions for plain values, `Result`s, `Option`s, lists, strings and numbers.
+- Unwrap an `Ok` or a `Some` and check the value inside, in one pipeline.
+- Pass or fail a test from your own `case` when no matcher fits.
+- Read a real report with one failure of each kind.
+- Check that each failing test fails for the reason you meant.
+
+## Before you start
+
+You need Dream Test as a dev dependency and a test runner module. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up.
+
+```sh
+gleam add --dev dream_test
 ```
 
-Read it as a pipeline (top-to-bottom):
+The examples test the `add` and `divide` functions from that guide, plus a few functions of the Gleam standard library. Every matcher on this page comes from `dream_test/matchers`, which holds all the built-in ones. The outputs are real outputs of the code shown, with every time set to 0, so they stay the same from run to run.
 
-- Start from the value you’re checking.
-- `should` starts an assertion chain.
-- Each matcher either confirms something (“be_equal”) or unwraps something (“be_ok”, “be_some”).
-- `or_fail_with(...)` attaches the message you’ll see when this fails.
+## How an assertion reads
 
-### Why this pattern?
+Every assertion is one pipeline, as in the tests of [Step 1](#step-1-compare-a-value). Read it top to bottom:
 
-- **No macros, no hidden magic**: everything is ordinary Gleam code.
-- **Composable**: matchers can unwrap values (like `Option`/`Result`) and pass the unwrapped value onward.
-- **Consistent failures**: failures are structured values that reporters can format well.
+- Start from the value you check.
+- `should` starts the chain.
+- Each matcher checks something (`be_equal`), or unwraps something and passes the inside on (`be_ok`, `be_some`).
+- `or_fail_with` ends the chain. It turns the result into what a test returns, and gives the message you'll see if a matcher failed.
 
-There’s also a human reason:
+There are no macros and no hidden state. A matcher is a plain function from one `MatchResult` to the next, so you can write your own the same way ([Write your own matcher](https://github.com/TrustBound/dream_test/blob/main/docs/guides/custom-matchers.md)). When a matcher fails, it records a structured failure, and the reporters print each kind in its own layout.
 
-- Assertions become part of your test’s narrative. A good pipeline reads like a sentence and fails with a message that tells you what matters.
+## Which matcher to use
 
-### Chaining matchers (unwrap + assert)
+| Your value | Use | Why |
+|:---|:---|:---|
+| Any value you can write out in full | `be_equal(expected)`, `not_equal(other)` | Structural equality. The failure prints both values. |
+| A `Bool` | `be_true()`, `be_false()` | Reads better than `be_equal(True)`. |
+| A `Result` | `be_ok()`, `be_error()` | Checks the variant, then hands the inside to the next matcher. |
+| An `Option` | `be_some()`, `be_none()` | The same, for `Some` and `None`. |
+| A `List` | `contain(item)`, `not_contain(item)`, `have_length(n)`, `be_empty()` | The failure prints the whole list. |
+| A `String` | `start_with`, `end_with`, `contain_string`, `match_regex` | Checks a part, so unrelated text can change. |
+| An `Int` or a `Float` | `be_greater_than`, `be_less_than`, `be_at_least`, `be_at_most`, `be_between`, `be_in_range`, and the `_float` versions | For values you can't pin to one number. |
+| A big text or structure | `match_snapshot`, `match_snapshot_inspect` | Compares with a file. See [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md). |
+| Anything else | `succeed()` and `fail_with(message)` in a `case` | Your own logic, with the same result type. |
 
-#### Chain matchers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/chaining.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+The [reference page](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md#matchers) lists every matcher with exactly what it checks.
+
+## Step 1: Compare a value
+
+`be_equal` is the matcher you'll use most. It compares with `==`, so it works on any value: numbers, strings, lists, records, tuples. Compare the whole value when you can. A test that checks one field of a record lets the other fields break in silence.
+
+### Compare values and Bools <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_values.gleam#L15-L28"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, be_ok, be_some, or_fail_with, should}
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
+    group("equality and booleans", [
+      it("compares whole values", fn() {
+        string.split("a,b,c", ",")
+        |> should
+        |> be_equal(["a", "b", "c"])
+        |> or_fail_with("the string should split at each comma")
+      }),
+      it("checks a Bool", fn() {
+        list.is_empty([1])
+        |> should
+        |> be_false()
+        |> or_fail_with("a list with one item is not empty")
+      }),
+    ]),
+```
+
+These tests are part of one suite, `tests()` in the snippet file, which imports every matcher of this page from `dream_test/matchers`.
+
+## Step 2: Unwrap a Result or an Option, then check what's inside
+
+Most functions worth testing return a `Result` or an `Option`. Without help, every test would start with a `case` to get the value out. The unwrapping matchers do that for you: `be_ok()` checks that the value is `Ok`, and the next matcher gets the value inside. `be_error()`, `be_some()` and `be_none()` work the same way.
+
+### Unwrap, then check <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_values.gleam#L29-L59"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+    group("Result and Option", [
+      it("unwraps an Ok, then checks the value", fn() {
+        divide(10, 2)
+        |> should
+        |> be_ok()
+        |> be_equal(5)
+        |> or_fail_with("10 / 2 should be Ok(5)")
+      }),
+      it("unwraps an Error, then checks the error", fn() {
+        divide(1, 0)
+        |> should
+        |> be_error()
+        |> contain_string("zero")
+        |> or_fail_with("the error should name the zero")
+      }),
+      it("unwraps a Some", fn() {
+        dict.from_list([#("alice", 30)])
+        |> dict.get("alice")
+        |> option.from_result
+        |> should
+        |> be_some()
+        |> be_equal(30)
+        |> or_fail_with("alice should be 30")
+      }),
+      it("checks a None", fn() {
+        option.from_result(dict.get(dict.new(), "bob"))
+        |> should
+        |> be_none()
+        |> or_fail_with("an empty dict has no bob")
+      }),
+    ]),
+```
+
+The chain reads as the sentence you mean: "this should be Ok, and the value should be 5". When the first matcher fails, the ones after it don't run, and the failure names the first one. So you never get a confusing "expected 5, got Error(...)".
+
+## Step 3: Check lists, strings and numbers
+
+Sometimes you don't know the whole value, or you don't care about all of it. A list from a database query comes back in any order. A message includes a timestamp. A duration is "under a second", not an exact number. Check the part that matters:
+
+### Check a part of a value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_values.gleam#L60-L86"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+    group("lists, strings and numbers", [
+      it("finds an item and counts the items", fn() {
+        [1, 2, 3]
+        |> should
+        |> contain(2)
+        |> have_length(3)
+        |> or_fail_with("the list should hold 2, and three items")
+      }),
+      it("checks an empty list", fn() {
+        list.filter([1, 3, 5], int_is_even)
+        |> should
+        |> be_empty()
+        |> or_fail_with("no odd number is even")
+      }),
+      it("checks the start of a string", fn() {
+        string.uppercase("hello world")
+        |> should
+        |> start_with("HELLO")
+        |> or_fail_with("the text should start with HELLO")
+      }),
+      it("checks a range", fn() {
+        string.length("hello")
+        |> should
+        |> be_between(1, 10)
+        |> or_fail_with("the length should be between 1 and 10")
+      }),
+    ]),
+```
+
+Matchers that don't unwrap pass the same value on, so `contain(2) |> have_length(3)` checks two things about one list. Keep such chains short: each extra check is one more thing the failure must explain.
+
+Two range matchers look alike, so check which one you mean. `be_between(1, 10)` is strict: `1 < value < 10`. `be_in_range(1, 10)` includes both ends: `1 <= value <= 10`.
+
+## Step 4: Decide in your own code
+
+Some checks don't fit a matcher: a value with several right answers, or a check that depends on an earlier branch. Write a `case`, and return `Ok(succeed())` or `Ok(fail_with(message))` from each branch. Both give the same type as an `or_fail_with` chain, so the test body stays a normal test body:
+
+### Pass or fail from a case <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_values.gleam#L87-L96"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+    group("your own logic", [
+      it("passes or fails with a case", fn() {
+        case divide(9, 3) {
+          Ok(3) -> Ok(succeed())
+          Ok(other) ->
+            Ok(fail_with("expected 3, got " <> string.inspect(other)))
+          Error(message) -> Ok(fail_with(message))
+        }
+      }),
+    ]),
+```
+
+A test body returns `Result(AssertionResult, String)`. The `Error` side is for code that can't even get to the assertion, such as a setup step that fails. That makes `use value <- result.try(...)` work in a test body: an `Error` ends the test as a failure with that text.
+
+## Step 5: Read the failures
+
+Here's a suite with seven tests, each failing in a different way. It lives in a function named `failing_tests()`, so it doesn't run as one of the project's tests. The last test returns an `Error` from its body:
+
+### A test body that returns an Error <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_failures.gleam#L59-L65"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+    it("an Error from the test body", fn() {
+      use quotient <- result.try(divide(1, 0))
+      quotient
+      |> should
+      |> be_equal(0)
+      |> or_fail_with("1 / 0 should be 0")
+    }),
+```
+
+The run prints this report. It's the report of `bdd.failures_only()`, which leaves out the passing tests and doesn't repeat the failures, so each failure shows once:
+
+### One failure of each kind <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_assertions_failures.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+Failures
+  ✗ a different value
+    be_equal
+      Message: the string should split at each separator
+      Expected: ["a", "b", "c"]
+      Actual:   ["a", "b;c"]
+  ✗ an Error where an Ok was expected
+    be_ok
+      Message: 1 / 0 should be Ok(0)
+      Expected: Ok(_)
+      Actual:   Error("Cannot divide by zero")
+  ✗ a None where a Some was expected
+    be_some
+      Message: alice should be 30
+      Expected: Some(_)
+      Actual:   None
+  ✗ a missing item
+    contain
+      Message: the list should hold 4
+      Operation: contain
+      Expected: 4
+      Actual:   [1, 2, 3]
+  ✗ a string with another start
+    start_with
+      Message: the text should start with HELLO
+      Operation: start_with
+      Pattern:   HELLO
+      Actual:    hello world
+  ✗ a failure from your own logic
+    fail_with
+      Message: 9 / 2 should not round down
+  ✗ an Error from the test body
+    error
+      Message: Cannot divide by zero
+
+Summary: 7 run, 7 failed, 0 passed in 0ms
+```
+
+What to read in each:
+
+- The line under the test name is the matcher that failed, the *operator*. In the second test it's `be_ok`, not `be_equal`: the chain stopped at the first matcher that failed.
+- `Message` is your `or_fail_with` text, or the text you gave `fail_with`.
+- `Expected` and `Actual` show the values. For a list or a string, the failure also shows the operation and, for strings, the pattern.
+- `fail_with` has only your message. Put the values in it, as the `case` in Step 4 does with `string.inspect`.
+- `error` is the operator of an `Error` from the test body. Its message is the text of the `Error`, so make that text say what went wrong.
+
+## Test your code
+
+A failing test proves something only when it fails for the right reason. A test that should fail at `be_equal`, but fails at `be_ok` because the setup broke, hides the real problem. You can check that with Dream Test: run the suite silently, and read the operator of each failure from the report.
+
+### Check why each test fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/assertions_failure_reasons.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
+import dream_test/types.{type AssertionFailure, type RunReport, type TestResult}
 import dream_test/unit.{describe, it}
-import gleam/option.{Some}
+import gleam/list
+import snippets/guides/assertions_failures.{failing_tests}
 
 pub fn tests() {
-  describe("Chaining matchers", [
-    // Unwrap Some, then check the value
-    it("unwraps Option", fn() {
-      Some(42)
+  describe("The failure examples", [
+    it("each fail at the matcher that the test name says", fn() {
+      // Act
+      let report =
+        runner.new([failing_tests()])
+        |> runner.silent()
+        |> runner.run()
+
+      // Assert
+      failed_operators(report)
       |> should
-      |> be_some()
-      |> be_equal(42)
-      |> or_fail_with("Should contain 42")
-    }),
-    // Unwrap Ok, then check the value
-    it("unwraps Result", fn() {
-      Ok("success")
-      |> should
-      |> be_ok()
-      |> be_equal("success")
-      |> or_fail_with("Should be Ok with 'success'")
+      |> be_equal([
+        #("a different value", ["be_equal"]),
+        #("an Error where an Ok was expected", ["be_ok"]),
+        #("a None where a Some was expected", ["be_some"]),
+        #("a missing item", ["contain"]),
+        #("a string with another start", ["start_with"]),
+        #("a failure from your own logic", ["fail_with"]),
+        #("an Error from the test body", ["error"]),
+      ])
+      |> or_fail_with("each test should fail at its own matcher")
     }),
   ])
 }
 
-pub fn main() {
-  runner.new([tests()])
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
+/// The name of each test, with the operator of each of its failures.
+fn failed_operators(report: RunReport) -> List(#(String, List(String))) {
+  types.report_tests(report)
+  |> list.map(name_and_operators)
+}
+
+fn name_and_operators(result: TestResult) -> #(String, List(String)) {
+  #(result.name, list.map(result.failures, operator))
+}
+
+fn operator(failure: AssertionFailure) -> String {
+  failure.operator
 }
 ```
 
-### Built-in matcher catalogue (practical examples)
+Each `TestResult` holds its `failures`, a list of `AssertionFailure` values with the `operator`, the `message` and a `payload` with the details that the reporters print. The check passes:
 
-#### Built-in matchers <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/builtin_matchers.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The report of the check <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_assertions_reasons.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-```gleam
-import dream_test/matchers.{
-  be_between, be_equal, be_false, be_ok, be_some, be_true, contain,
-  contain_string, have_length, match_regex, or_fail_with, should,
-}
-import dream_test/unit.{describe, it}
-import gleam/option.{Some}
+```text
+The failure examples
+  ✓ each fail at the matcher that the test name says
 
-pub fn tests() {
-  describe("Built-in matchers", [
-    it("boolean: be_true", fn() {
-      True
-      |> should
-      |> be_true()
-      |> or_fail_with("expected True")
-    }),
-    it("boolean: be_false", fn() {
-      False
-      |> should
-      |> be_false()
-      |> or_fail_with("expected False")
-    }),
-    it("option: be_some + equal", fn() {
-      Some(42)
-      |> should
-      |> be_some()
-      |> be_equal(42)
-      |> or_fail_with("expected Some(42)")
-    }),
-    it("result: be_ok + equal", fn() {
-      Ok("hello")
-      |> should
-      |> be_ok()
-      |> be_equal("hello")
-      |> or_fail_with("expected Ok(\"hello\")")
-    }),
-    it("collection: have_length", fn() {
-      [1, 2, 3]
-      |> should
-      |> have_length(3)
-      |> or_fail_with("expected list length 3")
-    }),
-    it("collection: contain", fn() {
-      [1, 2, 3]
-      |> should
-      |> contain(2)
-      |> or_fail_with("expected list to contain 2")
-    }),
-    it("comparison: be_between", fn() {
-      5
-      |> should
-      |> be_between(1, 10)
-      |> or_fail_with("expected 5 to be between 1 and 10")
-    }),
-    it("string: contain_string", fn() {
-      "hello world"
-      |> should
-      |> contain_string("world")
-      |> or_fail_with("expected substring match")
-    }),
-    it("string: match_regex", fn() {
-      "user-123"
-      |> should
-      |> match_regex("^user-\\d+$")
-      |> or_fail_with("expected an id like user-123")
-    }),
-  ])
-}
+Summary: 1 run, 0 failed, 1 passed in 0ms
 ```
 
-### Built-in matchers (table)
+## Common pitfalls
 
-All built-in matchers are re-exported from `dream_test/matchers` and are designed to be used in the `should |> matcher(...) |> or_fail_with(...)` pipeline.
+**A vague `or_fail_with` message.** *Symptom:* the log says `Message: should work`, and you open the code to find out what "work" meant. *Fix:* say what should be true, in terms of the values: "10 / 2 should be Ok(5)".
 
-| Category               | Matcher                        | What it asserts / does                                               |
-| ---------------------- | ------------------------------ | -------------------------------------------------------------------- |
-| **Equality**           | `be_equal(expected)`           | Structural equality (`==`).                                          |
-| **Equality**           | `not_equal(unexpected)`        | Structural inequality (`!=`).                                        |
-| **Boolean**            | `be_true()`                    | Value is `True`.                                                     |
-| **Boolean**            | `be_false()`                   | Value is `False`.                                                    |
-| **Option**             | `be_some()`                    | Value is `Some(_)` and **unwraps** to the inner value for chaining.  |
-| **Option**             | `be_none()`                    | Value is `None`.                                                     |
-| **Result**             | `be_ok()`                      | Value is `Ok(_)` and **unwraps** to the `Ok` value for chaining.     |
-| **Result**             | `be_error()`                   | Value is `Error(_)` and **unwraps** to the error value for chaining. |
-| **Collections (List)** | `contain(item)`                | List contains `item`.                                                |
-| **Collections (List)** | `not_contain(item)`            | List does not contain `item`.                                        |
-| **Collections (List)** | `have_length(n)`               | List length is exactly `n`.                                          |
-| **Collections (List)** | `be_empty()`                   | List is empty (`[]`).                                                |
-| **Comparison (Int)**   | `be_greater_than(n)`           | Value is `> n`.                                                      |
-| **Comparison (Int)**   | `be_less_than(n)`              | Value is `< n`.                                                      |
-| **Comparison (Int)**   | `be_at_least(n)`               | Value is `>= n`.                                                     |
-| **Comparison (Int)**   | `be_at_most(n)`                | Value is `<= n`.                                                     |
-| **Comparison (Int)**   | `be_between(min, max)`         | Value is strictly between: `min < value < max`.                      |
-| **Comparison (Int)**   | `be_in_range(min, max)`        | Value is in inclusive range: `min <= value <= max`.                  |
-| **Comparison (Float)** | `be_greater_than_float(n)`     | Value is `> n`.                                                      |
-| **Comparison (Float)** | `be_less_than_float(n)`        | Value is `< n`.                                                      |
-| **String**             | `start_with(prefix)`           | String starts with `prefix`.                                         |
-| **String**             | `end_with(suffix)`             | String ends with `suffix`.                                           |
-| **String**             | `contain_string(substring)`    | String contains `substring`.                                         |
-| **String**             | `match_regex(pattern)`         | String matches a regular expression (`pattern`) anywhere within it.  |
-| **Snapshot**           | `match_snapshot(path)`         | Compares a `String` to a snapshot file (creates it on first run).    |
-| **Snapshot**           | `match_snapshot_inspect(path)` | Snapshot testing for any value via `string.inspect` serialization.   |
+**One chain that checks too much.** *Symptom:* a long chain fails, and the message fits only one of its checks. *Fix:* split it into two tests, each with its own message.
 
-### Writing custom matchers (the matcher pattern)
+**A partial check where the whole value is known.** *Symptom:* a field you didn't check changes, and every test still passes. *Fix:* when you can write out the whole value, use `be_equal` on all of it.
 
-Dream Test doesn’t require a special “custom matcher API.” Built-in and custom matchers follow the same simple pattern:
+**`be_between` for an inclusive range.** *Symptom:* a value equal to a bound fails. *Fix:* `be_between` leaves out both bounds. Use `be_in_range` to include them.
 
-- A matcher is a function that **takes a `MatchResult(a)`** and **returns a `MatchResult(b)`**.
-- If the incoming result is already a failure, the matcher should **propagate it unchanged**.
-- Otherwise, it inspects the value and returns either `MatchOk(value)` or `MatchFailed(AssertionFailure(...))`.
+**`result.unwrap` in a test body.** *Symptom:* a test passes with a default value after the code returned an `Error`. *Fix:* use `be_ok()` or `use value <- result.try(...)`, so an `Error` fails the test.
 
-Here’s a minimal custom matcher that checks “even number”:
+**A snapshot for a small value.** *Symptom:* a test reads a file to compare a three-item list. *Fix:* use `be_equal`. Snapshots are for output too big to write out by hand.
 
-#### An even-number matcher <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/matchers/custom_matchers.gleam#L5-L41"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+## Where to go next
 
-```gleam
-import dream_test/types.{
-  AssertionFailure, CustomMatcherFailure, MatchFailed, MatchOk,
-}
-import dream_test/unit.{describe, it}
-import gleam/int
-import gleam/option.{Some}
-import gleam/string
-
-/// A custom matcher that checks if an integer is even.
-///
-/// Matchers receive a `MatchResult(a)` and return a `MatchResult(b)`.
-/// Most matchers keep the same type (a == b), but unwrapping matchers
-/// like `be_some` change the type.
-///
-pub fn be_even(result) {
-  case result {
-    // If already failed, propagate the failure
-    MatchFailed(failure) -> MatchFailed(failure)
-    // Otherwise, check our condition
-    MatchOk(value) -> check_even(value)
-  }
-}
-
-fn check_even(value) {
-  case value % 2 == 0 {
-    True -> MatchOk(value)
-    False ->
-      MatchFailed(AssertionFailure(
-        operator: "be_even",
-        message: "",
-        payload: Some(CustomMatcherFailure(
-          actual: int.to_string(value),
-          description: "expected an even number",
-        )),
-      ))
-  }
-}
-```
-
-This example uses a structured `payload` (`CustomMatcherFailure`) so reporters can display richer diagnostics without forcing you to bake everything into a string message.
-
-### Why matchers unwrap values
-
-The “unwrap then assert” flow is one of the biggest quality-of-life wins of the pipeline approach.
-
-Instead of:
-
-- Pattern matching in every test
-- Copy/pasting error handling
-- Producing unclear failures (“expected Ok(_) but got Error(_)”) without context
-
-…you can write the story you mean: “this should be Ok, and the value should equal X.”
-
-### Explicit success/failure (when branching is unavoidable)
-
-Sometimes you need a conditional check that isn’t a good fit for the normal matcher pipeline.
-Use `succeed()` and `fail_with("...")` to keep the return type consistent.
-
-#### Explicit success and failure <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/explicit_failures.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
-```gleam
-import dream_test/matchers.{fail_with, succeed}
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/unit.{describe, it}
-import snippets.{divide}
-
-pub fn tests() {
-  describe("Explicit failures", [
-    it("succeeds explicitly when division works", fn() {
-      let result = divide(10, 2)
-      Ok(case result {
-        Ok(_) -> succeed()
-        Error(_) -> fail_with("Should have succeeded")
-      })
-    }),
-    it("fails explicitly when expecting an error", fn() {
-      let result = divide(10, 0)
-      Ok(case result {
-        Ok(_) -> fail_with("Should have returned an error")
-        Error(_) -> succeed()
-      })
-    }),
-  ])
-}
-
-pub fn main() {
-  runner.new([tests()])
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
-}
-```
-
-### Common pitfalls (and how to avoid them)
-
-- **Forgetting `or_fail_with(...)`**: without it, failures tend to be harder to interpret in CI logs. Treat it like part of the assertion, not an optional extra.
-- **Asserting too much in one chain**: long chains can hide which step mattered. Split into smaller checks when it improves clarity.
-- **Using snapshots where equality is clearer**: if a value is tiny, prefer `be_equal(...)` over snapshot matchers (see the snapshot chapter for the tradeoff).
-
-### What's Next?
-
-- Go back to [Context-aware unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md)
-- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
-- Continue to [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)
+- [Write your own matcher](https://github.com/TrustBound/dream_test/blob/main/docs/guides/custom-matchers.md): a matcher for your own types, with its own failure output.
+- [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md): compare big outputs with a file.
+- [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md#matchers): every built-in matcher.
+- [API reference on HexDocs](https://hexdocs.pm/dream_test/dream_test/matchers.html): `dream_test/matchers`.

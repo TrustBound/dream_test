@@ -482,7 +482,7 @@ pub fn default_timeout_ms(
 
 /// Exit the BEAM with status 1 if the run fails.
 ///
-/// The run fails in five cases (see "Exit status" in
+/// The run fails in five cases (see "Step 6: Decide the exit status" in
 /// `docs/guides/runner-and-execution.md`):
 ///
 /// 1. A test is `Failed`, `TimedOut` or `SetupFailed`.

@@ -1,0 +1,19 @@
+3/3 [███████████████████████████████████████████████████████████████] 100% done 
+Calculator
+  ✓ adds two numbers
+  ✓ divides two numbers
+  ✗ rounds a division up
+    be_equal
+      Message: 7 / 2 should round up to 4
+      Expected: 4
+      Actual:   3
+
+Failures:
+Calculator
+  ✗ rounds a division up
+    be_equal
+      Message: 7 / 2 should round up to 4
+      Expected: 4
+      Actual:   3
+
+Summary: 3 run, 1 failed, 2 passed in 0ms

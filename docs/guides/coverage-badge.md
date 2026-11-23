@@ -1,23 +1,64 @@
-## Coverage badge on GitHub
+# Publish a coverage badge from your own CI
 
-This chapter shows how to put a live coverage badge in your README. Your own GitHub Actions workflow measures the coverage, then writes one small JSON file to a `badges` branch. [shields.io](https://shields.io/badges/endpoint-badge) reads that file and draws the badge. No outside coverage service gets your code or a token.
+A coverage badge in your README tells every visitor how much of the code the tests run, and it keeps you honest when the number drops. Most badges come from an outside coverage service that wants your code and a token. You don't need one. Your own GitHub Actions workflow already measures the coverage. It can write one small JSON file to a `badges` branch, and [shields.io](https://shields.io/badges/endpoint-badge) draws the badge from that file. This guide sets that up, with the exact workflow that Dream Test uses for its own badge.
 
-Dream Test uses the same setup for its own badge.
+## Table of Contents
 
-### Mental model
+- [What you'll build](#what-youll-build)
+- [Before you start](#before-you-start)
+- [How the badge gets made](#how-the-badge-gets-made)
+- [Which parts you need](#which-parts-you-need)
+- [Step 1: Write the JSON summary](#step-1-write-the-json-summary)
+- [Step 2: Read the total in the test job](#step-2-read-the-total-in-the-test-job)
+- [Step 3: Publish the badge from a second job](#step-3-publish-the-badge-from-a-second-job)
+- [Step 4: Add the badge to your README](#step-4-add-the-badge-to-your-readme)
+- [The badge colour](#the-badge-colour)
+- [When the badge doesn't work](#when-the-badge-doesnt-work)
+- [Test your code](#test-your-code)
+- [Common pitfalls](#common-pitfalls)
+- [Where to go next](#where-to-go-next)
+
+## What you'll build
+
+In this guide you'll:
+
+- Make your test run write a JSON summary of the coverage.
+- Read the total and a colour from it in CI, on every push and pull request.
+- Publish a badge file to a `badges` branch from a job that runs no project code.
+- Show the badge in your README, with a link to the CI runs.
+
+## Before you start
+
+You need coverage in your test run. [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md) sets it up.
+
+```sh
+gleam add --dev dream_test
+```
+
+The setup works for a public GitHub repository with GitHub Actions. It uses only `git`, `jq` and `base64`, which every `ubuntu-latest` runner has, and no third-party action.
+
+## How the badge gets made
 
 - **The test job measures.** `gleam test` writes a JSON summary of the coverage.
-- **The test job reads the total.** A shell step turns the total into a badge text (`80.0%`) and a colour.
-- **A second job publishes.** It runs only on a push to `main`. It publishes whenever `gleam test` wrote the JSON and the read step produced a badge text, also when tests failed or the total is below the minimum. It commits `coverage.json` to the `badges` branch. It runs no project code, so it is the only job with write access.
-- **shields.io draws.** The README image asks shields.io for a badge. shields.io reads `coverage.json` from the `badges` branch.
+- **The test job reads the total.** A shell step turns the total into a badge text, such as `80.0%`, and a colour.
+- **A second job publishes.** It runs only on a push to `main`. It commits `coverage.json` to the `badges` branch. It runs no project code, so it's the only job with write access.
+- **shields.io draws.** The README image asks shields.io for a badge, and shields.io reads `coverage.json` from the `badges` branch.
 
-The `badges` branch has no shared history with your code. It holds only `coverage.json`, and each changed total adds one commit.
+The `badges` branch shares no history with your code. It holds only `coverage.json`, and each changed total adds one commit.
 
-### 1. Write the JSON summary
+## Which parts you need
 
-Set `coverage.json_path` in your test `main`. The badge step reads `total` and `minimum_percent` from this file.
+| Your situation | Do | Why |
+|:---|:---|:---|
+| No workflow yet | Copy the parts of Steps 2 and 3 into `.github/workflows/ci.yml`, with your checkout, setup and test steps | The badge needs the test job and the publish job in one workflow. |
+| A workflow with a test job already | Add the `outputs`, `id: tests` and the read step to your test job, and add the publish job | The publish job reads the test job by its id `test`. |
+| A private repository | Don't use this setup | shields.io can't read `raw.githubusercontent.com` of a private repository without a token. |
 
-#### Coverage for the badge <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_badge.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+## Step 1: Write the JSON summary
+
+Set `coverage.json_path` in your test `main`. The badge step reads `total` and `minimum_percent` from this file:
+
+### Coverage for the badge <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/coverage/coverage_badge.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 fn coverage_config() {
@@ -35,47 +76,48 @@ pub fn main() {
 }
 ```
 
-The minimum is optional. It sets the badge colour (see below). With `runner.exit_on_failure`, a total below the minimum makes `gleam test` end with exit status 1, so the `test` job fails. The workflow below still reads the total and publishes it, in red. It also publishes when tests fail: the badge shows the coverage that the run measured. If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written. Then the badge step fails when the tests passed. When the tests failed, it writes no badge text, and nothing is published.
+The minimum is optional. It sets the badge colour (see [The badge colour](#the-badge-colour)). With `runner.exit_on_failure`, a total below the minimum makes `gleam test` end with exit status 1, so the test job fails. The workflow still reads the total and publishes it, in red. It also publishes when tests fail: the badge shows the coverage that the run measured.
 
-### 2. Add the workflow
+If you use `runner.coverage_from_environment`, set `DREAM_TEST_COVERAGE: "1"` on the `gleam test` step. Without coverage, no JSON file is written: then the badge step fails when the tests passed, and writes no badge text when they failed, so nothing is published.
 
-Save this file as `.github/workflows/coverage.yml`, or copy these three parts into your existing workflow:
+## Step 2: Read the total in the test job
 
-- the `outputs` and the last step of the `test` job. The job must have the id `test`, because the `coverage-badge` job reads it with `needs: test` and `needs.test.outputs`
-- `id: tests` on your `gleam test` step, because the last step reads its result
-- the whole `coverage-badge` job
+These are the lines of Dream Test's own workflow, `.github/workflows/ci.yml`. The test job must have the id `test`, and declare two outputs for the publish job:
 
-Replace `OWNER/REPO` with your repository. Change `main` if your default branch has a different name.
+### The outputs of the test job <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/.github/workflows/ci.yml#L19-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-```yaml illustration
-name: Coverage
-
-on:
-  pull_request:
-  push:
-    branches:
-      - main
-
-jobs:
+```yaml
   test:
+    name: Build & Test
     runs-on: ubuntu-latest
     outputs:
       coverage_message: ${{ steps.coverage_badge.outputs.message }}
       coverage_color: ${{ steps.coverage_badge.outputs.color }}
-    steps:
-      - uses: actions/checkout@v4
+```
 
-      - uses: erlef/setup-beam@v1
-        with:
-          otp-version: "28"
-          gleam-version: "1.19.2"
-          rebar3-version: "3"
+The step that runs the tests needs `id: tests`, because the read step checks its result. Dream Test runs its tests from a script. In your project, this step runs `gleam test`:
 
-      - name: Run tests
+### The test step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/.github/workflows/ci.yml#L58-L62"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```yaml
+      - name: Check, build and test
         id: tests
-        run: gleam test
+        env:
+          CI: "true"
+        run: sh scripts/check.sh
+```
 
+The last step of the test job reads the JSON summary, and writes the badge text and colour to the job outputs:
+
+### The read step <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/.github/workflows/ci.yml#L67-L107"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```yaml
       - name: Read coverage for the badge
+        # Runs on every event, so a pull request also shows that the JSON
+        # summary is readable. Only the badge job below publishes. It also
+        # runs when an earlier step failed: the badge shows the coverage
+        # that the run measured, also when tests failed or the total is
+        # below the minimum (then in red).
         id: coverage_badge
         if: ${{ !cancelled() }}
         env:
@@ -111,11 +153,33 @@ jobs:
           echo "Coverage badge: $message ($color)"
           echo "message=$message" >> "$GITHUB_OUTPUT"
           echo "color=$color" >> "$GITHUB_OUTPUT"
+```
 
+What it does:
+
+- It runs on every event, so a pull request also shows that the JSON is readable. `!cancelled()` makes it run also when `gleam test` failed.
+- It fails when the tests passed and the file is missing, or when the file has no executable lines. When `gleam test` failed and wrote no file, it writes no badge text and passes.
+- The `jq` program applies [the colour rule](#the-badge-colour) to the exact line counts. The badge text is `total.percent` from the JSON, which is already rounded down, with one decimal: `80.0%`.
+
+## Step 3: Publish the badge from a second job
+
+The publish job reads the outputs of the test job and commits `coverage.json` to the `badges` branch:
+
+### The publish job <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/.github/workflows/ci.yml#L109-L174"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```yaml
   coverage-badge:
-    if: ${{ !cancelled() && needs.test.outputs.coverage_message != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'OWNER/REPO' }}
+    name: Publish coverage badge
+    # Only a push to main in this repository publishes. Pull requests and
+    # forks never do. The job publishes whenever the test run wrote the
+    # coverage JSON and the read step produced a badge text, also when tests
+    # failed or the total is below the minimum. A test run that wrote no
+    # coverage JSON publishes nothing.
+    if: ${{ !cancelled() && needs.test.outputs.coverage_message != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'TrustBound/dream_test' }}
     needs: test
     runs-on: ubuntu-latest
+    # This job runs no project code. It only writes one file to the
+    # `badges` branch.
     permissions:
       contents: write
     concurrency:
@@ -172,23 +236,35 @@ jobs:
           echo "Coverage badge published: $MESSAGE ($COLOR)"
 ```
 
-What each part does:
+Change `TrustBound/dream_test` in the `if:` line to your repository, and `main` to your default branch if it has another name. What each part does:
 
 | Part | Why |
-|---|---|
-| `id: tests` | The read step gets the result of `gleam test` from it. |
-| `Read coverage for the badge` | Runs on every event, so a pull request also shows that the JSON is readable. `!cancelled()` makes it run also when `gleam test` failed. It fails when the tests passed and the file is missing, or when the file has no executable lines. When `gleam test` failed and wrote no file, it writes no badge text. |
-| `if:` on `coverage-badge` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. `!cancelled()` makes it run also when the `test` job failed, so it publishes whenever `gleam test` wrote the JSON and the read step produced a badge text, also when tests failed. `coverage_message != ''` skips it when no badge text was read. |
-| `needs: test` | The job starts after the `test` job and reads its badge text. |
+|:---|:---|
+| `if:` | Only a push to `main` in your repository publishes. Pull requests and forks skip the job. `!cancelled()` makes it run also when the test job failed, and `coverage_message != ''` skips it when no badge text was read. |
+| `needs: test` | The job starts after the test job and reads its outputs. |
 | `permissions: contents: write` | The push needs it. Only this job gets it, and this job runs no project code. |
 | `concurrency` | Two quick pushes to `main` publish one after the other, not at the same time. |
-| `git ls-remote` | Exit status `2` means there is no `badges` branch yet, so the step makes it as an orphan branch. |
-| `git diff --cached --quiet` | No commit when the total did not change. |
+| `git ls-remote` | Exit status `2` means there's no `badges` branch yet, so the step makes it as an orphan branch. |
+| `git diff --cached --quiet` | No commit when the total didn't change. |
 | `HEAD:refs/heads/badges` | The step pushes to `badges` only. It never touches another branch. |
 
-The step uses only `git`, `jq` and `base64`, which every `ubuntu-latest` runner has. It needs no third-party action.
+## Step 4: Add the badge to your README
 
-### 3. The badge colour
+Replace `OWNER/REPO` with your repository:
+
+```markdown
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OWNER/REPO/badges/coverage.json)](https://github.com/OWNER/REPO/actions/workflows/ci.yml?query=branch%3Amain)
+```
+
+The link opens the runs of the workflow on `main`. Add `&style=flat-square`, or another shields.io style, to the image address to match your other badges.
+
+Then push to `main`, and check it:
+
+1. Open the `Publish coverage badge` job in the Actions tab. Its last line is `Coverage badge published: 80.0% (yellow)`, or `Coverage badge unchanged: 80.0%` when the total didn't change.
+2. Run `git fetch origin badges`, then `git show origin/badges:coverage.json`. It prints the badge file.
+3. Open `https://raw.githubusercontent.com/OWNER/REPO/badges/coverage.json` in a browser. It shows the same JSON.
+
+## The badge colour
 
 The colour follows the rule of the coloured coverage table (`coverage.color()`):
 
@@ -200,49 +276,41 @@ The colour follows the rule of the coloured coverage table (`coverage.color()`):
 | no minimum: below 50% | `red` |
 | no minimum: 50% or above, below 100% | `yellow` |
 
-The comparison uses the exact line counts, like `coverage.check_minimum`. The badge text is the rounded-down `total.percent` from the JSON, with one decimal: `80.0%`.
+The comparison uses the exact line counts, like `coverage.check_minimum`.
 
-### 4. Add the badge to your README
-
-Replace `OWNER/REPO` again:
-
-```markdown
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OWNER/REPO/badges/coverage.json)](https://github.com/OWNER/REPO/actions/workflows/coverage.yml?query=branch%3Amain)
-```
-
-The link opens the runs of the workflow on `main`. Add `&style=flat-square` (or another shields.io style) to the image address to match your other badges.
-
-### 5. Make sure it works
-
-1. Push to `main`.
-2. Open the `coverage-badge` job in the Actions tab. The last line is `Coverage badge published: 80.0% (yellow)`, or `Coverage badge unchanged: 80.0%` when the total did not change.
-3. Read the file from the branch:
-
-   ```sh illustration
-   git fetch origin badges
-   git show origin/badges:coverage.json
-   ```
-
-4. Open `https://raw.githubusercontent.com/OWNER/REPO/badges/coverage.json` in a browser. It shows the same JSON.
-
-### Troubleshooting
+## When the badge doesn't work
 
 | Problem | Cause and fix |
 |---|---|
 | The badge shows an error in place of a percent | No push to `main` published the file yet. Push to `main` once. |
 | The badge shows an old value | GitHub and shields.io keep a copy for a few minutes. Wait about five minutes. |
-| The job is `skipped` | The `if:` does not match. Check the branch name and the `OWNER/REPO` value. In a fork, the job is skipped on purpose. To publish from a fork, set the fork's own name. |
+| The job is `skipped` | The `if:` doesn't match. Check the branch name and the repository name. In a fork, the job is skipped on purpose. To publish from a fork, set the fork's own name. |
 | `Permission to OWNER/REPO.git denied to github-actions[bot]` (403) | The job has no write access. Keep `permissions: contents: write` on the job. If your organization blocks write access for workflows, an admin must allow it in Settings, Actions, General, Workflow permissions. |
 | `protected branch hook declined` or a ruleset error | A branch protection rule or ruleset covers `badges`, often with a pattern such as `*` or `**`. Remove `badges` from the rule, or let GitHub Actions bypass it. |
-| `Coverage badge failed: build/coverage/coverage.json does not exist.` | The test run did not write the JSON. Set `coverage.json_path`, and turn coverage on in CI (`DREAM_TEST_COVERAGE` when you use `runner.coverage_from_environment`). |
-| The badge does not turn red when the total falls below the minimum | The total below the minimum fails `gleam test`. Steps and jobs without a status function in their `if:` are skipped after a failure. Keep `!cancelled()` in the `if:` of the read step and of the `coverage-badge` job. |
+| `Coverage badge failed: build/coverage/coverage.json does not exist.` | The test run didn't write the JSON. Set `coverage.json_path`, and turn coverage on in CI (`DREAM_TEST_COVERAGE` when you use `runner.coverage_from_environment`). |
+| The badge doesn't turn red when the total falls below the minimum | The total below the minimum fails `gleam test`, and steps and jobs without a status function in their `if:` are skipped after a failure. Keep `!cancelled()` in the `if:` of the read step and of the publish job. |
 | `the coverage JSON has no executable lines` | Coverage found no lines to measure. Check `coverage.source_directory` and your exclusions. |
 | `failed to push some refs` (not a fast-forward) | Another run pushed to `badges` at the same time. Keep the `concurrency` group, then run the job again. |
 | The badge never loads in a private repository | `raw.githubusercontent.com` needs a token for a private repository, and shields.io has none. This setup works only for a public repository. |
 
-### What's Next?
+## Test your code
 
-- Go back to [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
-- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
-- Read the Coverage section of the [main README](https://github.com/TrustBound/dream_test/blob/main/README.md#coverage)
-- Continue to [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
+The read step is the part most likely to break, and you can run it on your machine before you push. Run your tests with coverage so the JSON summary exists, then run the `jq` program of the read step against `build/coverage/coverage.json`. It prints `green`, `yellow` or `red`. A file from a run with no executable lines makes `jq` fail with `the coverage JSON has no executable lines`, as CI would.
+
+The JSON summary itself is tested in this repository: the [coverage guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md#step-7-write-files-for-other-tools) shows a real one, and its test compares it with a real coverage run.
+
+## Common pitfalls
+
+**A publish job without `!cancelled()`.** *Symptom:* the badge stays green while CI is red. *Fix:* keep `!cancelled()` in the `if:` of the read step and of the publish job, so a failed test run still publishes its real total.
+
+**Write access for the test job.** *Symptom:* code from a pull request could push to your repository. *Fix:* give `contents: write` only to the publish job, which runs no project code.
+
+**A badge branch under branch protection.** *Symptom:* `protected branch hook declined`. *Fix:* leave `badges` out of your rules.
+
+**No `id: test` on the test job.** *Symptom:* the publish job can't read `needs.test.outputs`. *Fix:* name the job `test`, or change `needs:` and `needs.test` to its id.
+
+## Where to go next
+
+- [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): the minimum, the exclusions and the JSON summary.
+- [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): the exit status that fails the test job.
+- [shields.io endpoint badges](https://shields.io/badges/endpoint-badge): the format of `coverage.json`, and the badge styles.

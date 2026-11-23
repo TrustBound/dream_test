@@ -1,0 +1,14 @@
+start the database for 2 suites
+  create a schema for Cart
+    run Cart > starts empty
+    run Cart > adds an item
+  create a schema for Checkout
+    run Checkout > charges the card
+stop the database
+Cart
+  ✓ starts empty
+  ✓ adds an item
+Checkout
+  ✓ charges the card
+
+Summary: 3 run, 0 failed, 3 passed in 0ms

@@ -1,0 +1,9 @@
+Response matchers
+  have_status
+    ✓ passes the response on when the status matches
+    ✓ fails with the actual status when it differs
+    ✓ keeps a failure from an earlier matcher
+  have_body
+    ✓ passes the body on
+
+Summary: 4 run, 0 failed, 4 passed in 0ms

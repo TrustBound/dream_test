@@ -1,0 +1,12 @@
+outer before_all
+  outer before_each
+    inner before_each
+      the test body
+    inner after_each
+  outer after_each
+outer after_all
+Outer
+  Inner
+    ✓ runs in the middle
+
+Summary: 1 run, 0 failed, 1 passed in 0ms

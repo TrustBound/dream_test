@@ -18,31 +18,26 @@
 //// ## Schema
 ////
 //// The keys are always in this order. A new key is only added at the end of
-//// an object, and `version` changes when a key changes meaning.
+//// an object, and `version` changes when a key changes meaning. This is the
+//// summary of a run that measures `src/app`, with two files excluded:
 ////
-//// ```text illustration
-//// {
-////   "version": 1,
-////   "files": [
-////     {
-////       "path": "src/app/cart.gleam",         // relative to the project root
-////       "lines_hit": 18,                       // executable lines that ran
-////       "lines_total": 20,                     // executable lines
-////       "percent": 90.0,                       // rounded down; null with no lines
-////       "missing": [{"first": 12, "last": 13}],
-////       "ignored": [{"first": 40, "last": 44, "reason": "debug only"}]
-////     }
-////   ],
-////   "excluded_files": [
-////     {"path": "src/app/generated/db.gleam",
-////      "pattern": "src/app/generated/**",
-////      "reason": "generated code"}         // null when there is no reason
-////   ],
-////   "total": {"lines_hit": 18, "lines_total": 20, "percent": 90.0},
-////   "minimum_percent": 80.0,                  // null when no minimum is set
-////   "minimum_percent_per_file": 50.0          // null when no per-file minimum
-//// }
+//// ### A JSON summary <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_coverage_json.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
+//// ```text
+//// {"version":1,"files":[{"path":"src/app/cart.gleam","lines_hit":3,"lines_total":3,"percent":100.0,"missing":[],"ignored":[]}],"excluded_files":[{"path":"src/app/generated/db.gleam","pattern":"src/app/generated/**","reason":"generated code"},{"path":"src/app/internal/debug.gleam","pattern":"src/app/internal/**","reason":"debug helpers"}],"total":{"lines_hit":3,"lines_total":3,"percent":100.0},"minimum_percent":90.0,"minimum_percent_per_file":null}
 //// ```
+////
+//// - `version`: the schema version, `1`.
+//// - `files`: one object for each measured file, sorted by path: `path`
+////   (relative to the project root), `lines_hit` (executable lines that
+////   ran), `lines_total` (executable lines), `percent` (rounded down;
+////   `null` with no lines), `missing` (ranges such as
+////   `{"first": 12, "last": 13}`) and `ignored` (ranges with a `reason`).
+//// - `excluded_files`: `path`, the `pattern` that matched, and the
+////   `reason`, or `null` when there is no reason.
+//// - `total`: `lines_hit`, `lines_total` and `percent` of all files.
+//// - `minimum_percent` and `minimum_percent_per_file`: `null` when no
+////   minimum is set.
 ////
 //// `minimum_percent` comes from `coverage.minimum_percent` and
 //// `minimum_percent_per_file` from `coverage.minimum_percent_per_file`.

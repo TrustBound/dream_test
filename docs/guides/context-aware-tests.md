@@ -1,146 +1,77 @@
-## Context-aware unit tests (`dream_test/unit_context`)
+# Share a context between tests
 
-`unit_context` is for the cases where you want to **pass a shared value into every test** (and have hooks transform it).
+Plain hooks return `Ok(Nil)`, so they can make a file or start a server, but they can't hand anything to the tests. Real setups make values: a database connection, the subject of a process, a client with a token. You want each test to get that value as an argument, with its type checked by the compiler, not fished out of a global. That's what a context does in Dream Test. This guide shows how to pass a value to every test, how to change it in hooks, how to start a resource once and stop it after the last test, and what the report says when that setup fails.
 
-If you’ve ever built a DB handle, HTTP client, fixture, or “scenario state” and wished you could thread it through tests cleanly, this is the tool.
+## Table of Contents
 
-Use `dream_test/unit_context` when you want hooks and tests to operate on a shared, strongly-typed **context value** that you control.
+- [What you'll build](#what-youll-build)
+- [Before you start](#before-you-start)
+- [Which kind of suite to use](#which-kind-of-suite-to-use)
+- [Step 1: Switch to the context DSL](#step-1-switch-to-the-context-dsl)
+- [Step 2: Change the context in hooks](#step-2-change-the-context-in-hooks)
+- [Step 3: Get the context from a setup](#step-3-get-the-context-from-a-setup)
+- [Step 4: Run context suites with other suites](#step-4-run-context-suites-with-other-suites)
+- [When the setup fails](#when-the-setup-fails)
+- [Test your code](#test-your-code)
+- [Common pitfalls](#common-pitfalls)
+- [Where to go next](#where-to-go-next)
 
-### `unit` vs `unit_context`: same DSL names, different data flow
+## What you'll build
 
-`dream_test/unit_context` intentionally mirrors the `dream_test/unit` DSL. You’ll see the **same function names** (`describe`, `it`, `group`, hooks like `before_each`, etc.) so you don’t have to learn a second vocabulary.
+In this guide you'll:
 
-What changes is the **shape of the suite**:
+- Give a suite a starting value that every test receives.
+- Change that value in `before_each` hooks, with nested groups.
+- Start a user store process once for a suite, hand it to every test, and stop it after the last one.
+- Read the report of a setup that can't start the store.
+- Test the setup and teardown functions on their own.
 
-- In `unit`, `describe("name", [...])` builds a suite where `it("name", fn() { ... })` has no context parameter.
-- In `unit_context`, `describe("name", initial, [...])` builds a suite where `it("name", fn(context) { ... })` receives the current context value.
+## Before you start
 
-In practice, “switching” between them is mostly swapping the import:
+You need Dream Test as a dev dependency and a test runner module. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up, and [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md) explains hooks.
 
-#### The unit import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/dsl_import.gleam#L2-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+```sh
+gleam add --dev dream_test
+```
+
+The store example uses `gleam_erlang` for processes. The outputs on this page are real outputs of the code shown, with every time set to 0, so they stay the same from run to run.
+
+## Which kind of suite to use
+
+| Your situation | Use | Why |
+|:---|:---|:---|
+| The tests need no shared value | `dream_test/unit` | The simplest. Hooks return `Ok(Nil)`. |
+| The tests share a value you can build up front, and hooks change it | `unit_context.describe(name, initial, children)` | Every hook and test gets the value. |
+| The value comes from a setup that must run once and be undone, such as a process or a pool | `unit_context.describe_with_setup(name:, setup:, teardown:, children:)` | The setup runs once, its value is the context, and the teardown gets it after the last test. |
+| Gherkin scenarios that share a server | `steps.new_with_setup` | The same idea for features. See [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#step-6-start-a-server-once-for-all-scenarios). |
+
+When the setup is tiny and reads well inside the test, stay with `unit`. A context earns its place when the setup makes a value that many tests use.
+
+## Step 1: Switch to the context DSL
+
+`dream_test/unit_context` has the same names as `dream_test/unit`: `describe`, `group`, `it`, `skip`, `pending`, the four hooks and `with_tags`. Switching is mostly a change of import:
+
+### The unit import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/unit/dsl_import.gleam#L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/unit.{describe, it}
 ```
 
-#### The unit_context import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_dsl_import.gleam#L2-L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The unit_context import <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_dsl_import.gleam#L2"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/unit_context.{describe, it}
 ```
 
-Tip: avoid importing _both_ sets of unqualified names in the same module—`describe`/`it` would collide. Pick one DSL per test module.
+Two things change. `describe` takes a starting value, `describe(name, initial, children)`, and each `it` body takes the context, `it(name, fn(context) { ... })`. Pick one DSL for each test module: if you import the unqualified names of both, `describe` and `it` clash.
 
-This is the right tool when:
+Why the starting value? Gleam must know the type of the context when it checks `fn(context) { ... }`, and the suite is built before any hook runs. The `initial` value fixes that type when the suite is built, so every hook and test is type-checked against it. No hook has to be "the one that makes the context".
 
-- Your setup produces values you want to pass into the test body (DB handles, fixtures, clients).
-- You want to model “state” explicitly and type-safely (instead of storing it in globals or rebuilding it in every test).
-- You want hooks to _transform_ the context for each test.
+## Step 2: Change the context in hooks
 
-If you don’t need an explicit context, prefer `dream_test/unit` — it’s simpler.
+In a context suite, `before_each` gets the context and returns `Ok(new_context)`. Each test gets the context after all its `before_each` hooks ran. This suite counts the hooks:
 
-For setup/teardown that spans multiple suites, use runner-level hooks in [Runner & execution model](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md).
-
-### The idea: context flows through the suite
-
-- You give `describe` an `initial` value.
-- `before_all` / `before_each` can transform that context.
-- Each `it` receives the current context.
-
-### Why the initial value exists
-
-The `initial` value might look redundant at first (“why not let `before_all` create the context?”), but it’s doing an important job: it makes the **context type known when the suite is built**, before any tests run.
-
-That matters in Gleam because:
-
-- The test structure is built as ordinary data, and its parts (`before_each`, `it`, etc.) are typed with a concrete `context` type.
-- Hooks run at test time, but the compiler needs the context type at compile time so `it("...", fn(context) { ... })` is type-checked correctly.
-- Practically: it keeps context-aware suites simple and predictable—no special “first hook defines the context” rule, and no loss of type-safety.
-
-This is the “make dependencies explicit” version of hooks: instead of setup functions writing to global state (or relying on process dictionaries), the setup returns a value, and that value is passed into the test body.
-
-### A context from a setup (`describe_with_setup`)
-
-Sometimes the context is a resource that must start before the first test and stop after the last one, for example a server or a database pool. Use `describe_with_setup` in place of `describe`. The reports call its setup the *context setup*, and its teardown the *context teardown*:
-
-- `setup` runs one time for the tests of this `describe_with_setup`, before the first of them, and only when at least one of them runs. A `suite.join` or `suite.group` of two such suites runs two setups, one for each. Its value is the context of every hook and test.
-- `teardown` gets the same value after the last test.
-- Both run in one process that lives while the tests run, so a process that the setup starts stays alive.
-- When `setup` returns `Error`, crashes or times out, each test is `SetupFailed` with the operator `context setup`, and `teardown` does not run. For an `Error`, the message is the text of the `Error`. A crash reads `the context setup crashed in Store: <reason>`, and a timeout reads `the context setup timed out in Store`.
-- When `teardown` returns `Error`, crashes or times out, the run report gets a teardown failure for the hook `context teardown`. The report shows `context teardown in Store`, then the message, for example `the context teardown crashed in Store: <reason>`.
-- When the process of the setup stops, each test that did not start is `SetupFailed` with `not run: the context setup of "Store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `context setup`, and `teardown` still runs when `setup` returned.
-
-#### A suite whose context comes from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
-```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/unit_context.{describe_with_setup, it}
-import gleam/erlang/process.{type Subject}
-
-pub type Request {
-  Get(reply_to: Subject(Int))
-  Stop
-}
-
-// The setup starts a process that holds a number. It lives while the tests
-// run, because it runs in the process of the setup.
-
-fn start_store() -> Result(Subject(Request), String) {
-  let started = process.new_subject()
-  process.spawn(fn() { serve(started) })
-  case process.receive(started, 1000) {
-    Ok(store) -> Ok(store)
-    Error(Nil) -> Error("the store did not start")
-  }
-}
-
-fn stop_store(store: Subject(Request)) -> Result(Nil, String) {
-  process.send(store, Stop)
-  Ok(Nil)
-}
-
-fn serve(started: Subject(Subject(Request))) -> Nil {
-  let requests = process.new_subject()
-  process.send(started, requests)
-  answer(requests)
-}
-
-fn answer(requests: Subject(Request)) -> Nil {
-  case process.receive_forever(requests) {
-    Get(reply_to: reply_to) -> {
-      process.send(reply_to, 42)
-      answer(requests)
-    }
-    Stop -> Nil
-  }
-}
-
-pub fn tests() {
-  describe_with_setup(
-    "Store",
-    setup: start_store,
-    teardown: stop_store,
-    children: [
-      it("gives the number", fn(store: Subject(Request)) {
-        process.call(store, 1000, Get)
-        |> should
-        |> be_equal(42)
-        |> or_fail_with("the store should give 42")
-      }),
-    ],
-  )
-}
-```
-
-### Context suites run with other suites
-
-The context stays inside the suite, so every suite has the same type, `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery also loads a context suite and runs it with its own context. See [Gherkin: a setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for a run with all three kinds.
-
-### A minimal example: counter context
-
-A `before_each` hook runs before every test of its group, wherever it stands in the list of the group. A hook after a test still runs before that test. To give a hook to some tests only, put them in a nested `group`.
-
-#### A counter context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A counter context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -189,86 +120,254 @@ pub fn main() {
 }
 ```
 
-### Hooks in nested groups (`group`)
+Both tests pass:
 
-`unit_context.group` works like `unit.group`: it nests tests, and it limits hooks.
+### The report of the counter suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_context_counter.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-- A hook of an **outer group** applies to every test in it, also in nested groups.
-- A hook of an **inner group** applies only to the tests in that group.
+```text
+Context-aware suite
+  ✓ receives the updated context
+  with a second hook
+    ✓ sees both hooks
 
-#### Hooks in context-aware groups <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/hooks/context_aware_grouping.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+Summary: 2 run, 0 failed, 2 passed in 0ms
+```
+
+The first test sees `1`: one hook ran. The test in the nested group sees `2`: the outer hook ran, then its own. A hook of an outer group applies to every test in it, also in nested groups, and a hook of an inner group only to the tests of that group. A hook applies to its whole group, wherever it stands in the list.
+
+Each test starts from the same value. A change that one test's hooks make never reaches another test, so the tests can run in parallel.
+
+Note the annotation `fn(context: Context)`. Gleam lets you read a record field such as `context.counter` only when it knows the record type, and an anonymous function doesn't always give it enough to infer it. The annotation is the smallest hint that makes `context.counter` compile.
+
+## Step 3: Get the context from a setup
+
+A counter you can write up front. A running process you can't: something has to start it, and something has to stop it. `describe_with_setup` takes a `setup` function that returns `Ok(context)`, and a `teardown` function that gets the context back. Here the setup starts a user store, a small process that holds names by id:
+
+### A store that every test gets <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/context_store.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/unit_context.{before_each, describe, group, it}
+import dream_test/unit_context.{before_each, describe_with_setup, it}
+import gleam/dict.{type Dict}
+import gleam/erlang/process.{type Subject}
 
-pub type Context {
-  Context(counter: Int)
+/// A message to the user store: a small process that holds names by id.
+pub type Message {
+  Put(id: Int, name: String)
+  Get(id: Int, reply_to: Subject(Result(String, Nil)))
+  Stop
 }
 
-fn increment_counter(context: Context) {
-  Ok(Context(counter: context.counter + 1))
+/// Starts the store, and gives the subject to send it messages.
+pub fn start_store() -> Result(Subject(Message), String) {
+  let started = process.new_subject()
+  process.spawn(fn() { serve(started) })
+  case process.receive(started, 1000) {
+    Ok(store) -> Ok(store)
+    Error(Nil) -> Error("the store did not start")
+  }
+}
+
+pub fn stop_store(store: Subject(Message)) -> Result(Nil, String) {
+  process.send(store, Stop)
+  Ok(Nil)
+}
+
+fn serve(started: Subject(Subject(Message))) -> Nil {
+  let messages = process.new_subject()
+  process.send(started, messages)
+  answer(messages, dict.new())
+}
+
+fn answer(messages: Subject(Message), names: Dict(Int, String)) -> Nil {
+  case process.receive_forever(messages) {
+    Put(id:, name:) -> answer(messages, dict.insert(names, id, name))
+    Get(id:, reply_to:) -> {
+      process.send(reply_to, dict.get(names, id))
+      answer(messages, names)
+    }
+    Stop -> Nil
+  }
 }
 
 pub fn tests() {
-  describe("Context-aware grouping", Context(counter: 0), [
-    // This outer hook applies everywhere under this describe, including groups.
-    before_each(increment_counter),
-
-    group("inner group", [
-      // This hook only applies to tests inside this group.
-      before_each(increment_counter),
-
-      it("sees both outer + inner hooks", fn(context: Context) {
-        context.counter
+  describe_with_setup(
+    "User store",
+    setup: start_store,
+    teardown: stop_store,
+    children: [
+      before_each(put_alice),
+      it("finds a user by id", fn(store: Subject(Message)) {
+        process.call(store, 1000, Get(1, _))
         |> should
-        |> be_equal(2)
-        |> or_fail_with("expected counter to be 2 (outer + inner before_each)")
+        |> be_equal(Ok("Alice"))
+        |> or_fail_with("the store should hold Alice as user 1")
       }),
-    ]),
-
-    it("sees only outer hook", fn(context: Context) {
-      context.counter
-      |> should
-      |> be_equal(1)
-      |> or_fail_with("expected counter to be 1 (outer before_each only)")
-    }),
-  ])
+      it("has no user 2", fn(store: Subject(Message)) {
+        process.call(store, 1000, Get(2, _))
+        |> should
+        |> be_equal(Error(Nil))
+        |> or_fail_with("the store should not hold user 2")
+      }),
+    ],
+  )
 }
 
-pub fn main() {
-  runner.new([tests()])
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
+fn put_alice(store: Subject(Message)) -> Result(Subject(Message), String) {
+  process.send(store, Put(1, "Alice"))
+  Ok(store)
 }
 ```
 
-### Important Gleam detail: when type inference needs help
+### The report of the store suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_context_store.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-In a context-aware test, you often read record fields, such as `context.counter`.
-Gleam can only allow record-field access when it knows the record type, so sometimes you need a minimal type hint:
+```text
+User store
+  ✓ finds a user by id
+  ✓ has no user 2
 
-- `it("reads the counter", fn(context: Context) { ... context.counter ... })`
+Summary: 2 run, 0 failed, 2 passed in 0ms
+```
 
-That’s not “extra ceremony” — it’s the smallest annotation needed for record field access.
+How the setup runs. The reports call it the *context setup*, and the teardown the *context teardown*:
 
-### When to prefer plain `unit` instead
+- The setup runs once for the tests of this `describe_with_setup`, before the first of them, and only when at least one of them runs.
+- Its value is the context of every hook and test. Here every test gets the store's `Subject`, and `before_each(put_alice)` uses it to add a user before each test.
+- The teardown gets the same value after the last test.
+- The setup and the teardown run in one process that lives while the tests run. So the store, which the setup spawned, stays alive for every test, and stops only when the teardown sends `Stop`.
 
-`unit_context` is great when setup produces something you want to reuse. But it’s not “better” by default.
+The tests run in parallel against the one store, so each test must leave the others alone. Here every test reads the user that `before_each` writes, and no test changes it.
 
-Prefer `dream_test/unit` when:
+## Step 4: Run context suites with other suites
 
-- Your setup is tiny and reads well inline.
-- You don’t need hooks to transform shared state.
-- The context would just become another “thing you have to understand” without providing leverage.
+The context stays inside the suite, so a context suite has the same type as any other: `TestSuite`. One `runner.new` takes `unit` suites, `unit_context` suites with different context types, and Gherkin features. Module discovery loads a context suite too, and runs it with its own context. [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#step-6-start-a-server-once-for-all-scenarios) shows a run with all three kinds.
 
-### What's Next?
+`suite.group` and `suite.join` make one suite from several, and each keeps its context. Two `describe_with_setup` suites in one `suite.join` still run two setups, one for each.
 
-- Go back to [Writing unit tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md)
-- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
-- Continue to [Assertions & matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md)
+## When the setup fails
+
+The store might not start: the port is taken, the database is down. Make the setup return `Error(message)` and the tests don't run:
+
+### A setup that cannot start the store <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/context_store_down.gleam#L8-L22"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+pub fn store_down_tests() {
+  describe_with_setup(
+    "User store",
+    setup: fn() { Error("the store did not start: port 7000 is in use") },
+    teardown: fn(_store: Nil) { Ok(Nil) },
+    children: [
+      it("finds a user by id", fn(_store: Nil) {
+        1
+        |> should
+        |> be_equal(1)
+        |> or_fail_with("never runs")
+      }),
+    ],
+  )
+}
+```
+
+### The report of a failed context setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_context_store_down.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+User store
+  ⚠ finds a user by id
+    context setup
+      Message: the store did not start: port 7000 is in use
+
+Failures:
+User store
+  ⚠ finds a user by id
+    context setup
+      Message: the store did not start: port 7000 is in use
+
+Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms
+```
+
+Each test is `SetupFailed`, the operator is `context setup`, and the message is the text of your `Error`. Make that text say what to fix. The teardown doesn't run, because there's no context to tear down. The run fails.
+
+The other ways a context setup or teardown can fail:
+
+- A setup that crashes gives the message `the context setup crashed in User store: <reason>`. One that times out gives `the context setup timed out in User store`.
+- A teardown that returns `Error`, crashes or times out doesn't change the test statuses. The run report gets a teardown failure for the hook `context teardown`, and the report shows `context teardown in User store`, then the message, such as `the context teardown crashed in User store: <reason>`.
+- When the process of the setup stops while the tests run, each test that hadn't started is `SetupFailed` with `not run: the context setup of "User store" stopped (<reason>)`. The run report gets a `types.SetupStopped` for the hook `context setup`, and the teardown still runs, because the setup returned.
+
+## Test your code
+
+The setup and the teardown are plain functions, so test them as plain functions. A setup that starts something broken makes every test of the suite fail in confusing ways, and a teardown that doesn't stop it leaks a process into every later test.
+
+### Tests for the setup and the teardown <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/context_store_setup_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
+import dream_test/unit.{describe, it}
+import gleam/erlang/process
+import gleam/result
+import snippets/guides/context_store.{Get, Put, start_store, stop_store}
+
+pub fn tests() {
+  describe("The user store setup", [
+    it("starts a store that keeps what it gets", fn() {
+      // Arrange
+      use store <- result.try(start_store())
+      process.send(store, Put(7, "Grace"))
+
+      // Act
+      let found = process.call(store, 1000, Get(7, _))
+      use Nil <- result.try(stop_store(store))
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok("Grace"))
+      |> or_fail_with("the new store should give back user 7")
+    }),
+    it("stops the store in the teardown", fn() {
+      // Arrange
+      use store <- result.try(start_store())
+
+      // Act
+      let stopped = stop_store(store)
+
+      // Assert
+      stopped
+      |> should
+      |> be_ok()
+      |> be_equal(Nil)
+      |> or_fail_with("the teardown should succeed")
+    }),
+  ])
+}
+```
+
+The first test starts a store, uses it, and stops it, so it checks that the store the setup gives really works. `use store <- result.try(start_store())` ends the test with the setup's error text if the store doesn't start. The second checks that the teardown returns `Ok(Nil)`. The report:
+
+### The report of the setup tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_context_checks.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+The user store setup
+  ✓ starts a store that keeps what it gets
+  ✓ stops the store in the teardown
+
+Summary: 2 run, 0 failed, 2 passed in 0ms
+```
+
+## Common pitfalls
+
+**Both DSLs imported unqualified.** *Symptom:* the compiler says `describe` or `it` is imported twice. *Fix:* pick `unit` or `unit_context` for the module, or import one of them qualified.
+
+**A field access that doesn't compile.** *Symptom:* `context.counter` gives an error about an unknown record type. *Fix:* annotate the parameter: `fn(context: Context)`.
+
+**Tests that change a shared resource.** *Symptom:* tests of a `describe_with_setup` suite pass alone and fail together. *Fix:* the tests run in parallel against one resource. Give each test its own keys or rows, or run the suite with lower concurrency.
+
+**A resource started in `before_all` of a context suite.** *Symptom:* you need the value in the tests, but `before_all` can only change the context of the group. *Fix:* start the resource in the `setup` of `describe_with_setup`, which runs once and hands its value to every test.
+
+**A vague setup error.** *Symptom:* `Message: failed` under every test. *Fix:* return `Error` with what failed and why, as in `the store did not start: port 7000 is in use`.
+
+## Where to go next
+
+- [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md): the hooks of plain suites, and which process runs each one.
+- [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md): scenarios with a typed state and a shared setup.
+- [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): concurrency for suites that share a resource.
+- [API reference on HexDocs](https://hexdocs.pm/dream_test/dream_test/unit_context.html): `describe`, `describe_with_setup` and the rest of `unit_context`.

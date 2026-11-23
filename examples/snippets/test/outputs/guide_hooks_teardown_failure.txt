@@ -1,0 +1,8 @@
+Database
+  ✓ saves a user
+
+Setup and teardown failures:
+  after_all in Database
+    could not drop the test schema
+
+Summary: 1 run, 0 failed, 1 passed, 1 teardown failed in 0ms

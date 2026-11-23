@@ -43,7 +43,7 @@ pub fn tests() {
 
 /// The exit status and the output of `gleam compile-package` for the
 /// example `compile_errors/<name>.gleam`.
-fn compile_example(name: String) -> Result(#(Int, String), String) {
+pub fn compile_example(name: String) -> Result(#(Int, String), String) {
   let package = packages_folder <> name
   use source <- result.try(
     file.read("compile_errors/" <> name <> ".gleam")

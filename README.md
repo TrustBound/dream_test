@@ -87,43 +87,49 @@ Dream Test splits reporting into:
 - **Progress** (during the run): `runner.progress_reporter(progress.new())`
 - **Results** (after the run): `runner.results_reporters([bdd.new(), json.new(), ...])`
 
-## Full Usage Guide
+## Guides
 
-1. [Installation](https://github.com/TrustBound/dream_test/blob/main/docs/guides/installation.md)
-2. [Quick Start](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md)
-3. [Writing Tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md)
-4. [Context-Aware Tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md)
-5. [Assertions & Matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md)
-6. [Lifecycle Hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)
-7. [Runner & Execution](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md) — includes runner hooks
-8. [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md)
-9. [Snapshot Testing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md)
-10. [Gherkin BDD](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)
-11. [Utilities](https://github.com/TrustBound/dream_test/blob/main/docs/guides/utilities.md)
-12. [Coverage](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
-13. [Coverage Badge on GitHub](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
-14. [Upgrading to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md) — from Dream Test 2.x
+1. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md): from an empty test folder to a green run, a red run you can read, and a CI job that fails when a test fails.
+2. [Organize tests with groups, skips and tags](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md): groups, pending and skipped tests, tags, and filters that run part of a suite.
+3. [Check values with matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md): the assertion pipeline, which matcher fits which value, and what each failure prints.
+4. [Write your own matcher](https://github.com/TrustBound/dream_test/blob/main/docs/guides/custom-matchers.md): a matcher for your own types, its failure output, and tests for it.
+5. [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md): `before_all`, `before_each`, `after_each`, `after_all` and runner hooks, and what the report shows when one fails or hangs.
+6. [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): pass a typed value to every test, and start a resource once with `describe_with_setup`.
+7. [Choose and read the test output](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md): the BDD, progress and JSON reporters, a reporter of your own for CI, and reporter crashes.
+8. [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md): snapshot files, a changed snapshot, and how to update one.
+9. [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md): features in Gleam and in `.feature` files, Rules and Examples, a shared server, and tests for your steps.
+10. [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): concurrency, timeouts, suites with their own settings, and every case that gives exit status 1.
+11. [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): the coverage table, minimums, exclusions with reasons, report files and coverage from servers.
+12. [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md): a live badge from your own GitHub Actions workflow, with no outside service.
+13. [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md): every breaking change, with the 2.x code and the 3.0.0 code.
+14. [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md): every matcher, the runner settings, the rules of hook processes, the Gherkin rules and the helper modules.
 
 ## Unit Tests
 
-### A unit test file <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/readme/unit_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/quick-start.md#a-unit-test-file-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### A first test module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/getting_started_first_test.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/getting-started.md#a-first-test-module-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-import gleam/string
+import snippets.{add, divide}
 
 pub fn tests() {
-  describe("String utilities", [
-    it("trims whitespace", fn() {
-      "  hello  "
-      |> string.trim()
+  describe("Calculator", [
+    it("adds two numbers", fn() {
+      add(2, 3)
       |> should
-      |> be_equal("hello")
-      |> or_fail_with("Should remove surrounding whitespace")
+      |> be_equal(5)
+      |> or_fail_with("2 + 3 should be 5")
+    }),
+    it("divides two numbers", fn() {
+      divide(10, 2)
+      |> should
+      |> be_ok()
+      |> be_equal(5)
+      |> or_fail_with("10 / 2 should be 5")
     }),
   ])
 }
@@ -137,7 +143,7 @@ pub fn main() {
 }
 ```
 
-<sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/quick-start.md)</sub>
+<sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md)</sub>
 
 ## Gherkin Integration Tests
 

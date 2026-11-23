@@ -1,139 +1,188 @@
-## Runner & execution model
+# Run a large suite fast and predictably
 
-This chapter is about turning “a suite” into “a reliable test run.”
+A suite of thirty tests runs in a blink however you set it up. A suite of three thousand, with database tests, a few slow calls and one test that sometimes hangs, needs decisions: how many tests run at once, how long a test may take, which suites must run alone, and what exactly makes CI go red. Dream Test makes each of those a line in your `main`, so the policy is in one place you can read. This guide walks through them, with the real output of a test that hangs and a CI runner that uses them all.
 
-Suites describe behavior; the runner decides execution policy. The runner exists so you can make those policies explicit instead of relying on defaults you can’t see.
+## Table of Contents
 
-### Mental model
+- [What you'll build](#what-youll-build)
+- [Before you start](#before-you-start)
+- [How the runner schedules tests](#how-the-runner-schedules-tests)
+- [Which setting for which problem](#which-setting-for-which-problem)
+- [Step 1: Set the concurrency and the timeout](#step-1-set-the-concurrency-and-the-timeout)
+- [Step 2: See a test time out](#step-2-see-a-test-time-out)
+- [Step 3: Run the suites that share a resource one test at a time](#step-3-run-the-suites-that-share-a-resource-one-test-at-a-time)
+- [Step 4: Combine suites](#step-4-combine-suites)
+- [Step 5: Run part of the suite](#step-5-run-part-of-the-suite)
+- [Step 6: Decide the exit status](#step-6-decide-the-exit-status)
+- [Test your code](#test-your-code)
+- [Common pitfalls](#common-pitfalls)
+- [Where to go next](#where-to-go-next)
 
-- You control **how fast** tests run with `max_concurrency`.
-- You control **how long** tests may run with `default_timeout_ms`.
-- You control **CI behavior** with `exit_on_failure`. See [Exit status](#exit-status-exit_on_failure).
+## What you'll build
 
-Dream Test is **suite-first**:
+In this guide you'll:
 
-- You define suites with `dream_test/unit` or `dream_test/unit_context`
-- You run them with `dream_test/runner`
+- Tune how many tests run at once, and how long each may take.
+- Read the report of a test that hangs past its timeout.
+- Run database suites one test at a time, next to unit suites that run in parallel.
+- Combine explicit suites, discovered suites and a suite with its own settings in one CI runner.
+- Know every case that makes the exit status 1, and check your policy with a test.
 
-<sub>(Under the hood: the runner uses the parallel executor, but most users never need to call it directly.)</sub>
+## Before you start
 
-### Why Dream Test is explicit here
+You need Dream Test as a dev dependency and a test runner module. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up.
 
-Most testing pain shows up at the runner layer:
+```sh
+gleam add --dev dream_test
+```
 
-- Flakiness due to shared resources + parallelism
-- Hung tests that stall CI
-- Output that is hard to interpret under concurrency
+The outputs on this page are real outputs of the code shown, with every time set to 0, so they stay the same from run to run.
 
-Dream Test’s runner makes those constraints visible and configurable.
+## How the runner schedules tests
 
-### Configure parallelism + timeouts
+The runner runs each test in its own process, so a test that crashes or hangs can't take the others down with it. Within that:
 
-Use `max_concurrency` and `default_timeout_ms` to tune execution:
+- The suites run one after the other.
+- Inside a suite, the groups run one after the other: first the direct tests of a group, then each child group, in the written order.
+- Only the direct tests of one group run at the same time, up to `max_concurrency` of them.
 
-- **`max_concurrency` is the most tests that run at the same time.** Only the direct tests of one group run in parallel. The groups run one after the other: first the direct tests of a group, then each child group in the written order. The suites also run one after the other. A value below 1 counts as 1.
-- **Higher concurrency** speeds up independent tests.
-- **Lower concurrency** is safer for tests that share external resources (DBs, ports, filesystem paths).
-- **`default_timeout_ms` must be at least 1.** With 0, the tests and hooks that use it get no time, so they almost always time out, and the result is not dependable. A value below 0 almost always stops the run with the Erlang error `timeout_value` when the run waits for a hook in a setup process, for example a `before_all` hook.
+So parallelism comes from groups with many tests, and the order of groups and suites stays fixed. The default is `max_concurrency` 4 and `default_timeout_ms` 5000 (`parallel.default_config()`).
 
-#### Concurrency and timeouts <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+## Which setting for which problem
+
+| Your situation | Use | Why |
+|:---|:---|:---|
+| Many independent, pure tests, and the run is slow | `runner.max_concurrency(8)` or more | More tests of a group run at once. |
+| Tests share a port, a folder or a database schema, and fail at random | `runner.add_suites_with_config` with `max_concurrency: 1` for those suites | They run one at a time, the rest stay parallel. |
+| A test or a hook hangs and stalls CI | `runner.default_timeout_ms(ms)` | The runner stops waiting, marks it, and goes on. |
+| Slow but healthy tests time out on a slow CI machine | A higher timeout for the suites that need it | Keep a tight default for the rest. |
+| Only some tests should run | `runner.filter_tests(predicate)` | Filters by name, groups, tags or kind. |
+| CI must go red on any problem | `runner.exit_on_failure()` | Exit status 1 when the run fails. |
+
+## Step 1: Set the concurrency and the timeout
+
+Here's a runner for CI with all the settings of this guide in one place:
+
+### A CI runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/runner_ci_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should}
+import dream_test/discover
+import dream_test/matchers.{succeed}
+import dream_test/parallel
 import dream_test/reporters/bdd
-import dream_test/reporters/progress
 import dream_test/runner
 import dream_test/unit.{describe, it}
-
-pub fn tests() {
-  describe("Runner config demo", [
-    it("runs with custom config", fn() {
-      1 + 1
-      |> should
-      |> be_equal(2)
-      |> or_fail_with("Math works")
-    }),
-  ])
-}
+import snippets/guides/writing_tests_cart
 
 pub fn main() {
-  runner.new([tests()])
+  runner.new([writing_tests_cart.tests()])
+  |> runner.add_suites(check_suites())
+  |> runner.add_suites_with_config(database_config(), [database_tests()])
   |> runner.max_concurrency(8)
   |> runner.default_timeout_ms(10_000)
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
+  |> runner.results_reporters([bdd.new() |> bdd.summary_only()])
   |> runner.exit_on_failure()
   |> runner.run()
 }
+
+fn check_suites() {
+  discover.tests("snippets/guides/**_check.gleam")
+  |> discover.to_suites()
+}
+
+/// The database tests share one schema, so they run one at a time, and a
+/// slow query gets a minute.
+fn database_config() -> parallel.ParallelConfig {
+  parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+}
+
+fn database_tests() {
+  describe("Database", [
+    it("creates a user", fn() { Ok(succeed()) }),
+    it("deletes a user", fn() { Ok(succeed()) }),
+  ])
+}
 ```
 
-### Sequential execution (when shared resources matter)
+`max_concurrency(8)` lets up to eight tests of a group run at once. A value below 1 counts as 1. `default_timeout_ms(10_000)` gives each test body ten seconds, and each hook ten seconds too.
 
-When tests share external state, you often want `max_concurrency(1)` to avoid flakiness.
+The timeout must be at least 1. With 0, the tests and hooks that use it get no time, so they almost always time out, and the result isn't dependable. A value below 0 almost always stops the run with the Erlang error `timeout_value`, when the run waits for a hook in a setup process, such as a `before_all` hook.
 
-#### Sequential execution <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/sequential_execution.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+The test timeout is the `timeout_ms` of the test when it has one, else the default timeout. `unit.it` and `unit_context.it` give no `timeout_ms`. Only a test you build with `types.Test(..., timeout_ms: Some(ms), ...)` has its own.
+
+The run prints:
+
+### The summary of the CI run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_runner_ci.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+Summary: 9 run, 0 failed, 6 passed, 1 skipped, 2 pending in 0ms
+```
+
+## Step 2: See a test time out
+
+A test that waits for a server that never answers would stall the run forever. The timeout stops that. Here's a suite with a test that sleeps for a second, run with a timeout of 200 ms:
+
+### A test slower than the timeout <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/runner_timeout.gleam#L10-L25"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/unit.{describe, it}
-
-pub fn tests() {
-  describe("Sequential tests", [
-    it("first test", fn() {
-      // When tests share external resources, run them sequentially
-      1 + 1
-      |> should
-      |> be_equal(2)
-      |> or_fail_with("Math works")
-    }),
-    it("second test", fn() {
-      2 + 2
-      |> should
-      |> be_equal(4)
-      |> or_fail_with("Math still works")
+pub fn search_tests() {
+  describe("Search", [
+    it("answers fast", fn() { Ok(succeed()) }),
+    it("waits for an index that never comes", fn() {
+      process.sleep(1000)
+      Ok(succeed())
     }),
   ])
 }
 
-pub fn main() {
-  // Sequential execution for tests with shared state
-  runner.new([tests()])
-  |> runner.max_concurrency(1)
-  |> runner.default_timeout_ms(30_000)
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
+pub fn run_with_a_short_timeout() -> RunReport {
+  runner.new([search_tests()])
+  |> runner.default_timeout_ms(200)
+  |> runner.silent()
   |> runner.run()
 }
 ```
 
-### Suites with different contexts in one run
+### The report of a timed-out test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_runner_timeout.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` take a `List(TestSuite)`. A `TestSuite` (from `dream_test/suite`) has no type parameter, because each suite keeps its context inside it. So one run can hold a `unit` suite, a `unit_context` suite with any context type, and a Gherkin feature. See [Gherkin: a setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#a-setup-for-all-scenarios-for-example-a-server) for an example.
+```text
+Search
+  ✓ answers fast
+  ! waits for an index that never comes
+    timeout
+      Message: test timed out
 
-To make a suite from a `types.Tree` that you build yourself, use `suite.from_tree`.
+Failures:
+Search
+  ! waits for an index that never comes
+    timeout
+      Message: test timed out
 
-To make one suite from several suites, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
+Summary: 2 run, 0 failed, 1 passed, 1 timed out in 0ms
+```
 
-- `suite.group(name:, suites:)` puts each suite in a group named `name`. The group name is the first name of each test: `["Shop", "Cart", "starts empty"]`.
-- `suite.join(name:, suites:)` adds no group. Each test keeps its own names: `["Cart", "starts empty"]`. The runner sees one suite named `name`, so `before_each_suite` runs one time for all of them.
+`!` marks a test that timed out. Its status is `TimedOut`, with the failure `timeout: test timed out`, and the summary counts it apart from the failed tests. The runner kills the test's process, runs the `after_each` hooks that didn't run yet in a new process, and goes on with the next test. The run fails.
 
-`discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name.
+A hook that hangs gets the same treatment: a setup hook gives `SetupFailed` with `hook timed out in <groups>`, and a teardown hook gives a teardown failure. [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md#when-a-hook-hangs) shows that report.
 
-Each discovered module must define `pub fn tests()` that returns a `TestSuite`. Discovery skips a module without it, and gives no error for it. When no module that the pattern matches has `tests()`, discovery gives the error `<pattern>: no test module matches the pattern`. A pattern names files under `test/`, for example `unit/**_test.gleam` for `test/unit/cart_test.gleam`.
+## Step 3: Run the suites that share a resource one test at a time
 
-Discovery has five load errors. Each one is a failing test, so a wrong pattern never gives a run that passes with no tests:
+Most flaky suites share something: a port, a path, a database schema. Two tests that write the same row at the same time give a different result each run. You have two fixes:
 
-- `<pattern>: cannot search for test modules: <class>:<reason>`: the pattern cannot be searched.
-- `<pattern>: no test module matches the pattern`
-- `<module>: cannot load the module: <reason>`: the beam file of the module does not load.
-- `<module>: tests() crashed: <class>:<reason>`
-- `<module>: tests() did not return a test suite: <value>`
+- Give each test its own resource: a unique port from `process.unique_port()`, a temp folder named after the test, a schema for each test.
+- Run the suites that share the resource one test at a time.
 
-#### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+The CI runner above does the second for the database suite. `runner.add_suites_with_config(config, suites)` adds suites with their own `parallel.ParallelConfig`: here `max_concurrency: 1` and a timeout of a minute. The other suites keep the run's settings. One runner, two policies, and no second `gleam test`.
+
+`runner.max_concurrency(1)` on the whole runner also works, but it makes every test wait for every other.
+
+## Step 4: Combine suites
+
+`runner.new`, `runner.add_suites` and `runner.add_suites_with_config` all take a `List(TestSuite)`. A `TestSuite` from `dream_test/suite` has no type parameter, because each suite keeps its context inside it. So one run holds `unit` suites, `unit_context` suites with any context type, Gherkin features, and the suites that discovery finds, as the CI runner does.
+
+To make one suite from several, use `suite.group` or `suite.join`. Each suite keeps its own context in both:
+
+### Put suites in a group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L24-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 /// Each suite becomes a group inside "Shop".
@@ -142,7 +191,9 @@ pub fn grouped() -> TestSuite {
 }
 ```
 
-#### Join suites in one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L29-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+`suite.group(name:, suites:)` puts each suite in a group named `name`. The group name becomes the first name of each test: `["Shop", "Cart", "starts empty"]`.
+
+### Join suites in one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/group_and_join.gleam#L29-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 /// One suite named "Shop" that holds both suites as they are.
@@ -151,227 +202,96 @@ pub fn joined() -> TestSuite {
 }
 ```
 
-### Mixed execution policies (per-suite concurrency/timeout)
+`suite.join(name:, suites:)` adds no group. Each test keeps its own names: `["Cart", "starts empty"]`. The runner sees one suite named `name`, so `before_each_suite` runs one time for all of them.
 
-If only *some* suites share external state (for example: database suites) you don’t need two separate runners.
-Instead, run everything in one runner and apply an execution config override to the suites that need it.
+`discover.to_suite` uses both: each module suite goes in the group, and the load errors stay directly under the suite name. To make a suite from a `types.Tree` you build yourself, use `suite.from_tree`.
 
-#### Execution config for each suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/suite_specific_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+## Step 5: Run part of the suite
 
-```gleam
-import dream_test/matchers.{succeed}
-import dream_test/parallel
-import dream_test/reporters/bdd
-import dream_test/reporters/progress
-import dream_test/runner
-import dream_test/unit.{describe, it}
+`runner.filter_tests(predicate)` runs only the tests for which the predicate returns `True`. It gets each test's `TestInfo`: name, groups, tags, kind and source. A group with no selected test doesn't run, and neither do its hooks. [Organize tests with groups, skips and tags](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md#step-5-run-only-some-tests) shows filters by tag, and how to test them.
 
-fn unit_tests() {
-  describe("Unit suite", [
-    it("is fast", fn() { Ok(succeed()) }),
-  ])
-}
+## Step 6: Decide the exit status
 
-fn db_tests() {
-  describe("DB suite (sequential)", [
-    it("pretend db test", fn() { Ok(succeed()) }),
-  ])
-}
-
-pub fn main() {
-  configured_runner()
-  |> runner.progress_reporter(progress.new())
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
-}
-
-/// The unit suite runs with the run config. The DB suite runs one test at
-/// a time, with a 60s timeout.
-pub fn configured_runner() -> runner.RunBuilder {
-  let db_config =
-    parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
-
-  runner.new([])
-  |> runner.add_suites([unit_tests()])
-  |> runner.add_suites_with_config(db_config, [db_tests()])
-  |> runner.max_concurrency(8)
-  |> runner.default_timeout_ms(10_000)
-}
-```
-
-### Exit status (`exit_on_failure`)
-
-CI reads the exit status of `gleam test`. Without `runner.exit_on_failure`, the exit status is 0, also when the run fails. `runner.run` returns the report, `main` returns, and the CI step passes.
+CI reads the exit status of `gleam test`. Without `runner.exit_on_failure()`, it's 0 even when the run fails: `runner.run` returns the report, `main` returns, and the CI step passes.
 
 The run fails when one of these is true:
 
-- a test is `Failed`, `TimedOut` or `SetupFailed`
-- a teardown hook failed
-- the process of a setup stopped while its tests ran (`SetupStopped`)
-- the `render` function of a `reporter_types.Custom` results reporter crashed
-- coverage failed, for example a total below `coverage.minimum_percent`
+1. A test is `Failed`, `TimedOut` or `SetupFailed`.
+2. A teardown hook failed, also when every test passed.
+3. The process of a setup stopped while its tests ran (`types.SetupStopped`).
+4. The `render` function of a `reporter_types.Custom` results reporter crashed.
+5. Coverage failed, for example a total below `coverage.minimum_percent`.
 
-The first four make `types.failed` return `True` for the report that `runner.run` returns. `types.report_reporter_crashes` gives the position and the full reason of each crashed results reporter. Use it when your code picks its own exit status from the report.
+`exit_on_failure` doesn't stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1, and `runner.run` doesn't return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
 
-A silent run (`runner.silent`) writes nothing to the standard output: no progress, no results reports and no coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed, and a coverage error, for example a total below `coverage.minimum_percent`.
+`types.failed(report)` is `True` in the first four cases. `types.report_tests(report)` gives the test results, `types.report_hook_failures(report)` the failed teardowns and stopped setups, and `types.report_reporter_crashes(report)` the position and the full reason of each crashed results reporter. Use them when your code picks its own exit status from the report.
 
-`exit_on_failure` does not stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1. `runner.run` does not return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
+A silent run, `runner.silent()`, writes nothing to the standard output: no progress, no reports and no coverage table. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a custom reporter that crashed, and a coverage error.
 
-In these docs, "the run fails" means one of these five cases. Only with `exit_on_failure` does a failed run give exit status 1.
+## Test your code
 
-#### End with exit status 1 when the run fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/exit_status.gleam#L1-L18"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+The second case surprises people: a run where every test passed can still fail. That's on purpose, because a cleanup that didn't happen leaves a mess for the next run. If your CI depends on that policy, pin it with a test. Run a suite with a failing teardown silently, and check `types.failed`:
+
+### Check that a failed cleanup fails the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/runner_failure_policy.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
-import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-import dream_test/reporters/bdd
+import dream_test/matchers.{be_true, or_fail_with, should, succeed}
 import dream_test/runner
-import dream_test/types.{type AssertionResult}
-import dream_test/unit.{describe, it}
-
-fn example_tests() {
-  describe("Example", [
-    it("passes", fn() { Ok(succeed()) }),
-  ])
-}
-
-pub fn main() {
-  runner.new([example_tests()])
-  |> runner.results_reporters([bdd.new()])
-  |> runner.exit_on_failure()
-  |> runner.run()
-}
-```
-
-To print your own report after the run and still end with exit status 1, see [Custom post-run reporter](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md#custom-post-run-reporter-format-a-runreport).
-
-### Runner hooks (test/suite/run)
-
-Runner hooks let you apply setup/teardown **across suites** without modifying
-each suite’s contents. Hooks are metadata-aware and receive structured info
-about what is running.
-
-**`types.TestInfo` fields**:
-
-- `name`: leaf test name (`it("...")`)
-- `groups`: the names of the groups around the test, outermost first (e.g. `["outer", "inner"]`). `types.full_name(info.groups, info.name)` gives the group path + test name (e.g. `["outer", "inner", "leaf"]`).
-- `tags`: effective tags (includes inherited group tags)
-- `kind`: `types.TestKind`: `Unit` or `GherkinScenario(scenario_id:, feature:, rule:)`
-- `source`: best-effort origin string (see below)
-
-**`types.SuiteInfo` fields**:
-
-- `name`: top-level suite/group name
-- `tests`: deterministic list of `TestInfo` values that will execute
-- `source`: best-effort origin string (see below)
-
-**Hook signatures**:
-
-- `before_each_test` / `after_each_test` receive `types.TestInfo` and return `Result(Nil, String)`. They do not get the context of the test: the suites of one run can have different context types, and each suite keeps its own context.
-- `before_each_suite` / `after_each_suite` receive `types.SuiteInfo`.
-- `before_all_suites` / `after_all_suites` receive the full list of `SuiteInfo` after filtering.
-
-**Failures and where the hooks run**:
-
-- A failed `before_each_test`, `before_each_suite` or `before_all_suites` hook gives `SetupFailed` to the tests that it serves.
-- A failed `after_each_test`, `after_each_suite` or `after_all_suites` hook does not change a test status. All the remaining teardown hooks still run, the failure goes into `types.report_hook_failures(report)`, and the run fails.
-- The suite-level hooks run in one setup process for each scope, so a pool that `before_all_suites` starts lives until `after_all_suites` stops it. Each hook gets the default timeout. A hook that never returns fails with `hook timed out` for a `before_all_suites` or `after_all_suites` hook, and `hook timed out in <suite>` for a `before_each_suite` or `after_each_suite` hook. The run goes on. The per-test hooks run in the process of the test (see [Where hooks run](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md#where-hooks-run)).
-
-`source` is best-effort:
-
-- Unit discovery suites use the **Erlang module name**, for example `unit@cart_test` for `test/unit/cart_test.gleam`.
-- Gherkin discovery suites use the **.feature path**. When module discovery finds a module whose `tests()` gives a Gherkin discovery suite, each scenario keeps the `.feature` path. A test gets the module name only when it has no source.
-- Manually constructed suites use `None`.
-
-#### Runner hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_hooks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
-```gleam
-import dream_test/matchers.{succeed}
-import dream_test/runner
-import dream_test/types.{type SuiteInfo, type TestInfo}
-import dream_test/unit.{describe, it}
-import gleam/int
-import gleam/io
-import gleam/list
-import gleam/string
-
-pub fn tests() {
-  describe("Example", [
-    it("a", fn() { Ok(succeed()) }),
-    it("b", fn() { Ok(succeed()) }),
-  ])
-}
-
-pub fn main() {
-  runner.new([tests()])
-  |> runner.before_all_suites(before_all_suites_hook)
-  |> runner.before_each_suite(before_each_suite_hook)
-  |> runner.before_each_test(before_each_test_hook)
-  |> runner.after_each_test(after_each_test_hook)
-  |> runner.run()
-}
-
-fn before_all_suites_hook(suites: List(SuiteInfo)) -> Result(Nil, String) {
-  io.println("suites: " <> int.to_string(list.length(suites)))
-  Ok(Nil)
-}
-
-fn before_each_suite_hook(suite: SuiteInfo) -> Result(Nil, String) {
-  io.println("suite: " <> suite.name)
-  Ok(Nil)
-}
-
-fn before_each_test_hook(info: TestInfo) -> Result(Nil, String) {
-  io.println(
-    "test: " <> string.join(types.full_name(info.groups, info.name), " > "),
-  )
-  Ok(Nil)
-}
-
-fn after_each_test_hook(_info: TestInfo) -> Result(Nil, String) {
-  Ok(Nil)
-}
-```
-
-### Choosing a concurrency number (practical guidance)
-
-- Start with the default: `max_concurrency` 4 and `default_timeout_ms` 5000 (`parallel.default_config()`).
-- If you see flakes involving ports/files/DB state, either isolate those resources per test or set `max_concurrency(1)` for that run.
-- If you have a large suite of pure unit tests (no external state), increasing concurrency often speeds up feedback noticeably.
-
-### Advanced: running the executor directly
-
-Most users should not call `dream_test/parallel` directly. It’s public so advanced tooling can embed the executor. The executor runs a typed tree, a `types.Tree(context)`: one top-level group with its children and one context. Build one with `types.tree`, not with `unit.describe`, which gives a `TestSuite`.
-
-#### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
-
-```gleam
-import dream_test/matchers.{have_length, or_fail_with, should, succeed}
-import dream_test/parallel
 import dream_test/types
-import dream_test/unit.{describe, it}
+import dream_test/unit.{after_all, describe, it}
+
+/// Every test passes, but the cleanup fails.
+fn suite_with_a_failed_cleanup() {
+  describe("Uploads", [
+    after_all(fn() { Error("could not delete the upload folder") }),
+    it("stores a file", fn() { Ok(succeed()) }),
+  ])
+}
 
 pub fn tests() {
-  describe("Parallel executor", [
-    it("can run a tree and return a report of the results", fn() {
-      let tree =
-        types.tree("Suite", Nil, [
-          it("a", fn() { Ok(succeed()) }),
-          it("b", fn() { Ok(succeed()) }),
-        ])
+  describe("The run report", [
+    it("fails a run whose cleanup failed", fn() {
+      // Act
+      let report =
+        runner.new([suite_with_a_failed_cleanup()])
+        |> runner.silent()
+        |> runner.run()
 
-      parallel.run_tree_parallel(parallel.default_config(), tree)
-      |> types.report_tests
+      // Assert
+      types.failed(report)
       |> should
-      |> have_length(2)
-      |> or_fail_with("expected two results")
+      |> be_true()
+      |> or_fail_with("a failed teardown should fail the run")
     }),
   ])
 }
 ```
 
-### What's Next?
+### The report of the policy check <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_runner_check.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-- Go back to [Lifecycle hooks](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md)
-- Go back to [Documentation README](https://github.com/TrustBound/dream_test/blob/main/docs/guides/index.md)
-- Continue to [Reporters](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md)
+```text
+The run report
+  ✓ fails a run whose cleanup failed
+
+Summary: 1 run, 0 failed, 1 passed in 0ms
+```
+
+## Common pitfalls
+
+**Tests that share a resource and run in parallel.** *Symptom:* a test fails once in ten runs, never alone. *Fix:* give each test its own resource, or run that suite with `max_concurrency: 1` through `add_suites_with_config`.
+
+**A timeout of 0.** *Symptom:* every test times out, or the run stops with `timeout_value`. *Fix:* the timeout must be at least 1 ms. Use a few seconds.
+
+**One slow suite sets the timeout for all.** *Symptom:* a hung unit test takes a minute to fail. *Fix:* keep the default tight, and give the slow suite its own timeout with `add_suites_with_config`.
+
+**No `exit_on_failure`.** *Symptom:* failures in the log, green CI. *Fix:* add `runner.exit_on_failure()` before `runner.run()`.
+
+**Code after `runner.run()`.** *Symptom:* a step after the run never happens when tests fail. *Fix:* with `exit_on_failure`, the program ends inside `runner.run`. Put the step in a custom results reporter, or a runner hook.
+
+## Where to go next
+
+- [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md): hooks, their processes and their timeouts.
+- [Choose and read the test output](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md): reporters for CI, and custom ones.
+- [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): the fifth way a run fails.
+- [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md#run-the-executor-directly): the `parallel` executor, for tools of your own.
+- [API reference on HexDocs](https://hexdocs.pm/dream_test/dream_test/runner.html): every runner setting.

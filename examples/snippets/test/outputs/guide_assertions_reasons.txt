@@ -1,0 +1,4 @@
+The failure examples
+  ✓ each fail at the matcher that the test name says
+
+Summary: 1 run, 0 failed, 1 passed in 0ms

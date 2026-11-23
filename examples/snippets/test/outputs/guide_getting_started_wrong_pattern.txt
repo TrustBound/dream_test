@@ -1,0 +1,13 @@
+1/1 [███████████████████████████████████████████████████████████████] 100% done 
+Discovery Errors
+  ✗ Discovery Error: snippets/units/**.gleam: no test module matches the pattern
+    discover
+      Message: Failed to discover/load test modules (see test name for details)
+
+Failures:
+Discovery Errors
+  ✗ Discovery Error: snippets/units/**.gleam: no test module matches the pattern
+    discover
+      Message: Failed to discover/load test modules (see test name for details)
+
+Summary: 1 run, 1 failed, 0 passed in 0ms

@@ -1,0 +1,16 @@
+handle
+  ✗ greets a user who is not there
+    have_status
+      Message: the greeting should name alice
+      Description: expected the status 200
+      Actual:      404
+
+Failures:
+handle
+  ✗ greets a user who is not there
+    have_status
+      Message: the greeting should name alice
+      Description: expected the status 200
+      Actual:      404
+
+Summary: 1 run, 1 failed, 0 passed in 0ms

@@ -67,18 +67,15 @@ type MainEnd {
 
 /// Snippet files whose `main` must end with more than exit status 0, and
 /// how it ends.
-/// - `custom_post_run_reporter.gleam` prints the line that its doc shows.
 /// - `coverage_badge.gleam` sets a minimum of 80.0%, and the snippets
 ///   project measures its own `src`, which no snippet test covers.
 /// - `coverage_server.gleam` merges the LCOV files of servers, and no
 ///   server runs, so no file matches.
+/// - `reporters_ci.gleam` runs a suite with a failing test, on purpose,
+///   to show the reports that CI gets.
+/// - `reporters_crash.gleam` has a custom reporter that crashes, on
+///   purpose, to show the error that the runner writes.
 const mains_with_other_end = [
-  #(
-    "examples/snippets/test/snippets/reporters/custom_post_run_reporter.gleam",
-    EndsWithStatusZeroAndLine(
-      line: "MyReport: 3 total; 3 passed; 0 failed; 0 teardown failed; 0 setup stopped",
-    ),
-  ),
   #(
     "examples/snippets/test/snippets/coverage/coverage_badge.gleam",
     EndsWith(
@@ -93,6 +90,22 @@ const mains_with_other_end = [
       status: 1,
       line: "  No LCOV files match \"build/coverage/servers/*.info\".",
       last_line: "Tests: 1 passed. Exit status 1, because coverage was requested and did not complete.",
+    ),
+  ),
+  #(
+    "examples/snippets/test/snippets/guides/reporters_ci.gleam",
+    EndsWith(
+      status: 1,
+      line: "::error title=Checkout > adds the tax::20% tax on 1250 should be 1525",
+      last_line: "JSON report: build/test-report.json",
+    ),
+  ),
+  #(
+    "examples/snippets/test/snippets/guides/reporters_crash.gleam",
+    EndsWith(
+      status: 1,
+      line: "Results reporter failed",
+      last_line: "  Fix: make the render function return a String for every RunReport.",
     ),
   ),
 ]

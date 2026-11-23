@@ -1,0 +1,5 @@
+The user store setup
+  ✓ starts a store that keeps what it gets
+  ✓ stops the store in the teardown
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

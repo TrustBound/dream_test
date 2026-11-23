@@ -1,0 +1,24 @@
+warning: Unused imported module
+  ┌─ build/compile_errors/upgrade_suite_type/src/upgrade_suite_type.gleam:6:1
+  │
+6 │ import dream_test/types.{type TestSuite}
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This imported module is never used
+
+Hint: You can safely remove it.
+
+error: Unknown module type
+  ┌─ build/compile_errors/upgrade_suite_type/src/upgrade_suite_type.gleam:6:26
+  │
+6 │ import dream_test/types.{type TestSuite}
+  │                          ^^^^^^^^^^^^^^
+
+The module `dream_test/types` does not have a `TestSuite` type.
+
+error: Unknown type
+  ┌─ build/compile_errors/upgrade_suite_type/src/upgrade_suite_type.gleam:9:19
+  │
+9 │ pub fn tests() -> TestSuite(Nil) {
+  │                   ^^^^^^^^^^^^^^
+
+The type `TestSuite` is not defined or imported in this module.
+

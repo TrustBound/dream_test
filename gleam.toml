@@ -16,21 +16,20 @@ gleam_stdlib = ">= 0.60.0 and < 2.0.0"
 
 [documentation]
 pages = [
-  { title = "Guide overview", path = "guides/index.html", source = "./docs/guides/index.md" },
-  { title = "Installation", path = "guides/installation.html", source = "./docs/guides/installation.md" },
-  { title = "Quick Start", path = "guides/quick-start.html", source = "./docs/guides/quick-start.md" },
-  { title = "Writing Tests", path = "guides/writing-tests.html", source = "./docs/guides/writing-tests.md" },
-  { title = "Context-Aware Tests", path = "guides/context-aware-tests.html", source = "./docs/guides/context-aware-tests.md" },
-  { title = "Assertions & Matchers", path = "guides/assertions-and-matchers.html", source = "./docs/guides/assertions-and-matchers.md" },
-  { title = "Lifecycle Hooks", path = "guides/lifecycle-hooks.html", source = "./docs/guides/lifecycle-hooks.md" },
-  { title = "Runner & Execution", path = "guides/runner-and-execution.html", source = "./docs/guides/runner-and-execution.md" },
-  { title = "Reporters", path = "guides/reporters.html", source = "./docs/guides/reporters.md" },
-  { title = "Snapshot Testing", path = "guides/snapshot-testing.html", source = "./docs/guides/snapshot-testing.md" },
-  { title = "Gherkin BDD", path = "guides/gherkin-bdd.html", source = "./docs/guides/gherkin-bdd.md" },
-  { title = "Utilities", path = "guides/utilities.html", source = "./docs/guides/utilities.md" },
-  { title = "Coverage", path = "guides/coverage.html", source = "./docs/guides/coverage.md" },
-  { title = "Coverage Badge on GitHub", path = "guides/coverage-badge.html", source = "./docs/guides/coverage-badge.md" },
-  { title = "Upgrading to 3.0.0", path = "guides/upgrading-to-3.html", source = "./docs/guides/upgrading-to-3.md" },
+  { title = "Write and run your first test", path = "guides/getting-started.html", source = "./docs/guides/getting-started.md" },
+  { title = "Organize tests with groups, skips and tags", path = "guides/writing-tests.html", source = "./docs/guides/writing-tests.md" },
+  { title = "Check values with matchers", path = "guides/assertions-and-matchers.html", source = "./docs/guides/assertions-and-matchers.md" },
+  { title = "Write your own matcher", path = "guides/custom-matchers.html", source = "./docs/guides/custom-matchers.md" },
+  { title = "Set up and tear down around tests", path = "guides/lifecycle-hooks.html", source = "./docs/guides/lifecycle-hooks.md" },
+  { title = "Share a context between tests", path = "guides/context-aware-tests.html", source = "./docs/guides/context-aware-tests.md" },
+  { title = "Choose and read the test output", path = "guides/reporters.html", source = "./docs/guides/reporters.md" },
+  { title = "Lock down large output with snapshots", path = "guides/snapshot-testing.html", source = "./docs/guides/snapshot-testing.md" },
+  { title = "Write Gherkin features", path = "guides/gherkin-bdd.html", source = "./docs/guides/gherkin-bdd.md" },
+  { title = "Run a large suite fast and predictably", path = "guides/runner-and-execution.html", source = "./docs/guides/runner-and-execution.md" },
+  { title = "Measure line coverage and gate CI on it", path = "guides/coverage.html", source = "./docs/guides/coverage.md" },
+  { title = "Publish a coverage badge from your own CI", path = "guides/coverage-badge.html", source = "./docs/guides/coverage-badge.md" },
+  { title = "Upgrade from Dream Test 2.x to 3.0.0", path = "guides/upgrading-to-3.html", source = "./docs/guides/upgrading-to-3.md" },
+  { title = "Reference", path = "guides/reference.html", source = "./docs/guides/reference.md" },
 ]
 
 [tools.dream_snippets]

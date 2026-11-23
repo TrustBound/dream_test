@@ -1,0 +1,6 @@
+A snapshot test with no snapshot file
+  ✓ passes and writes the file
+A changed receipt
+  ✓ fails its snapshot test
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

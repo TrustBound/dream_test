@@ -1,0 +1,12 @@
+Search index
+  ⚠ finds a document
+    before_all
+      Message: hook timed out in Search index
+
+Failures:
+Search index
+  ⚠ finds a document
+    before_all
+      Message: hook timed out in Search index
+
+Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms

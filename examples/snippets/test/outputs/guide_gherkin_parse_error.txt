@@ -1,0 +1,1 @@
+line 3: "And I have 3 items in my cart" has no step before it. And, But and * take the phase of the step before them, so the first step of a Background, or of a Scenario with no Background steps, must use Given, When or Then.

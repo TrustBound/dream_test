@@ -1,0 +1,5 @@
+Cart
+  total
+    ✓ is 0 for an empty cart
+
+Summary: 1 run, 0 failed, 1 passed in 0ms
