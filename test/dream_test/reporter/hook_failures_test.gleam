@@ -37,6 +37,26 @@ pub fn tests() {
       |> or_fail_with("a run-level hook should have no scope")
     }),
 
+    it("format puts each line of a message under its first line", fn() {
+      hook_failures.format([
+        types.TeardownFailed(
+          hook: types.AfterAllHook,
+          path: ["root"],
+          message: "pool still running\n  worker 1\r\n\n  worker 2",
+        ),
+      ])
+      |> should
+      |> be_equal(
+        "Setup and teardown failures:\n"
+        <> "  after_all in root\n"
+        <> "    pool still running\n"
+        <> "      worker 1\n"
+        <> "\n"
+        <> "      worker 2\n",
+      )
+      |> or_fail_with("each line of the message should keep the indent")
+    }),
+
     it("format shows a stopped setup without a list when all tests ran", fn() {
       hook_failures.format([
         types.SetupStopped(

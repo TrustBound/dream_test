@@ -15,10 +15,10 @@ Feature: Shopping Cart
       ✗ crash
         Step: When the cart breaks (test/features/shopping_cart_failures.feature:14)
         Message: error:#{function => <<"break_cart">>,line => 25,
-        message => <<"the cart broke">>,
-        module => <<"snippets/guides/gherkin_file_failures">>,
-        file => <<"test/snippets/guides/gherkin_file_failures.gleam">>,
-        gleam_error => panic}
+                         message => <<"the cart broke">>,
+                         module => <<"snippets/guides/gherkin_file_failures">>,
+                         file => <<"test/snippets/guides/gherkin_file_failures.gleam">>,
+                         gleam_error => panic}
       Run it alone: gleam test -- --only "Shopping Cart/Breaking the cart"
 
 Summary: 3 run, 3 failed, 0 passed in 0ms

@@ -11,6 +11,7 @@
 //// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
+import dream_test/internal/lines
 import dream_test/internal/only
 import dream_test/reporters/diff
 import dream_test/reporters/hook_failures
@@ -451,14 +452,10 @@ fn format_one_failure(failure: AssertionFailure) -> String {
 fn format_step_line(payload: Option(types.FailurePayload)) -> String {
   case payload {
     Some(StepFailure(keyword:, text:, file:, line:, ..)) ->
-      string.concat([
+      labelled_line(
         "        Step: ",
-        keyword,
-        " ",
-        text,
-        step_place(file, line),
-        "\n",
-      ])
+        keyword <> " " <> text <> step_place(file, line),
+      )
     _ -> ""
   }
 }
@@ -488,8 +485,14 @@ fn step_cause(
 fn format_failure_message(message: String) -> String {
   case message {
     "" -> ""
-    _ -> string.concat(["        Message: ", message, "\n"])
+    _ -> labelled_line("        Message: ", message)
   }
+}
+
+/// One labelled value of a failure. Each line of the value after the first
+/// starts at the column of the value, under its first line.
+fn labelled_line(label: String, value: String) -> String {
+  label <> lines.continue_under(value, lines.margin_after(label)) <> "\n"
 }
 
 fn format_failure_payload(

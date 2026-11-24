@@ -275,6 +275,41 @@ Rule: D
         |> or_fail_with("format_scenarios should give no summary line")
       }),
 
+      it("puts each line of a message or step under its first line", fn() {
+        gherkin.format_scenarios([
+          scenario(["Cart"], "misses", types.Failed, [
+            failure(
+              "No recording matches GET /a\nNearest recording: a.json\n  origin:\n\n  - x\r\n  + y",
+              Some(types.StepFailure(
+                keyword: "Then",
+                text: "the text is\nlong",
+                file: None,
+                line: None,
+                cause: None,
+              )),
+            ),
+          ]),
+        ])
+        |> should
+        |> be_equal(
+          "Feature: Cart\n"
+          <> "  Scenario: misses ✗\n"
+          <> "      ✗ check\n"
+          <> "        Step: Then the text is\n"
+          <> "              long\n"
+          <> "        Message: No recording matches GET /a\n"
+          <> "                 Nearest recording: a.json\n"
+          <> "                   origin:\n"
+          <> "\n"
+          <> "                   - x\n"
+          <> "                   + y\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/misses\"\n",
+        )
+        |> or_fail_with(
+          "each line after the first should start under the first",
+        )
+      }),
+
       it("format_scenarios gives no text for no results", fn() {
         gherkin.format_scenarios([])
         |> should

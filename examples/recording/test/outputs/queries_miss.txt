@@ -2,10 +2,10 @@ Tasks
   ✗ finds the share token of task 42
     fail_with
       Message: No recording matches SELECT share_token FROM tasks WHERE id = $1 with [42]
-Nearest recording in test/recordings/queries/tasks.json:
-  parameters:
-  - [5]
-  + [42]
+               Nearest recording in test/recordings/queries/tasks.json:
+                 parameters:
+                 - [5]
+                 + [42]
     Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Failures:
@@ -13,10 +13,10 @@ Tasks
   ✗ finds the share token of task 42
     fail_with
       Message: No recording matches SELECT share_token FROM tasks WHERE id = $1 with [42]
-Nearest recording in test/recordings/queries/tasks.json:
-  parameters:
-  - [5]
-  + [42]
+               Nearest recording in test/recordings/queries/tasks.json:
+                 parameters:
+                 - [5]
+                 + [42]
     Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms

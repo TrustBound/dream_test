@@ -7,6 +7,7 @@
 //// (e.g. snapshot tests) or when you’re formatting results incrementally in a
 //// custom runner.
 
+import dream_test/internal/lines
 import dream_test/internal/only
 import dream_test/reporters/ansi
 import dream_test/reporters/diff
@@ -1054,16 +1055,13 @@ fn format_step_line(
 ) -> String {
   case payload {
     Some(StepFailure(keyword:, text:, file:, line:, ..)) ->
-      string.concat([
+      labelled_line(
+        color,
         base_indent,
-        ansi.apply_if(color, ansi.dim, "    Step: "),
-        ansi.apply_if(
-          color,
-          ansi.cyan,
-          keyword <> " " <> text <> step_place(file, line),
-        ),
-        "\n",
-      ])
+        "    Step: ",
+        ansi.cyan,
+        keyword <> " " <> text <> step_place(file, line),
+      )
     _ -> ""
   }
 }
@@ -1097,12 +1095,27 @@ fn format_failure_message(
 ) -> String {
   case message {
     "" -> ""
-    _ -> {
-      let label = ansi.apply_if(color, ansi.dim, "    Message: ")
-      let msg = ansi.apply_if(color, ansi.red, message)
-      string.concat([base_indent, label, msg, "\n"])
-    }
+    _ -> labelled_line(color, base_indent, "    Message: ", ansi.red, message)
   }
+}
+
+/// One labelled value of a failure: `base_indent`, the label in dim, and
+/// the value in `style`. Each line of the value after the first starts at
+/// the column of the value, under its first line.
+fn labelled_line(
+  color: Bool,
+  base_indent: String,
+  label: String,
+  style: fn(String) -> String,
+  value: String,
+) -> String {
+  let margin = base_indent <> lines.margin_after(label)
+  string.concat([
+    base_indent,
+    ansi.apply_if(color, ansi.dim, label),
+    ansi.apply_if(color, style, lines.continue_under(value, margin)),
+    "\n",
+  ])
 }
 
 fn format_failure_payload(
@@ -1161,15 +1174,15 @@ fn format_failure_payload(
         <> ansi.apply_if(color, ansi.cyan, operation)
         <> "\n"
       let pat_line =
-        base_indent
-        <> ansi.apply_if(color, ansi.dim, "    Pattern:   ")
-        <> ansi.apply_if(color, ansi.green, pattern)
-        <> "\n"
+        labelled_line(
+          color,
+          base_indent,
+          "    Pattern:   ",
+          ansi.green,
+          pattern,
+        )
       let actual_line =
-        base_indent
-        <> ansi.apply_if(color, ansi.dim, "    Actual:    ")
-        <> ansi.apply_if(color, ansi.red, actual)
-        <> "\n"
+        labelled_line(color, base_indent, "    Actual:    ", ansi.red, actual)
       op_line <> pat_line <> actual_line
     }
     Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) ->
@@ -1183,15 +1196,15 @@ fn format_failure_payload(
       )
     Some(CustomMatcherFailure(actual, description)) -> {
       let desc_line =
-        base_indent
-        <> ansi.apply_if(color, ansi.dim, "    Description: ")
-        <> ansi.apply_if(color, ansi.cyan, description)
-        <> "\n"
+        labelled_line(
+          color,
+          base_indent,
+          "    Description: ",
+          ansi.cyan,
+          description,
+        )
       let actual_line =
-        base_indent
-        <> ansi.apply_if(color, ansi.dim, "    Actual:      ")
-        <> ansi.apply_if(color, ansi.red, actual)
-        <> "\n"
+        labelled_line(color, base_indent, "    Actual:      ", ansi.red, actual)
       desc_line <> actual_line
     }
     _ -> ""

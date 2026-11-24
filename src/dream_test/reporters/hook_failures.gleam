@@ -18,6 +18,7 @@
 //// }
 //// ```
 
+import dream_test/internal/lines
 import dream_test/reporters/ansi
 import dream_test/types.{type HookFailure, SetupStopped, TeardownFailed}
 import gleam/list
@@ -156,9 +157,10 @@ fn failure_lines(color: Bool, title: String, details: List(String)) -> String {
   ])
 }
 
-/// One detail line of a failure, indented under its first line.
+/// One detail line of a failure, indented under its first line. Each line
+/// of a detail of more than one line keeps the indent.
 fn detail_line(detail: String) -> String {
-  "    " <> detail <> "\n"
+  "    " <> lines.continue_under(detail, "    ") <> "\n"
 }
 
 /// The lines that name the tests that a stopped setup did not run, or no

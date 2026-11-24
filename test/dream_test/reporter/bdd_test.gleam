@@ -993,6 +993,115 @@ pub fn tests() {
         )
         |> or_fail_with("expected the step line first")
       }),
+      it(
+        "puts each line of a value of more than one line under its first line",
+        fn() {
+          // Arrange
+          let report =
+            report_of([
+              result_of(
+                ["s"],
+                "misses",
+                types.Failed,
+                [
+                  failure(
+                    "No recording matches GET /a\nNearest recording: a.json\n  origin:\n\n  - x\r\n  + y",
+                    types.StepFailure(
+                      keyword: "Then",
+                      text: "the text is\nlong",
+                      file: None,
+                      line: None,
+                      cause: Some(types.StringMatchFailure(
+                        actual: "one\r\ntwo",
+                        pattern: "x\ny",
+                        operation: "contain",
+                      )),
+                    ),
+                  ),
+                  failure(
+                    "plain",
+                    types.CustomMatcherFailure(
+                      actual: "7\n8",
+                      description: "is even\nand small",
+                    ),
+                  ),
+                ],
+                types.Unit,
+              ),
+            ])
+
+          // Act
+          let text = bdd.format(report)
+
+          // Assert
+          text
+          |> should
+          |> be_equal(
+            "s\n"
+            <> "  ✗ misses\n"
+            <> "    check\n"
+            <> "      Step: Then the text is\n"
+            <> "            long\n"
+            <> "      Message: No recording matches GET /a\n"
+            <> "               Nearest recording: a.json\n"
+            <> "                 origin:\n"
+            <> "\n"
+            <> "                 - x\n"
+            <> "                 + y\n"
+            <> "      Operation: contain\n"
+            <> "      Pattern:   x\n"
+            <> "                 y\n"
+            <> "      Actual:    one\n"
+            <> "                 two\n"
+            <> "    check\n"
+            <> "      Message: plain\n"
+            <> "      Description: is even\n"
+            <> "                   and small\n"
+            <> "      Actual:      7\n"
+            <> "                   8\n"
+            <> "    Run it alone: gleam test -- --only \"s/misses\"\n"
+            <> "\n"
+            <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
+          )
+          |> or_fail_with(
+            "each line after the first should start under the first",
+          )
+        },
+      ),
+      it("colours a message of more than one line as one value", fn() {
+        // Arrange
+        let report =
+          report_of([
+            result_of(
+              ["s"],
+              "misses",
+              types.Failed,
+              [types.AssertionFailure("check", "first\nsecond", None)],
+              types.Unit,
+            ),
+          ])
+
+        // Act
+        let text =
+          bdd.render(config(True, reporter_types.BddFailuresOnly), report)
+
+        // Assert
+        text
+        |> should
+        |> be_equal(
+          "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[31m✗\u{001B}[0m \u{001B}[31mmisses\u{001B}[0m\n"
+          <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
+          <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mfirst\n"
+          <> "               second\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/misses\"\n"
+          <> "\n"
+          <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m1\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m0\u{001B}[0m passed in \u{001B}[36m0ms\u{001B}[0m\n",
+        )
+        |> or_fail_with(
+          "the margin should sit inside the colour of the message",
+        )
+      }),
       it("names the step with the place that is known", fn() {
         // Arrange
         let step_failure = fn(file, line) {

@@ -914,6 +914,11 @@ the guide labels them.
 
 ### Fixed
 
+- The BDD and Gherkin reports put each line of a failure message of more
+  than one line under the first line, after `Message: `. The same is true
+  for a `Step:` text, and for the `Pattern:`, `Actual:` and
+  `Description:` values that the BDD report shows. A `\r\n` line ending
+  is a line break. Before, the lines after the first started at column 0.
 - The failure of a changed snapshot holds the two texts that
   `match_snapshot` compared, both with no newlines at their ends. Before,
   its `actual` kept the newlines at the end of the value, so the report
