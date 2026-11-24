@@ -179,7 +179,7 @@ On the BEAM, a resource often lives as long as the process that started it. Each
 |---|---|---|
 | `before_all_suites`, `after_all_suites` | one setup process for the whole run | the default timeout, for each hook |
 | `before_each_suite`, `after_each_suite` | one setup process for each suite | the default timeout of the suite, for each hook |
-| the context setup and teardown (`unit_context.describe_with_setup`, `steps.new_with_setup`) | one setup process for each tree that has them, started after `before_each_suite` | the default timeout of the suite, for each |
+| the context setup and teardown (`context.setup`, `steps.new_with_setup`) | one setup process for each tree that has them, started after `before_each_suite` | the default timeout of the suite, for each |
 | `before_all`, `after_all` | one setup process for each group | the default timeout, for each hook |
 | `before_each_test`, `before_each`, the body, `after_each`, `after_each_test` | one process for each test | the default timeout for each hook, the test timeout for the body |
 

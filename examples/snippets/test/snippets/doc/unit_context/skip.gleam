@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -11,7 +12,7 @@ pub type Context {
 }
 
 pub fn suite() -> TestSuite {
-  describe("Skipping context-aware tests", Context(counter: 0), [
+  describe("Skipping context-aware tests", context.value(Context(counter: 0)), [
     skip("this test is skipped", fn(_context: Context) {
       // This would pass if it ran, but Dream Test will mark it skipped.
       Ok(succeed())

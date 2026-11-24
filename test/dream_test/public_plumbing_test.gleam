@@ -25,7 +25,7 @@ pub fn tests() {
       suite.new(
         name: "fixed",
         tags: ["tagged"],
-        children: [unit_context.it("gets 7", is_seven)],
+        tests: [unit_context.it("gets 7", is_seven)],
         context: FixedContext(7),
       )
       |> run_all
@@ -39,7 +39,7 @@ pub fn tests() {
         suite.new(
           name: "fixed",
           tags: ["tagged"],
-          children: [unit_context.it("gets 7", is_seven)],
+          tests: [unit_context.it("gets 7", is_seven)],
           context: FixedContext(7),
         )
       #(suite.name(made), list.map(suite.tests(made), test_tags))
@@ -55,7 +55,7 @@ pub fn tests() {
         suite.new(
           name: "setup",
           tags: [],
-          children: [
+          tests: [
             unit_context.it("first gets 7", is_seven),
             unit_context.it("second gets 7", is_seven),
           ],
@@ -94,7 +94,7 @@ pub fn tests() {
           suite.new(
             name: "fixed",
             tags: [],
-            children: [unit_context.it("gets 7", is_seven)],
+            tests: [unit_context.it("gets 7", is_seven)],
             context: FixedContext(7),
           ),
           suite.RunInput(

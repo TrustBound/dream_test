@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/discover
 import dream_test/file
 import dream_test/gherkin/discover as gherkin_discover
@@ -22,7 +23,7 @@ pub fn tests() {
       let log_path = "test/fixtures/file/temp/runner_hooks_order.txt"
 
       let suite =
-        ctx_describe("root", Nil, [
+        ctx_describe("root", context.value(Nil), [
           before_all(fn(_ctx: Nil) { write_string(log_path, "") }),
           before_each(fn(_ctx: Nil) { append_line(log_path, "suite_before\n") }),
           after_each(fn(_ctx: Nil) { append_line(log_path, "suite_after\n") }),
@@ -90,7 +91,7 @@ pub fn tests() {
       let _ = write_string(log_path, "")
 
       let suite =
-        ctx_describe("suite_one", Nil, [
+        ctx_describe("suite_one", context.value(Nil), [
           before_all(fn(_ctx: Nil) {
             append_line(log_path, "suite_before_all\n")
           }),

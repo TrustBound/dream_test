@@ -8,7 +8,6 @@ import gleam/result
 import snippets/doc/unit_context/before_all as before_all_example
 import snippets/doc/unit_context/before_each as before_each_example
 import snippets/doc/unit_context/describe as describe_example
-import snippets/doc/unit_context/describe_with_setup as describe_with_setup_example
 import snippets/doc/unit_context/group as group_example
 import snippets/doc/unit_context/pending as pending_example
 import snippets/doc/unit_context/skip as skip_example
@@ -249,16 +248,6 @@ pub fn tests() -> TestSuite {
         #("inherits the group tag", ["slow"]),
       ])
       |> or_fail_with("expected the tags of each test")
-    }),
-    it("describe_with_setup.server_suite passes with the setup context", fn() {
-      // Act
-      let result = statuses(describe_with_setup_example.server_suite())
-
-      // Assert
-      result
-      |> should
-      |> be_equal([#(["Server", "answers a ping"], Passed)])
-      |> or_fail_with("expected the server test to pass")
     }),
     it("pending.cart_suite has one passed and two pending tests", fn() {
       // Act

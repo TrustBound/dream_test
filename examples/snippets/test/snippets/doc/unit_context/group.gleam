@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -15,7 +16,7 @@ fn increment_counter(context: Context) -> Result(Context, String) {
 }
 
 pub fn suite() -> TestSuite {
-  describe("Context-aware grouping", Context(counter: 0), [
+  describe("Context-aware grouping", context.value(Context(counter: 0)), [
     // This outer hook applies everywhere under this describe, including groups.
     before_each(increment_counter),
     group("inner group", [

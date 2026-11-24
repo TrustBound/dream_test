@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/runner
 import dream_test/suite.{type TestSuite}
@@ -11,7 +12,7 @@ fn cart_suite() -> TestSuite {
 }
 
 fn stock_suite() -> TestSuite {
-  unit_context.describe("Stock", 3, [
+  unit_context.describe("Stock", context.value(3), [
     unit_context.it("has 3 items", fn(items: Int) {
       items
       |> should

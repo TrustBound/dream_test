@@ -4,11 +4,12 @@
 
 import app/tasks.{NoSuchTask, Task}
 import dream_postgres_client.{TransactionRolledBack}
+import dream_test/context
 import dream_test/matchers.{
   be_equal, be_ok, contain, not_contain, or_fail_with, should,
 }
 import dream_test/suite.{type TestSuite}
-import dream_test/unit_context.{describe_with_setup, it}
+import dream_test/unit_context.{describe, it}
 import gleam/list
 import gleam/result
 import gleam/string
@@ -17,11 +18,10 @@ import recorded_queries/database_setup.{
 }
 
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Tasks",
-    setup: start_task_database,
-    teardown: stop_database,
-    children: [
+    context.setup(start_task_database, teardown: stop_database),
+    [
       it("lists a new task as open", fn(database: Database) {
         use id <- result.try(add(database, "Buy milk"))
         tasks.open_tasks(database.db)

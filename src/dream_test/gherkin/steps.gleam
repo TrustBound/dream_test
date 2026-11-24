@@ -344,7 +344,7 @@ pub fn new(initial initial: state) -> StepRegistry(state) {
 /// scenarios run, so a server that the setup starts and links stays
 /// alive. When `setup` returns `Error`, crashes or times out, each
 /// scenario is `SetupFailed` with the operator `context setup` and `teardown`
-/// does not run. See `unit_context.describe_with_setup` for the other
+/// does not run. See `context.setup` for the other
 /// cases.
 ///
 /// ## Example
@@ -433,21 +433,21 @@ pub fn new_with_setup(
 /// - `Scenarios(feature)`: the tests of the scenarios of a Feature, and a
 ///   group for each Rule, with no group for the Feature. The tags of the
 ///   Feature itself are not on these tests.
-/// - `Group(name, tags, children)`: a group of your own, for example with a
-///   tag, that holds more children.
+/// - `Group(name, tags, tests)`: a group of your own, for example with a
+///   tag, that holds more tests.
 /// - `Node(node)`: a test, a hook or a group that you make, for example
 ///   with `unit_context.it` or `unit_context.before_each`. It gets the same
 ///   start as the scenarios.
 pub type SuiteChild(state) {
   Feature(feature: types.Feature)
   Scenarios(feature: types.Feature)
-  Group(name: String, tags: List(String), children: List(SuiteChild(state)))
+  Group(name: String, tags: List(String), tests: List(SuiteChild(state)))
   Node(node: dream_types.Node(state))
 }
 
 /// Make a suite whose tests start as the registry says: from the state of
 /// `new`, or from the value of the setup of `new_with_setup`. The setup
-/// runs one time for all the children, and only when at least one of
+/// runs one time for all the tests, and only when at least one of
 /// their tests runs.
 ///
 /// `gherkin/discover.to_suite` uses it. Use it
@@ -460,7 +460,7 @@ pub type SuiteChild(state) {
 /// - `registry`: the steps, and where each test starts
 /// - `name`: the name of the top-level group
 /// - `tags`: the tags of the top-level group
-/// - `children`: the Features, groups, tests and hooks (see `SuiteChild`)
+/// - `tests`: the Features, groups, tests and hooks (see `SuiteChild`)
 ///
 /// ## Example
 ///
@@ -485,9 +485,9 @@ pub type SuiteChild(state) {
 ///   cart cart: gherkin_types.Feature,
 ///   invoice invoice: gherkin_types.Feature,
 /// ) -> TestSuite {
-///   to_suite(registry: steps, name: "Shop", tags: [], children: [
+///   to_suite(registry: steps, name: "Shop", tags: [], tests: [
 ///     Feature(cart),
-///     Group(name: "Billing", tags: ["billing"], children: [
+///     Group(name: "Billing", tags: ["billing"], tests: [
 ///       Feature(invoice),
 ///     ]),
 ///     Node(unit_context.it("the server answers", answers)),
@@ -499,12 +499,12 @@ pub fn to_suite(
   registry registry: StepRegistry(state),
   name name: String,
   tags tags: List(String),
-  children children: List(SuiteChild(state)),
+  tests tests: List(SuiteChild(state)),
 ) -> TestSuite {
   suite.new(
     name: name,
     tags: tags,
-    children: children_to_nodes(children, registry),
+    tests: children_to_nodes(tests, registry),
     context: registry.start,
   )
 }
@@ -601,7 +601,7 @@ pub fn feature_suite(
   suite.new(
     name: feature.name,
     tags: feature.tags,
-    children: feature_children(feature, registry, Some(feature.name)),
+    tests: feature_children(feature, registry, Some(feature.name)),
     context: registry.start,
   )
 }
@@ -633,11 +633,11 @@ fn child_to_nodes(
       ),
     ]
     Scenarios(feature) -> feature_children(feature, registry, None)
-    Group(name: name, tags: tags, children: children) -> [
+    Group(name: name, tags: tags, tests: tests) -> [
       dream_types.Group(
         name: name,
         tags: tags,
-        children: children_to_nodes(children, registry),
+        children: children_to_nodes(tests, registry),
       ),
     ]
     Node(node) -> [node]

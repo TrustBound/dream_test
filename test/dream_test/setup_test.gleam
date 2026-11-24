@@ -1,6 +1,7 @@
-//// A suite whose context comes from a setup:
-//// `unit_context.describe_with_setup`.
+//// A suite whose context comes from a setup: `unit_context.describe`
+//// with `context.setup`.
 
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/hook_failures
 import dream_test/reporters/json
@@ -21,7 +22,7 @@ import gleam/result
 import gleam/string
 
 pub fn tests() {
-  describe("unit_context.describe_with_setup", [
+  describe("unit_context.describe with context.setup", [
     it("gives the value of the setup to each test, once", fn() {
       let events = process.new_subject()
       let report =
@@ -62,11 +63,13 @@ pub fn tests() {
       let events = process.new_subject()
       let report =
         runner.new([
-          unit_context.describe_with_setup(
+          unit_context.describe(
             "empty",
-            setup: fn() { send_and_give(events, "setup", 7) },
-            teardown: fn(_value: Int) { send_ok(events, "teardown") },
-            children: [],
+            context: context.setup(
+              start: fn() { send_and_give(events, "setup", 7) },
+              teardown: fn(_value: Int) { send_ok(events, "teardown") },
+            ),
+            tests: [],
           ),
         ])
         |> runner.silent()
@@ -191,11 +194,13 @@ pub fn tests() {
     it("a teardown error is a teardown failure", fn() {
       let report =
         runner.new([
-          unit_context.describe_with_setup(
+          unit_context.describe(
             "server",
-            setup: fn() { Ok(7) },
-            teardown: fn(_value: Int) { Error("port still open") },
-            children: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
+            context: context.setup(
+              start: fn() { Ok(7) },
+              teardown: fn(_value: Int) { Error("port still open") },
+            ),
+            tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
           ),
         ])
         |> runner.silent()
@@ -217,11 +222,10 @@ pub fn tests() {
     it("a teardown that crashes is a teardown failure", fn() {
       let report =
         runner.new([
-          unit_context.describe_with_setup(
+          unit_context.describe(
             "server",
-            setup: fn() { Ok(7) },
-            teardown: crash_with,
-            children: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
+            context: context.setup(start: fn() { Ok(7) }, teardown: crash_with),
+            tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
           ),
         ])
         |> runner.silent()
@@ -236,11 +240,13 @@ pub fn tests() {
     it("the reports name a failed context teardown in plain words", fn() {
       let failures =
         runner.new([
-          unit_context.describe_with_setup(
+          unit_context.describe(
             "Server",
-            setup: fn() { Ok(7) },
-            teardown: fn(_value: Int) { Error("port still open") },
-            children: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
+            context: context.setup(
+              start: fn() { Ok(7) },
+              teardown: fn(_value: Int) { Error("port still open") },
+            ),
+            tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
           ),
         ])
         |> runner.silent()
@@ -301,11 +307,13 @@ pub fn tests() {
       let events = process.new_subject()
       let report =
         runner.new([
-          unit_context.describe_with_setup(
+          unit_context.describe(
             "server",
-            setup: fn() { Ok(process.self()) },
-            teardown: fn(_setup_process: Pid) { send_ok(events, "teardown") },
-            children: [
+            context: context.setup(
+              start: fn() { Ok(process.self()) },
+              teardown: fn(_setup_process: Pid) { send_ok(events, "teardown") },
+            ),
+            tests: [
               unit_context.it("stops the setup", kill_and_wait),
               unit_context.it("never runs", fn(_setup_process) { Ok(succeed()) }),
             ],
@@ -346,7 +354,7 @@ pub fn tests() {
       let report =
         runner.new([
           suite.join(name: "all", suites: [
-            unit_context.describe("first", setup_processes, [
+            unit_context.describe("first", context.value(setup_processes), [
               unit_context.it(
                 "stops the before_each_suite setup",
                 kill_before_each_suite_process,
@@ -389,13 +397,15 @@ pub fn tests() {
 
 /// A suite whose setup gives 7. Each step sends an event.
 fn counted_suite(events: Subject(String)) {
-  unit_context.describe_with_setup(
+  unit_context.describe(
     "server",
-    setup: fn() { send_and_give(events, "setup", 7) },
-    teardown: fn(value: Int) {
-      send_ok(events, "teardown got " <> int.to_string(value))
-    },
-    children: [
+    context: context.setup(
+      start: fn() { send_and_give(events, "setup", 7) },
+      teardown: fn(value: Int) {
+        send_ok(events, "teardown got " <> int.to_string(value))
+      },
+    ),
+    tests: [
       unit_context.it("first", fn(value) {
         report_value(events, "first", value)
       }),
@@ -408,11 +418,12 @@ fn counted_suite(events: Subject(String)) {
 
 /// A suite with the setup `setup`. Its teardown sends an event.
 fn broken_suite(events: Subject(String), setup: fn() -> Result(Int, String)) {
-  unit_context.describe_with_setup(
+  unit_context.describe(
     "broken",
-    setup: setup,
-    teardown: fn(_value: Int) { send_ok(events, "teardown") },
-    children: [
+    context: context.setup(start: setup, teardown: fn(_value: Int) {
+      send_ok(events, "teardown")
+    }),
+    tests: [
       unit_context.it("first", fn(_value) { Ok(succeed()) }),
       unit_context.it("second", fn(_value) { Ok(succeed()) }),
     ],

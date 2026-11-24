@@ -39,7 +39,7 @@ In this guide, you will:
 
 ## Before you start
 
-You need a project with Dream Test and a test runner. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up. This guide also uses `unit_context.describe_with_setup`, which [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup) explains.
+You need a project with Dream Test and a test runner. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up. This guide also uses `unit_context.describe` with `context.setup`, which [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup) explains.
 
 The code of this guide is the project `examples/recording` in the Dream Test repository. Its tests run in CI on each change. `dream_postgres` is not on Hex yet, so the project gets it from GitHub. `dream_postgres_client` is the driver, a fork of Pog:
 
@@ -139,7 +139,7 @@ This is the one thing that makes recordings easy. The test decides which connect
 
 You record on your machine, and CI plays back. So the mode comes from an environment variable, `RECORDER_MODE`. `recorder.parse_mode` turns the text into a `recorder.Mode`. It accepts `record`, `playback` and `passthrough`, and gives an `Error` that names any other text. With no variable, the tests play back.
 
-A recorder is a process, so something must start it before the first test and stop it after the last test. In Dream Test, that is the `setup` and the `teardown` of `unit_context.describe_with_setup`. The setup runs one time for the suite, and its value is the context of each test. Here the context is `Database`: the connection and its recorder:
+A recorder is a process, so something must start it before the first test and stop it after the last test. In Dream Test, that is the `start` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. Here the context is `Database`: the connection and its recorder:
 
 ### Start the recorder and connect <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/database_setup.gleam#L16-L62"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -201,7 +201,7 @@ How it works:
 - When the setup returns an `Error`, no test of the suite runs, and the report shows the message.
 - `hide_share_tokens` keeps a secret out of the file. [Keep secrets out of the file](#keep-secrets-out-of-the-file) shows it.
 
-Why not `before_all` and `after_all` of `dream_test/unit`? Those hooks return `Ok(Nil)`, so they cannot give the connection to the tests. `describe_with_setup` gives the value of the setup to each test, with its type.
+Why not `before_all` and `after_all` of `dream_test/unit`? Those hooks return `Ok(Nil)`, so they cannot give the connection to the tests. `context.setup` gives the value of the setup to each test, with its type.
 
 ## Step 3: Make the schema through the recorder
 
@@ -240,15 +240,14 @@ So the setup has the same code in each mode. In playback, the schema queries get
 
 Each test gets the `Database` and passes `database.db` to the code under test:
 
-### The task suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L19-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The task suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L20-L46"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Tasks",
-    setup: start_task_database,
-    teardown: stop_database,
-    children: [
+    context.setup(start_task_database, teardown: stop_database),
+    [
       it("lists a new task as open", fn(database: Database) {
         use id <- result.try(add(database, "Buy milk"))
         tasks.open_tasks(database.db)
@@ -436,15 +435,17 @@ How it works:
 
 In playback mode, a query with no recording never reaches a database. It fails with the query error `InterceptorFailed`. `recorder.error` reads the `recorder.RecorderError` back from that error. Here is a test that asks for the share token of task 42, a query that the record run did not run:
 
-### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/miss_tests.gleam#L15-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/miss_tests.gleam#L16-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Tasks",
-    setup: fn() { start_database(recorder.Playback, "tasks") },
-    teardown: stop_database,
-    children: [
+    context.setup(
+      fn() { start_database(recorder.Playback, "tasks") },
+      teardown: stop_database,
+    ),
+    [
       it("finds the share token of task 42", fn(database: Database) {
         tasks.share_token(database.db, 42)
         |> result.map_error(recorder.error)
@@ -620,5 +621,5 @@ The project proves that playback never connects: its CI job has no database, and
 - [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md): the same pattern for HTTP calls, with `dream_http_client`.
 - [Test database code with recorded queries](https://github.com/TrustBound/dream_postgres/blob/main/docs/guides/recorded-queries.md): the full recorder API of `dream_postgres`, and recordings written by hand.
 - [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): `runner.add_suites_with_config` and the concurrency of a suite.
-- [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): `describe_with_setup` and the context of each test.
+- [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): `context.setup` and the context of each test.
 - [API reference on HexDocs](https://hexdocs.pm/dream_postgres/dream_postgres/recorder.html): `recorder` and `recording`.

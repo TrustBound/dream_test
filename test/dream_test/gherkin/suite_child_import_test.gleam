@@ -18,10 +18,10 @@ import gleam/list
 pub fn tests() {
   describe("steps.SuiteChild next to dream_test/types.Group", [
     it("builds and runs a suite from every kind of child", fn() {
-      steps.to_suite(registry: registry(), name: "Shop", tags: [], children: [
+      steps.to_suite(registry: registry(), name: "Shop", tags: [], tests: [
         steps.Feature(shop_feature("Cart")),
         steps.Scenarios(shop_feature("Stock")),
-        steps.Group(name: "Billing", tags: [], children: [
+        steps.Group(name: "Billing", tags: [], tests: [
           steps.Feature(shop_feature("Invoice")),
         ]),
         steps.Node(

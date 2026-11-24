@@ -127,16 +127,13 @@ pub type UnitNode =
 /// ## Parameters
 ///
 /// - `name`: the suite name (shown in reports)
-/// - `children`: the suite contents (tests, groups, and hooks)
+/// - `tests`: the suite contents (tests, groups, and hooks)
 ///
 /// ## Returns
 ///
 /// A `TestSuite` you can pass to `runner.new([ ... ])`.
-pub fn describe(
-  name name: String,
-  children children: List(UnitNode),
-) -> TestSuite {
-  suite.from_tree(Tree(initial: Nil, name: name, tags: [], children: children))
+pub fn describe(name name: String, tests tests: List(UnitNode)) -> TestSuite {
+  suite.from_tree(Tree(initial: Nil, name: name, tags: [], children: tests))
 }
 
 /// Create a nested group inside a suite.
@@ -196,13 +193,13 @@ pub fn describe(
 /// ## Parameters
 ///
 /// - `name`: the group name (shown in reports and in `types.TestInfo.groups`)
-/// - `children`: nested tests/groups/hooks under this group
+/// - `tests`: nested tests/groups/hooks under this group
 ///
 /// ## Returns
 ///
-/// A `UnitNode` you include in a parent `describe`/`group` children list.
-pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
-  Group(name: name, tags: [], children: children)
+/// A `UnitNode` you include in the tests of a parent `describe` or `group`.
+pub fn group(name name: String, tests tests: List(UnitNode)) -> UnitNode {
+  Group(name: name, tags: [], children: tests)
 }
 
 /// Define a single test case.

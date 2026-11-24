@@ -22,35 +22,30 @@ I have done engineering for twenty years, and I tried many approaches to mocking
 
 Here is what that looks like. This is one suite of the example project. It tests a weather client:
 
-### The Forecast suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L18-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The Forecast suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L19-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
-    "Forecast",
-    setup: start_weather_api,
-    teardown: stop_api,
-    children: [
-      it("gives the forecast for Oslo", fn(api: Api) {
-        forecast(api.base, "oslo")
-        |> should
-        |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
-        |> or_fail_with("the forecast for Oslo should be snow")
-      }),
-      it("gives the forecast for Lisbon", fn(api: Api) {
-        forecast(api.base, "lisbon")
-        |> should
-        |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
-        |> or_fail_with("the forecast for Lisbon should be sun")
-      }),
-      it("reports a city that the API does not know", fn(api: Api) {
-        forecast(api.base, "atlantis")
-        |> should
-        |> be_equal(Error(UnknownCity("atlantis")))
-        |> or_fail_with("Atlantis should be unknown")
-      }),
-    ],
-  )
+  describe("Forecast", context.setup(start_weather_api, teardown: stop_api), [
+    it("gives the forecast for Oslo", fn(api: Api) {
+      forecast(api.base, "oslo")
+      |> should
+      |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
+      |> or_fail_with("the forecast for Oslo should be snow")
+    }),
+    it("gives the forecast for Lisbon", fn(api: Api) {
+      forecast(api.base, "lisbon")
+      |> should
+      |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
+      |> or_fail_with("the forecast for Lisbon should be sun")
+    }),
+    it("reports a city that the API does not know", fn(api: Api) {
+      forecast(api.base, "atlantis")
+      |> should
+      |> be_equal(Error(UnknownCity("atlantis")))
+      |> or_fail_with("Atlantis should be unknown")
+    }),
+  ])
 }
 
 fn start_weather_api() -> Result(Api, String) {
@@ -108,15 +103,14 @@ A test of this kind has two boundaries.
 
 This is black-box testing with one more control. The test does not look inside the box, and it does not replace parts inside the box. It controls the world around the box. Here is a test of the database example. It adds a task through the public function, and checks the open tasks that a caller gets:
 
-### A test through the public interface <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L19-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A test through the public interface <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Tasks",
-    setup: start_task_database,
-    teardown: stop_database,
-    children: [
+    context.setup(start_task_database, teardown: stop_database),
+    [
       it("lists a new task as open", fn(database: Database) {
         use id <- result.try(add(database, "Buy milk"))
         tasks.open_tasks(database.db)
@@ -131,7 +125,7 @@ The test does not know how `open_tasks` builds its query. It knows only what the
 
 ## Keep substitution in the suite setup
 
-The real code takes one value at its boundary. The weather client takes a base HTTP request. The task functions take a database connection. The suite setup of Dream Test (`describe_with_setup`) makes that value, and gives it to each test. The setup also chooses the mode: record, playback or passthrough.
+The real code takes one value at its boundary. The weather client takes a base HTTP request. The task functions take a database connection. The suite setup of Dream Test (`context.setup`) makes that value, and gives it to each test. The setup also chooses the mode: record, playback or passthrough.
 
 The HTTP setup puts a recorder on the base request:
 

@@ -73,11 +73,15 @@ hook starts now lives for the tests of its group. A test runs its
   `suite.group` and `suite.join` put suites together, and each keeps its
   own context.
 - A context setup gives the context of a tree and runs once, only
-  when at least one of its tests runs: `unit_context.describe_with_setup`
-  for unit tests, and `steps.new_with_setup` for Gherkin scenarios, for
-  example to start one server for all the scenarios of a feature.
+  when at least one of its tests runs: `context.setup` in
+  `unit_context.describe` for unit tests, and `steps.new_with_setup` for
+  Gherkin scenarios, for example to start one server for all the
+  scenarios of a feature.
+- The new module `dream_test/context` makes the context of
+  `unit_context.describe`: `context.value(start)` for a fixed start value,
+  and `context.setup(start, teardown:)` for a value from a setup.
 - `steps.to_suite` makes one suite from several Features with one
-  registry, so one setup serves all of them. Its children
+  registry, so one setup serves all of them. Its tests
   (`steps.SuiteChild`) are `Feature`, `Scenarios`, `Group`
   and `Node`.
 - `suite.from_tree` turns a tree that you build by hand (`types.Tree`)
@@ -246,10 +250,18 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   a tree is one top-level group with its children and one context, and a
   suite holds one or more trees. The `parallel` functions take the tree
   with the label `tree:` in place of `suite:`.
-- The start value has the label `initial` in place of `seed`, as in
-  `steps.new(initial:)`: `unit_context.describe(name:, initial:,
-  children:)`, `types.tree(name:, initial:, children:)` and the field
-  `types.Tree.initial`. A call without labels does not change.
+- `unit_context.describe` takes a `dream_test/context.Context` in place
+  of the start value: `describe(name, 0, tests)` is now
+  `describe(name, context.value(0), tests)`, and
+  `describe(name:, seed:, children:)` is now
+  `describe(name:, context:, tests:)`.
+- The label `children` is now `tests` in `unit.describe`, `unit.group`,
+  `unit_context.describe`, `unit_context.group`, `suite.new`,
+  `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels
+  does not change.
+- The start value of a tree has the label `initial` in place of `seed`,
+  as in `steps.new(initial:)`: `types.tree(name:, initial:, tests:)` and
+  the field `types.Tree.initial`.
 - The `parallel` names say "tree" in place of "root": `run_root_parallel`
   is now `run_tree_parallel`, `run_root_parallel_with_reporter` is now
   `run_tree_parallel_with_reporter`, and `RunRootParallelWithReporterConfig`

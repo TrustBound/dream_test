@@ -39,7 +39,7 @@ Each 2.x example on this page has the label **Code at 2.1.3**: the code is a cop
 
 ## Which steps you need
 
-Code that uses only `unit`, `unit_context` and the runner with its default reporters compiles without changes, except for these items:
+Code that uses only `unit` and the runner with its default reporters compiles without changes, except for these items:
 
 - the Gherkin step definitions
 - `TestSuite` type annotations
@@ -47,14 +47,15 @@ Code that uses only `unit`, `unit_context` and the runner with its default repor
 - filter predicates and other code that reads `full_name` of a `TestInfo` or a `TestResult`
 - `runner.has_failures`
 - code that uses the result of `runner.run` as a list
-- the label `seed:` of `unit_context.describe`, which is now `initial:`
+- each `unit_context.describe` call, which takes a `context.value(start)` in place of the start value
+- the label `children:` of `describe` and `group`, which is now `tests:`
 
 Most projects need only Steps 1 to 4. Do the steps in order. The first ones affect the most projects.
 
 | Your code uses | What changed | Step |
 |:---|:---|:---|
 | Gherkin steps | Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` and `FeatureConfig` are removed: use `steps.feature_suite`. | [Step 3](#step-3-port-the-gherkin-step-definitions) |
-| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases, also for a run with no test (`runner.allow_no_tests()` allows one). `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
+| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases, also for a run with no test (`runner.allow_no_tests()` allows one). `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. `unit_context.describe` takes a `context.value(start)` in place of the start value. The label `children` of `describe` and `group` is now `tests`, and `types.Tree` has `initial` in place of `seed`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
 | Hooks | A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. | [Step 5](#step-5-check-the-hook-failures) |
 | Reporters | The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`, and `FailurePayload` the new variant `StepFailure`. | [Step 6](#step-6-update-the-reporters) |
 | The JSON report | The JSON report has schema version `2.0`. | [Step 7](#step-7-update-the-tools-that-read-the-json-report) |
@@ -667,9 +668,10 @@ pub fn suite() -> TestSuite(Nil) {
 }
 ```
 
-#### 3.0.0: suites with the type `TestSuite`, in one run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/suite_type.gleam#L1-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: suites with the type `TestSuite`, in one run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/suite_type.gleam#L1-L28"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/runner
 import dream_test/suite.{type TestSuite}
@@ -683,7 +685,7 @@ pub fn suite() -> TestSuite {
 }
 
 pub fn context_suite() -> TestSuite {
-  unit_context.describe("context suite", 41, [
+  unit_context.describe("context suite", context.value(41), [
     unit_context.it("gets 41", fn(number: Int) {
       number
       |> should
@@ -1187,9 +1189,13 @@ pub fn tests() -> TestSuite {
 }
 ```
 
-### `seed` is now `initial`
+### `unit_context.describe` takes a context, and `children` is now `tests`
 
-The start value of a context has the label `initial` in place of `seed`, as in `steps.new(initial:)`. This affects `unit_context.describe(name:, initial:, children:)`, `types.tree(name:, initial:, children:)` and the field `initial` of `types.Tree`. A call without labels, such as `unit_context.describe("counter", 0, [...])`, does not change. Change only the label.
+`unit_context.describe` takes a `dream_test/context.Context` in place of the start value. Put the start value in `context.value`: `unit_context.describe("counter", 0, [...])` is now `unit_context.describe("counter", context.value(0), [...])`, with `import dream_test/context`. With labels, `describe(name:, seed:, children:)` is now `describe(name:, context:, tests:)`. A start value that a setup makes and a teardown stops goes in `context.setup(start, teardown:)` (see [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup)).
+
+The label `children` is now `tests` in `unit.describe`, `unit.group`, `unit_context.describe`, `unit_context.group`, `suite.new`, `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels, such as `unit.describe("math", [...])`, does not change. Change only the label.
+
+The start value of `types.tree` and the field of `types.Tree` have the label `initial` in place of `seed`, as in `steps.new(initial:)`: `types.tree(name:, initial:, tests:)`.
 
 #### 2.x: `unit_context.describe` with the label `seed` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit_context.gleam#L115-L121"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1203,16 +1209,16 @@ pub fn describe(
 }
 ```
 
-#### 3.0.0: `unit_context.describe` with the label `initial` <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/initial_label.gleam#L5-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: `unit_context.describe` with a context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/describe_context.gleam#L6-L15"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  unit_context.describe(name: "a counter", initial: 41, children: [
-    unit_context.it("starts from the initial value", fn(count: Int) {
+  unit_context.describe(name: "a counter", context: context.value(41), tests: [
+    unit_context.it("starts from the value of the context", fn(count: Int) {
       count
       |> should
       |> be_equal(41)
-      |> or_fail_with("expected the initial value 41")
+      |> or_fail_with("expected the start value 41")
     }),
   ])
 }
@@ -1281,11 +1287,11 @@ Module discovery loads a test module whose `tests()` returns a suite with a cont
 - A failed setup hook gives `SetupFailed` to each test that it serves.
 - A failed teardown hook does not change the status of a test. The other teardown hooks still run. The failure goes into the hook failures of the run report, and the run fails. With `runner.exit_on_failure`, the exit status is 1 (see [Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#step-6-decide-the-exit-status)).
 
-A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that all the tests of a tree share, use `unit_context.describe_with_setup`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
+A setup hook and its teardown hook run only when at least one of the tests that they serve runs. In 2.x, the `before_all` and `after_all` hooks of a group with no test, and the suite hooks of a suite with no test, still ran. Do not use an empty group or suite only to run a hook: put the hook in a group that has tests. For a resource that all the tests of a tree share, use `context.setup` in `unit_context.describe`, or `steps.new_with_setup` for Gherkin. To run suites with different contexts together, use `suite.group` or `suite.join`.
 
 ### A setup whose process stops
 
-A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `describe_with_setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, path, reason, not_run)`. `SetupStopped` is the second variant of `types.HookFailure`. A `case` on a `HookFailure` needs a branch for it.
+A `before_all`, `before_each_suite` or `before_all_suites` hook, or a context setup (from `context.setup` or `steps.new_with_setup`), runs in a process that lives while its tests run. When that process stops, for example because a process linked to it crashed, the run report gets a `types.SetupStopped(setup, path, reason, not_run)`. `SetupStopped` is the second variant of `types.HookFailure`. A `case` on a `HookFailure` needs a branch for it.
 
 - Each test that had not started is `SetupFailed`, with a failure such as `not run: the setup from before_all in "Database" stopped (killed)`. `not_run` lists the full names of these tests.
 - The teardown hooks still run, in a new process.
@@ -1422,7 +1428,7 @@ fn count_broken(report: RunReport) -> Int {
 
 In 2.x, each hook and each test body ran in its own process. A process, a subject or an ETS table that a hook made stopped before the test body ran. In 3.0.0, a test runs its hooks and its body in one process. The `before_all` and `after_all` hooks of a group run in one setup process of that group. You do not have to change code for this. But a hook can now make a subject, and the test body can receive from it. The same code compiled in 2.x, but the test failed.
 
-#### 3.0.0: a test receives a message that its hook sent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_process.gleam#L9-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+#### 3.0.0: a test receives a message that its hook sent <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/upgrading/hook_process.gleam#L10-L28"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub type Context {
@@ -1430,7 +1436,7 @@ pub type Context {
 }
 
 pub fn suite() {
-  describe("Inbox", Context(inbox: process.new_subject()), [
+  describe("Inbox", context.value(Context(inbox: process.new_subject())), [
     before_each(fn(_context) {
       let inbox = process.new_subject()
       process.send(inbox, "welcome")
@@ -2245,7 +2251,7 @@ pub fn tests() {
 
 ### Three items that did nothing
 
-`types.TestKind.Integration`, the alias `types.TestSuiteItem` and the module `dream_test/context` are removed. No part of Dream Test made or read them.
+`types.TestKind.Integration`, the alias `types.TestSuiteItem` and the old module `dream_test/context` (`TestContext`, `new`, `failures`, `add_failure`) are removed. No part of Dream Test made or read them. The name `dream_test/context` now holds the context of `unit_context.describe`.
 
 No test ever had the kind `Integration`. To mark integration tests, give them a tag, and filter on the tag:
 

@@ -614,7 +614,7 @@ pub fn call(
 ///   links stays alive. When the setup returns `Error`, crashes or times
 ///   out, each test is `SetupFailed` and the teardown does not run.
 ///
-/// `unit_context.describe_with_setup` and `steps.new_with_setup` make a
+/// `context.setup` and `steps.new_with_setup` make a
 /// `ContextFromSetup`.
 pub type SuiteContext(context) {
   FixedContext(value: context)
@@ -633,7 +633,7 @@ pub type SuiteContext(context) {
 ///
 /// - `name`: name of the top-level group
 /// - `initial`: the initial context value stored in the `Tree`
-/// - `children`: children under the top-level group
+/// - `tests`: the tests, groups and hooks under the top-level group
 ///
 /// ## Returns
 ///
@@ -647,15 +647,15 @@ pub type SuiteContext(context) {
 /// import dream_test/types.{type Tree}
 ///
 /// pub fn empty_math_tree() -> Tree(Int) {
-///   types.tree(name: "math", initial: 0, children: [])
+///   types.tree(name: "math", initial: 0, tests: [])
 /// }
 /// ```
 pub fn tree(
   name name: String,
   initial initial: context,
-  children children: List(Node(context)),
+  tests tests: List(Node(context)),
 ) -> Tree(context) {
-  Tree(initial: initial, name: name, tags: [], children: children)
+  Tree(initial: initial, name: name, tags: [], children: tests)
 }
 
 /// The complete name of a test: its group names, then its own name.
@@ -793,7 +793,7 @@ pub fn is_failure(status status: Status) -> Bool {
 /// - `AfterEachSuiteHook`: `runner.after_each_suite`
 /// - `AfterAllSuitesHook`: `runner.after_all_suites`
 /// - `ContextTeardownHook`: the teardown of a tree whose context comes from
-///   a setup (`unit_context.describe_with_setup`,
+///   a setup (`context.setup`,
 ///   `steps.new_with_setup`). It runs after the last test of that tree.
 ///   Its name is `"context teardown"`.
 pub type TeardownHook {
@@ -854,7 +854,7 @@ pub fn teardown_hook_name(hook hook: TeardownHook) -> String {
 /// - `BeforeAllSuitesHook`: `runner.before_all_suites`. It serves every
 ///   test of the run.
 /// - `ContextSetupHook`: the setup of a tree whose context comes from a
-///   setup (`unit_context.describe_with_setup`, `steps.new_with_setup`).
+///   setup (`context.setup`, `steps.new_with_setup`).
 ///   It runs once, before the first test of that tree, and its value is
 ///   the context of the tests of that tree. Its name is `"context setup"`.
 pub type SetupHook {

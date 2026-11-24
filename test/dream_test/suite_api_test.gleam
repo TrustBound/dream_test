@@ -258,7 +258,7 @@ fn ignore(_text: String) -> Nil {
 /// with no source.
 fn feature_file_suite() -> suite.TestSuite {
   suite.from_tree(
-    types.tree(name: "cart", initial: Nil, children: [
+    types.tree(name: "cart", initial: Nil, tests: [
       types.Test(
         name: "from the file",
         tags: [],

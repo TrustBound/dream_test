@@ -42,8 +42,8 @@ The examples test a small cart module with one function, `cart.total(prices)`, w
 
 | Your situation | Use | Why |
 |:---|:---|:---|
-| Name the thing you test | `describe(name, children)` | The top of the suite. Its name is the first line of the report. |
-| Several tests about one behavior of that thing | `group(name, children)` | A nested level in the report, and a scope for hooks. |
+| Name the thing you test | `describe(name, tests)` | The top of the suite. Its name is the first line of the report. |
+| Several tests about one behavior of that thing | `group(name, tests)` | A nested level in the report, and a scope for hooks. |
 | A test you know you need, but haven't written | `pending(name)` | It shows in the report with `~`, and the run still passes. |
 | A test with a body that must not run for now | `skip(name, body)` | The body stays in the code and keeps compiling. It shows with `-`. |
 | A slice of tests you want to run, or leave out, together | `with_tags([...])` and `runner.filter_tests` | Tags are data, so a filter doesn't parse test names. |

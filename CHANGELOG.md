@@ -62,11 +62,18 @@ store. This release has breaking changes. Read
   suite holds one or more trees. The tree holds the top-level group
   itself: `Tree(initial:, name:, tags:, children:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
-- The start value has the label `initial` in place of `seed`:
-  `unit_context.describe(name:, initial:, children:)`,
-  `types.tree(name:, initial:, children:)` and the field
-  `types.Tree.initial`, the same label as `steps.new(initial:)`. A call
-  without labels does not change.
+- `unit_context.describe` takes a `dream_test/context.Context` in place
+  of the start value: `describe(name, 0, tests)` is now
+  `describe(name, context.value(0), tests)`, and
+  `describe(name:, seed:, children:)` is now
+  `describe(name:, context:, tests:)`.
+- The label `children` is now `tests` in `unit.describe`, `unit.group`,
+  `unit_context.describe`, `unit_context.group`, `suite.new`,
+  `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels
+  does not change.
+- The start value of a tree has the label `initial` in place of `seed`:
+  `types.tree(name:, initial:, tests:)` and the field
+  `types.Tree.initial`, the same label as `steps.new(initial:)`.
 - `types.TestResult` and `types.TestInfo` hold `groups: List(String)` (the
   names of the groups around the test) in place of
   `full_name: List(String)`.
@@ -80,7 +87,9 @@ store. This release has breaking changes. Read
   `runner.filter_tests`.
 - The alias `types.TestSuiteItem` is removed. Use `types.Node`.
 - The module `dream_test/context` (`TestContext`, `new`, `failures`,
-  `add_failure`) is removed. Nothing in Dream Test used it.
+  `add_failure`) is removed. Nothing in Dream Test used it. The name
+  `dream_test/context` now holds the context of `unit_context.describe`
+  (see "A context from a setup" below).
 - `TestSuite` has no type parameter and moves to the new module
   `dream_test/suite`. `types.TestSuite(context)` is removed. Each tree of
   a suite keeps its context inside the suite, so one `runner.new` takes a
@@ -336,8 +345,9 @@ the guide labels them.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
 - `feature.to_test_suite` and `FeatureConfig` are removed. Use
   `steps.feature_suite(registry:, feature:)`.
-- `unit_context.describe` and `types.tree` take `initial:` in place of
-  `seed:`.
+- `unit_context.describe` takes `context.value(start)` in place of the
+  start value, and `types.tree` takes `initial:` in place of `seed:`.
+- The label `children` of `describe` and `group` is now `tests`.
 - `StepContext` has `scenario_id` in place of `world`.
 - `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`.
 - A pattern registered two times in one phase is an error.
@@ -374,7 +384,7 @@ the guide labels them.
 - Parse errors are typed, and the parser follows the official grammar.
 - `sandbox.run_isolated` takes the function and its input.
 - `types.ModuleCoverage` and `types.CoverageSummary` are removed.
-- `types.TestKind.Integration`, `types.TestSuiteItem` and the module
+- `types.TestKind.Integration`, `types.TestSuiteItem` and the old module
   `dream_test/context` are removed.
 
 ### Added
@@ -422,7 +432,7 @@ the guide labels them.
     get. One `runner.new` takes `unit` suites, `unit_context` suites and
     Gherkin features together
   - `suite.from_tree` makes a suite from a `types.Tree` that you build
-    yourself. `suite.new` makes one from children and a
+    yourself. `suite.new` makes one from tests and a
     `types.SuiteContext`
   - `suite.group` puts suites in one group, and `suite.join` puts them one
     after the other in one suite. Each suite keeps its own context
@@ -449,15 +459,17 @@ the guide labels them.
 
 - **A context from a setup**
 
-  - `unit_context.describe_with_setup(name:, setup:, teardown:,
-    children:)` makes a suite whose context is the value of `setup`
+  - The module `dream_test/context` makes the context of
+    `unit_context.describe(name:, context:, tests:)`: `context.value(start)`
+    is a fixed start value, and `context.setup(start:, teardown:)` makes a
+    suite whose context is the value of `start`
   - `steps.new_with_setup(setup:, teardown:)` makes a step registry whose
     scenarios start from the value of `setup`. `gherkin/discover.to_suite`
     runs the setup one time for the scenarios of all its files.
-    `steps.to_suite(registry:, name:, tags:, children:)` makes a suite
-    that starts as the registry says. Its children are
+    `steps.to_suite(registry:, name:, tags:, tests:)` makes a suite
+    that starts as the registry says. Its tests are
     `steps.SuiteChild` values: `Feature(feature)`,
-    `Scenarios(feature)`, `Group(name:, tags:, children:)` and
+    `Scenarios(feature)`, `Group(name:, tags:, tests:)` and
     `Node(node)`. The scenarios of every Feature run with the steps
     of that registry, so a suite of Features cannot mix the steps of one
     registry with the setup of another
@@ -749,7 +761,7 @@ the guide labels them.
   - "Test HTTP calls with recordings" shows a Dream Test suite that
     records the calls of an API client with the recorder of
     `dream_http_client`, and plays them back with no network. It covers
-    the recorder in the setup of `describe_with_setup`, the mode from an
+    the recorder in the setup of `context.setup`, the mode from an
     environment variable with `recorder.parse_mode`, a mock server for the
     record run, a request with no recording, streams, and how to keep a
     token out of the files

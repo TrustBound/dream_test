@@ -1,9 +1,10 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit_context.{before_each, describe, it}
 
 pub fn suite() -> TestSuite {
-  describe("Counter", 0, [
+  describe("Counter", context.value(0), [
     before_each(fn(count) { Ok(count + 1) }),
     it("starts at one", fn(count: Int) {
       count

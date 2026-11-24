@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -11,7 +12,7 @@ pub type Context {
 }
 
 pub fn suite() -> TestSuite {
-  describe("Tagging context-aware tests", Context(counter: 0), [
+  describe("Tagging context-aware tests", context.value(Context(counter: 0)), [
     group("group tagged slow", [
       it("inherits the group tag", fn(_context: Context) { Ok(succeed()) }),
     ])

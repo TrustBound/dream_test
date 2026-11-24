@@ -7,6 +7,7 @@
 //// ### Run suites of different contexts together <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```gleam
+//// import dream_test/context
 //// import dream_test/gherkin/feature.{feature, given, scenario, then}
 //// import dream_test/gherkin/steps.{type StepContext}
 //// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -21,7 +22,7 @@
 //// }
 ////
 //// fn number_suite() -> TestSuite {
-////   unit_context.describe("Numbers", 41, [
+////   unit_context.describe("Numbers", context.value(41), [
 ////     unit_context.it("is 41", fn(number: Int) {
 ////       number
 ////       |> should
@@ -176,12 +177,12 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
   new(
     name: tree.name,
     tags: tree.tags,
-    children: tree.children,
+    tests: tree.children,
     context: FixedContext(tree.initial),
   )
 }
 
-/// Make a suite from typed children and the place where its tests get
+/// Make a suite from typed tests and the place where its tests get
 /// their context.
 ///
 /// With `types.FixedContext(value)`, each test starts from `value`, as
@@ -190,13 +191,13 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 /// only when at least one of its tests runs. A `join` or `group` keeps
 /// each tree apart, so each one runs its own setup. Its value is the context of every hook and test,
 /// and the teardown gets it after the last test (see
-/// `types.SuiteContext`). `unit_context.describe_with_setup` calls this.
+/// `types.SuiteContext`). `unit_context.describe` calls this.
 ///
 /// ## Parameters
 ///
 /// - `name`: the name of the top-level group
 /// - `tags`: the tags of the top-level group
-/// - `children`: the tests, groups and hooks
+/// - `tests`: the tests, groups and hooks
 /// - `context`: where the tests get their context
 ///
 /// ## Example
@@ -232,7 +233,7 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 ///   suite.new(
 ///     name: "server",
 ///     tags: [],
-///     children: [unit_context.it("answers", answers)],
+///     tests: [unit_context.it("answers", answers)],
 ///     context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
 ///   )
 /// }
@@ -240,11 +241,11 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
 pub fn new(
   name name: String,
   tags tags: List(String),
-  children children: List(Node(context)),
+  tests tests: List(Node(context)),
   context context: SuiteContext(context),
 ) -> TestSuite {
   TestSuite(name: name, parts: [
-    tree_part(Tree(name: name, tags: tags, children: children, context: context)),
+    tree_part(Tree(name: name, tags: tags, children: tests, context: context)),
   ])
 }
 
@@ -311,6 +312,7 @@ pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
 /// ### Put suites in one group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
+/// import dream_test/context
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 /// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit
@@ -321,7 +323,7 @@ pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
 /// }
 ///
 /// fn number_suite() -> TestSuite {
-///   unit_context.describe("Numbers", 41, [
+///   unit_context.describe("Numbers", context.value(41), [
 ///     unit_context.it("is 41", fn(number: Int) {
 ///       number
 ///       |> should

@@ -438,7 +438,7 @@ The tags of a test are the Feature tags, then the Rule tags, then the scenario t
 
 Some features need a resource that lives for all their scenarios, such as a server. Make the registry with `steps.new_with_setup` in place of `steps.new`. Here's a small server, a process that answers each ping with "pong":
 
-### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L15-L57"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The server <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L16-L58"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // A small server: a process that answers each ping with "pong".
@@ -488,7 +488,7 @@ fn answer(requests: Subject(Request)) -> Nil {
 
 The registry starts it in its setup and stops it in its teardown:
 
-### The steps with a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L59-L88"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The steps with a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L60-L89"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // The steps. The setup starts the server once, before the first scenario.
@@ -523,7 +523,7 @@ fn reply_is(state: ServerState, context: StepContext) {
 }
 ```
 
-### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L90-L103"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The feature <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L91-L104"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn server_feature() -> TestSuite {
@@ -555,7 +555,7 @@ With `discover.to_suite`, the setup runs once for the scenarios of all the files
 
 The feature is a `TestSuite` like any other, so it runs in one `runner.new` with a `unit` suite and a `unit_context` suite:
 
-### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L105-L134"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### One run with three kinds of suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_setup.gleam#L106-L135"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 // Suites whose trees have other contexts run in the same `runner.new`.
@@ -572,7 +572,7 @@ pub fn math_suite() -> TestSuite {
 }
 
 pub fn counter_suite() -> TestSuite {
-  unit_context.describe("Counter", 41, [
+  unit_context.describe("Counter", context.value(41), [
     unit_context.it("starts at 41", fn(count: Int) {
       count
       |> should
@@ -618,20 +618,20 @@ fn shop_steps() -> StepRegistry(Int) {
 
 /// Two Features in one suite: the setup runs one time for both.
 fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
-  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
+  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], tests: [
     Feature(cart),
-    Group(name: "Warehouse", tags: ["warehouse"], children: [
+    Group(name: "Warehouse", tags: ["warehouse"], tests: [
       Feature(stock),
     ]),
   ])
 }
 ```
 
-`types` here is `dream_test/gherkin/types`. `steps.to_suite` takes these children (`steps.SuiteChild`):
+`types` here is `dream_test/gherkin/types`. `steps.to_suite` takes these tests (`steps.SuiteChild`):
 
 - `Feature(feature)`: a group named after the Feature, with a test for each scenario.
 - `Scenarios(feature)`: the tests of the scenarios, with no group for the Feature. The Feature's tags don't reach them, and their result kind has `feature: None`. The Gherkin reporter prints the groups around them, joined with ` > `, as their heading, such as `Shop > Billing`.
-- `Group(name:, tags:, children:)`: a group of your own that holds more children.
+- `Group(name:, tags:, tests:)`: a group of your own that holds more tests.
 - `Node(node)`: a test, a hook or a group you make, for example with `unit_context.it`. It gets the same start as the scenarios.
 
 A Feature gets its steps only from the registry of its suite. To use two registries, make two suites, for example with `suite.join`: each setup then runs once for its own Features.

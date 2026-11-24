@@ -3,9 +3,10 @@
 import app/forecast.{Forecast, UnknownCity, forecast}
 import dream_mock_server/config.{Exact, MockRoute, Prefix}
 import dream_mock_server/server
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
-import dream_test/unit_context.{describe_with_setup, it}
+import dream_test/unit_context.{describe, it}
 import gleam/http
 import gleam/option.{None, Some}
 import gleam/result
@@ -16,31 +17,26 @@ import recorded_http/api_setup.{type Api, recorder_mode, start_api, stop_api}
 const weather_port = 19_801
 
 pub fn tests() -> TestSuite {
-  describe_with_setup(
-    "Forecast",
-    setup: start_weather_api,
-    teardown: stop_api,
-    children: [
-      it("gives the forecast for Oslo", fn(api: Api) {
-        forecast(api.base, "oslo")
-        |> should
-        |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
-        |> or_fail_with("the forecast for Oslo should be snow")
-      }),
-      it("gives the forecast for Lisbon", fn(api: Api) {
-        forecast(api.base, "lisbon")
-        |> should
-        |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
-        |> or_fail_with("the forecast for Lisbon should be sun")
-      }),
-      it("reports a city that the API does not know", fn(api: Api) {
-        forecast(api.base, "atlantis")
-        |> should
-        |> be_equal(Error(UnknownCity("atlantis")))
-        |> or_fail_with("Atlantis should be unknown")
-      }),
-    ],
-  )
+  describe("Forecast", context.setup(start_weather_api, teardown: stop_api), [
+    it("gives the forecast for Oslo", fn(api: Api) {
+      forecast(api.base, "oslo")
+      |> should
+      |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
+      |> or_fail_with("the forecast for Oslo should be snow")
+    }),
+    it("gives the forecast for Lisbon", fn(api: Api) {
+      forecast(api.base, "lisbon")
+      |> should
+      |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
+      |> or_fail_with("the forecast for Lisbon should be sun")
+    }),
+    it("reports a city that the API does not know", fn(api: Api) {
+      forecast(api.base, "atlantis")
+      |> should
+      |> be_equal(Error(UnknownCity("atlantis")))
+      |> or_fail_with("Atlantis should be unknown")
+    }),
+  ])
 }
 
 fn start_weather_api() -> Result(Api, String) {

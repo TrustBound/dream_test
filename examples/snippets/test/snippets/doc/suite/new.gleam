@@ -26,7 +26,7 @@ pub fn server_suite() -> TestSuite {
   suite.new(
     name: "server",
     tags: [],
-    children: [unit_context.it("answers", answers)],
+    tests: [unit_context.it("answers", answers)],
     context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
   )
 }

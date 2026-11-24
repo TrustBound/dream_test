@@ -7,6 +7,7 @@
 //// hooks and its body. The runner waits for each hook with a timeout, so a
 //// hook that never returns or kills its process does not stop the run.
 
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/progress
 import dream_test/runner
@@ -31,7 +32,7 @@ import gleam/string
 pub fn tests() {
   describe("hook resources", [
     it("a pool that before_all starts lives for the tests of its group", fn() {
-      unit_context.describe("pool group", NoPool, [
+      unit_context.describe("pool group", context.value(NoPool), [
         unit_context.before_all(start_pool_in_context),
         unit_context.it("uses the pool", pool_in_context_is_alive),
         unit_context.after_all(stop_pool_in_context),
@@ -48,7 +49,7 @@ pub fn tests() {
       fn() {
         unit_context.describe(
           "table group",
-          atom.create("dream_test_before_all_table"),
+          context.value(atom.create("dream_test_before_all_table")),
           [
             unit_context.before_all(make_table),
             unit_context.it("uses the table", table_in_context_exists),
@@ -68,7 +69,7 @@ pub fn tests() {
     it("a pool that before_all_suites starts lives for the tests", fn() {
       let pool_name = process.new_name("dream_test_suite_pool")
       runner.new([
-        unit_context.describe("pool suite", pool_name, [
+        unit_context.describe("pool suite", context.value(pool_name), [
           unit_context.it("uses the pool", named_pool_is_alive),
         ]),
       ])
@@ -133,7 +134,7 @@ pub fn tests() {
     }),
 
     it("a pool that before_each starts lives for the test body", fn() {
-      unit_context.describe("pool test", NoPool, [
+      unit_context.describe("pool test", context.value(NoPool), [
         unit_context.before_each(start_pool_in_context),
         unit_context.it("uses the pool", pool_in_context_is_alive),
         unit_context.after_each(stop_pool_in_context),
@@ -148,7 +149,7 @@ pub fn tests() {
     it("an ETS table that before_each makes lives for the test body", fn() {
       unit_context.describe(
         "table test",
-        atom.create("dream_test_before_each_table"),
+        context.value(atom.create("dream_test_before_each_table")),
         [
           unit_context.before_each(make_table),
           unit_context.it("uses the table", table_in_context_exists),
@@ -291,7 +292,7 @@ pub fn tests() {
 
     it("a body that times out still runs after_each with its context", fn() {
       let reports = process.new_subject()
-      unit_context.describe("root", "start", [
+      unit_context.describe("root", context.value("start"), [
         unit_context.before_each(fn(_context) { Ok("set up") }),
         unit_context.it("hangs", fn(_context) { hang() }),
         unit_context.after_each(fn(context) {
@@ -316,7 +317,7 @@ pub fn tests() {
 
     it("a test process that is killed still runs after_each", fn() {
       let reports = process.new_subject()
-      unit_context.describe("root", "start", [
+      unit_context.describe("root", context.value("start"), [
         unit_context.before_each(fn(_context) { Ok("set up") }),
         unit_context.it("kills itself", fn(_context) { kill_self() }),
         unit_context.after_each(fn(context) {

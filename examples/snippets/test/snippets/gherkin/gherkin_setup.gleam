@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/gherkin/feature.{feature, given, scenario, then, when}
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
 import dream_test/matchers.{be_equal, be_false, or_fail_with, should}
@@ -116,7 +117,7 @@ pub fn math_suite() -> TestSuite {
 }
 
 pub fn counter_suite() -> TestSuite {
-  unit_context.describe("Counter", 41, [
+  unit_context.describe("Counter", context.value(41), [
     unit_context.it("starts at 41", fn(count: Int) {
       count
       |> should

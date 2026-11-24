@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
@@ -15,7 +16,7 @@ fn increment_counter(context: Context) -> Result(Context, String) {
 }
 
 pub fn suite() -> TestSuite {
-  describe("Context-aware suite", Context(counter: 0), [
+  describe("Context-aware suite", context.value(Context(counter: 0)), [
     before_each(increment_counter),
     it("receives the updated context", fn(context: Context) {
       context.counter

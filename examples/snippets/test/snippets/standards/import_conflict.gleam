@@ -12,7 +12,7 @@ import dream_test/gherkin/types.{type Feature, type Scenario}
 import dream_test/types.{type Node, Group as NodeGroup} as test_types
 
 pub fn checkout_group(feature: Feature) -> SuiteChild(Nil) {
-  Group(name: "Checkout", tags: [], children: [Scenarios(feature)])
+  Group(name: "Checkout", tags: [], tests: [Scenarios(feature)])
 }
 
 pub fn plain_group() -> Node(Nil) {
@@ -49,7 +49,7 @@ pub fn tests() {
       values
       |> should
       |> be_equal(#(
-        Group(name: "Checkout", tags: [], children: [Scenarios(feature)]),
+        Group(name: "Checkout", tags: [], tests: [Scenarios(feature)]),
         NodeGroup(name: "plain", tags: [], children: []),
         test_types.Unit,
       ))

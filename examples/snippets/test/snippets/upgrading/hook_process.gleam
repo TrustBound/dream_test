@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, have_length, or_fail_with, should}
 import dream_test/runner
 import dream_test/types
@@ -11,7 +12,7 @@ pub type Context {
 }
 
 pub fn suite() {
-  describe("Inbox", Context(inbox: process.new_subject()), [
+  describe("Inbox", context.value(Context(inbox: process.new_subject())), [
     before_each(fn(_context) {
       let inbox = process.new_subject()
       process.send(inbox, "welcome")

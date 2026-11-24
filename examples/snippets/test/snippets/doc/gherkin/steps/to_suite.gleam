@@ -16,9 +16,9 @@ pub fn shop_suite(
   cart cart: gherkin_types.Feature,
   invoice invoice: gherkin_types.Feature,
 ) -> TestSuite {
-  to_suite(registry: steps, name: "Shop", tags: [], children: [
+  to_suite(registry: steps, name: "Shop", tags: [], tests: [
     Feature(cart),
-    Group(name: "Billing", tags: ["billing"], children: [
+    Group(name: "Billing", tags: ["billing"], tests: [
       Feature(invoice),
     ]),
     Node(unit_context.it("the server answers", answers)),

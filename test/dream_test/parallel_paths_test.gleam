@@ -1,6 +1,7 @@
 //// Black-box tests of parallel runner paths: hook failures, timeouts and
 //// crashes, in the parallel and the sequential executor.
 
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/parallel
 import dream_test/reporters/progress
@@ -399,7 +400,7 @@ pub fn tests() {
       // the hooks get 60s, so they always finish. The test times out, and the
       // after_each hook runs in a new process. It must not see the old
       // process alive: that process could still own a table or a name.
-      unit_context.describe("root", process.self(), [
+      unit_context.describe("root", context.value(process.self()), [
         unit_context.before_each(test_process),
         timed_context_test("hangs", 20, hang_with_context),
         unit_context.after_each(fail_if_alive),

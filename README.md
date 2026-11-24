@@ -105,7 +105,7 @@ Dream Test splits reporting into:
 3. [Check values with matchers](https://github.com/TrustBound/dream_test/blob/main/docs/guides/assertions-and-matchers.md): the assertion pipeline, which matcher fits which value, and what each failure prints.
 4. [Write your own matcher](https://github.com/TrustBound/dream_test/blob/main/docs/guides/custom-matchers.md): a matcher for your own types, its failure output, and tests for it.
 5. [Set up and tear down around tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/lifecycle-hooks.md): `before_all`, `before_each`, `after_each`, `after_all` and runner hooks, and what the report shows when one fails or hangs.
-6. [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): pass a typed value to every test, and start a resource once with `describe_with_setup`.
+6. [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): pass a typed value to every test, and start a resource once with `context.setup`.
 7. [Choose and read the test output](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reporters.md): the BDD, progress and JSON reporters, a reporter of your own for CI, and reporter crashes.
 8. [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md): snapshot files, a changed snapshot, and how to update one.
 9. [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md): features in Gleam and in `.feature` files, Rules and Examples, a shared server, and tests for your steps.
@@ -250,37 +250,32 @@ pub fn tests() {
 
 ## Record once, test offline
 
-A test of an API client or of database code needs the network or a database. With a recorder, the test runs one time against the real service, and the recorder writes each request or query and its response to a file. After that, the test plays the file back, with no network and no database. Start the recorder in the setup of `describe_with_setup`, and choose the mode with an environment variable:
+A test of an API client or of database code needs the network or a database. With a recorder, the test runs one time against the real service, and the recorder writes each request or query and its response to a file. After that, the test plays the file back, with no network and no database. Start the recorder in the setup of `context.setup`, and choose the mode with an environment variable:
 
-### A suite that plays back recorded HTTP calls <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L18-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-http.md#a-suite-that-plays-back-recorded-http-calls-"><img align="right" alt="Guide: Test HTTP calls with recordings" title="Guide: Test HTTP calls with recordings" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### A suite that plays back recorded HTTP calls <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L19-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-http.md#a-suite-that-plays-back-recorded-http-calls-"><img align="right" alt="Guide: Test HTTP calls with recordings" title="Guide: Test HTTP calls with recordings" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
-    "Forecast",
-    setup: start_weather_api,
-    teardown: stop_api,
-    children: [
-      it("gives the forecast for Oslo", fn(api: Api) {
-        forecast(api.base, "oslo")
-        |> should
-        |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
-        |> or_fail_with("the forecast for Oslo should be snow")
-      }),
-      it("gives the forecast for Lisbon", fn(api: Api) {
-        forecast(api.base, "lisbon")
-        |> should
-        |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
-        |> or_fail_with("the forecast for Lisbon should be sun")
-      }),
-      it("reports a city that the API does not know", fn(api: Api) {
-        forecast(api.base, "atlantis")
-        |> should
-        |> be_equal(Error(UnknownCity("atlantis")))
-        |> or_fail_with("Atlantis should be unknown")
-      }),
-    ],
-  )
+  describe("Forecast", context.setup(start_weather_api, teardown: stop_api), [
+    it("gives the forecast for Oslo", fn(api: Api) {
+      forecast(api.base, "oslo")
+      |> should
+      |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
+      |> or_fail_with("the forecast for Oslo should be snow")
+    }),
+    it("gives the forecast for Lisbon", fn(api: Api) {
+      forecast(api.base, "lisbon")
+      |> should
+      |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
+      |> or_fail_with("the forecast for Lisbon should be sun")
+    }),
+    it("reports a city that the API does not know", fn(api: Api) {
+      forecast(api.base, "atlantis")
+      |> should
+      |> be_equal(Error(UnknownCity("atlantis")))
+      |> or_fail_with("Atlantis should be unknown")
+    }),
+  ])
 }
 
 fn start_weather_api() -> Result(Api, String) {
@@ -291,15 +286,14 @@ fn start_weather_api() -> Result(Api, String) {
 
 `RECORDER_MODE=record gleam test` records the calls, and `gleam test` plays them back. In CI, the tests need no network and no API token. The same pattern records PostgreSQL queries with `dream_postgres`, and plays them back with no database. The setup gives each test a connection from the recorder:
 
-### A suite that plays back recorded queries <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L19-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-queries.md#the-task-suite-"><img align="right" alt="Guide: Test database code with recorded queries" title="Guide: Test database code with recorded queries" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### A suite that plays back recorded queries <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L20-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-queries.md#the-task-suite-"><img align="right" alt="Guide: Test database code with recorded queries" title="Guide: Test database code with recorded queries" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Tasks",
-    setup: start_task_database,
-    teardown: stop_database,
-    children: [
+    context.setup(start_task_database, teardown: stop_database),
+    [
       it("lists a new task as open", fn(database: Database) {
         use id <- result.try(add(database, "Buy milk"))
         tasks.open_tasks(database.db)

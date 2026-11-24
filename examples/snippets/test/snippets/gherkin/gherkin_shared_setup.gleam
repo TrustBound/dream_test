@@ -43,9 +43,9 @@ fn shop_steps() -> StepRegistry(Int) {
 
 /// Two Features in one suite: the setup runs one time for both.
 fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
-  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], children: [
+  steps.to_suite(registry: shop_steps(), name: "Shop", tags: [], tests: [
     Feature(cart),
-    Group(name: "Warehouse", tags: ["warehouse"], children: [
+    Group(name: "Warehouse", tags: ["warehouse"], tests: [
       Feature(stock),
     ]),
   ])

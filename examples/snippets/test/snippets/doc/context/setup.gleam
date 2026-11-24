@@ -1,7 +1,8 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{type AssertionResult}
-import dream_test/unit_context.{describe_with_setup, it}
+import dream_test/unit_context.{describe, it}
 
 pub type Server {
   Server(port: Int)
@@ -23,10 +24,7 @@ fn answers_a_ping(server: Server) -> Result(AssertionResult, String) {
 }
 
 pub fn server_suite() -> TestSuite {
-  describe_with_setup(
-    "Server",
-    setup: start_server,
-    teardown: stop_server,
-    children: [it("answers a ping", answers_a_ping)],
-  )
+  describe("Server", context.setup(start_server, teardown: stop_server), [
+    it("answers a ping", answers_a_ping),
+  ])
 }

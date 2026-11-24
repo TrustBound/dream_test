@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/file
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/runner
@@ -14,7 +15,7 @@ pub fn tests() {
       let log_path = "test/fixtures/file/temp/hook_order/order.txt"
 
       let suite =
-        ctx_describe("root", Nil, [
+        ctx_describe("root", context.value(Nil), [
           before_all(fn(_ctx: Nil) { write_string(log_path, "") }),
 
           // Outer hooks

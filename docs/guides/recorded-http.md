@@ -37,7 +37,7 @@ In this guide, you will:
 
 ## Before you start
 
-You need a project with Dream Test and a test runner. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up. This guide also uses `unit_context.describe_with_setup`, which [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup) explains.
+You need a project with Dream Test and a test runner. [Write and run your first test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/getting-started.md) sets both up. This guide also uses `unit_context.describe` with `context.setup`, which [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup) explains.
 
 The code of this guide is the project `examples/recording` in the Dream Test repository. Its tests run in CI on each change. `dream_http_client` and `dream_mock_server` are not on Hex yet, so the project gets them from GitHub. These lines of its `gleam.toml` add the client:
 
@@ -148,7 +148,7 @@ Playback is the default on purpose. A run that forgets the variable sends nothin
 
 ## Step 3: Start the recorder in the suite setup
 
-A recorder is a process. Something must start it before the first test and stop it after the last test. In Dream Test, that is the `setup` and the `teardown` of `unit_context.describe_with_setup`. The setup runs one time for the suite, and its value is the context of each test. The teardown gets the same value after the last test. `start_api` is the setup, and `stop_api` is the teardown:
+A recorder is a process. Something must start it before the first test and stop it after the last test. In Dream Test, that is the `start` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. The teardown gets the same value after the last test. `start_api` is the setup, and `stop_api` is the teardown:
 
 ### Start and stop the recorder <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/api_setup.gleam#L33-L69"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -200,41 +200,36 @@ How it works:
 - When the setup returns an `Error`, no test of the suite runs, and the report shows the message. A wrong `RECORDER_MODE` stops the suite there, with the text of `parse_mode`.
 - The two transformers keep the token and the `date` header out of the files. [Keep secrets and changing data out of the files](#keep-secrets-and-changing-data-out-of-the-files) shows them.
 
-Why not `before_all` and `after_all` of `dream_test/unit`? Those hooks return `Ok(Nil)`, so they cannot give the recorder to the tests. `describe_with_setup` gives the value of the setup to each test, with its type.
+Why not `before_all` and `after_all` of `dream_test/unit`? Those hooks return `Ok(Nil)`, so they cannot give the recorder to the tests. `context.setup` gives the value of the setup to each test, with its type.
 
 ## Step 4: Write the tests
 
 Each test gets the `Api` and passes `api.base` to the code under test:
 
-### A suite that plays back recorded HTTP calls <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L18-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A suite that plays back recorded HTTP calls <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L19-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
-    "Forecast",
-    setup: start_weather_api,
-    teardown: stop_api,
-    children: [
-      it("gives the forecast for Oslo", fn(api: Api) {
-        forecast(api.base, "oslo")
-        |> should
-        |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
-        |> or_fail_with("the forecast for Oslo should be snow")
-      }),
-      it("gives the forecast for Lisbon", fn(api: Api) {
-        forecast(api.base, "lisbon")
-        |> should
-        |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
-        |> or_fail_with("the forecast for Lisbon should be sun")
-      }),
-      it("reports a city that the API does not know", fn(api: Api) {
-        forecast(api.base, "atlantis")
-        |> should
-        |> be_equal(Error(UnknownCity("atlantis")))
-        |> or_fail_with("Atlantis should be unknown")
-      }),
-    ],
-  )
+  describe("Forecast", context.setup(start_weather_api, teardown: stop_api), [
+    it("gives the forecast for Oslo", fn(api: Api) {
+      forecast(api.base, "oslo")
+      |> should
+      |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
+      |> or_fail_with("the forecast for Oslo should be snow")
+    }),
+    it("gives the forecast for Lisbon", fn(api: Api) {
+      forecast(api.base, "lisbon")
+      |> should
+      |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
+      |> or_fail_with("the forecast for Lisbon should be sun")
+    }),
+    it("reports a city that the API does not know", fn(api: Api) {
+      forecast(api.base, "atlantis")
+      |> should
+      |> be_equal(Error(UnknownCity("atlantis")))
+      |> or_fail_with("Atlantis should be unknown")
+    }),
+  ])
 }
 
 fn start_weather_api() -> Result(Api, String) {
@@ -247,7 +242,7 @@ The tests do not know the mode. The same three tests check the live API in a rec
 
 The mock server of the record run has one route for each city, and a 404 for the rest. `server.start_with_config` starts it with these routes only:
 
-### The mock weather API <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L51-L76"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The mock weather API <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L47-L72"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 /// The mock server that stands in for the weather API in a record run.
@@ -342,15 +337,17 @@ The playback recorder finds the file of each request by its match key. By defaul
 
 In playback mode, a request with no file is not sent. It fails with the transport error `NoRecording`, which names the method and the URL. Here is a test for Bergen, a city that the record run did not ask for:
 
-### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/miss_tests.gleam#L13-L27"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/miss_tests.gleam#L14-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
+  describe(
     "Forecast",
-    setup: fn() { start_api(recorder.Playback, 19_801, server.start) },
-    teardown: stop_api,
-    children: [
+    context.setup(
+      fn() { start_api(recorder.Playback, 19_801, server.start) },
+      teardown: stop_api,
+    ),
+    [
       it("gives the forecast for Bergen", fn(api: Api) {
         forecast(api.base, "bergen")
         |> should
@@ -432,28 +429,23 @@ pub fn alert_messages(api: ClientRequest) -> Result(List(String), String) {
 
 The suite has the same form as the forecast suite. Its setup starts the built-in endpoints of the mock server in a record run, with `server.start`. The endpoint `/stream/json` sends five JSON lines, one every 200 ms:
 
-### A suite that plays back a stream <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/alerts_tests.gleam#L13-L39"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A suite that plays back a stream <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/alerts_tests.gleam#L14-L35"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
-  describe_with_setup(
-    "Alert feed",
-    setup: start_alert_feed,
-    teardown: stop_api,
-    children: [
-      it("reads the message of each alert", fn(api: Api) {
-        alert_messages(api.base)
-        |> should
-        |> be_equal(
-          Ok([
-            "JSON event 1", "JSON event 2", "JSON event 3", "JSON event 4",
-            "JSON event 5",
-          ]),
-        )
-        |> or_fail_with("the feed should give five alerts in order")
-      }),
-    ],
-  )
+  describe("Alert feed", context.setup(start_alert_feed, teardown: stop_api), [
+    it("reads the message of each alert", fn(api: Api) {
+      alert_messages(api.base)
+      |> should
+      |> be_equal(
+        Ok([
+          "JSON event 1", "JSON event 2", "JSON event 3", "JSON event 4",
+          "JSON event 5",
+        ]),
+      )
+      |> or_fail_with("the feed should give five alerts in order")
+    }),
+  ])
 }
 
 // The built-in endpoints of the mock server include /stream/json, which
@@ -594,7 +586,7 @@ To refresh the recordings, a developer runs the record script on their machine, 
 
 **A token in a recording.** *Symptom:* the API token shows in a file in your repository. *Fix:* remove the header with a request transformer, and add a test that reads the files. Then change the token, because the history of the repository still holds it.
 
-**A setup that uses the wrong hooks.** *Symptom:* the tests cannot get the recorder, or each test starts its own. *Fix:* start the recorder in the `setup` of `describe_with_setup`, and stop it in the `teardown`. Each test then gets it in its context.
+**A setup that uses the wrong hooks.** *Symptom:* the tests cannot get the recorder, or each test starts its own. *Fix:* start the recorder in the `start` function of `context.setup`, and stop it in the `teardown`. Each test then gets it in its context.
 
 **A test that passes only against the live API.** *Symptom:* a test passes in a record run and fails in playback, or the other way. *Fix:* the test depends on something that changes on each run, such as the current time. Check only the stable parts, or remove the changing data with a response transformer.
 
@@ -603,5 +595,5 @@ To refresh the recordings, a developer runs the record script on their machine, 
 - [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md): the same pattern for PostgreSQL queries, with `dream_postgres`.
 - [Testing with recorded responses](https://github.com/TrustBound/dream_http_client/blob/main/docs/guides/recording-and-playback.md): the full recorder API of `dream_http_client`, and recordings written by hand.
 - [Matching requests and hiding secrets in recordings](https://github.com/TrustBound/dream_http_client/blob/main/docs/guides/request-matching-and-scrubbing.md): match keys, and what to do when two recordings match.
-- [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): `describe_with_setup` and the context of each test.
+- [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md): `context.setup` and the context of each test.
 - [dream_mock_server](https://github.com/TrustBound/dream_mock_server): the mock server of the record run.

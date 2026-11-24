@@ -1,5 +1,6 @@
 //// One run with suites whose contexts have different types.
 
+import dream_test/context
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -74,7 +75,7 @@ fn plain_suite() {
 }
 
 fn number_suite() {
-  unit_context.describe("number", 41, [
+  unit_context.describe("number", context.value(41), [
     unit_context.it("gets 41", check_number),
   ])
 }

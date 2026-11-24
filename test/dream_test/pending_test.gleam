@@ -1,5 +1,6 @@
 //// Pending tests: a name with no body, for a test skeleton.
 
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/json
@@ -35,7 +36,7 @@ pub fn tests() {
 
     it("unit_context.pending gives the status Pending", fn() {
       runner.new([
-        unit_context.describe("context", 41, [
+        unit_context.describe("context", context.value(41), [
           unit_context.pending("gets the context later"),
         ]),
       ])

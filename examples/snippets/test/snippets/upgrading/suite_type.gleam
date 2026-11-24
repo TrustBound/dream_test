@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 import dream_test/runner
 import dream_test/suite.{type TestSuite}
@@ -11,7 +12,7 @@ pub fn suite() -> TestSuite {
 }
 
 pub fn context_suite() -> TestSuite {
-  unit_context.describe("context suite", 41, [
+  unit_context.describe("context suite", context.value(41), [
     unit_context.it("gets 41", fn(number: Int) {
       number
       |> should

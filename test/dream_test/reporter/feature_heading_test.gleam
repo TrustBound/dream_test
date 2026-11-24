@@ -261,7 +261,7 @@ fn discovered_suite() -> TestSuite {
 
 fn shop_suite() -> TestSuite {
   let cart = cart_feature()
-  steps.to_suite(registry: registry(), name: "Shop", tags: [], children: [
+  steps.to_suite(registry: registry(), name: "Shop", tags: [], tests: [
     Group("Billing", [], [Scenarios(cart)]),
     Feature(cart),
   ])

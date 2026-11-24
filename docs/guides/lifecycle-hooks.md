@@ -46,7 +46,7 @@ Hooks go in the list of a `describe` or a `group`, next to the tests. Each one i
 |:---|:---|:---|
 | Fresh state for every test, such as an empty table | `before_each` and `after_each` | They run around each test of the group. `after_each` runs even when the test fails. |
 | One expensive resource for all tests of a group, such as a fixture file | `before_all` and `after_all` | They run once for the group, before its first test and after its last. |
-| The tests need the value that the setup made, such as a connection | `unit_context.describe_with_setup` | The setup returns a value, and every test gets it. See [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md). |
+| The tests need the value that the setup made, such as a connection | `unit_context.describe` with `context.setup` | The setup returns a value, and every test gets it. See [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md). |
 | The same setup for every suite of a run, such as a database server | `runner.before_all_suites`, `runner.before_each_suite`, `runner.before_each_test` and their `after_` partners | Runner hooks wrap suites without changing them. |
 | A few lines that the test reads to make sense | No hook. A named helper in the test body | A hook hides setup that explains the assertion. |
 
@@ -440,7 +440,7 @@ On the BEAM, a resource often lives as long as the process that started it: an E
 |---|---|---|
 | `before_all_suites`, `after_all_suites` | one setup process for the whole run | the default timeout, for each hook |
 | `before_each_suite`, `after_each_suite` | one setup process for each suite | the default timeout of the suite, for each hook |
-| the context setup and teardown (`unit_context.describe_with_setup`, `steps.new_with_setup`) | one setup process for each tree that has them, started after `before_each_suite` | the default timeout of the suite, for each |
+| the context setup and teardown (`context.setup`, `steps.new_with_setup`) | one setup process for each tree that has them, started after `before_each_suite` | the default timeout of the suite, for each |
 | `before_all`, `after_all` | one setup process for each group | the default timeout, for each hook |
 | `before_each_test`, `before_each`, the body, `after_each`, `after_each_test` | one process for each test | the default timeout for each hook, the test timeout for the body |
 

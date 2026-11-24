@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process as dt_process
 import dream_test/runner
@@ -60,11 +61,13 @@ pub fn tests() {
       // returns, the counter must stop with the setup process.
       let counters = beam_process.new_subject()
       runner.new([
-        unit_context.describe_with_setup(
+        unit_context.describe(
           "setup",
-          setup: fn() { start_counter_in_setup(counters) },
-          teardown: leave_counter,
-          children: [unit_context.it("passes", counter_context_passes)],
+          context.setup(
+            fn() { start_counter_in_setup(counters) },
+            leave_counter,
+          ),
+          [unit_context.it("passes", counter_context_passes)],
         ),
       ])
       |> runner.silent()

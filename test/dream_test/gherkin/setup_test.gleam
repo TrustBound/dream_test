@@ -81,7 +81,7 @@ pub fn tests() {
           registry: steps.new(initial: 7),
           name: "start",
           tags: [],
-          children: [steps.Node(unit_context.it("gets 7", is_7))],
+          tests: [steps.Node(unit_context.it("gets 7", is_7))],
         ),
       ])
       |> statuses
@@ -98,7 +98,7 @@ pub fn tests() {
             registry: counter_steps(events, Ok(7)),
             name: "start",
             tags: [],
-            children: [steps.Node(unit_context.it("gets 7", is_7))],
+            tests: [steps.Node(unit_context.it("gets 7", is_7))],
           ),
         ])
       #(statuses(report), receive_all(events, []))
@@ -119,7 +119,7 @@ pub fn tests() {
       let registry = counter_steps(events, Ok(10))
       let report =
         run([
-          steps.to_suite(registry: registry, name: "Shop", tags: [], children: [
+          steps.to_suite(registry: registry, name: "Shop", tags: [], tests: [
             steps.Node(
               unit_context.before_each(fn(value) {
                 record_before_each(events, value)
@@ -127,7 +127,7 @@ pub fn tests() {
             ),
             steps.Feature(counter_parsed("Cart")),
             steps.Scenarios(counter_parsed("Stock")),
-            steps.Group(name: "Billing", tags: ["billing"], children: [
+            steps.Group(name: "Billing", tags: ["billing"], tests: [
               steps.Feature(counter_parsed("Invoice")),
             ]),
             steps.Node(unit_context.it("gets 10", is_10)),
@@ -169,13 +169,13 @@ pub fn tests() {
               registry: counter_steps(cart_events, Ok(10)),
               name: "Cart suite",
               tags: [],
-              children: [steps.Feature(counter_parsed("Cart"))],
+              tests: [steps.Feature(counter_parsed("Cart"))],
             ),
             steps.to_suite(
               registry: counter_steps(stock_events, Ok(10)),
               name: "Stock suite",
               tags: [],
-              children: [steps.Feature(counter_parsed("Stock"))],
+              tests: [steps.Feature(counter_parsed("Stock"))],
             ),
           ]),
         ])
@@ -211,7 +211,7 @@ pub fn tests() {
               registry: counter_steps(events, Ok(10)),
               name: "Shop",
               tags: [],
-              children: [
+              tests: [
                 steps.Feature(counter_parsed("Cart")),
                 steps.Feature(shop_parsed()),
               ],

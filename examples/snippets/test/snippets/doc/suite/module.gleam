@@ -1,3 +1,4 @@
+import dream_test/context
 import dream_test/gherkin/feature.{feature, given, scenario, then}
 import dream_test/gherkin/steps.{type StepContext}
 import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -12,7 +13,7 @@ fn plain_suite() -> TestSuite {
 }
 
 fn number_suite() -> TestSuite {
-  unit_context.describe("Numbers", 41, [
+  unit_context.describe("Numbers", context.value(41), [
     unit_context.it("is 41", fn(number: Int) {
       number
       |> should
