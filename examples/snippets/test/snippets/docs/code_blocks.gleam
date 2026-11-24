@@ -123,11 +123,25 @@ const kill_margin_ms = 10_000
 /// links to. `make examples` runs `gleam test` in each project.
 /// - `cache_app_test.gleam` is the test main of `cache_app`.
 /// - The shopping cart feature and steps run from `shopping_cart_test`.
+/// - The files of `examples/recording` run from `recording_test`, which
+///   the CI job of that project runs in playback mode, and
+///   `make check-snippets` too.
 const run_by_other_projects = [
   "examples/cache_app/test/cache_app_test.gleam",
   "examples/shopping_cart/test/features/shopping_cart.gleam",
   "examples/shopping_cart/test/steps/cart.gleam",
   "examples/shopping_cart/test/steps/cart_state.gleam",
+  "examples/recording/src/app/forecast.gleam",
+  "examples/recording/src/app/tasks.gleam",
+  "examples/recording/test/outputs_tests.gleam",
+  "examples/recording/test/recorded_http/alerts_tests.gleam",
+  "examples/recording/test/recorded_http/api_setup.gleam",
+  "examples/recording/test/recorded_http/forecast_tests.gleam",
+  "examples/recording/test/recorded_http/miss_tests.gleam",
+  "examples/recording/test/recorded_queries/database_setup.gleam",
+  "examples/recording/test/recorded_queries/miss_tests.gleam",
+  "examples/recording/test/recorded_queries/tasks_tests.gleam",
+  "examples/recording/test/recording_test.gleam",
 ]
 
 /// The tag of the 2.x code that the upgrade guide shows.
