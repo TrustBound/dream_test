@@ -6,7 +6,7 @@ This guide explains the idea behind the two recording guides of Dream Test. It i
 
 ## Table of Contents
 
-- [What changed my mind](#what-changed-my-mind)
+- [What changed our mind](#what-changed-our-mind)
 - [Two boundaries](#two-boundaries)
 - [Keep substitution in the suite setup](#keep-substitution-in-the-suite-setup)
 - [Use recordings to capture behavior and make it repeatable](#use-recordings-to-capture-behavior-and-make-it-repeatable)
@@ -16,11 +16,15 @@ This guide explains the idea behind the two recording guides of Dream Test. It i
 - [Be clear about where recordings can drift](#be-clear-about-where-recordings-can-drift)
 - [The two working examples](#the-two-working-examples)
 
-## What changed my mind
+## What changed our mind
 
-I have done engineering for twenty years, and I tried many approaches to mocking. I used fixtures. I used dependency injection. Each approach had a cost. Then I found that a test can go through the real path of the code and still run without the services that the code depends on. I did not have to put dependency-injection pass-through points into the whole codebase. And the tests ran much faster than tests that call the real services each time.
+Every test that touches an outside service forces a choice. Call the real service, and the test is slow, needs a network and credentials, and fails when the service has a bad day. Replace the service, and you must decide where the replacement goes.
 
-Here is what that looks like. This is one suite of the example project. It tests a weather client:
+Over twenty years of engineering, we tried most of the usual answers. Hand-written fixtures go stale: they hold the response we expected, not the response the service sends. Dependency injection works, but it spreads. Every function between the test and the service gets a parameter that exists only so that a test can pass a fake through it.
+
+What changed our mind was a smaller seam. The code under test takes one value that leads outside the system: a base HTTP request, or a database connection. In a test, a recorder supplies that value. Everything between the public entry point and that value runs for real, and nothing in the application knows that a test runs. The same suite runs against the live service when we want to check the service, and from recordings when we want speed. A playback run takes milliseconds and needs no network and no database.
+
+Here is one suite of the example project. It tests a weather client, and it runs both ways:
 
 ### The Forecast suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L19-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -270,18 +274,18 @@ One scenario can run at more than one scope. Each scope proves something differe
 | With a real database | PostgreSQL | Transactions and persistence work on a real server. |
 | With a live service or a sandbox | The service | The code agrees with the current contract of the service. |
 
-The suite in [What changed my mind](#what-changed-my-mind) shows this. The same tests ran live and offline, and only the environment variable changed. Where the entry points of a system allow it, the same business expectation can also carry across unit, integration, system and end-to-end runs. The expectation stays, and only the boundary changes.
+The suite in [What changed our mind](#what-changed-our-mind) shows this. The same tests ran live and offline, and only the environment variable changed. Where the entry points of a system allow it, the same business expectation can also carry across unit, integration, system and end-to-end runs. The expectation stays, and only the boundary changes.
 
 ## Catch changes in external systems before deployment
 
-I did a lot of work with integrations. Those integrations changed small things without warning, and we found out in production. Then we put a system test in CI that ran our tests against the real system. With it, we found these changes before deployment.
+We did a lot of work with integrations. Those integrations changed small things without warning, and we found out in production. Then we put a system test in CI that ran our tests against the real system. With it, we found these changes before deployment.
 
 The same suite does this job. Normal CI runs in playback, with no network and no database. A second CI job runs the same tests against the real system, on a schedule or before each deployment. It sets the variable that the example suites read:
 
 - `RECORDER_MODE=passthrough gleam test` sends each request and query to the real system, and writes nothing.
 - `RECORDER_MODE=record gleam test` also writes new recordings. Use it when you want a diff of what changed.
 
-When the system changes a field, a status or the shape of an error, a test of that job fails before the deployment. The script of the live run in [What changed my mind](#what-changed-my-mind) is such a run for the example project. The example project has no CI job of this kind. Its CI job runs in playback only.
+When the system changes a field, a status or the shape of an error, a test of that job fails before the deployment. The script of the live run in [What changed our mind](#what-changed-our-mind) is such a run for the example project. The example project has no CI job of this kind. Its CI job runs in playback only.
 
 ## Be clear about where recordings can drift
 
