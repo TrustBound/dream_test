@@ -14,7 +14,7 @@ import snippets_child_vm.{
 /// The JSON of the example suite of `format` and `report`, with the values
 /// that change from run to run made fixed by `without_run_values`.
 const example_suite_json =
-  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"Example Suite\",\"passes\"],\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
+  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"Example Suite\",\"passes\"],\"only_path\":\"Example Suite/passes\",\"run_alone\":\"gleam test -- --only \\\"Example Suite/passes\\\"\",\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
 
 /// The pretty JSON of the example suite of `format_pretty` and
 /// `report_pretty`, with the values that change from run to run made fixed
@@ -47,6 +47,8 @@ const example_suite_pretty_json =
   <> "        \"Example Suite\",\n"
   <> "        \"passes\"\n"
   <> "      ],\n"
+  <> "      \"only_path\": \"Example Suite/passes\",\n"
+  <> "      \"run_alone\": \"gleam test -- --only \\\"Example Suite/passes\\\"\",\n"
   <> "      \"status\": \"passed\",\n"
   <> "      \"duration_ms\": 0,\n"
   <> "      \"tags\": [],\n"
@@ -87,6 +89,8 @@ const cart_suite_pretty_json =
   <> "        \"Cart\",\n"
   <> "        \"starts empty\"\n"
   <> "      ],\n"
+  <> "      \"only_path\": \"Cart/starts empty\",\n"
+  <> "      \"run_alone\": \"gleam test -- --only \\\"Cart/starts empty\\\"\",\n"
   <> "      \"status\": \"passed\",\n"
   <> "      \"duration_ms\": 0,\n"
   <> "      \"tags\": [],\n"
@@ -100,7 +104,7 @@ const cart_suite_pretty_json =
 /// The JSON of the two tests of the module example, made fixed by
 /// `without_run_values`.
 const module_example_json =
-  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"outputs JSON format\",\"full_name\":[\"JSON Reporter\",\"outputs JSON format\"],\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"includes test metadata\",\"full_name\":[\"JSON Reporter\",\"includes test metadata\"],\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
+  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"outputs JSON format\",\"full_name\":[\"JSON Reporter\",\"outputs JSON format\"],\"only_path\":\"JSON Reporter/outputs JSON format\",\"run_alone\":\"gleam test -- --only \\\"JSON Reporter/outputs JSON format\\\"\",\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"includes test metadata\",\"full_name\":[\"JSON Reporter\",\"includes test metadata\"],\"only_path\":\"JSON Reporter/includes test metadata\",\"run_alone\":\"gleam test -- --only \\\"JSON Reporter/includes test metadata\\\"\",\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
 
 /// The JSON values that change from run to run, and the fixed text that
 /// replaces each one, for compact and for pretty JSON:
@@ -143,7 +147,7 @@ fn without_run_values_in(run: ChildRun) -> ChildRun {
 /// The JSON of the cart suite of `new` and `render`, made fixed by
 /// `without_run_values`.
 const cart_suite_json =
-  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"starts empty\",\"full_name\":[\"Cart\",\"starts empty\"],\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
+  "{\"version\":\"2.0\",\"timestamp_ms\":0,\"duration_ms\":0,\"system\":{\"os\":\"<os>\",\"otp_version\":\"<otp_version>\",\"gleam_stdlib_version\":\"<gleam_stdlib_version>\"},\"summary\":{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"starts empty\",\"full_name\":[\"Cart\",\"starts empty\"],\"only_path\":\"Cart/starts empty\",\"run_alone\":\"gleam test -- --only \\\"Cart/starts empty\\\"\",\"status\":\"passed\",\"duration_ms\":0,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n"
 
 /// A run report of the one passed test of the cart suite.
 fn cart_report() -> RunReport {

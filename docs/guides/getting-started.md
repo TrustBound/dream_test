@@ -158,6 +158,7 @@ Calculator
       Message: 7 / 2 should round up to 4
       Expected: 4
       Actual:   3
+    Run it alone: gleam test -- --only "Calculator/rounds a division up"
 
 Failures:
 Calculator
@@ -166,6 +167,7 @@ Calculator
       Message: 7 / 2 should round up to 4
       Expected: 4
       Actual:   3
+    Run it alone: gleam test -- --only "Calculator/rounds a division up"
 
 Summary: 3 run, 1 failed, 2 passed in 0ms
 ```
@@ -244,12 +246,14 @@ Discovery Errors
   ✗ Discovery Error: snippets/units/**.gleam: no test module matches the pattern
     discover
       Message: Failed to discover/load test modules (see test name for details)
+    Run it alone: gleam test -- --only 'Discovery Errors/Discovery Error: snippets\/units\/**.gleam: no test module matches the pattern'
 
 Failures:
 Discovery Errors
   ✗ Discovery Error: snippets/units/**.gleam: no test module matches the pattern
     discover
       Message: Failed to discover/load test modules (see test name for details)
+    Run it alone: gleam test -- --only 'Discovery Errors/Discovery Error: snippets\/units\/**.gleam: no test module matches the pattern'
 
 Summary: 1 run, 1 failed, 0 passed in 0ms
 ```

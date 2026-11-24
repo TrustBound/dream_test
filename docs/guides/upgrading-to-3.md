@@ -792,7 +792,7 @@ A run with no test passed in 2.x. In 3.0.0, it fails, and the report ends with a
 
 ### `runner.silent` still writes errors
 
-In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops the normal output only: progress, results reports and the coverage report. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed, and a coverage error, for example a total below `coverage.minimum_percent`.
+In 2.x, `runner.silent` dropped all output. In 3.0.0, it drops the normal output only: progress, results reports and the coverage report. It still writes three kinds of error to the standard error stream: the error of a `--only` path that selects no test, the `Results reporter failed` error of a `reporter_types.Custom` reporter that crashed, and a coverage error, for example a total below `coverage.minimum_percent`.
 
 ### Runner test hooks: only the `TestInfo`, with `groups`
 

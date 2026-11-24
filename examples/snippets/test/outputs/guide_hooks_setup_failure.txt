@@ -2,11 +2,13 @@ Setup failures
   ⚠ will not run
     before_each
       Message: could not connect to database
+    Run it alone: gleam test -- --only "Setup failures/will not run"
 
 Failures:
 Setup failures
   ⚠ will not run
     before_each
       Message: could not connect to database
+    Run it alone: gleam test -- --only "Setup failures/will not run"
 
 Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms

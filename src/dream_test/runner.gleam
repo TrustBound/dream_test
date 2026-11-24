@@ -62,6 +62,7 @@
 
 import dream_test/coverage.{type CoverageConfig, type CoverageSession}
 import dream_test/coverage/report.{type CoverageReport}
+import dream_test/internal/only
 import dream_test/parallel
 import dream_test/reporters/bdd
 import dream_test/reporters/coverage as coverage_reporter
@@ -135,6 +136,7 @@ pub opaque type RunBuilder {
     suite_runs: List(SuiteRun),
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
+    arguments: Option(List(String)),
     should_exit_on_failure: Bool,
     no_tests_allowed: Bool,
     progress_reporter: Option(progress.ProgressReporter),
@@ -165,9 +167,10 @@ type SuiteRun {
 
 /// Output sinks used by `runner.run()`.
 ///
-/// Reporters write to `out`. The runner writes two kinds of error to
+/// Reporters write to `out`. The runner writes three kinds of error to
 /// `error`: the `Results reporter failed` error of a
-/// `reporter_types.Custom` reporter that crashed, and a coverage error. A test failure is not an error of the runner.
+/// `reporter_types.Custom` reporter that crashed, a coverage error, and
+/// the error of a `--only` path that selects no test. A test failure is not an error of the runner.
 pub type Output {
   Output(out: fn(String) -> Nil, error: fn(String) -> Nil)
 }
@@ -223,6 +226,7 @@ pub fn new(suites suites: List(TestSuite)) -> RunBuilder {
     suite_runs: suites_to_suite_runs_default(suites, []),
     config: config,
     test_filter: None,
+    arguments: None,
     should_exit_on_failure: False,
     no_tests_allowed: False,
     progress_reporter: None,
@@ -831,9 +835,10 @@ pub fn coverage_from_environment(
 /// results reports and no coverage report. `runner.run()` still returns the
 /// report.
 ///
-/// A silent run still writes two kinds of error to the standard error
+/// A silent run still writes three kinds of error to the standard error
 /// stream:
 ///
+/// - the error of a `--only` path that selects no test
 /// - the `Results reporter failed` error of a `reporter_types.Custom`
 ///   reporter that crashed
 /// - a coverage error, for example a total below
@@ -929,6 +934,16 @@ pub fn filter_tests(
   predicate predicate: fn(TestInfo) -> Bool,
 ) -> RunBuilder {
   RunBuilder(..builder, test_filter: Some(predicate))
+}
+
+/// Use `arguments` in place of the command line of the BEAM, for the
+/// `--only` paths. The tests of dream_test use it.
+@internal
+pub fn with_arguments(
+  builder builder: RunBuilder,
+  arguments arguments: List(String),
+) -> RunBuilder {
+  RunBuilder(..builder, arguments: Some(arguments))
 }
 
 /// Register a runner-level hook that runs before each test.
@@ -1236,6 +1251,14 @@ pub fn after_all_suites(
 /// With `exit_on_failure`, a failed run does not return: it writes all its
 /// output and then ends the program with exit status 1.
 ///
+/// The runner reads `--only "<path>"` from the command line:
+/// `gleam test -- --only "Suite/group/test"` runs only that test, and the
+/// path of a group or a suite runs all the tests in it. `--only` can come
+/// more than one time, and a test must also pass `filter_tests`. A path
+/// that selects no test, or a wrong `--only`, writes an error to the error
+/// output and ends the program with exit status 1 before any test runs.
+/// Only the outermost run reads the command line.
+///
 /// A run that runs no test fails: a filter that keeps no test, or no
 /// suites. The BDD and Gherkin reporters write a `No tests ran` line after
 /// the summary line. Use `allow_no_tests` when a run can be empty on
@@ -1297,15 +1320,109 @@ pub fn after_all_suites(
 /// reporter crashes, or when coverage fails (a total or a file below a
 /// minimum, or coverage that did not complete).
 pub fn run(builder builder: RunBuilder) -> RunReport {
-  let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
+  let outermost = takes_command_line(builder.arguments)
+  let checked =
+    only.checked_paths(
+      run_arguments(builder.arguments, outermost),
+      all_test_names(builder.suite_runs),
+    )
+  run_or_stop(builder, outermost, checked)
+}
+
+/// Run the selected tests, or, for a wrong `--only`, write the error and
+/// end the program with exit status 1 before any test or hook runs.
+fn run_or_stop(
+  builder: RunBuilder,
+  outermost: Bool,
+  checked: Result(List(only.OnlyPath), String),
+) -> RunReport {
+  case checked {
+    Ok(paths) -> {
+      let report = run_selected(builder, paths)
+      finish_outermost_run(outermost)
+      report
+    }
+    Error(text) -> {
+      let Output(error: write_error, ..) = run_output(builder)
+      write_error(text)
+      finish_outermost_run(outermost)
+      end_program_in_run(1)
+    }
+  }
+}
+
+/// Whether this run reads the command line of the BEAM: only when no
+/// arguments were given to the builder, and no other run is in progress.
+/// A run inside a test of another run does not read it.
+fn takes_command_line(arguments: Option(List(String))) -> Bool {
+  case arguments {
+    Some(_) -> False
+    None -> start_outermost_run()
+  }
+}
+
+/// The arguments of the run: the given ones, the command line of the BEAM
+/// for the outermost run, or none.
+fn run_arguments(
+  arguments: Option(List(String)),
+  outermost: Bool,
+) -> List(String) {
+  case arguments, outermost {
+    Some(given), _ -> given
+    None, True -> command_line_arguments()
+    None, False -> []
+  }
+}
+
+/// The names of each test of the suite runs, before any filter.
+fn all_test_names(suite_runs: List(SuiteRun)) -> List(List(String)) {
+  list.flat_map(suite_runs, suite_run_test_names)
+}
+
+fn suite_run_test_names(suite_run: SuiteRun) -> List(List(String)) {
+  list.map(suite_run.tests, test_info_names)
+}
+
+fn test_info_names(info: TestInfo) -> List(String) {
+  types.full_name(info.groups, info.name)
+}
+
+/// The filter of the run: the filter of `filter_tests`, and the `--only`
+/// paths when there are any. A test runs only when both keep it.
+fn selection_filter(
+  filter: Option(fn(TestInfo) -> Bool),
+  paths: List(only.OnlyPath),
+) -> Option(fn(TestInfo) -> Bool) {
+  case paths {
+    [] -> filter
+    _ -> Some(fn(info) { keeps_selected(filter, paths, info) })
+  }
+}
+
+fn keeps_selected(
+  filter: Option(fn(TestInfo) -> Bool),
+  paths: List(only.OnlyPath),
+  info: TestInfo,
+) -> Bool {
+  only.selects(paths, test_info_names(info))
+  && option.unwrap(filter, keep_every_test)(info)
+}
+
+fn run_output(builder: RunBuilder) -> Output {
+  case builder.output {
+    Some(output) -> output
+    None -> default_output()
+  }
+}
+
+fn run_selected(builder: RunBuilder, paths: List(only.OnlyPath)) -> RunReport {
+  let keep = selection_filter(builder.test_filter, paths)
+  let selected_runs = apply_test_filter(builder.suite_runs, keep)
   let total = count_total_tests(selected_runs)
   let suite_runs_with_infos = suite_runs_with_infos(selected_runs, [])
   let suite_infos = list.map(suite_runs_with_infos, suite_info_of_pair)
 
-  let output = case builder.output {
-    Some(output) -> output
-    None -> default_output()
-  }
+  let output = run_output(builder)
 
   let coverage_state = start_coverage(builder.coverage)
 
@@ -1350,7 +1467,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         builder.runner_after_each_suite,
         builder.runner_before_each_test,
         builder.runner_after_each_test,
-        builder.test_filter,
+        keep,
         Collected(tests: [], hook_failures: []),
         all_suites_setup_process,
       )
@@ -2816,6 +2933,24 @@ fn append_suite_runs_with_override(
 ) -> List(SuiteRun) {
   list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
 }
+
+/// `end_program`, typed as the result of `run`. It never returns.
+@external(erlang, "dream_test_runner_ffi", "end_program")
+fn end_program_in_run(status: Int) -> RunReport
+
+/// Whether this run is the outermost run in progress, and so reads the
+/// command line. The outermost run must call `finish_outermost_run`.
+@external(erlang, "dream_test_runner_ffi", "start_outermost_run")
+fn start_outermost_run() -> Bool
+
+/// End the outermost run, when `outermost` is `True`.
+@external(erlang, "dream_test_runner_ffi", "finish_outermost_run")
+fn finish_outermost_run(outermost: Bool) -> Nil
+
+/// The arguments after `--` of `gleam test -- ...`: the plain arguments
+/// of the BEAM.
+@external(erlang, "dream_test_runner_ffi", "command_line_arguments")
+fn command_line_arguments() -> List(String)
 
 /// Ask the BEAM to stop with `status`, then wait until the BEAM stops.
 /// Never returns.

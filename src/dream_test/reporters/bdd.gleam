@@ -7,6 +7,7 @@
 //// (e.g. snapshot tests) or when you’re formatting results incrementally in a
 //// custom runner.
 
+import dream_test/internal/only
 import dream_test/reporters/ansi
 import dream_test/reporters/diff
 import dream_test/reporters/gherkin as gherkin_reporter
@@ -983,12 +984,28 @@ fn format_failure_details(
   result: TestResult,
   indent_level: Int,
 ) -> String {
-  case result.status {
-    Failed -> format_all_failures(color, result.failures, indent_level, "")
-    SetupFailed -> format_all_failures(color, result.failures, indent_level, "")
-    TimedOut -> format_all_failures(color, result.failures, indent_level, "")
-    _ -> ""
+  case types.is_failure(result.status) {
+    True ->
+      format_all_failures(color, result.failures, indent_level, "")
+      <> format_run_alone(color, result, indent_level)
+    False -> ""
   }
+}
+
+/// The `Run it alone:` line of a failed test: the command that runs only
+/// this test.
+fn format_run_alone(
+  color: Bool,
+  result: TestResult,
+  indent_level: Int,
+) -> String {
+  string.concat([
+    build_indent(indent_level),
+    "  ",
+    ansi.apply_if(color, ansi.dim, "Run it alone: "),
+    only.command(types.full_name(result.groups, result.name)),
+    "\n",
+  ])
 }
 
 fn format_all_failures(

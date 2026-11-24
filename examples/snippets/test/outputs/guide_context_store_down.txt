@@ -2,11 +2,13 @@ User store
   ⚠ finds a user by id
     context setup
       Message: the store did not start: port 7000 is in use
+    Run it alone: gleam test -- --only "User store/finds a user by id"
 
 Failures:
 User store
   ⚠ finds a user by id
     context setup
       Message: the store did not start: port 7000 is in use
+    Run it alone: gleam test -- --only "User store/finds a user by id"
 
 Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms

@@ -17,8 +17,10 @@
 ////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
 ////   number of teardown hooks that failed, and `setup_stopped`, the number
 ////   of setups whose process stopped
-//// - `tests`: per-test details (name, full_name, status, duration_ms, tags,
-////   kind, failures). `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
+//// - `tests`: per-test details (name, full_name, only_path, run_alone,
+////   status, duration_ms, tags, kind, failures). `only_path` is the path
+////   of the test for `gleam test -- --only`, and `run_alone` is the
+////   command that runs only this test. `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
 ////   scenario id ends with a number that is unique in the run and changes
 ////   from run to run, so do not compare `kind` of a Gherkin test between
 ////   runs: use `full_name`. Only a Gherkin test has `feature` and `rule`,
@@ -88,6 +90,7 @@
 //// }
 //// ```
 
+import dream_test/internal/only
 import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
@@ -458,14 +461,14 @@ fn hook_failure_fields(
 }
 
 fn build_test_json(result: TestResult) -> Json {
+  let names = types.full_name(result.groups, result.name)
   json.object(
     list.flatten([
       [
         #("name", json.string(result.name)),
-        #(
-          "full_name",
-          json.array(types.full_name(result.groups, result.name), json.string),
-        ),
+        #("full_name", json.array(names, json.string)),
+        #("only_path", json.string(only.path(names))),
+        #("run_alone", json.string(only.command(names))),
         #("status", json.string(status_to_string(result.status))),
         #("duration_ms", json.int(result.duration_ms)),
         #("tags", json.array(result.tags, json.string)),

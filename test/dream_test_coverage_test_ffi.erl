@@ -8,6 +8,7 @@
     run_main_in_new_vm/2,
     run_main_like_new_gleam_in_new_vm/2,
     run_measured_main_in_new_vm/3,
+    run_measured_main_with_arguments_in_new_vm/3,
     set_environment_variable/2,
     unset_environment_variable/1,
     start_server_in_new_vm/2,
@@ -179,16 +180,29 @@ run_measured_main_in_new_vm(Module, Function, Environment) ->
     ),
     run_in_new_vm(Eval, Environment).
 
+%% Like `run_measured_main_in_new_vm`, with no environment change, and with
+%% Arguments (a Gleam list of strings) as the plain arguments of the new
+%% BEAM, the same as `gleam test -- Arguments`.
+run_measured_main_with_arguments_in_new_vm(Module, Function, Arguments) ->
+    Eval = io_lib:format(
+        "'dream_test@coverage_child_measure':run_measured(<<\"~ts\">>, <<\"~ts\">>), init:stop(0).",
+        [Module, Function]
+    ),
+    run_in_new_vm(Eval, [], [unicode:characters_to_list(Argument) || Argument <- Arguments]).
+
 %% The new process gets 60 seconds in all, from its start. A worker process
 %% starts it and collects its output. At the deadline, the worker kills the
 %% operating system process of the new BEAM, and the status is -1. When the
 %% calling process stops first, for example because its test timed out, the
 %% worker kills the new BEAM too. Closing the port alone does not stop it.
 run_in_new_vm(Eval, Environment) ->
+    run_in_new_vm(Eval, Environment, []).
+
+run_in_new_vm(Eval, Environment, Arguments) ->
     Caller = self(),
     Ref = make_ref(),
     {Worker, Monitor} = spawn_monitor(
-        fun() -> run_new_vm_for(Caller, Ref, Eval, Environment) end
+        fun() -> run_new_vm_for(Caller, Ref, Eval, Environment, Arguments) end
     ),
     receive
         {Ref, Result} ->
@@ -200,7 +214,7 @@ run_in_new_vm(Eval, Environment) ->
 
 %% In the worker: start the new BEAM, collect its output and send the
 %% result to Caller.
-run_new_vm_for(Caller, Ref, Eval, Environment) ->
+run_new_vm_for(Caller, Ref, Eval, Environment, Arguments) ->
     CallerMonitor = erlang:monitor(process, Caller),
     Deadline = erlang:monotonic_time(millisecond) + 60000,
     Port = open_port(
@@ -208,7 +222,7 @@ run_new_vm_for(Caller, Ref, Eval, Environment) ->
         [exit_status, binary, stderr_to_stdout, use_stdio,
          {env, [{"ERL_CRASH_DUMP_SECONDS", "0"}
                 | [environment_entry(Entry) || Entry <- Environment]]},
-         {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval)]}]
+         {args, ["-noshell" | code_path_args()] ++ ["-eval", lists:flatten(Eval), "-extra" | Arguments]}]
     ),
     {os_pid, OsPid} = erlang:port_info(Port, os_pid),
     Result = collect_output(Port, OsPid, CallerMonitor, Deadline, <<>>),

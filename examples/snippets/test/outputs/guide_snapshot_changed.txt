@@ -9,6 +9,7 @@ Receipt
         - TOTAL 6.25
         + croissant... 2.95
         + TOTAL 6.45
+    Run it alone: gleam test -- --only "Receipt/renders the items and the total"
 
 Failures:
 Receipt
@@ -22,5 +23,6 @@ Receipt
         - TOTAL 6.25
         + croissant... 2.95
         + TOTAL 6.45
+    Run it alone: gleam test -- --only "Receipt/renders the items and the total"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms

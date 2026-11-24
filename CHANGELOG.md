@@ -391,6 +391,29 @@ the guide labels them.
 
 ### Added
 
+- **Run one test with `--only`** (`dream_test/runner`)
+
+  - `gleam test -- --only "Suite/group/test"` runs only that test. The
+    runner reads the option from the command line, so `main` does not
+    change. The path is the suite name, the group names and the test
+    name, joined with `/`, and must match exactly. The path of a group or
+    a suite runs all the tests in it. For a Gherkin scenario, the path is
+    the Feature name and the scenario name
+  - `--only` can come more than one time. A test runs when one path
+    selects it and the `runner.filter_tests` predicate keeps it. The
+    hooks around the selected tests run as usual
+  - In a name, `\/` is a `/` and `\\` is a `\`
+  - A path that selects no test, or a wrong `--only`, ends the program
+    with exit status 1 before any test or hook runs, also without
+    `exit_on_failure`. The error lists the three closest paths as
+    commands
+  - Only the outermost run reads the command line. A run that a test
+    starts inside another run does not use `--only`
+  - The BDD and Gherkin reports print a `Run it alone:` line under each
+    failed, timed-out or setup-failed test, also under `Failures:`. The
+    line holds the command that runs only that test, quoted for a POSIX
+    shell. The JSON report has `only_path` and `run_alone` for each test
+
 - **Line diffs in failure reports** (`dream_test/reporters/diff`)
 
   - A failure whose expected or actual text has more than one line, or

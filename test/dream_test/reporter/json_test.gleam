@@ -188,7 +188,7 @@ pub fn tests() {
         |> after("\"summary\":")
         |> should
         |> be_equal(
-          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
+          "{\"total\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"pending\":0,\"timed_out\":0,\"setup_failed\":0,\"teardown_failed\":0,\"setup_stopped\":0},\"tests\":[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"only_path\":\"s/passes\",\"run_alone\":\"gleam test -- --only \\\"s/passes\\\"\",\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("compact JSON should have no spaces or new lines")
       }),
@@ -221,6 +221,8 @@ pub fn tests() {
           <> "        \"s\",\n"
           <> "        \"passes\"\n"
           <> "      ],\n"
+          <> "      \"only_path\": \"s/passes\",\n"
+          <> "      \"run_alone\": \"gleam test -- --only \\\"s/passes\\\"\",\n"
           <> "      \"status\": \"passed\",\n"
           <> "      \"duration_ms\": 2,\n"
           <> "      \"tags\": [],\n"
@@ -338,7 +340,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"feature\":\"F\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"hook_failures\":[]}\n",
+          "[{\"name\":\"sells\",\"full_name\":[\"s\",\"sells\"],\"only_path\":\"s/sells\",\"run_alone\":\"gleam test -- --only \\\"s/sells\\\"\",\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:F::Rule: Stock::sells#1\",\"feature\":\"F\",\"rule\":\"Rule: Stock\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with(
           "a Gherkin scenario should have its Feature and its Rule",
@@ -363,7 +365,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"pays\",\"full_name\":[\"s\",\"pays\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:pays#1\",\"feature\":null,\"rule\":null,\"failures\":[]}],\"hook_failures\":[]}\n",
+          "[{\"name\":\"pays\",\"full_name\":[\"s\",\"pays\"],\"only_path\":\"s/pays\",\"run_alone\":\"gleam test -- --only \\\"s/pays\\\"\",\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:pays#1\",\"feature\":null,\"rule\":null,\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with(
           "a scenario outside a Feature should have a null Feature",
@@ -375,7 +377,7 @@ pub fn tests() {
         |> after("\"tests\":")
         |> should
         |> be_equal(
-          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"feature\":null,\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
+          "[{\"name\":\"passes\",\"full_name\":[\"s\",\"passes\"],\"only_path\":\"s/passes\",\"run_alone\":\"gleam test -- --only \\\"s/passes\\\"\",\"status\":\"passed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"fails\",\"full_name\":[\"s\",\"fails\"],\"only_path\":\"s/fails\",\"run_alone\":\"gleam test -- --only \\\"s/fails\\\"\",\"status\":\"failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[{\"operator\":\"check\",\"message\":\"m\"}]},{\"name\":\"skips\",\"full_name\":[\"s\",\"skips\"],\"only_path\":\"s/skips\",\"run_alone\":\"gleam test -- --only \\\"s/skips\\\"\",\"status\":\"skipped\",\"duration_ms\":2,\"tags\":[],\"kind\":\"gherkin:f:1\",\"feature\":null,\"rule\":null,\"failures\":[]},{\"name\":\"waits\",\"full_name\":[\"s\",\"waits\"],\"only_path\":\"s/waits\",\"run_alone\":\"gleam test -- --only \\\"s/waits\\\"\",\"status\":\"pending\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"times out\",\"full_name\":[\"s\",\"times out\"],\"only_path\":\"s/times out\",\"run_alone\":\"gleam test -- --only \\\"s/times out\\\"\",\"status\":\"timed_out\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]},{\"name\":\"has no setup\",\"full_name\":[\"s\",\"has no setup\"],\"only_path\":\"s/has no setup\",\"run_alone\":\"gleam test -- --only \\\"s/has no setup\\\"\",\"status\":\"setup_failed\",\"duration_ms\":2,\"tags\":[],\"kind\":\"unit\",\"failures\":[]}],\"hook_failures\":[]}\n",
         )
         |> or_fail_with("each test should have its status and kind")
       }),

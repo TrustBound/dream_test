@@ -206,15 +206,18 @@ Rule: D
           <> "        Actual:   1\n"
           <> "      ✗ check\n"
           <> "      ✗ check\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/removes\"\n"
           <> "  Scenario: empties -\n"
           <> "Feature: Checkout\n"
           <> "  Scenario: pays ~\n"
           <> "  Scenario: waits !\n"
           <> "      ✗ check\n"
           <> "        Message: too slow\n"
+          <> "      Run it alone: gleam test -- --only \"Checkout/waits\"\n"
           <> "  Scenario: ships ⚠\n"
           <> "      ✗ check\n"
           <> "        Message: no db\n"
+          <> "      Run it alone: gleam test -- --only \"Checkout/ships\"\n"
           <> "\n"
           <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
@@ -266,7 +269,8 @@ Rule: D
           <> "  Scenario: adds ✓\n"
           <> "  Scenario: removes ✗\n"
           <> "      ✗ check\n"
-          <> "        Message: bad\n",
+          <> "        Message: bad\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/removes\"\n",
         )
         |> or_fail_with("format_scenarios should give no summary line")
       }),
@@ -332,7 +336,8 @@ Rule: D
           <> "        Step: Then the total is 15.00 (test/cart.feature:7)\n"
           <> "        Message: the total should match\n"
           <> "        Expected: 15.0\n"
-          <> "        Actual:   14.0\n",
+          <> "        Actual:   14.0\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/totals\"\n",
         )
         |> or_fail_with("expected the step line first")
       }),
@@ -376,7 +381,8 @@ Rule: D
           <> "        Message: Undefined step: When I pay\n"
           <> "      ✗ step\n"
           <> "        Step: When I pay\n"
-          <> "        Message: Undefined step: When I pay\n",
+          <> "        Message: Undefined step: When I pay\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/pays\"\n",
         )
         |> or_fail_with("expected the line, the file, then no place")
       }),
@@ -411,7 +417,8 @@ Rule: D
           <> "        Diff (- expected, + actual):\n"
           <> "            a\n"
           <> "          - b\n"
-          <> "          + B\n",
+          <> "          + B\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/prints\"\n",
         )
         |> or_fail_with("expected the diff under the snapshot path")
       }),
@@ -441,7 +448,8 @@ Rule: D
           "Feature: Cart\n"
           <> "  Scenario: prints ✗\n"
           <> "      ✗ check\n"
-          <> "        Snapshot missing: r.snap\n",
+          <> "        Snapshot missing: r.snap\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/prints\"\n",
         )
         |> or_fail_with("expected the path of the missing snapshot")
       }),
@@ -469,7 +477,8 @@ Rule: D
           <> "        Diff (- expected, + actual):\n"
           <> "            x\n"
           <> "          - y\n"
-          <> "          + z\n",
+          <> "          + z\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/compares\"\n",
         )
         |> or_fail_with("expected the diff in place of Expected and Actual")
       }),

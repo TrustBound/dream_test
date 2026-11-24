@@ -101,6 +101,7 @@ Checkout
       Message: 20% tax on 1250 should be 1525
       Expected: 1525
       Actual:   1500
+    Run it alone: gleam test -- --only "Checkout/adds the tax"
   payment
     - charges the card
     ~ refunds a cancelled order
@@ -112,6 +113,7 @@ Checkout
       Message: 20% tax on 1250 should be 1525
       Expected: 1525
       Actual:   1500
+    Run it alone: gleam test -- --only "Checkout/adds the tax"
 
 Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 ```
@@ -119,6 +121,8 @@ Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 The marks: `✓` passed, `✗` failed, `!` timed out, `⚠` setup failed, `-` skipped and `~` pending. The summary line counts each status, and shows a count only when it isn't 0, in this order after `passed`: skipped, pending, timed out, setup failed, teardown failed, setup stopped.
 
 A failure whose expected or actual text has more than one line, such as a snapshot, shows a line diff in place of `Expected:` and `Actual:`: a line that starts with `-` is in the expected text only, and a line that starts with `+` is in the actual text only. [Lock down large output with snapshots](https://github.com/TrustBound/dream_test/blob/main/docs/guides/snapshot-testing.md) shows one. A failure in a Gherkin step has a `Step:` line that names the step, before the message.
+
+Each failed, timed-out or setup-failed test ends with a `Run it alone:` line, also under `Failures:` and in the failures-only report. The line holds the command that runs only that test: its path is the suite name, the group names and the test name, joined with `/`. [Run one test](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#run-one-test) gives the rules of `--only`.
 
 With `bdd.color()`, the marks and the summary get ANSI colours. Leave colour off when the output goes to a file or a tool that doesn't read ANSI codes.
 
@@ -135,6 +139,7 @@ Checkout
       Message: 20% tax on 1250 should be 1525
       Expected: 1525
       Actual:   1500
+    Run it alone: gleam test -- --only "Checkout/adds the tax"
 
 Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 ```
@@ -185,6 +190,8 @@ A run that runs no test fails. In every mode, the BDD and Gherkin reports then e
         "Checkout",
         "totals the cart"
       ],
+      "only_path": "Checkout/totals the cart",
+      "run_alone": "gleam test -- --only \"Checkout/totals the cart\"",
       "status": "passed",
       "duration_ms": 0,
       "tags": [
@@ -199,6 +206,8 @@ A run that runs no test fails. In every mode, the BDD and Gherkin reports then e
         "Checkout",
         "adds the tax"
       ],
+      "only_path": "Checkout/adds the tax",
+      "run_alone": "gleam test -- --only \"Checkout/adds the tax\"",
       "status": "failed",
       "duration_ms": 0,
       "tags": [],
@@ -219,6 +228,8 @@ A run that runs no test fails. In every mode, the BDD and Gherkin reports then e
         "payment",
         "charges the card"
       ],
+      "only_path": "Checkout/payment/charges the card",
+      "run_alone": "gleam test -- --only \"Checkout/payment/charges the card\"",
       "status": "skipped",
       "duration_ms": 0,
       "tags": [],
@@ -232,6 +243,8 @@ A run that runs no test fails. In every mode, the BDD and Gherkin reports then e
         "payment",
         "refunds a cancelled order"
       ],
+      "only_path": "Checkout/payment/refunds a cancelled order",
+      "run_alone": "gleam test -- --only \"Checkout/payment/refunds a cancelled order\"",
       "status": "pending",
       "duration_ms": 0,
       "tags": [],
@@ -254,7 +267,7 @@ What each key holds:
 | `duration_ms` | The sum of the test durations. |
 | `system` | `os`, `otp_version`, and `gleam_stdlib_version`, the version of the `gleam_stdlib` package the tests ran with, or `"unknown"` when that application isn't loaded. The Gleam compiler version isn't in the report, because the compiled code doesn't record it. |
 | `summary` | The counts by status: `total`, `passed`, `failed`, `skipped`, `pending`, `timed_out`, `setup_failed`, then `teardown_failed`, the teardown hooks that failed, and `setup_stopped`, the setups whose process stopped. |
-| `tests` | One object for each test: `name`, `full_name` (the group names, then the test name), `status`, `duration_ms`, `tags`, `kind` and `failures`. Each failure has `operator` and `message`, plus the details of its kind, such as `expected` and `actual`. The `expected` and `actual` texts are whole: the JSON report has no diff. |
+| `tests` | One object for each test: `name`, `full_name` (the group names, then the test name), `only_path` (the path for `--only`), `run_alone` (the command that runs only this test), `status`, `duration_ms`, `tags`, `kind` and `failures`. Each failure has `operator` and `message`, plus the details of its kind, such as `expected` and `actual`. The `expected` and `actual` texts are whole: the JSON report has no diff. |
 | `tests[].kind` | `"unit"`, or `"gherkin:<scenario id>"` for a scenario. The scenario id ends with a number that changes between runs, so compare Gherkin tests by `full_name`, not by `kind`. |
 | `tests[].failures[].step` | Only on a failure in a Gherkin step: `keyword` and `text`, the step as the feature writes it, `file`, the path of the `.feature` file or `null`, and `line`, the line of the step or `null` for an inline step. The details of the failure inside the step, such as `expected` and `actual`, follow it. |
 | `tests[].feature`, `tests[].rule` | Only on a Gherkin test, after `kind`. `feature` is the name of its Feature, or `null` for a scenario in no Feature group. `rule` is the name of its Rule group, such as `"Rule: Stock"`, or `null` outside a Rule. |
@@ -341,6 +354,7 @@ Checkout
       Message: 20% tax on 1250 should be 1525
       Expected: 1525
       Actual:   1500
+    Run it alone: gleam test -- --only "Checkout/adds the tax"
 
 Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 ::error title=Checkout > adds the tax::20% tax on 1250 should be 1525

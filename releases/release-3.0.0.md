@@ -15,6 +15,7 @@ is a major release: read the Migration Guide before you update.
 - **Gherkin conformance**: the parser follows the official Gherkin grammar
 - **Typed step state (breaking)**: each Gherkin scenario has one typed state value, and `world` is removed
 - **Clearer failure reports**: a failure of more than one line, such as a changed snapshot, shows as a line diff, and a failure in a Gherkin step names the step, its file and its line
+- **Run one test**: each failed test prints `gleam test -- --only "<path>"`, the command that runs only that test
 - **Guides for tests with recordings**: record HTTP calls and PostgreSQL queries one time, then play them back in CI with no network and no database
 
 ## What's New
@@ -140,6 +141,20 @@ step that crashes read alike. The failure has the new payload
 `types.StepFailure`, so the JSON report has the step too, as a `step`
 object. [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/gherkin-bdd.md)
 shows a real report.
+
+### Run One Test
+
+Each failed test in the BDD and Gherkin reports ends with a
+`Run it alone:` line, for example
+`Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"`.
+The runner reads `--only` from the command line, so `main` does not
+change. The path is the suite name, the group names and the test name,
+joined with `/`. The path of a group or a suite runs all its tests, and
+`--only` works together with `runner.filter_tests`. A path that selects
+no test fails the run before any test runs, and the error lists the
+closest paths. The JSON report has `only_path` and `run_alone` for each
+test. [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/runner-and-execution.md#run-one-test)
+gives the rules.
 
 ### Guides
 

@@ -11,6 +11,7 @@
 //// - the feature and scenario lines without a summary (`format_scenarios`)
 //// - to write the report using a custom function (`report`)
 
+import dream_test/internal/only
 import dream_test/reporters/diff
 import dream_test/reporters/hook_failures
 import dream_test/reporters/summary
@@ -414,11 +415,13 @@ fn status_marker(status: Status) -> String {
 // ============================================================================
 
 fn format_failure_details(result: TestResult) -> String {
-  case result.status {
-    Failed -> format_all_failures(result.failures, "")
-    SetupFailed -> format_all_failures(result.failures, "")
-    TimedOut -> format_all_failures(result.failures, "")
-    _ -> ""
+  case types.is_failure(result.status) {
+    True ->
+      format_all_failures(result.failures, "")
+      <> "      Run it alone: "
+      <> only.command(types.full_name(result.groups, result.name))
+      <> "\n"
+    False -> ""
   }
 }
 

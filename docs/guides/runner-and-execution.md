@@ -14,6 +14,7 @@ A suite of thirty tests runs in a blink however you set it up. A suite of three 
 - [Step 4: Combine suites](#step-4-combine-suites)
 - [Step 5: Run part of the suite](#step-5-run-part-of-the-suite)
 - [Step 6: Decide the exit status](#step-6-decide-the-exit-status)
+- [Run one test](#run-one-test)
 - [Test your code](#test-your-code)
 - [Common pitfalls](#common-pitfalls)
 - [Where to go next](#where-to-go-next)
@@ -151,12 +152,14 @@ Search
   ! waits for an index that never comes
     timeout
       Message: test timed out
+    Run it alone: gleam test -- --only "Search/waits for an index that never comes"
 
 Failures:
 Search
   ! waits for an index that never comes
     timeout
       Message: test timed out
+    Run it alone: gleam test -- --only "Search/waits for an index that never comes"
 
 Summary: 2 run, 0 failed, 1 passed, 1 timed out in 0ms
 ```
@@ -227,7 +230,41 @@ The run fails when one of these is true:
 
 `types.failed(report)` is `True` in the first five cases, and `types.failed_with_no_tests(report)` in the fifth. `types.report_tests(report)` gives the test results, `types.report_hook_failures(report)` the failed teardowns and stopped setups, and `types.report_reporter_crashes(report)` the position and the full reason of each crashed results reporter. Use them when your code picks its own exit status from the report.
 
-A silent run, `runner.silent()`, writes nothing to the standard output: no progress, no reports and no coverage table. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a custom reporter that crashed, and a coverage error.
+A silent run, `runner.silent()`, writes nothing to the standard output: no progress, no reports and no coverage table. It still writes three kinds of error to the standard error stream: the error of a `--only` path that selects no test, the `Results reporter failed` error of a custom reporter that crashed, and a coverage error.
+
+## Run one test
+
+Each failed test in the BDD and Gherkin reports ends with a `Run it alone:` line. The line holds the command that runs only that test. Copy the command, fix the code, and run the command until the test passes:
+
+### Run one test of the recording guide <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/scripts/playback.sh#L9"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```sh
+gleam test -- --only "Forecast/gives the forecast for Oslo"
+```
+
+The runner reads `--only` from the command line itself, so your `main` does not change. The rules:
+
+1. The path is the suite name, the group names and the test name, joined with `/`. For a Gherkin scenario, it is the Feature name and the scenario name, as the report shows them, without `Feature:` and `Scenario:`.
+2. The path must match the names exactly. The path of a group or a suite runs all the tests inside it.
+3. Give `--only` more than one time to run the tests of each path.
+4. In a name, write a `/` as `\/` and a `\` as `\\`. The printed commands do this for you.
+5. `--only` works together with `runner.filter_tests`: a test runs only when the path selects it and the filter keeps it.
+6. The hooks around the selected tests run as usual. The `before_all` of the suite runs one time, and so does each `before_all` of a group around a selected test.
+
+A path that selects no test fails the run before any test or hook runs, also without `exit_on_failure`. The error lists the three closest paths as commands, and the exit status is 1. This is the error of a typo in the recording guide:
+
+### The error of a path that selects no test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/test/fixtures/only_unknown_path.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+No test has the --only path "Forecast/gives the forecast for Olso"
+  Closest paths:
+    gleam test -- --only "Forecast/gives the forecast for Oslo"
+    gleam test -- --only "Forecast/gives the forecast for Lisbon"
+    gleam test -- --only "Tasks/gives the share token of a task"
+  Fix: use the full path: the suite name, the group names and the test name, joined with /. Write a / in a name as \/.
+```
+
+The printed command is safe to paste in a POSIX shell. A path with `"`, `$`, `` ` ``, `\` or `!` goes in single quotes, and a `'` in it becomes `'\''`. Only the outermost run reads the command line: a run that a test starts inside another run does not use `--only`.
 
 ## Test your code
 

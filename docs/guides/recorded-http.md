@@ -370,6 +370,7 @@ Forecast
       Message: Bergen should have a forecast
       Expected: Ok(_)
       Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
 
 Failures:
 Forecast
@@ -378,6 +379,7 @@ Forecast
       Message: Bergen should have a forecast
       Expected: Ok(_)
       Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms
 ```

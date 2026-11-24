@@ -216,6 +216,7 @@ handle
       Message: the greeting should name alice
       Description: expected the status 200
       Actual:      404
+    Run it alone: gleam test -- --only "handle/greets a user who is not there"
 
 Failures:
 handle
@@ -224,6 +225,7 @@ handle
       Message: the greeting should name alice
       Description: expected the status 200
       Actual:      404
+    Run it alone: gleam test -- --only "handle/greets a user who is not there"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms
 ```

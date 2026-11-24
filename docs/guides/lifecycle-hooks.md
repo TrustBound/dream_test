@@ -319,12 +319,14 @@ Setup failures
   ⚠ will not run
     before_each
       Message: could not connect to database
+    Run it alone: gleam test -- --only "Setup failures/will not run"
 
 Failures:
 Setup failures
   ⚠ will not run
     before_each
       Message: could not connect to database
+    Run it alone: gleam test -- --only "Setup failures/will not run"
 
 Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms
 ```
@@ -420,12 +422,14 @@ Search index
   ⚠ finds a document
     before_all
       Message: hook timed out in Search index
+    Run it alone: gleam test -- --only "Search index/finds a document"
 
 Failures:
 Search index
   ⚠ finds a document
     before_all
       Message: hook timed out in Search index
+    Run it alone: gleam test -- --only "Search index/finds a document"
 
 Summary: 1 run, 0 failed, 0 passed, 1 setup failed in 0ms
 ```

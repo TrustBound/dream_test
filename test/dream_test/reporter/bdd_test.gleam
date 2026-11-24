@@ -247,6 +247,7 @@ pub fn tests() {
           <> "      Message: 1 + 2 should equal 3\n"
           <> "      Expected: 3\n"
           <> "      Actual:   4\n"
+          <> "    Run it alone: gleam test -- --only \"Math/adds numbers incorrectly\"\n"
           <> "\n"
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n"
 
@@ -363,14 +364,17 @@ pub fn tests() {
           <> "      Message: bad\n"
           <> "      Expected: 2\n"
           <> "      Actual:   1\n"
+          <> "    Run it alone: gleam test -- --only \"s/fails\"\n"
           <> "  - skips\n"
           <> "  ~ waits\n"
           <> "  ! times out\n"
           <> "    timeout\n"
           <> "      Message: too slow\n"
+          <> "    Run it alone: gleam test -- --only \"s/times out\"\n"
           <> "  ⚠ has no setup\n"
           <> "    before_each\n"
           <> "      Message: no db\n"
+          <> "    Run it alone: gleam test -- --only \"s/has no setup\"\n"
           <> "\n"
           <> "Failures:\n"
           <> "s\n"
@@ -379,12 +383,15 @@ pub fn tests() {
           <> "      Message: bad\n"
           <> "      Expected: 2\n"
           <> "      Actual:   1\n"
+          <> "    Run it alone: gleam test -- --only \"s/fails\"\n"
           <> "  ! times out\n"
           <> "    timeout\n"
           <> "      Message: too slow\n"
+          <> "    Run it alone: gleam test -- --only \"s/times out\"\n"
           <> "  ⚠ has no setup\n"
           <> "    before_each\n"
           <> "      Message: no db\n"
+          <> "    Run it alone: gleam test -- --only \"s/has no setup\"\n"
           <> "\n"
           <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
@@ -405,14 +412,17 @@ pub fn tests() {
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mbad\u{001B}[0m\n"
           <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
           <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m1\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/fails\"\n"
           <> "  \u{001B}[33m-\u{001B}[0m \u{001B}[33mskips\u{001B}[0m\n"
           <> "  \u{001B}[33m~\u{001B}[0m \u{001B}[33mwaits\u{001B}[0m\n"
           <> "  \u{001B}[31m!\u{001B}[0m \u{001B}[31mtimes out\u{001B}[0m\n"
           <> "    \u{001B}[1m\u{001B}[35mtimeout\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mtoo slow\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/times out\"\n"
           <> "  \u{001B}[31m⚠\u{001B}[0m \u{001B}[31mhas no setup\u{001B}[0m\n"
           <> "    \u{001B}[1m\u{001B}[35mbefore_each\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mno db\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/has no setup\"\n"
           <> "\n"
           <> "\u{001B}[1m\u{001B}[31mFailures:\u{001B}[0m\u{001B}[0m\n"
           <> "\u{001B}[1m\u{001B}[36ms\u{001B}[0m\u{001B}[0m\n"
@@ -421,12 +431,15 @@ pub fn tests() {
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mbad\u{001B}[0m\n"
           <> "  \u{001B}[2m    Expected: \u{001B}[0m\u{001B}[32m2\u{001B}[0m\n"
           <> "  \u{001B}[2m    Actual:   \u{001B}[0m\u{001B}[31m1\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/fails\"\n"
           <> "  \u{001B}[31m!\u{001B}[0m \u{001B}[31mtimes out\u{001B}[0m\n"
           <> "    \u{001B}[1m\u{001B}[35mtimeout\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mtoo slow\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/times out\"\n"
           <> "  \u{001B}[31m⚠\u{001B}[0m \u{001B}[31mhas no setup\u{001B}[0m\n"
           <> "    \u{001B}[1m\u{001B}[35mbefore_each\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Message: \u{001B}[0m\u{001B}[31mno db\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/has no setup\"\n"
           <> "\n"
           <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m6\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m1\u{001B}[0m passed, \u{001B}[33m1\u{001B}[0m\u{001B}[2m skipped\u{001B}[0m, \u{001B}[33m1\u{001B}[0m\u{001B}[2m pending\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m timed out\u{001B}[0m, \u{001B}[31m1\u{001B}[0m\u{001B}[2m setup failed\u{001B}[0m in \u{001B}[36m0ms\u{001B}[0m\n",
         )
@@ -446,12 +459,15 @@ pub fn tests() {
           <> "      Message: bad\n"
           <> "      Expected: 2\n"
           <> "      Actual:   1\n"
+          <> "    Run it alone: gleam test -- --only \"s/fails\"\n"
           <> "  ! times out\n"
           <> "    timeout\n"
           <> "      Message: too slow\n"
+          <> "    Run it alone: gleam test -- --only \"s/times out\"\n"
           <> "  ⚠ has no setup\n"
           <> "    before_each\n"
           <> "      Message: no db\n"
+          <> "    Run it alone: gleam test -- --only \"s/has no setup\"\n"
           <> "\n"
           <> "Summary: 6 run, 1 failed, 1 passed, 1 skipped, 1 pending, 1 timed out, 1 setup failed in 0ms\n",
         )
@@ -503,6 +519,7 @@ pub fn tests() {
           <> "      Message: gone\n"
           <> "      Expected: 0\n"
           <> "      Actual:   1\n"
+          <> "    Run it alone: gleam test -- --only \"Cart/removes\"\n"
           <> "\n"
           <> "Failures:\n"
           <> "Feature: Cart\n"
@@ -511,6 +528,7 @@ pub fn tests() {
           <> "      Message: gone\n"
           <> "      Expected: 0\n"
           <> "      Actual:   1\n"
+          <> "    Run it alone: gleam test -- --only \"Cart/removes\"\n"
           <> "\n"
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n",
         )
@@ -598,6 +616,7 @@ pub fn tests() {
           <> "    check\n"
           <> "      Description: is even\n"
           <> "      Actual:      7\n"
+          <> "    Run it alone: gleam test -- --only \"p/payloads\"\n"
           <> "\n"
           <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
         )
@@ -660,6 +679,7 @@ pub fn tests() {
           <> "    \u{001B}[1m\u{001B}[35mcheck\u{001B}[0m\u{001B}[0m\n"
           <> "  \u{001B}[2m    Description: \u{001B}[0m\u{001B}[36mis even\u{001B}[0m\n"
           <> "  \u{001B}[2m    Actual:      \u{001B}[0m\u{001B}[31m7\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"p/payloads\"\n"
           <> "\n"
           <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m1\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m0\u{001B}[0m passed in \u{001B}[36m0ms\u{001B}[0m\n",
         )
@@ -707,6 +727,7 @@ pub fn tests() {
           <> "        Message: gone\n"
           <> "        Expected: 0\n"
           <> "        Actual:   1\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/removes\"\n"
           <> "\n"
           <> "Summary: 2 run, 1 failed, 1 passed in 0ms\n",
         )
@@ -731,6 +752,7 @@ pub fn tests() {
           <> "        Message: gone\n"
           <> "        Expected: 0\n"
           <> "        Actual:   1\n"
+          <> "      Run it alone: gleam test -- --only \"Cart/removes\"\n"
           <> "\n"
           <> "Summary: 3 run, 1 failed, 2 passed in 0ms\n",
         )
@@ -877,6 +899,7 @@ pub fn tests() {
           <> "        - b\n"
           <> "        + B\n"
           <> "          c\n"
+          <> "    Run it alone: gleam test -- --only \"s/renders\"\n"
           <> "\n"
           <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
         )
@@ -916,6 +939,7 @@ pub fn tests() {
             <> "          x\n"
             <> "        - y\n"
             <> "        + z\n"
+            <> "    Run it alone: gleam test -- --only \"s/compares\"\n"
             <> "\n"
             <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
           )
@@ -963,6 +987,7 @@ pub fn tests() {
           <> "      Message: the total should match\n"
           <> "      Expected: 15.0\n"
           <> "      Actual:   14.0\n"
+          <> "    Run it alone: gleam test -- --only \"s/checks\"\n"
           <> "\n"
           <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
         )
@@ -1015,6 +1040,7 @@ pub fn tests() {
           <> "    check\n"
           <> "      Step: When I pay\n"
           <> "      Message: Undefined step: When I pay\n"
+          <> "    Run it alone: gleam test -- --only \"s/pays\"\n"
           <> "\n"
           <> "Summary: 1 run, 1 failed, 0 passed in 0ms\n",
         )
@@ -1066,6 +1092,7 @@ pub fn tests() {
           <> "          a\n"
           <> "        \u{001B}[32m- b\u{001B}[0m\n"
           <> "        \u{001B}[31m+ c\u{001B}[0m\n"
+          <> "    \u{001B}[2mRun it alone: \u{001B}[0mgleam test -- --only \"s/checks\"\n"
           <> "\n"
           <> "\u{001B}[1m\u{001B}[36mSummary: \u{001B}[0m\u{001B}[0m\u{001B}[36m1\u{001B}[0m run, \u{001B}[31m1\u{001B}[0m failed, \u{001B}[32m0\u{001B}[0m passed in \u{001B}[36m0ms\u{001B}[0m\n",
         )

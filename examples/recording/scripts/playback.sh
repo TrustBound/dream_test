@@ -5,3 +5,5 @@ set -eu
 
 gleam format --check
 gleam test
+# Runs one test alone, with the command that a failed test prints
+gleam test -- --only "Forecast/gives the forecast for Oslo"

@@ -4,6 +4,7 @@ Tasks
       Message: task 42 should have a share token
       Expected: Ok(_)
       Actual:   Error(Ok(NoRecording("SELECT share_token FROM tasks WHERE id = $1", "[42]", "test/recordings/queries/tasks.json")))
+    Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Failures:
 Tasks
@@ -12,5 +13,6 @@ Tasks
       Message: task 42 should have a share token
       Expected: Ok(_)
       Actual:   Error(Ok(NoRecording("SELECT share_token FROM tasks WHERE id = $1", "[42]", "test/recordings/queries/tasks.json")))
+    Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms

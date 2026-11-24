@@ -7,6 +7,7 @@ Calculator
       Message: 7 / 2 should round up to 4
       Expected: 4
       Actual:   3
+    Run it alone: gleam test -- --only "Calculator/rounds a division up"
 
 Failures:
 Calculator
@@ -15,5 +16,6 @@ Calculator
       Message: 7 / 2 should round up to 4
       Expected: 4
       Actual:   3
+    Run it alone: gleam test -- --only "Calculator/rounds a division up"
 
 Summary: 3 run, 1 failed, 2 passed in 0ms

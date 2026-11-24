@@ -95,6 +95,7 @@ pub fn tests() -> TestSuite {
             <> "      Message: expected two items\n"
             <> "      Expected: 2\n"
             <> "      Actual:   1\n"
+            <> "    Run it alone: gleam test -- --only \"Cart/counts two items\"\n"
             <> "\n"
             <> "Summary: 2 run, 1 failed, 1 passed in <duration>\n",
           error_output: "",

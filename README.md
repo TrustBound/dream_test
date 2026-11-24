@@ -80,6 +80,7 @@ Record HTTP calls and database queries one time, then play them back in each run
 | 🛡️ **Isolation**                       | Crashes and timeouts don't break the run                                                                  |
 | ⏱️ **Timeouts**                        | A default timeout for each test and hook (`runner.default_timeout_ms`), and one for each group of suites (`runner.add_suites_with_config`) |
 | 🔍 **Test discovery**                  | Find tests from file paths                                                                                |
+| 🎯 **Run one test**                    | Each failed test prints `gleam test -- --only "<path>"`, the command that runs only that test                |
 | 🚨 **Exit-on-failure**                 | Exit status 1 for CI when the run fails, after every test ran and all output is written                   |
 | 🪝 **Runner hooks**                    | Runner-level hooks for per-test/per-suite/per-run setup and teardown                                       |
 | 🧩 **Suite-specific execution config** | Run some suites sequential/with custom timeouts in the same runner (`runner.add_suites_with_config(...)`) |

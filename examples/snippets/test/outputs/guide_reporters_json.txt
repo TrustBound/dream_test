@@ -25,6 +25,8 @@
         "Checkout",
         "totals the cart"
       ],
+      "only_path": "Checkout/totals the cart",
+      "run_alone": "gleam test -- --only \"Checkout/totals the cart\"",
       "status": "passed",
       "duration_ms": 0,
       "tags": [
@@ -39,6 +41,8 @@
         "Checkout",
         "adds the tax"
       ],
+      "only_path": "Checkout/adds the tax",
+      "run_alone": "gleam test -- --only \"Checkout/adds the tax\"",
       "status": "failed",
       "duration_ms": 0,
       "tags": [],
@@ -59,6 +63,8 @@
         "payment",
         "charges the card"
       ],
+      "only_path": "Checkout/payment/charges the card",
+      "run_alone": "gleam test -- --only \"Checkout/payment/charges the card\"",
       "status": "skipped",
       "duration_ms": 0,
       "tags": [],
@@ -72,6 +78,8 @@
         "payment",
         "refunds a cancelled order"
       ],
+      "only_path": "Checkout/payment/refunds a cancelled order",
+      "run_alone": "gleam test -- --only \"Checkout/payment/refunds a cancelled order\"",
       "status": "pending",
       "duration_ms": 0,
       "tags": [],
