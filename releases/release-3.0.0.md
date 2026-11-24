@@ -1,6 +1,6 @@
 # Dream Test 3.0.0 Release Notes
 
-**Release Date:** not released yet (draft)
+**Release Date:** 2026-11-24
 
 Dream Test 3.0.0 adds line coverage to the runner. It also runs the hooks of
 each scope in a process that keeps their resources alive, follows the official
