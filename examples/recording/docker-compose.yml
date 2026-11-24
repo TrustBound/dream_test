@@ -1,0 +1,22 @@
+# The PostgreSQL server for a record run of the database tests. Start it with
+# `make db-up` and stop it with `make db-down`. It keeps no data: each start
+# gives an empty database. A playback run needs no server.
+
+name: dream_test_recording
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dream
+      POSTGRES_PASSWORD: dream
+      POSTGRES_DB: recording
+    ports:
+      # Port 5438 on this machine, so the record run does not use a
+      # PostgreSQL server that already listens on 5432.
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dream -d recording"]
+      interval: 1s
+      timeout: 5s
+      retries: 30

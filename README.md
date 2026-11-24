@@ -36,6 +36,17 @@ One line in your test `main` turns it on. [Read more](#coverage).
 | 🔀 **Merged runs**             | Combine coverage from servers and other BEAM instances into one report   |
 | 🧭 **Exact lines**             | Every line maps to its Gleam source line on Gleam 1.19+                  |
 
+### Recorded tests
+
+Record HTTP calls and database queries one time, then play them back in each run. [Read more](#record-once-test-offline).
+
+| Feature                       | What you get                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| 🎙️ **Recorded HTTP calls**    | Tests of an API client with no network, from files that `dream_http_client` writes |
+| 🐘 **Recorded queries**       | Tests of database code with no PostgreSQL, from files that `dream_postgres` writes |
+| 🔁 **One command to refresh** | `RECORDER_MODE=record gleam test` records, and `gleam test` plays back          |
+| 🚫 **Clear misses**           | A request or a query with no recording fails, and the report names it           |
+
 ### Test Styles
 
 | Feature                 | What you get                                     |
@@ -101,8 +112,10 @@ Dream Test splits reporting into:
 10. [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): concurrency, timeouts, suites with their own settings, and every case that gives exit status 1.
 11. [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): the coverage table, minimums, exclusions with reasons, report files and coverage from servers.
 12. [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md): a live badge from your own GitHub Actions workflow, with no outside service.
-13. [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md): every breaking change, with the 2.x code and the 3.0.0 code.
-14. [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md): every matcher, the runner settings, the rules of hook processes, the Gherkin rules and the helper modules.
+13. [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md): record the calls of an API client one time, play them back in CI with no network, and keep the token out of the files.
+14. [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md): record PostgreSQL queries one time, play them back with no database, and test a transaction.
+15. [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md): every breaking change, with the 2.x code and the 3.0.0 code.
+16. [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md): every matcher, the runner settings, the rules of hook processes, the Gherkin rules and the helper modules.
 
 ## Unit Tests
 
@@ -239,6 +252,51 @@ pub fn tests() {
 ```
 
 <sub>📖 [Guide](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md)</sub>
+
+## Record once, test offline
+
+A test of an API client or of database code needs the network or a database. With a recorder, the test runs one time against the real service, and the recorder writes each request or query and its response to a file. After that, the test plays the file back, with no network and no database. Start the recorder in the setup of `describe_with_setup`, and choose the mode with an environment variable:
+
+### A suite that plays back recorded HTTP calls <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/forecast_tests.gleam#L18-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-http.md#a-suite-that-plays-back-recorded-http-calls-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+
+```gleam
+pub fn tests() -> TestSuite {
+  describe_with_setup(
+    "Forecast",
+    setup: start_weather_api,
+    teardown: stop_api,
+    children: [
+      it("gives the forecast for Oslo", fn(api: Api) {
+        forecast(api.base, "oslo")
+        |> should
+        |> be_equal(Ok(Forecast("Oslo", high: 4, low: -2, summary: "Snow")))
+        |> or_fail_with("the forecast for Oslo should be snow")
+      }),
+      it("gives the forecast for Lisbon", fn(api: Api) {
+        forecast(api.base, "lisbon")
+        |> should
+        |> be_equal(Ok(Forecast("Lisbon", high: 19, low: 12, summary: "Sun")))
+        |> or_fail_with("the forecast for Lisbon should be sun")
+      }),
+      it("reports a city that the API does not know", fn(api: Api) {
+        forecast(api.base, "atlantis")
+        |> should
+        |> be_equal(Error(UnknownCity("atlantis")))
+        |> or_fail_with("Atlantis should be unknown")
+      }),
+    ],
+  )
+}
+
+fn start_weather_api() -> Result(Api, String) {
+  use mode <- result.try(recorder_mode())
+  start_api(mode, weather_port, start_mock_weather_api)
+}
+```
+
+`RECORDER_MODE=record gleam test` records the calls, and `gleam test` plays them back. In CI, the tests need no network and no API token. The same pattern records PostgreSQL queries with `dream_postgres`, and plays them back with no database.
+
+<sub>📖 [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md) · [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md)</sub>
 
 ## Coverage
 

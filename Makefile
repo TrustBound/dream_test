@@ -1,6 +1,6 @@
 # Makefile for dream_test
 
-.PHONY: test build format snippets check-snippets examples check all
+.PHONY: test build format snippets recording check-snippets examples check all
 
 # Run the dream_test tests, with line coverage (fails below 100%)
 test:
@@ -19,9 +19,15 @@ format:
 snippets:
 	cd examples/snippets && gleam test
 
-# Check every code block of the docs, and print each problem and the
-# summary line
-check-snippets:
+# Run the tests of the recording guides from their committed recordings,
+# with no network and no database (CI runs the same script)
+recording:
+	cd examples/recording && sh scripts/playback.sh
+
+# Run the recording tests, which compare the outputs that the recording
+# guides show, then check every code block of the docs, and print each
+# problem and the summary line
+check-snippets: recording
 	cd examples/snippets && gleam run -m snippets/docs/docs_check
 
 # Run the tests of the other example projects

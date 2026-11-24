@@ -28,6 +28,8 @@ pages = [
   { title = "Run a large suite fast and predictably", path = "guides/runner-and-execution.html", source = "./docs/guides/runner-and-execution.md" },
   { title = "Measure line coverage and gate CI on it", path = "guides/coverage.html", source = "./docs/guides/coverage.md" },
   { title = "Publish a coverage badge from your own CI", path = "guides/coverage-badge.html", source = "./docs/guides/coverage-badge.md" },
+  { title = "Test HTTP calls with recordings", path = "guides/recorded-http.html", source = "./docs/guides/recorded-http.md" },
+  { title = "Test database code with recorded queries", path = "guides/recorded-queries.html", source = "./docs/guides/recorded-queries.md" },
   { title = "Upgrade from Dream Test 2.x to 3.0.0", path = "guides/upgrading-to-3.html", source = "./docs/guides/upgrading-to-3.md" },
   { title = "Reference", path = "guides/reference.html", source = "./docs/guides/reference.md" },
 ]
@@ -51,4 +53,8 @@ tested_files = [
   "examples/snippets/compile_errors",
   "examples/shopping_cart/features",
   "examples/shopping_cart/test/outputs",
+  "examples/recording/gleam.toml",
+  "examples/recording/docker-compose.yml",
+  "examples/recording/scripts",
+  "examples/recording/test",
 ]

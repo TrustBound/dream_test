@@ -1,0 +1,16 @@
+Forecast
+  ✗ gives the forecast for Bergen
+    be_ok
+      Message: Bergen should have a forecast
+      Expected: Ok(_)
+      Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+
+Failures:
+Forecast
+  ✗ gives the forecast for Bergen
+    be_ok
+      Message: Bergen should have a forecast
+      Expected: Ok(_)
+      Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+
+Summary: 1 run, 1 failed, 0 passed in 0ms

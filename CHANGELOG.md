@@ -742,6 +742,28 @@ the guide labels them.
     reporter later in the list does not see the crash of a reporter before
     it. With `runner.exit_on_failure()`, the exit status is 1
 
+- **Guides for tests with recordings** (`docs/guides/recorded-http.md`,
+  `docs/guides/recorded-queries.md`, `examples/recording`, `README.md`)
+
+  - "Test HTTP calls with recordings" shows a Dream Test suite that
+    records the calls of an API client with the recorder of
+    `dream_http_client`, and plays them back with no network. It covers
+    the recorder in the setup of `describe_with_setup`, the mode from an
+    environment variable with `recorder.parse_mode`, a mock server for the
+    record run, a request with no recording, streams, and how to keep a
+    token out of the files
+  - "Test database code with recorded queries" shows the same pattern for
+    PostgreSQL with the recorder of `dream_postgres`: playback with no
+    database, a transaction that rolls back, the `RecorderError` of a
+    query with no recording, a secret kept out of the file, and a suite
+    that runs with `max_concurrency: 1`
+  - The new project `examples/recording` holds the tested code of both
+    guides and its committed recordings. A new CI job runs its tests in
+    playback mode, with no network and no database. Its tests compare
+    each output that the guides show with the real report.
+    `make record` in the project records again, with PostgreSQL in Docker
+  - The README has a new section, "Record once, test offline"
+
 ### Changed
 
 - **Toolchain** (`.github/workflows/*.yml`, `CONTRIBUTING.md`)

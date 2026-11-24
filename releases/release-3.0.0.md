@@ -15,6 +15,7 @@ is a major release: read the Migration Guide before you update.
 - **Gherkin conformance**: the parser follows the official Gherkin grammar
 - **Typed step state (breaking)**: each Gherkin scenario has one typed state value, and `world` is removed
 - **Clearer failure reports**: a failure of more than one line, such as a changed snapshot, shows as a line diff, and a failure in a Gherkin step names the step, its file and its line
+- **Guides for tests with recordings**: record HTTP calls and PostgreSQL queries one time, then play them back in CI with no network and no database
 
 ## What's New
 
@@ -140,7 +141,7 @@ shows a real report.
 
 The guides moved from `documentation/` to `docs/guides/`. Their file names
 have no number now, for example `docs/guides/writing-tests.md`. They are
-rewritten by reader task: 13 guides and one reference page. Each guide
+rewritten by reader task: 15 guides and one reference page. Each guide
 starts with a table of contents, walks through numbered steps with the
 real output of each one, passing and failing, and ends with its failure
 cases, a "Test your code" section and common pitfalls. A test compares
@@ -148,9 +149,17 @@ each output that a guide shows with the real output of the code. New
 guides: "Write and run your first test" (`getting-started.md`), "Write
 your own matcher" (`custom-matchers.md`), and the reference page
 (`reference.md`) with every matcher, the runner settings, the rules of
-hook processes and the Gherkin rules. Each example in the README has a
-guide badge. The badge links to the guide section that shows the same
-example. HexDocs shows each guide as a page.
+hook processes and the Gherkin rules. Two more new guides show tests
+with recordings: "Test HTTP calls with recordings" (`recorded-http.md`)
+records the calls of an API client with `dream_http_client`, and "Test
+database code with recorded queries" (`recorded-queries.md`) records
+PostgreSQL queries with `dream_postgres`. Both play back in CI with no
+network and no database. Their steps are tests, so they end with the CI
+job in place of a "Test your code" section. Their code is the new project
+`examples/recording`, and a new CI job runs its tests in playback mode.
+Each example in the README has a guide badge. The badge links to the
+guide section that shows the same example. HexDocs shows each guide as a
+page.
 
 ## Testing
 
@@ -312,6 +321,8 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
 - [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
 - [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+- [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md)
+- [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md)
 - [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md)
 - [Changelog](https://github.com/TrustBound/dream_test/blob/main/CHANGELOG.md)
 

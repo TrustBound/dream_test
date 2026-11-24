@@ -172,3 +172,27 @@ jobs:
           git commit -q -m "Coverage badge: $MESSAGE"
           git push -q origin HEAD:refs/heads/badges
           echo "Coverage badge published: $MESSAGE ($COLOR)"
+
+  recording:
+    name: Recording tests in playback mode
+    # The tests of the guides about recorded HTTP calls and recorded queries
+    # play back the recordings in examples/recording/test/recordings. They
+    # need no network and no database, so this job has no PostgreSQL
+    # service. The tests also compare the outputs that the guides show.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Erlang and Gleam
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          gleam-version: "1.19.2"
+          # The PostgreSQL driver of dream_postgres builds with rebar3
+          rebar3-version: "3"
+
+      - name: Run the recording tests in playback mode
+        working-directory: examples/recording
+        run: sh scripts/playback.sh
