@@ -1,0 +1,145 @@
+{
+  "format": "dream_postgres query recording",
+  "version": 1,
+  "queries": [
+    {
+      "sql": "DROP TABLE IF EXISTS tasks",
+      "parameters": [],
+      "result": {
+        "count": 0,
+        "rows": []
+      }
+    },
+    {
+      "sql": "CREATE TABLE tasks (id serial PRIMARY KEY, title text NOT NULL, done boolean NOT NULL DEFAULT false, share_token text NOT NULL DEFAULT md5(random()::text))",
+      "parameters": [],
+      "result": {
+        "count": 0,
+        "rows": []
+      }
+    },
+    {
+      "sql": "INSERT INTO tasks (title) VALUES ($1) RETURNING id",
+      "parameters": ["Buy milk"],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[1]}
+        ]
+      }
+    },
+    {
+      "sql": "SELECT id, title FROM tasks WHERE NOT done ORDER BY id",
+      "parameters": [],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[1,"Buy milk"]}
+        ]
+      }
+    },
+    {
+      "sql": "INSERT INTO tasks (title) VALUES ($1) RETURNING id",
+      "parameters": ["Pay rent"],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[2]}
+        ]
+      }
+    },
+    {
+      "sql": "INSERT INTO tasks (title) VALUES ($1) RETURNING id",
+      "parameters": ["Call the bank"],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[3]}
+        ]
+      }
+    },
+    {
+      "sql": "UPDATE tasks SET done = true WHERE id = $1",
+      "parameters": [2],
+      "result": {
+        "count": 1,
+        "rows": []
+      }
+    },
+    {
+      "sql": "UPDATE tasks SET done = true WHERE id = $1",
+      "parameters": [3],
+      "result": {
+        "count": 1,
+        "rows": []
+      }
+    },
+    {
+      "sql": "SELECT id, title FROM tasks WHERE NOT done ORDER BY id",
+      "parameters": [],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[1,"Buy milk"]}
+        ]
+      }
+    },
+    {
+      "sql": "INSERT INTO tasks (title) VALUES ($1) RETURNING id",
+      "parameters": ["Book flights"],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[4]}
+        ]
+      }
+    },
+    {
+      "sql": "UPDATE tasks SET done = true WHERE id = $1",
+      "parameters": [4],
+      "result": {
+        "count": 1,
+        "rows": []
+      }
+    },
+    {
+      "sql": "UPDATE tasks SET done = true WHERE id = $1",
+      "parameters": [999],
+      "result": {
+        "count": 0,
+        "rows": []
+      }
+    },
+    {
+      "sql": "SELECT id, title FROM tasks WHERE NOT done ORDER BY id",
+      "parameters": [],
+      "result": {
+        "count": 2,
+        "rows": [
+          {"tuple":[1,"Buy milk"]},
+          {"tuple":[4,"Book flights"]}
+        ]
+      }
+    },
+    {
+      "sql": "INSERT INTO tasks (title) VALUES ($1) RETURNING id",
+      "parameters": ["Plan the party"],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":[5]}
+        ]
+      }
+    },
+    {
+      "sql": "SELECT share_token FROM tasks WHERE id = $1",
+      "parameters": [5],
+      "result": {
+        "count": 1,
+        "rows": [
+          {"tuple":["[hidden]"]}
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 name = "dream_test"
-version = "2.1.3"
+version = "3.0.0"
 description = "A testing framework for Gleam that gets out of your way"
 licences = ["MIT"]
 repository = { type = "github", user = "TrustBound", repo = "dream_test" }
@@ -13,3 +13,49 @@ gleam_regexp = ">= 1.0.0 and < 2.0.0"
 gleam_stdlib = ">= 0.60.0 and < 2.0.0"
 
 [dev-dependencies]
+
+[documentation]
+pages = [
+  { title = "Write and run your first test", path = "guides/getting-started.html", source = "./docs/guides/getting-started.md" },
+  { title = "Organize tests with groups, skips and tags", path = "guides/writing-tests.html", source = "./docs/guides/writing-tests.md" },
+  { title = "Check values with matchers", path = "guides/assertions-and-matchers.html", source = "./docs/guides/assertions-and-matchers.md" },
+  { title = "Write your own matcher", path = "guides/custom-matchers.html", source = "./docs/guides/custom-matchers.md" },
+  { title = "Set up and tear down around tests", path = "guides/lifecycle-hooks.html", source = "./docs/guides/lifecycle-hooks.md" },
+  { title = "Share a context between tests", path = "guides/context-aware-tests.html", source = "./docs/guides/context-aware-tests.md" },
+  { title = "Choose and read the test output", path = "guides/reporters.html", source = "./docs/guides/reporters.md" },
+  { title = "Lock down large output with snapshots", path = "guides/snapshot-testing.html", source = "./docs/guides/snapshot-testing.md" },
+  { title = "Write Gherkin features", path = "guides/gherkin-bdd.html", source = "./docs/guides/gherkin-bdd.md" },
+  { title = "Run a large suite fast and predictably", path = "guides/runner-and-execution.html", source = "./docs/guides/runner-and-execution.md" },
+  { title = "Measure line coverage and gate CI on it", path = "guides/coverage.html", source = "./docs/guides/coverage.md" },
+  { title = "Publish a coverage badge from your own CI", path = "guides/coverage-badge.html", source = "./docs/guides/coverage-badge.md" },
+  { title = "Mock at the system boundary", path = "guides/mock-at-the-boundary.html", source = "./docs/guides/mock-at-the-boundary.md" },
+  { title = "Test HTTP calls with recordings", path = "guides/recorded-http.html", source = "./docs/guides/recorded-http.md" },
+  { title = "Test database code with recorded queries", path = "guides/recorded-queries.html", source = "./docs/guides/recorded-queries.md" },
+  { title = "Upgrade from Dream Test 2.x to 3.0.0", path = "guides/upgrading-to-3.html", source = "./docs/guides/upgrading-to-3.md" },
+  { title = "Reference", path = "guides/reference.html", source = "./docs/guides/reference.md" },
+]
+
+[tools.dream_snippets]
+markdown = [
+  "README.md",
+  "SECURITY.md",
+  "STANDARDS.md",
+  "CONTRIBUTING.md",
+  "docs",
+  "examples",
+]
+checked_from_version = "3.0.0"
+guides = ["docs/guides"]
+tested_files = [
+  "test",
+  ".github",
+  "scripts",
+  "examples/snippets/test",
+  "examples/snippets/compile_errors",
+  "examples/shopping_cart/features",
+  "examples/shopping_cart/test/outputs",
+  "examples/recording/gleam.toml",
+  "examples/recording/docker-compose.yml",
+  "examples/recording/scripts",
+  "examples/recording/test",
+]

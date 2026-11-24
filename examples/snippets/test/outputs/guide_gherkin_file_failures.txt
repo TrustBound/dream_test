@@ -1,0 +1,24 @@
+Feature: Shopping Cart
+  Scenario: Adding items ✗
+      ✗ be_equal
+        Step: Then I should have 5 items total (test/features/shopping_cart_failures.feature:5)
+        Message: the cart should hold the expected number of items
+        Expected: 5
+        Actual:   4
+      Run it alone: gleam test -- --only "Shopping Cart/Adding items"
+  Scenario: Removing items ✗
+      ✗ step
+        Step: When I remove 1 item (test/features/shopping_cart_failures.feature:9)
+        Message: Undefined step: When I remove 1 item
+      Run it alone: gleam test -- --only "Shopping Cart/Removing items"
+  Scenario: Breaking the cart ✗
+      ✗ crash
+        Step: When the cart breaks (test/features/shopping_cart_failures.feature:14)
+        Message: error:#{function => <<"break_cart">>,line => 25,
+                         message => <<"the cart broke">>,
+                         module => <<"snippets/guides/gherkin_file_failures">>,
+                         file => <<"test/snippets/guides/gherkin_file_failures.gleam">>,
+                         gleam_error => panic}
+      Run it alone: gleam test -- --only "Shopping Cart/Breaking the cart"
+
+Summary: 3 run, 3 failed, 0 passed in 0ms

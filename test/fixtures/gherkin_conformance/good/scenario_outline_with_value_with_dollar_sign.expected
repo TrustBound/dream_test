@@ -1,0 +1,6 @@
+feature "Scenario Outline with a value with a dollar sign ($)"
+  scenario "Scenario Outline" "minimalistic"
+    step "Given" "the <what>"
+    examples ""
+      header "what"
+      row "pa$$word"

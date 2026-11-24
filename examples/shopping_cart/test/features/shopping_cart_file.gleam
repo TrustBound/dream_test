@@ -5,15 +5,16 @@
 
 import dream_test/gherkin/discover
 import dream_test/gherkin/steps
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import steps/assertions
 import steps/cart
+import steps/cart_state
 import steps/checkout
 import steps/discount
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   let registry =
-    steps.new()
+    steps.new(initial: cart_state.initial())
     |> cart.register()
     |> discount.register()
     |> checkout.register()
@@ -21,5 +22,5 @@ pub fn tests() -> TestSuite(Nil) {
 
   discover.features("features/*.feature")
   |> discover.with_registry(registry)
-  |> discover.to_suite("Shopping Cart (file)")
+  |> discover.to_suite("Feature files")
 }

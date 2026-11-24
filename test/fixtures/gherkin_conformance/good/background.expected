@@ -1,0 +1,7 @@
+feature "Background"
+  background "a simple background"
+    step "Given" "the minimalism inside a background"
+  scenario "Scenario" "minimalistic"
+    step "Given" "the minimalism"
+  scenario "Scenario" "also minimalistic"
+    step "Given" "the minimalism"

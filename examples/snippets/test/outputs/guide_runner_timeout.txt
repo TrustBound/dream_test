@@ -1,0 +1,15 @@
+Search
+  ✓ answers fast
+  ! waits for an index that never comes
+    timeout
+      Message: test timed out
+    Run it alone: gleam test -- --only "Search/waits for an index that never comes"
+
+Failures:
+Search
+  ! waits for an index that never comes
+    timeout
+      Message: test timed out
+    Run it alone: gleam test -- --only "Search/waits for an index that never comes"
+
+Summary: 2 run, 0 failed, 1 passed, 1 timed out in 0ms

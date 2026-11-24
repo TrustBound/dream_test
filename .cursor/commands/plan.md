@@ -598,7 +598,7 @@ pub fn validate_json_with_valid_data_returns_decoded_data_test() {
 
 ### Application Structure
 
-```
+```text
 src/
 ├── main.gleam          # Server setup
 ├── router.gleam        # Route definitions
@@ -618,7 +618,7 @@ src/
 
 ### Core Structure
 
-```
+```text
 src/dream/
 ├── context.gleam               # AppContext
 ├── dream.gleam                 # Core exports

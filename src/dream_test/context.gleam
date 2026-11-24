@@ -1,227 +1,159 @@
-//// Per-test context.
+//// Where the tests of a context suite get their context.
 ////
-//// This module provides a small record (`TestContext`) for storing
-//// `types.AssertionFailure` values. Most test code won’t interact with it
-//// directly—matchers already turn failures into `types.AssertionResult`.
+//// `unit_context.describe` takes a `Context(a)`. Make it with one of two
+//// functions:
 ////
-//// You may find it useful if you’re building custom integrations where you want
-//// to accumulate multiple failures during a single test run.
+//// - `value(a)`: each test starts from a fixed value.
+//// - `setup(setup, teardown)`: `setup` makes the value once, before the
+////   first test of the suite, and `teardown` gets the value after the last
+////   test.
+////
+//// ## Example
+////
+//// ### Give a suite a fixed context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/context/value.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
+//// ```gleam
+//// import dream_test/context
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult}
+//// import dream_test/unit_context.{describe, it}
+////
+//// fn is_empty(items: List(String)) -> Result(AssertionResult, String) {
+////   items
+////   |> should
+////   |> be_equal([])
+////   |> or_fail_with("expected an empty cart")
+//// }
+////
+//// pub fn cart_suite() -> TestSuite {
+////   describe("Cart", context.value([]), [it("starts empty", is_empty)])
+//// }
+//// ```
 
-import dream_test/types.{type AssertionFailure}
+import dream_test/types.{type SuiteContext, ContextFromSetup, FixedContext}
 
-/// Per-test context carrying assertion failures and any other
-/// per-test metadata we may need later.
+/// Where the tests of a context suite get their context: a fixed value
+/// (`value`), or a value that a setup makes (`setup`).
 ///
-/// Most users do not need this type. Dream Test’s public matcher pipeline
-/// (`should |> ...`) carries failures via `types.MatchResult`, and the runner
-/// reports failures via `types.TestResult`.
-///
-/// `TestContext` exists as a small, explicit record for internal bookkeeping
-/// and future extension (e.g. if the framework needs to accumulate multiple
-/// failures during a single test run).
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/context
-/// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/types.{AssertionFailure}
-/// import dream_test/unit.{describe, it}
-/// import gleam/option.{None}
-///
-/// pub fn tests() {
-///   describe("dream_test/context", [
-///     it("new has no failures", fn() {
-///       context.new()
-///       |> context.failures()
-///       |> should
-///       |> be_equal([])
-///       |> or_fail_with("expected new context to have no failures")
-///     }),
-///
-///     it("add_failure stores failures newest-first", fn() {
-///       let first_failure =
-///         AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let second_failure =
-///         AssertionFailure(operator: "op2", message: "m2", payload: None)
-///
-///       context.new()
-///       |> context.add_failure(first_failure)
-///       |> context.add_failure(second_failure)
-///       |> context.failures()
-///       |> should
-///       |> be_equal([second_failure, first_failure])
-///       |> or_fail_with("expected newest-first failure ordering")
-///     }),
-///   ])
-/// }
-/// ```
-///
-/// ## Fields
-///
-/// - `failures`: stored newest-first
-pub type TestContext {
-  TestContext(failures: List(AssertionFailure))
+/// Give it to `unit_context.describe`.
+pub opaque type Context(a) {
+  Context(suite_context: SuiteContext(a))
 }
 
-/// Create a new, empty `TestContext`.
+/// A context that is a fixed value.
 ///
-/// ## Returns
-///
-/// A `TestContext` with no recorded failures.
+/// Each test of the suite starts from `value`. A `before_all` or
+/// `before_each` hook can change the value before a test gets it.
 ///
 /// ## Parameters
 ///
-/// None.
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/context
-/// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/types.{AssertionFailure}
-/// import dream_test/unit.{describe, it}
-/// import gleam/option.{None}
-///
-/// pub fn tests() {
-///   describe("dream_test/context", [
-///     it("new has no failures", fn() {
-///       context.new()
-///       |> context.failures()
-///       |> should
-///       |> be_equal([])
-///       |> or_fail_with("expected new context to have no failures")
-///     }),
-///
-///     it("add_failure stores failures newest-first", fn() {
-///       let first_failure =
-///         AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let second_failure =
-///         AssertionFailure(operator: "op2", message: "m2", payload: None)
-///
-///       context.new()
-///       |> context.add_failure(first_failure)
-///       |> context.add_failure(second_failure)
-///       |> context.failures()
-///       |> should
-///       |> be_equal([second_failure, first_failure])
-///       |> or_fail_with("expected newest-first failure ordering")
-///     }),
-///   ])
-/// }
-/// ```
-pub fn new() -> TestContext {
-  TestContext(failures: [])
-}
-
-/// Get all failures recorded in a `TestContext`.
-///
-/// Failures are stored newest-first.
-///
-/// ## Parameters
-///
-/// - `context`: the `TestContext` to inspect
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/context
-/// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/types.{AssertionFailure}
-/// import dream_test/unit.{describe, it}
-/// import gleam/option.{None}
-///
-/// pub fn tests() {
-///   describe("dream_test/context", [
-///     it("new has no failures", fn() {
-///       context.new()
-///       |> context.failures()
-///       |> should
-///       |> be_equal([])
-///       |> or_fail_with("expected new context to have no failures")
-///     }),
-///
-///     it("add_failure stores failures newest-first", fn() {
-///       let first_failure =
-///         AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let second_failure =
-///         AssertionFailure(operator: "op2", message: "m2", payload: None)
-///
-///       context.new()
-///       |> context.add_failure(first_failure)
-///       |> context.add_failure(second_failure)
-///       |> context.failures()
-///       |> should
-///       |> be_equal([second_failure, first_failure])
-///       |> or_fail_with("expected newest-first failure ordering")
-///     }),
-///   ])
-/// }
-/// ```
+/// - `value`: the value that each test starts from
 ///
 /// ## Returns
 ///
-/// A list of `AssertionFailure` values (newest-first).
-pub fn failures(context context: TestContext) -> List(AssertionFailure) {
-  context.failures
-}
-
-/// Record an `AssertionFailure` in a `TestContext`.
-///
-/// Dream Test represents assertion failures as structured values
-/// (`types.AssertionFailure`). This helper lets internal code accumulate those
-/// failures while a test runs.
-///
-/// Failures are stored **newest-first**, so adding a failure is \(O(1)\).
-///
-/// ## Parameters
-///
-/// - `context`: the current `TestContext`
-/// - `failure`: the failure to record
-///
-/// ## Returns
-///
-/// A new `TestContext` containing the added failure.
+/// A `Context(a)` for `unit_context.describe`.
 ///
 /// ## Example
+///
+/// ### Give a suite a fixed context <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/context/value.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/context
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
-/// import dream_test/types.{AssertionFailure}
-/// import dream_test/unit.{describe, it}
-/// import gleam/option.{None}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context.{describe, it}
 ///
-/// pub fn tests() {
-///   describe("dream_test/context", [
-///     it("new has no failures", fn() {
-///       context.new()
-///       |> context.failures()
-///       |> should
-///       |> be_equal([])
-///       |> or_fail_with("expected new context to have no failures")
-///     }),
+/// fn is_empty(items: List(String)) -> Result(AssertionResult, String) {
+///   items
+///   |> should
+///   |> be_equal([])
+///   |> or_fail_with("expected an empty cart")
+/// }
 ///
-///     it("add_failure stores failures newest-first", fn() {
-///       let first_failure =
-///         AssertionFailure(operator: "op1", message: "m1", payload: None)
-///       let second_failure =
-///         AssertionFailure(operator: "op2", message: "m2", payload: None)
+/// pub fn cart_suite() -> TestSuite {
+///   describe("Cart", context.value([]), [it("starts empty", is_empty)])
+/// }
+/// ```
+pub fn value(value: a) -> Context(a) {
+  Context(suite_context: FixedContext(value))
+}
+
+/// A context that a setup makes, and that a teardown gets after the last
+/// test.
 ///
-///       context.new()
-///       |> context.add_failure(first_failure)
-///       |> context.add_failure(second_failure)
-///       |> context.failures()
-///       |> should
-///       |> be_equal([second_failure, first_failure])
-///       |> or_fail_with("expected newest-first failure ordering")
-///     }),
+/// `setup` runs once for the suite, before its first test, and only when
+/// at least one of its tests runs. A `suite.join` or `suite.group` of two
+/// such suites runs two setups. The value that `setup` returns is the context of
+/// every hook and test. `teardown` gets the same value after the last
+/// test. The setup and the teardown run in one process that lives while
+/// the tests run, so a process that `setup` starts and links stays alive.
+///
+/// - When `setup` returns `Error`, crashes or times out, each test is
+///   `SetupFailed` with the operator `context setup` and the error text,
+///   and `teardown` does not run.
+/// - When the process of the setup stops, the tests that did not start
+///   are `SetupFailed`, and the run report gets a `types.SetupStopped`
+///   with the setup `types.ContextSetupHook`. `teardown` still runs when
+///   `setup` returned.
+/// - When `teardown` returns `Error`, crashes or times out, the run report
+///   gets a `types.TeardownFailed` with the hook `types.ContextTeardownHook`.
+///
+/// ## Parameters
+///
+/// - `setup`: makes the context, or gives `Error` with a message
+/// - `teardown`: gets the context after the last test
+///
+/// ## Returns
+///
+/// A `Context(a)` for `unit_context.describe`.
+///
+/// ## Example
+///
+/// ### Get the context from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/context/setup.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context.{describe, it}
+///
+/// pub type Server {
+///   Server(port: Int)
+/// }
+///
+/// fn start_server() -> Result(Server, String) {
+///   Ok(Server(port: 8080))
+/// }
+///
+/// fn stop_server(_server: Server) -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// fn answers_a_ping(server: Server) -> Result(AssertionResult, String) {
+///   server.port
+///   |> should
+///   |> be_equal(8080)
+///   |> or_fail_with("expected the server on port 8080")
+/// }
+///
+/// pub fn server_suite() -> TestSuite {
+///   describe("Server", context.setup(start_server, teardown: stop_server), [
+///     it("answers a ping", answers_a_ping),
 ///   ])
 /// }
 /// ```
-pub fn add_failure(
-  context context: TestContext,
-  failure failure: AssertionFailure,
-) -> TestContext {
-  TestContext(failures: [failure, ..context.failures])
+pub fn setup(
+  setup setup: fn() -> Result(a, String),
+  teardown teardown: fn(a) -> Result(Nil, String),
+) -> Context(a) {
+  Context(suite_context: ContextFromSetup(setup: setup, teardown: teardown))
+}
+
+/// The `types.SuiteContext` of a context, for `suite.new`.
+@internal
+pub fn to_suite_context(context: Context(a)) -> SuiteContext(a) {
+  context.suite_context
 }

@@ -8,12 +8,20 @@
 ////
 //// ## Example
 ////
+//// ### Unwrap Some and check the inner value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/option/be_some.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// Some(42)
-//// |> should
-//// |> be_some()
-//// |> be_equal(42)
-//// |> or_fail_with("expected Some(42)")
+//// import dream_test/matchers.{be_equal, be_some, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+//// import gleam/option.{Some}
+////
+//// pub fn some_holds_forty_two() -> Result(AssertionResult, String) {
+////   Some(42)
+////   |> should
+////   |> be_some()
+////   |> be_equal(42)
+////   |> or_fail_with("expected Some(42)")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -29,12 +37,20 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Unwrap Some and check the inner value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/option/be_some.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Some(42)
-/// |> should
-/// |> be_some()
-/// |> be_equal(42)
-/// |> or_fail_with("expected Some(42)")
+/// import dream_test/matchers.{be_equal, be_some, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/option.{Some}
+///
+/// pub fn some_holds_forty_two() -> Result(AssertionResult, String) {
+///   Some(42)
+///   |> should
+///   |> be_some()
+///   |> be_equal(42)
+///   |> or_fail_with("expected Some(42)")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -75,11 +91,19 @@ fn check_is_some(actual: Option(a)) -> MatchResult(a) {
 ///
 /// ## Example
 ///
+/// ### Assert that an option is None <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/option/be_none.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// None
-/// |> should
-/// |> be_none()
-/// |> or_fail_with("expected None")
+/// import dream_test/matchers.{be_none, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/option.{None}
+///
+/// pub fn none_is_empty() -> Result(AssertionResult, String) {
+///   None
+///   |> should
+///   |> be_none()
+///   |> or_fail_with("expected None")
+/// }
 /// ```
 ///
 /// ## Parameters

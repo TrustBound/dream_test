@@ -1,0 +1,5 @@
+Coverage
+File                Lines  Cover  Missing
+src/app/cart.gleam  18/20  90.0%  12-13
+Total               18/20  90.0%
+LCOV: build/coverage/lcov.info

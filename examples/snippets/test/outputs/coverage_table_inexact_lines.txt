@@ -1,0 +1,10 @@
+Coverage
+File                Lines  Cover
+src/app/cart.gleam  18/20  90.0%
+Total               18/20  90.0%
+LCOV: build/coverage/lcov.info
+
+Warning: coverage line numbers may be off in files that a Gleam version before 1.19 built:
+  src/app/cart.gleam
+  Reason: before 1.19, Gleam maps only the first line of each function to its source line, so other lines in a function can show the wrong number in the Missing column, the LCOV file and coverage:ignore markers.
+  Fix: build and test with Gleam 1.19 or later (`gleam --version` shows the version).

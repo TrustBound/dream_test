@@ -1,0 +1,11 @@
+feature "Escaped pipes"
+  description "    The \\-character will be considered as an escape in table cell\n    iff it is followed by a |-character, a \\-character or an n."
+  scenario "Scenario" "They are the future"
+    step "Given" "they have arrived"
+      table
+        row "æ" "o"
+        row "a" "ø"
+    step "Given" "they have arrived"
+      table
+        row "|æ\\n" "\\o\no\\"
+        row "\\|a\\\\n" "ø\\\nø\\"

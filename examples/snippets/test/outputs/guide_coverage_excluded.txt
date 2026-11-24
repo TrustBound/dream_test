@@ -1,0 +1,14 @@
+Cart
+  ✓ totals an empty cart
+  ✓ totals two prices
+
+Summary: 2 run, 0 failed, 2 passed in 0ms
+
+Coverage
+File                          Lines  Cover   Missing  Excluded
+src/app/cart.gleam            3/3    100.0%
+src/app/generated/db.gleam    excluded: matches src/app/generated/** (generated code)
+src/app/internal/debug.gleam  excluded: matches src/app/internal/** (debug helpers)
+Total                         3/3    100.0%
+Excluded: 2 files
+LCOV: build/coverage/lcov.info

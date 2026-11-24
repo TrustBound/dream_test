@@ -11,15 +11,9 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 - For complex, multi-parameter APIs in this project, we prefer **config records** with named fields rather than long positional argument lists.
   - Example (preferred):
     ```gleam
-    let config = SingleTestConfig(
-      name: "passing test",
-      full_name: ["bootstrap", "runner_core"],
-      tags: ["bootstrap", "runner"],
-      kind: types.Unit,
-      run: passing_test,
-    )
+    let config = ParallelConfig(max_concurrency: 4, default_timeout_ms: 5000)
 
-    run_single_test(config)
+    run_tree_parallel(config: config, tree: tree)
     ```
 
 ## 2. Imports & Namespaces
@@ -38,8 +32,8 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 ## 3. Type Imports
 
 - To import a **type** unqualified, use the `type` syntax:
-  - `import dream_test/context.{type TestContext, add_failure}`
-  - Then use `TestContext` and `add_failure` directly.
+  - `import dream_test/types.{type TestResult, full_name}`
+  - Then use `TestResult` and `full_name` directly.
 - Importing a constructor or value without `type` does **not** make it available as a type.
   - If you see "There is a value in scope with the name X, but no type in scope with that name", you probably forgot `type`.
 
@@ -55,13 +49,14 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
   - Example:
     ```gleam
     case node {
-      ItTest(name, run) ->
-        build_it_test_case(...)
+      Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-      DescribeGroup(name, children) -> {
+      Group(name: name, tests: tests, ..) -> {
         let new_prefix = list.append(name_prefix, [name])
-        to_test_cases_from_list(module_name, new_prefix, children, accumulated)
+        collect_test_names(new_prefix, tests, [])
       }
+
+      _ -> []
     }
     ```
 - Forgetting `{ .. }` around multiple expressions in a branch leads to syntax errors like "I was expecting an expression after this".
@@ -85,6 +80,10 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
 - Project standard: no closures capturing outer scope in library code.
 - No anonymous `fn` in library modules; every function should be named and top-level.
 - When tempted to use an inline anonymous function, instead define a small named helper.
+- Only two closures are allowed in library code: the function that starts a process (`spawn_unlinked(fn() { ... })`), and a stored callback that must capture data (for example the Gherkin scenario body in a `Node`). The body of each is exactly one call to a named top-level function. See STANDARDS.md, "The two allowed closures".
+- Never write a closure only to adapt a user function to a stored type. Store the function in the shape the user wrote (`types.NoInput(setup)` or `types.WithInput(setup)`) and call it with `types.call`.
+- To run a function later (for example in a sandbox), pass the function and its input as two parameters, as `sandbox.run_isolated(config, run, input)` does.
+- Erlang FFI: use a list comprehension or `fun name/arity`, not `fun(X) -> ... end`.
 
 ## 9. Check STANDARDS.md Before Designing APIs
 

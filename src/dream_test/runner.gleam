@@ -10,21 +10,26 @@
 ////
 //// ## What does the runner do?
 ////
-//// - Runs groups sequentially, tests in parallel (bounded by `max_concurrency`)
+//// - Runs the groups one after the other. Only the direct tests of one
+////   group run in parallel, at most `max_concurrency` at a time
 //// - Sandboxes tests and hooks (timeouts + crash isolation)
 //// - Optionally drives an event-based reporter
 ////
 //// ## Example
 ////
+//// ### Run suites with a progress bar and a BDD report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
 //// import dream_test/parallel
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("Example", [
 ////     it("works", fn() {
 ////       1 + 1
@@ -35,7 +40,13 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn db_tests() -> TestSuite {
+////   describe("Database", [
+////     it("connects", fn() { Ok(succeed()) }),
+////   ])
+//// }
+////
+//// pub fn main() -> RunReport {
 ////   let db_config =
 ////     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
 ////
@@ -49,19 +60,34 @@
 //// }
 //// ```
 
+import dream_test/coverage.{type CoverageConfig, type CoverageSession}
+import dream_test/coverage/report.{type CoverageReport}
+import dream_test/internal/only
 import dream_test/parallel
 import dream_test/reporters/bdd
+import dream_test/reporters/coverage as coverage_reporter
 import dream_test/reporters/json
 import dream_test/reporters/progress
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
-import dream_test/types.{
-  type AssertionFailure, type Node, type TestResult, type TestSuite, AfterAll,
-  AfterEach, BeforeAll, BeforeEach, Failed, Group, Root, SetupFailed, Test,
-  TimedOut, Unit,
+import dream_test/sandbox.{
+  type SetupProcess, type SetupProcessResult, SetupProcessCaught,
+  SetupProcessExited, SetupProcessLost, SetupProcessReturned,
+  SetupProcessTimedOut,
 }
+import dream_test/suite.{type TestSuite}
+import dream_test/types.{
+  type AssertionFailure, type HookFailure, type RunReport, type SetupHook,
+  type TeardownHook, type TestResult, AfterAllSuitesHook, AfterEachSuiteHook,
+  BeforeAllSuitesHook, BeforeEachSuiteHook, Passed, SetupFailed, SetupStopped,
+  TeardownFailed,
+}
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
+import gleam/string
 
 /// Lightweight information about a test, used for filtering what runs.
 ///
@@ -77,13 +103,14 @@ pub type TestInfo =
 ///
 /// ## Example
 ///
+/// ### Build and run a runner <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -104,19 +131,20 @@ pub type TestInfo =
 ///   |> runner.run()
 /// }
 /// ```
-pub opaque type RunBuilder(ctx) {
+pub opaque type RunBuilder {
   RunBuilder(
-    suite_runs: List(SuiteRun(ctx)),
+    suite_runs: List(SuiteRun),
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
+    arguments: Option(List(String)),
     should_exit_on_failure: Bool,
+    no_tests_allowed: Bool,
     progress_reporter: Option(progress.ProgressReporter),
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
-    runner_before_each_test: List(
-      fn(types.TestInfo, ctx) -> Result(ctx, String),
-    ),
-    runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
+    coverage: CoverageRequest,
+    runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
     runner_before_each_suite: List(fn(types.SuiteInfo) -> Result(Nil, String)),
     runner_after_each_suite: List(fn(types.SuiteInfo) -> Result(Nil, String)),
     runner_before_all_suites: List(
@@ -128,28 +156,34 @@ pub opaque type RunBuilder(ctx) {
   )
 }
 
-type SuiteRun(ctx) {
+/// A suite of the run, with its config and the tests of it that run.
+type SuiteRun {
   SuiteRun(
-    suite: TestSuite(ctx),
+    suite: TestSuite,
     config_override: Option(parallel.ParallelConfig),
+    tests: List(types.TestInfo),
   )
 }
 
 /// Output sinks used by `runner.run()`.
 ///
-/// Reporters write to `out`. Runner-internal errors (not test failures) may be
-/// written to `error` as well.
+/// Reporters write to `out`. The runner writes three kinds of error to
+/// `error`: the `Results reporter failed` error of a
+/// `reporter_types.Custom` reporter that crashed, a coverage error, and
+/// the error of a `--only` path that selects no test. A test failure is not an error of the runner.
 pub type Output {
   Output(out: fn(String) -> Nil, error: fn(String) -> Nil)
 }
 
 /// Create a new runner builder for a list of suites.
 ///
-/// The type parameter `ctx` is the suite context type. For `dream_test/unit`
-/// suites this is `Nil`. For `dream_test/unit_context` suites it is your custom
-/// context type.
+/// Every suite has the type `TestSuite`, whatever the context of its tests,
+/// so suites from `dream_test/unit`, `dream_test/unit_context` and Gherkin
+/// go in one list.
 ///
 /// ## Example
+///
+/// ### Create a runner for one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -157,7 +191,6 @@ pub type Output {
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -185,18 +218,21 @@ pub type Output {
 ///
 /// ## Returns
 ///
-/// A `RunBuilder(ctx)` you can pipe through configuration helpers and finally
+/// A `RunBuilder` you can pipe through configuration helpers and finally
 /// `runner.run()`.
-pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
+pub fn new(suites suites: List(TestSuite)) -> RunBuilder {
   let config = parallel.default_config()
   RunBuilder(
     suite_runs: suites_to_suite_runs_default(suites, []),
     config: config,
     test_filter: None,
+    arguments: None,
     should_exit_on_failure: False,
+    no_tests_allowed: False,
     progress_reporter: None,
     results_reporters: [],
     output: None,
+    coverage: NoCoverage,
     runner_before_each_test: [],
     runner_after_each_test: [],
     runner_before_each_suite: [],
@@ -216,16 +252,38 @@ pub fn new(suites suites: List(TestSuite(ctx))) -> RunBuilder(ctx) {
 ///
 /// ## Example
 ///
+/// ### Add two suites one after the other <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/add_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// runner.new([])
-/// |> runner.add_suites([unit_suite()])
-/// |> runner.add_suites([integration_suite()])
-/// |> runner.run()
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn unit_suite() -> TestSuite {
+///   describe("Unit", [
+///     it("adds", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn integration_suite() -> TestSuite {
+///   describe("Integration", [
+///     it("connects", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn run_unit_and_integration_suites() -> RunReport {
+///   runner.new([])
+///   |> runner.add_suites([unit_suite()])
+///   |> runner.add_suites([integration_suite()])
+///   |> runner.run()
+/// }
 /// ```
 pub fn add_suites(
-  builder builder: RunBuilder(ctx),
-  suites suites: List(TestSuite(ctx)),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  suites suites: List(TestSuite),
+) -> RunBuilder {
   let appended = append_suite_runs_default(builder.suite_runs, suites)
   RunBuilder(..builder, suite_runs: appended)
 }
@@ -241,35 +299,64 @@ pub fn add_suites(
 ///
 /// ## Example
 ///
+/// ### Run the database suite one test at a time <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/add_suites_with_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/parallel
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 ///
-/// let db_config =
-///   parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+/// pub fn unit_suite() -> TestSuite {
+///   describe("Unit", [
+///     it("adds", fn() { Ok(succeed()) }),
+///   ])
+/// }
 ///
-/// runner.new([])
-/// |> runner.add_suites([unit_suite()])
-/// |> runner.add_suites_with_config(db_config, [db_suite()])
-/// |> runner.max_concurrency(50)
-/// |> runner.default_timeout_ms(5_000)
-/// |> runner.run()
+/// pub fn db_suite() -> TestSuite {
+///   describe("Database", [
+///     it("connects", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn run_database_suite_alone() -> RunReport {
+///   let db_config =
+///     parallel.ParallelConfig(max_concurrency: 1, default_timeout_ms: 60_000)
+///
+///   runner.new([])
+///   |> runner.add_suites([unit_suite()])
+///   |> runner.add_suites_with_config(db_config, [db_suite()])
+///   |> runner.max_concurrency(50)
+///   |> runner.default_timeout_ms(5000)
+///   |> runner.run()
+/// }
 /// ```
 pub fn add_suites_with_config(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   config config: parallel.ParallelConfig,
-  suites suites: List(TestSuite(ctx)),
-) -> RunBuilder(ctx) {
+  suites suites: List(TestSuite),
+) -> RunBuilder {
   let appended =
     append_suite_runs_with_override(builder.suite_runs, config, suites)
   RunBuilder(..builder, suite_runs: appended)
 }
 
-/// Set the maximum number of concurrently running tests.
+/// Set the maximum number of tests that run at the same time.
 ///
-/// - `1` gives fully sequential test execution.
-/// - Higher values increase parallelism.
+/// Only the direct tests of one group run in parallel. The groups run one
+/// after the other: first the direct tests of a group, then each child
+/// group in the written order. The suites also run one after the other.
+///
+/// - `1` runs one test at a time.
+/// - A higher value lets more direct tests of one group run at the same
+///   time.
+/// - A value below 1 counts as 1.
 ///
 /// ## Example
+///
+/// ### Run the tests one at a time <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/sequential_execution.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -277,7 +364,6 @@ pub fn add_suites_with_config(
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Sequential tests", [
@@ -312,15 +398,16 @@ pub fn add_suites_with_config(
 /// ## Parameters
 ///
 /// - `builder`: the runner builder you’re configuring
-/// - `max`: maximum number of concurrently running tests (use `1` for fully sequential)
+/// - `max`: the most direct tests of one group that run at the same time
+///   (use `1` to run one test at a time)
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn max_concurrency(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   max max: Int,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   let parallel.ParallelConfig(max_concurrency: _, default_timeout_ms: timeout) =
     builder.config
   RunBuilder(
@@ -334,9 +421,13 @@ pub fn max_concurrency(
 
 /// Set the default timeout (milliseconds) applied to tests without an explicit timeout.
 ///
-/// Tests that exceed the timeout are killed and reported as `TimedOut`.
+/// The timeout counts from the start of the test body. A body that runs
+/// longer is killed and reported as `TimedOut`, in parallel and in
+/// sequential runs. Each hook gets the same timeout on its own.
 ///
 /// ## Example
+///
+/// ### Set the concurrency and the timeout <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/runner_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -344,7 +435,6 @@ pub fn max_concurrency(
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Runner config demo", [
@@ -372,14 +462,19 @@ pub fn max_concurrency(
 ///
 /// - `builder`: the runner builder you’re configuring
 /// - `timeout_ms`: timeout in milliseconds applied to tests without an explicit timeout
+///   and to each hook. Give a value of at least 1. With 0, the tests and
+///   hooks get no time, so they almost always time out, and the result is
+///   not dependable. A value below 0 almost always stops the run with the
+///   Erlang error `timeout_value` when the run waits for a hook in a setup
+///   process, for example a `before_all` hook.
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn default_timeout_ms(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   timeout_ms timeout_ms: Int,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   let parallel.ParallelConfig(max_concurrency: max, default_timeout_ms: _) =
     builder.config
   RunBuilder(
@@ -391,11 +486,36 @@ pub fn default_timeout_ms(
   )
 }
 
-/// Exit the BEAM with a non-zero code if any tests fail.
+/// Exit the BEAM with status 1 if the run fails.
+///
+/// The run fails in five cases (see "Step 6: Decide the exit status" in
+/// `docs/guides/runner-and-execution.md`):
+///
+/// 1. A test is `Failed`, `TimedOut` or `SetupFailed`.
+/// 2. A teardown hook failed, also when every test passed.
+/// 3. A setup stopped (`types.SetupStopped`).
+/// 4. The `render` function of a `reporter_types.Custom` reporter crashed.
+/// 5. Coverage failed.
+///
+/// `types.failed` is `True` in the first four cases.
 ///
 /// Useful for CI pipelines.
 ///
+/// When the run fails, `runner.run` first writes all its output, the
+/// reports and the coverage files. Then it ends the program with exit
+/// status 1 and does not return, so no code after `runner.run` runs. A
+/// second `runner.run` in the same `main` does not start. This is the same
+/// on every Gleam version, for `gleam test` and for `gleam run`.
+///
+/// To end the program, `runner.run` asks the BEAM to stop with status 1
+/// (`init:stop(1)`) and waits until the BEAM stops. The BEAM shuts down
+/// cleanly: the output is written, and applications stop.
+///
+/// When the run passes, `runner.run` returns the report.
+///
 /// ## Example
+///
+/// ### Exit with status 1 when the run fails <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -403,7 +523,6 @@ pub fn default_timeout_ms(
 /// import dream_test/reporters/progress
 /// import dream_test/runner
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 ///
 /// pub fn tests() {
 ///   describe("Example", [
@@ -431,30 +550,129 @@ pub fn default_timeout_ms(
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
-pub fn exit_on_failure(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+/// The updated `RunBuilder`.
+pub fn exit_on_failure(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, should_exit_on_failure: True)
+}
+
+/// Allow a run that runs no test.
+///
+/// By default, a run that runs no test fails: a filter that keeps no
+/// test, or `runner.new([])`. The BDD and Gherkin reporters then write a
+/// `No tests ran` line after the summary line, `types.failed` is `True`
+/// for the report, and with `exit_on_failure` the program ends with exit
+/// status 1. A test that is skipped or pending is a test that ran.
+///
+/// With `allow_no_tests`, a run with no test passes: the reporters write
+/// no `No tests ran` line, and the exit status is 0. Use it when a run is
+/// empty on purpose, for example a filter that a CI job sets and that can
+/// select nothing.
+///
+/// ## Example
+///
+/// ### Allow a filter that can select nothing <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/allow_no_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner.{type TestInfo}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+/// import gleam/list
+///
+/// pub fn only_migrations(info: TestInfo) -> Bool {
+///   list.contains(info.tags, "migration")
+/// }
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.filter_tests(only_migrations)
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.allow_no_tests()
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `builder`: the runner builder you’re configuring
+///
+/// ## Returns
+///
+/// The updated `RunBuilder`.
+pub fn allow_no_tests(builder builder: RunBuilder) -> RunBuilder {
+  RunBuilder(..builder, no_tests_allowed: True)
 }
 
 /// Attach a progress reporter (live output during the run).
 ///
 /// This reporter is driven by `TestFinished` events in completion order.
 /// It is intended for a single in-place progress bar UI.
+///
+/// ## Example
+///
+/// ### Attach a progress bar to the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/progress_reporter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/progress
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.run()
+/// }
+/// ```
 pub fn progress_reporter(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   reporter reporter: progress.ProgressReporter,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, progress_reporter: Some(reporter))
 }
 
 /// Attach results reporters (printed at the end, in the order provided).
 ///
-/// Results reporters receive the full traversal-ordered results list from the
-/// `RunFinished` event, so their output is deterministic under parallel execution.
+/// Each results reporter gets the run report once, after the run ends. Its
+/// tests are in traversal order, so the output is the same under parallel
+/// execution.
+///
+/// ## Example
+///
+/// ### Print two reports at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/results_reporters.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new(), bdd.new() |> bdd.summary_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn results_reporters(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   reporters reporters: List(reporter_types.ResultsReporter),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, results_reporters: reporters)
 }
 
@@ -465,37 +683,207 @@ pub fn results_reporters(
 ///
 /// ## Example
 ///
+/// ### Send the output to stdout and stderr <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/output.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
+/// import dream_test/matchers.{succeed}
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// pub fn main() {
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
-///   |> runner.output(runner.Output(out: io.print, error: io.eprint))
+///   |> runner.output(runner.Output(out: io.print, error: io.print_error))
 ///   |> runner.run()
 /// }
 /// ```
 pub fn output(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   output output: Output,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, output: Some(output))
 }
 
-/// Disable all reporter output (still returns results from `runner.run()`).
-pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
+/// Measure line coverage of the project's own `src` modules during the run.
+///
+/// Before any test runs, the runner gives every module built from the source
+/// directory the native line counters of the BEAM (Erlang/OTP 27 or later
+/// with the JIT). After the results reporters,
+/// it prints a coverage table and writes an LCOV file. See
+/// `dream_test/coverage` for the settings.
+///
+/// A coverage error (for example, a module without debug information) is
+/// written to the error output. With `exit_on_failure`, it also makes the run
+/// exit with status 1, so a broken coverage setup does not pass silently.
+///
+/// ## Example
+///
+/// ### Measure coverage in every run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/coverage.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/coverage
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
+///   runner.new([tests()])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.coverage(coverage.new())
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+pub fn coverage(
+  builder builder: RunBuilder,
+  config config: CoverageConfig,
+) -> RunBuilder {
+  RunBuilder(..builder, coverage: AlwaysCoverage(config))
+}
+
+/// Measure line coverage only when the `DREAM_TEST_COVERAGE` environment
+/// variable turns it on.
+///
+/// Use this to measure coverage in some runs (for example in CI) without a
+/// change to your test `main`. The runner reads the variable when
+/// `runner.run` starts:
+///
+/// | `DREAM_TEST_COVERAGE` | Result                         |
+/// |-----------------------|--------------------------------|
+/// | `1` or `true`         | coverage runs with `config`    |
+/// | `0` or `false`        | no coverage                    |
+/// | not set               | no coverage                    |
+/// | any other value       | coverage error                 |
+///
+/// The values are exact and lowercase. Any other value, an empty value
+/// included, is a coverage error (`coverage.InvalidEnvironmentValue`), so a
+/// mistyped value does not turn coverage off silently. The error is written
+/// to the error output, and with `exit_on_failure` the run exits with
+/// status 1.
+///
+/// This call and `runner.coverage` set the same option, so the last call
+/// wins.
+///
+/// ## Parameters
+///
+/// - `builder`: the run to configure
+/// - `config`: the coverage settings to use when the variable turns
+///   coverage on
+///
+/// ## Returns
+///
+/// The builder with coverage that depends on the environment.
+///
+/// ## Example
+///
+/// ### Measure coverage when the environment asks for it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/coverage_from_environment.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/coverage
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
+/// }
+///
+/// pub fn main() -> RunReport {
+///   runner.new([tests()])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.coverage_from_environment(coverage.new())
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// Then, in CI, set `DREAM_TEST_COVERAGE: "1"` in the `env` of the step
+/// that runs `gleam test`. A local `gleam test` runs without coverage, and
+/// `DREAM_TEST_COVERAGE=1 gleam test` runs with it.
+pub fn coverage_from_environment(
+  builder builder: RunBuilder,
+  config config: CoverageConfig,
+) -> RunBuilder {
+  RunBuilder(..builder, coverage: CoverageFromEnvironment(config))
+}
+
+/// Drop the normal output of the run, but keep the errors.
+///
+/// A silent run writes nothing to the standard output: no progress, no
+/// results reports and no coverage report. `runner.run()` still returns the
+/// report.
+///
+/// A silent run still writes three kinds of error to the standard error
+/// stream:
+///
+/// - the error of a `--only` path that selects no test
+/// - the `Results reporter failed` error of a `reporter_types.Custom`
+///   reporter that crashed
+/// - a coverage error, for example a total below
+///   `coverage.minimum_percent`, or coverage that did not complete
+///
+/// ## Example
+///
+/// ### Run without output <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/silent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/progress
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.progress_reporter(progress.new())
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.silent()
+///   |> runner.run()
+/// }
+/// ```
+pub fn silent(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, output: Some(silent_output()))
 }
 
 /// Filter which tests are executed.
 ///
-/// The predicate receives `TestInfo` (name, full name, effective tags, kind).
-/// Tags include inherited group tags.
+/// The predicate receives `TestInfo`: the test `name`, the names of its
+/// `groups` from the outermost group, its `tags`, its `kind` and its
+/// `source`. Tags include inherited group tags.
 ///
 /// Groups with no selected tests in their entire subtree are skipped entirely,
 /// including hooks.
 ///
 /// ## Example
+///
+/// ### Run only the smoke tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/filter_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
@@ -503,7 +891,6 @@ pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 /// import dream_test/reporters/progress
 /// import dream_test/runner.{type TestInfo}
 /// import dream_test/unit.{describe, it, with_tags}
-/// import gleam/io
 /// import gleam/list
 ///
 /// pub fn tests() {
@@ -541,38 +928,66 @@ pub fn silent(builder builder: RunBuilder(ctx)) -> RunBuilder(ctx) {
 ///
 /// ## Returns
 ///
-/// The updated `RunBuilder(ctx)`.
+/// The updated `RunBuilder`.
 pub fn filter_tests(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   predicate predicate: fn(TestInfo) -> Bool,
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(..builder, test_filter: Some(predicate))
+}
+
+/// Use `arguments` in place of the command line of the BEAM, for the
+/// `--only` paths. The tests of dream_test use it.
+@internal
+pub fn with_arguments(
+  builder builder: RunBuilder,
+  arguments arguments: List(String),
+) -> RunBuilder {
+  RunBuilder(..builder, arguments: Some(arguments))
 }
 
 /// Register a runner-level hook that runs before each test.
 ///
-/// The hook receives `types.TestInfo` and the current context value.
-/// If it returns `Error("...")`, the test is marked `SetupFailed`
-/// and the test body does not run.
+/// The hook receives `types.TestInfo`. It runs in the process of the test,
+/// before the `before_each` hooks, with the default timeout.
+/// If it returns `Error("...")`, times out or crashes, the test is marked
+/// `SetupFailed` and the test body does not run.
 ///
 /// ## Example
 ///
-/// ```gleam
-/// import dream_test/runner
-/// import dream_test/types.{type TestInfo}
+/// ### Log the name of each test before it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_each_test.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// fn log_test(info: TestInfo, ctx: Nil) {
-///   io.println("starting " <> string.join(info.full_name, " > "))
-///   Ok(ctx)
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport, type TestInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+/// import gleam/string
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Example", [
+///     it("works", fn() { Ok(succeed()) }),
+///   ])
 /// }
 ///
-/// runner.new([suite])
-/// |> runner.before_each_test(log_test)
+/// pub fn log_test(info: TestInfo) -> Result(Nil, String) {
+///   let name = string.join(types.full_name(info.groups, info.name), " > ")
+///   io.println("starting " <> name)
+///   Ok(Nil)
+/// }
+///
+/// pub fn main() -> RunReport {
+///   runner.new([tests()])
+///   |> runner.before_each_test(log_test)
+///   |> runner.run()
+/// }
 /// ```
 pub fn before_each_test(
-  builder builder: RunBuilder(ctx),
-  hook hook: fn(types.TestInfo, ctx) -> Result(ctx, String),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  hook hook: fn(types.TestInfo) -> Result(Nil, String),
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_each_test: list.append(builder.runner_before_each_test, [hook]),
@@ -581,12 +996,44 @@ pub fn before_each_test(
 
 /// Register a runner-level hook that runs after each test.
 ///
-/// The hook receives `types.TestInfo` and the current context value.
-/// If it returns `Error("...")`, the test is marked `Failed`.
+/// The hook receives `types.TestInfo`. It runs in the process of the test,
+/// after the body and the `after_each` hooks, with the default timeout. If
+/// the body timed out or the test process stopped, it runs in a new process.
+/// Every `after_each_test` hook
+/// runs, also after one fails. If it returns `Error("...")` or crashes, the
+/// status of the test does not change: the run report gets a
+/// `types.TeardownFailed` with hook `AfterEachTestHook`, and the run fails.
+///
+/// ## Example
+///
+/// ### Log each test after it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_each_test.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type TestInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_each_test(log_finished_test)
+///   |> runner.run()
+/// }
+///
+/// fn log_finished_test(info: TestInfo) -> Result(Nil, String) {
+///   io.println("finished " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_each_test(
-  builder builder: RunBuilder(ctx),
-  hook hook: fn(types.TestInfo, ctx) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+  builder builder: RunBuilder,
+  hook hook: fn(types.TestInfo) -> Result(Nil, String),
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_each_test: list.append(builder.runner_after_each_test, [hook]),
@@ -595,13 +1042,46 @@ pub fn after_each_test(
 
 /// Register a runner-level hook that runs before each suite.
 ///
-/// The hook receives `types.SuiteInfo` for the suite about to run.
-/// If it returns `Error("...")`, all tests in that suite are marked `Failed`
-/// and the suite is skipped.
+/// The hook receives `types.SuiteInfo` for the suite about to run. It runs
+/// in the setup process of the suite, so a resource that it starts lives
+/// until the `after_each_suite` hooks of the suite end. It gets the default
+/// timeout of the suite.
+/// If it returns `Error("...")`, times out or crashes, all tests in that suite are
+/// marked `SetupFailed`, the suite does not run, and `after_each_suite`
+/// still runs.
+///
+/// The hook does not run for a suite that has no test after filtering.
+///
+/// ## Example
+///
+/// ### Log each suite before it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_each_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.before_each_suite(log_suite_start)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_start(info: SuiteInfo) -> Result(Nil, String) {
+///   io.println("starting suite " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn before_each_suite(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_each_suite: list.append(builder.runner_before_each_suite, [
@@ -612,12 +1092,45 @@ pub fn before_each_suite(
 
 /// Register a runner-level hook that runs after each suite.
 ///
-/// The hook receives `types.SuiteInfo` for the suite that just ran.
-/// If it returns `Error("...")`, a synthetic failure result is appended.
+/// The hook receives `types.SuiteInfo` for the suite that just ran. It runs
+/// in the setup process of the suite, with the default timeout of the
+/// suite. Every `after_each_suite` hook runs, also after one fails. If it
+/// returns `Error("...")`, times out or crashes, the
+/// run report gets a `types.TeardownFailed` with hook `AfterEachSuiteHook`
+/// and the suite name in `path`, and the run fails.
+///
+/// The hook does not run for a suite that has no test after filtering.
+///
+/// ## Example
+///
+/// ### Log each suite after it runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_each_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/io
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_each_suite(log_suite_end)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_end(info: SuiteInfo) -> Result(Nil, String) {
+///   io.println("finished suite " <> info.name)
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_each_suite(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(types.SuiteInfo) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_each_suite: list.append(builder.runner_after_each_suite, [hook]),
@@ -626,13 +1139,50 @@ pub fn after_each_suite(
 
 /// Register a runner-level hook that runs before all suites.
 ///
-/// The hook receives the full list of `SuiteInfo` after filtering.
-/// If it returns `Error("...")`, all selected tests are marked `Failed`
-/// and the run short-circuits.
+/// The hook receives the full list of `SuiteInfo` after filtering. It runs
+/// in the setup process of the run, so a resource that it starts (for
+/// example a pool that links to the caller) lives until `after_all_suites`
+/// stops it. It gets the default timeout.
+/// If it returns `Error("...")`, times out or crashes, all selected tests are marked
+/// `SetupFailed`, no suite runs, and `after_all_suites` still runs.
+///
+/// The hook does not run when the run has no test after filtering.
+///
+/// ## Example
+///
+/// ### Count the suites before the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/before_all_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/int
+/// import gleam/io
+/// import gleam/list
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///     describe("Orders", [
+///       it("lists no orders", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.before_all_suites(log_suite_count)
+///   |> runner.run()
+/// }
+///
+/// fn log_suite_count(suites: List(SuiteInfo)) -> Result(Nil, String) {
+///   io.println("running " <> int.to_string(list.length(suites)) <> " suites")
+///   Ok(Nil)
+/// }
+/// ```
 pub fn before_all_suites(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_before_all_suites: list.append(builder.runner_before_all_suites, [
@@ -643,24 +1193,90 @@ pub fn before_all_suites(
 
 /// Register a runner-level hook that runs after all suites.
 ///
-/// The hook receives the full list of `SuiteInfo` after filtering.
-/// If it returns `Error("...")`, a synthetic failure result is appended.
+/// The hook receives the full list of `SuiteInfo` after filtering. It runs
+/// in the setup process of the run, with the default timeout. Every
+/// `after_all_suites` hook runs, also after one fails. If it returns
+/// `Error("...")`, times out or crashes, the
+/// run report gets a `types.TeardownFailed` with hook `AfterAllSuitesHook`
+/// and `path: []`, and the run fails.
+///
+/// The hook does not run when the run has no test after filtering.
+///
+/// ## Example
+///
+/// ### Count the suites after the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/after_all_suites.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport, type SuiteInfo}
+/// import dream_test/unit.{describe, it}
+/// import gleam/int
+/// import gleam/io
+/// import gleam/list
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///     describe("Orders", [
+///       it("lists no orders", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.after_all_suites(log_suites_run)
+///   |> runner.run()
+/// }
+///
+/// fn log_suites_run(suites: List(SuiteInfo)) -> Result(Nil, String) {
+///   io.println("ran " <> int.to_string(list.length(suites)) <> " suites")
+///   Ok(Nil)
+/// }
+/// ```
 pub fn after_all_suites(
-  builder builder: RunBuilder(ctx),
+  builder builder: RunBuilder,
   hook hook: fn(List(types.SuiteInfo)) -> Result(Nil, String),
-) -> RunBuilder(ctx) {
+) -> RunBuilder {
   RunBuilder(
     ..builder,
     runner_after_all_suites: list.append(builder.runner_after_all_suites, [hook]),
   )
 }
 
-/// Run all suites and return a list of `TestResult`.
+/// Run all suites and return a `types.RunReport`.
 ///
 /// If a progress reporter is attached, the runner will emit progress output during
 /// the run. Results reporters print at the end of the run.
 ///
+/// With `exit_on_failure`, a failed run does not return: it writes all its
+/// output and then ends the program with exit status 1.
+///
+/// The runner reads `--only "<path>"` from the command line:
+/// `gleam test -- --only "Suite/group/test"` runs only that test, and the
+/// path of a group or a suite runs all the tests in it. `--only` can come
+/// more than one time, and a test must also pass `filter_tests`. A path
+/// that selects no test, or a wrong `--only`, writes an error to the error
+/// output and ends the program with exit status 1 before any test runs.
+/// Only the outermost run reads the command line.
+///
+/// A run that runs no test fails: a filter that keeps no test, or no
+/// suites. The BDD and Gherkin reporters write a `No tests ran` line after
+/// the summary line. Use `allow_no_tests` when a run can be empty on
+/// purpose.
+///
+/// If the `render` function of a `reporter_types.Custom` reporter crashes,
+/// the runner writes a `Results reporter failed` error to the error output
+/// and goes on with the next reporter and with coverage. The error names
+/// the position of the reporter in the list of `results_reporters`. The
+/// first reporter is at position 1, and every reporter in the list counts.
+/// The returned report has the crash (see `types.report_reporter_crashes`),
+/// so `types.failed` is `True` for it. The reporters themselves get the
+/// report without the crashes. With `exit_on_failure`, the crash
+/// also ends the program with exit status 1.
+///
 /// ## Example
+///
+/// ### Run the suites and report the results <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/runner/minimal_test_runner.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -695,16 +1311,120 @@ pub fn after_all_suites(
 ///
 /// ## Returns
 ///
-/// A list of `TestResult` values, in deterministic order.
-pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
-  let selected_runs = apply_test_filter(builder.suite_runs, builder.test_filter)
-  let total = count_total_tests(selected_runs)
-  let suite_infos = suite_infos_from_runs(selected_runs, [])
+/// A `types.RunReport`: the `TestResult` of each test, in deterministic
+/// order, and the teardown hooks that failed. Read it with
+/// `types.report_tests` and `types.report_hook_failures`, and check it
+/// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
+/// when `types.failed(report)` is `True` (a run with no test, without
+/// `allow_no_tests`, is one), when a `reporter_types.Custom`
+/// reporter crashes, or when coverage fails (a total or a file below a
+/// minimum, or coverage that did not complete).
+pub fn run(builder builder: RunBuilder) -> RunReport {
+  let outermost = takes_command_line(builder.arguments)
+  let checked =
+    only.checked_paths(
+      run_arguments(builder.arguments, outermost),
+      all_test_names(builder.suite_runs),
+    )
+  run_or_stop(builder, outermost, checked)
+}
 
-  let output = case builder.output {
+/// Run the selected tests, or, for a wrong `--only`, write the error and
+/// end the program with exit status 1 before any test or hook runs.
+fn run_or_stop(
+  builder: RunBuilder,
+  outermost: Bool,
+  checked: Result(List(only.OnlyPath), String),
+) -> RunReport {
+  case checked {
+    Ok(paths) -> {
+      let report = run_selected(builder, paths)
+      finish_outermost_run(outermost)
+      report
+    }
+    Error(text) -> {
+      let Output(error: write_error, ..) = run_output(builder)
+      write_error(text)
+      finish_outermost_run(outermost)
+      end_program_in_run(1)
+    }
+  }
+}
+
+/// Whether this run reads the command line of the BEAM: only when no
+/// arguments were given to the builder, and no other run is in progress.
+/// A run inside a test of another run does not read it.
+fn takes_command_line(arguments: Option(List(String))) -> Bool {
+  case arguments {
+    Some(_) -> False
+    None -> start_outermost_run()
+  }
+}
+
+/// The arguments of the run: the given ones, the command line of the BEAM
+/// for the outermost run, or none.
+fn run_arguments(
+  arguments: Option(List(String)),
+  outermost: Bool,
+) -> List(String) {
+  case arguments, outermost {
+    Some(given), _ -> given
+    None, True -> command_line_arguments()
+    None, False -> []
+  }
+}
+
+/// The names of each test of the suite runs, before any filter.
+fn all_test_names(suite_runs: List(SuiteRun)) -> List(List(String)) {
+  list.flat_map(suite_runs, suite_run_test_names)
+}
+
+fn suite_run_test_names(suite_run: SuiteRun) -> List(List(String)) {
+  list.map(suite_run.tests, test_info_names)
+}
+
+fn test_info_names(info: TestInfo) -> List(String) {
+  types.full_name(info.groups, info.name)
+}
+
+/// The filter of the run: the filter of `filter_tests`, and the `--only`
+/// paths when there are any. A test runs only when both keep it.
+fn selection_filter(
+  filter: Option(fn(TestInfo) -> Bool),
+  paths: List(only.OnlyPath),
+) -> Option(fn(TestInfo) -> Bool) {
+  case paths {
+    [] -> filter
+    _ -> Some(fn(info) { keeps_selected(filter, paths, info) })
+  }
+}
+
+fn keeps_selected(
+  filter: Option(fn(TestInfo) -> Bool),
+  paths: List(only.OnlyPath),
+  info: TestInfo,
+) -> Bool {
+  only.selects(paths, test_info_names(info))
+  && option.unwrap(filter, keep_every_test)(info)
+}
+
+fn run_output(builder: RunBuilder) -> Output {
+  case builder.output {
     Some(output) -> output
     None -> default_output()
   }
+}
+
+fn run_selected(builder: RunBuilder, paths: List(only.OnlyPath)) -> RunReport {
+  let keep = selection_filter(builder.test_filter, paths)
+  let selected_runs = apply_test_filter(builder.suite_runs, keep)
+  let total = count_total_tests(selected_runs)
+  let suite_runs_with_infos = suite_runs_with_infos(selected_runs, [])
+  let suite_infos = list.map(suite_runs_with_infos, suite_info_of_pair)
+
+  let output = run_output(builder)
+
+  let coverage_state = start_coverage(builder.coverage)
 
   let completed0 = 0
   let progress_reporter0 = builder.progress_reporter
@@ -713,21 +1433,31 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
     Some(progress_reporter) -> {
       write_progress_event(
         progress_reporter,
-        reporter_types.RunStarted(total: total),
+        progress.RunStartedProgress(total: total),
         output,
       )
       completed0
     }
   }
 
+  let all_suites_timeout_ms = builder.config.default_timeout_ms
   let before_all_result =
-    run_before_all_suites_hooks(builder.runner_before_all_suites, suite_infos)
+    run_suite_level_hooks(
+      SuiteSetup(
+        hooks: all_suites_hooks(selected_runs, builder.runner_before_all_suites),
+        input: suite_infos,
+        scope: [],
+        timeout_ms: all_suites_timeout_ms,
+      ),
+      None,
+    )
 
-  let #(results, completed2, progress_reporter1) = case before_all_result {
-    Ok(_) ->
+  let #(collected, completed2, all_suites_setup_process_after_run) = case
+    before_all_result
+  {
+    SuiteSetupRan(setup_process: all_suites_setup_process) ->
       run_suites_with_hooks(
-        selected_runs,
-        suite_infos,
+        suite_runs_with_infos,
         builder.config,
         progress_reporter0,
         output,
@@ -737,11 +1467,13 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
         builder.runner_after_each_suite,
         builder.runner_before_each_test,
         builder.runner_after_each_test,
-        [],
+        keep,
+        Collected(tests: [], hook_failures: []),
+        all_suites_setup_process,
       )
-    Error(message) -> {
-      let failures =
-        build_failed_results_from_suites(
+    SuiteSetupFailed(setup_process: all_suites_setup_process, message: message) -> {
+      let setup_failures =
+        setup_failed_results_from_suites(
           suite_infos,
           "before_all_suites",
           message,
@@ -752,131 +1484,123 @@ pub fn run(builder builder: RunBuilder(ctx)) -> List(TestResult) {
           output,
           completed1,
           total,
-          failures,
+          setup_failures,
         )
-      let results_with_after_all =
-        apply_after_all_suites_hooks(
-          builder.runner_after_all_suites,
-          suite_infos,
-          failures,
-        )
-      #(results_with_after_all, completed_after_failures, progress_reporter0)
+      #(
+        Collected(tests: setup_failures, hook_failures: []),
+        completed_after_failures,
+        alive_suite_setup_process(all_suites_setup_process),
+      )
     }
   }
 
-  let final_results = case before_all_result {
-    Ok(_) ->
-      apply_after_all_suites_hooks(
-        builder.runner_after_all_suites,
-        suite_infos,
-        results,
-      )
-    Error(_) -> results
-  }
+  let after_all_failures =
+    finish_suite_scope(
+      SuiteTeardown(
+        hooks: all_suites_hooks(selected_runs, builder.runner_after_all_suites),
+        input: suite_infos,
+        scope: [],
+        timeout_ms: all_suites_timeout_ms,
+        hook_kind: AfterAllSuitesHook,
+        setup: BeforeAllSuitesHook,
+      ),
+      all_suites_setup_process_after_run,
+    )
 
-  case progress_reporter1 {
+  let hook_failures = list.append(collected.hook_failures, after_all_failures)
+  let report =
+    types.run_report(
+      tests: collected.tests,
+      hook_failures: hook_failures,
+      reporter_crashes: [],
+    )
+    |> with_no_tests_allowed(builder.no_tests_allowed)
+
+  let counts = summary.count(report)
+  case progress_reporter0 {
     None -> Nil
     Some(progress_reporter) ->
       write_progress_event(
         progress_reporter,
-        reporter_types.RunFinished(
+        progress.RunFinishedProgress(
           completed: completed2,
           total: total,
-          results: final_results,
+          teardown_failed: counts.teardown_failed,
+          setup_stopped: counts.setup_stopped,
         ),
         output,
       )
   }
 
-  write_results_reporters(builder.results_reporters, final_results, output)
+  let report =
+    types.run_report(
+      tests: collected.tests,
+      hook_failures: hook_failures,
+      reporter_crashes: write_results_reporters(
+        builder.results_reporters,
+        report,
+        output,
+      ),
+    )
+    |> with_no_tests_allowed(builder.no_tests_allowed)
 
-  maybe_exit_on_failure(builder.should_exit_on_failure, final_results)
+  let coverage_succeeded =
+    finish_coverage(
+      coverage_state,
+      output,
+      run_outcome(report, builder.should_exit_on_failure),
+    )
 
-  final_results
+  maybe_exit_on_failure(
+    builder.should_exit_on_failure,
+    report,
+    coverage_succeeded,
+  )
+
+  report
 }
 
-fn suite_infos_from_runs(
-  suite_runs: List(SuiteRun(ctx)),
-  acc_rev: List(types.SuiteInfo),
-) -> List(types.SuiteInfo) {
+/// `report`, with a run of no test allowed when `allowed` is `True`.
+fn with_no_tests_allowed(report: RunReport, allowed: Bool) -> RunReport {
+  case allowed {
+    True -> types.allow_no_tests(report)
+    False -> report
+  }
+}
+
+/// The test results and the hook failures of the suites that ran so
+/// far, in the order of the run.
+type Collected {
+  Collected(tests: List(TestResult), hook_failures: List(HookFailure))
+}
+
+/// Each suite run with the `SuiteInfo` of its suite, so the hooks of a
+/// suite always get the info of the suite that runs.
+fn suite_runs_with_infos(
+  suite_runs: List(SuiteRun),
+  acc_rev: List(#(SuiteRun, types.SuiteInfo)),
+) -> List(#(SuiteRun, types.SuiteInfo)) {
   case suite_runs {
     [] -> list.reverse(acc_rev)
-    [SuiteRun(suite: suite, config_override: _), ..rest] ->
-      suite_infos_from_runs(rest, [suite_info_from_suite(suite), ..acc_rev])
+    [suite_run, ..rest] ->
+      suite_runs_with_infos(rest, [
+        #(suite_run, suite_info_from_suite_run(suite_run)),
+        ..acc_rev
+      ])
   }
 }
 
-fn suite_info_from_suite(suite: TestSuite(ctx)) -> types.SuiteInfo {
-  let Root(seed: _seed, tree: tree) = suite
-  let tests_rev = collect_test_infos(tree, [], [], [])
-  let tests = list.reverse(tests_rev)
-  let source = suite_source_from_tests(tests)
+fn suite_info_of_pair(pair: #(SuiteRun, types.SuiteInfo)) -> types.SuiteInfo {
+  pair.1
+}
+
+fn suite_info_from_suite_run(suite_run: SuiteRun) -> types.SuiteInfo {
+  let source = suite_source_from_tests(suite_run.tests)
   types.SuiteInfo(
-    name: suite_name_from_tree(tree),
-    tests: tests,
+    name: suite.name(suite_run.suite),
+    tests: suite_run.tests,
     source: source,
   )
-}
-
-fn suite_name_from_tree(tree: Node(ctx)) -> String {
-  case tree {
-    Group(name: name, tags: _tags, children: _children) -> name
-    _ -> "<unknown-suite>"
-  }
-}
-
-fn collect_test_infos(
-  node: Node(ctx),
-  scope: List(String),
-  inherited_tags: List(String),
-  acc_rev: List(types.TestInfo),
-) -> List(types.TestInfo) {
-  case node {
-    Test(
-      name: name,
-      tags: tags,
-      kind: kind,
-      run: _run,
-      timeout_ms: _timeout_ms,
-      source: source,
-    ) -> {
-      let full_name = list.append(scope, [name])
-      let effective_tags = list.append(inherited_tags, tags)
-      let info =
-        types.TestInfo(
-          name: name,
-          full_name: full_name,
-          tags: effective_tags,
-          kind: kind,
-          source: source,
-        )
-      [info, ..acc_rev]
-    }
-    Group(name: name, tags: tags, children: children) -> {
-      let next_scope = list.append(scope, [name])
-      let next_tags = list.append(inherited_tags, tags)
-      collect_test_infos_children(children, next_scope, next_tags, acc_rev)
-    }
-    _ -> acc_rev
-  }
-}
-
-fn collect_test_infos_children(
-  children: List(Node(ctx)),
-  scope: List(String),
-  inherited_tags: List(String),
-  acc_rev: List(types.TestInfo),
-) -> List(types.TestInfo) {
-  case children {
-    [] -> acc_rev
-    [child, ..rest] ->
-      collect_test_infos_children(
-        rest,
-        scope,
-        inherited_tags,
-        collect_test_infos(child, scope, inherited_tags, acc_rev),
-      )
-  }
 }
 
 fn suite_source_from_tests(tests: List(types.TestInfo)) -> Option(String) {
@@ -886,7 +1610,7 @@ fn suite_source_from_tests(tests: List(types.TestInfo)) -> Option(String) {
       types.TestInfo(
         source: source,
         name: _name,
-        full_name: _full_name,
+        groups: _groups,
         tags: _tags,
         kind: _kind,
       ),
@@ -916,7 +1640,7 @@ fn all_sources_match(value: String, rest: List(types.TestInfo)) -> Bool {
       types.TestInfo(
         source: source,
         name: _name,
-        full_name: _full_name,
+        groups: _groups,
         tags: _tags,
         kind: _kind,
       ),
@@ -933,65 +1657,362 @@ fn all_sources_match(value: String, rest: List(types.TestInfo)) -> Bool {
   }
 }
 
-fn run_before_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suites) {
-        Ok(_) -> run_before_all_suites_hooks(rest, suites)
-        Error(message) -> Error(message)
-      }
+/// A suite-level hook with the input that it gets, so that the setup process
+/// process of its scope can run it.
+type SuiteHookCall(input) {
+  SuiteHookCall(hook: fn(input) -> Result(Nil, String), input: input)
+}
+
+fn call_suite_hook(call: SuiteHookCall(input)) -> Result(Nil, String) {
+  call.hook(call.input)
+}
+
+/// The setup process of a suite-level scope: all suites, or one suite.
+type SuiteSetupProcess(input) =
+  SetupProcess(SuiteHookCall(input), Result(Nil, String))
+
+/// The setup hooks of a suite-level scope. `scope` is `[]` for the whole
+/// run and `[suite name]` for one suite.
+type SuiteSetup(input) {
+  SuiteSetup(
+    hooks: List(fn(input) -> Result(Nil, String)),
+    input: input,
+    scope: List(String),
+    timeout_ms: Int,
+  )
+}
+
+/// The teardown hooks of a suite-level scope, the kind of hook that they
+/// are in a `TeardownFailed`, and the setup hook of the scope for a
+/// `SetupStopped` failure.
+type SuiteTeardown(input) {
+  SuiteTeardown(
+    hooks: List(fn(input) -> Result(Nil, String)),
+    input: input,
+    scope: List(String),
+    timeout_ms: Int,
+    hook_kind: TeardownHook,
+    setup: SetupHook,
+  )
+}
+
+/// The setup process of a suite-level scope whose setup hooks returned.
+type SuiteScopeSetupProcess(input) {
+  /// The setup process was alive at the last check.
+  SuiteSetupProcessAlive(setup_process: SuiteSetupProcess(input))
+  /// The setup process stopped with `reason`. The suites of the scope that have
+  /// not started do not run, and its teardown hooks run in a new setup process.
+  /// `not_run` is the full name of each test that it did not run, in the
+  /// order of the run.
+  SuiteSetupProcessGone(reason: String, not_run: List(List(String)))
+}
+
+fn alive_suite_setup_process(
+  setup_process: Option(SuiteSetupProcess(input)),
+) -> Option(SuiteScopeSetupProcess(input)) {
+  case setup_process {
+    Some(setup_process) ->
+      Some(SuiteSetupProcessAlive(setup_process: setup_process))
+    None -> None
   }
 }
 
-fn run_before_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  suite: types.SuiteInfo,
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suite) {
-        Ok(_) -> run_before_each_suite_hooks(rest, suite)
-        Error(message) -> Error(message)
-      }
+/// Look again at a setup process that was alive. The check takes the down
+/// message of a stopped setup process, so its reason is kept in `SuiteSetupProcessGone`.
+fn refresh_suite_setup_process(
+  setup_process: Option(SuiteScopeSetupProcess(input)),
+) -> Option(SuiteScopeSetupProcess(input)) {
+  case setup_process {
+    Some(SuiteSetupProcessAlive(setup_process: alive)) ->
+      Some(checked_suite_setup_process(sandbox.check_setup_process(alive)))
+    _ -> setup_process
   }
 }
 
-fn run_after_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  suite: types.SuiteInfo,
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
-    [hook, ..rest] ->
-      case hook(suite) {
-        Ok(_) -> run_after_each_suite_hooks(rest, suite)
-        Error(message) -> Error(message)
-      }
+fn checked_suite_setup_process(
+  checked: Result(SuiteSetupProcess(input), String),
+) -> SuiteScopeSetupProcess(input) {
+  case checked {
+    Ok(alive) -> SuiteSetupProcessAlive(setup_process: alive)
+    Error(reason) -> SuiteSetupProcessGone(reason: reason, not_run: [])
   }
 }
 
-fn run_after_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
-) -> Result(Nil, String) {
-  case hooks {
-    [] -> Ok(Nil)
+/// The result of the suite-level setup hooks of a scope, by cause.
+type SuiteSetupResult(input) {
+  /// Every hook returned `Ok`, or the setup process exited. `setup_process` is
+  /// `SuiteSetupProcessGone` when the setup process exited: the setup stopped, so the
+  /// tests of the scope are not run, and its teardown hooks run in a new
+  /// setup process. `setup_process` is `None` when the scope has no setup hook.
+  SuiteSetupRan(setup_process: Option(SuiteScopeSetupProcess(input)))
+  /// A hook returned `Error`, crashed inside the hook call, or timed out.
+  /// `message` names the scope for a crash or a timeout. `setup_process` is the
+  /// setup process when it is still alive.
+  SuiteSetupFailed(
+    setup_process: Option(SuiteSetupProcess(input)),
+    message: String,
+  )
+}
+
+/// Run suite-level setup hooks in order, in the setup process of their
+/// scope, and stop at the first failure or when the setup process exits. The
+/// first hook starts the setup process, so a resource that a hook starts lives
+/// until the setup process stops after the teardown hooks. Each hook gets the
+/// timeout of the scope.
+///
+/// A hook that returns `Error`, crashes or times out is a failure of the
+/// hook. A setup process that exits, while a hook runs or between two
+/// hooks, stops the setup.
+fn run_suite_level_hooks(
+  setup: SuiteSetup(input),
+  setup_process: Option(SuiteSetupProcess(input)),
+) -> SuiteSetupResult(input) {
+  case setup.hooks {
+    [] -> SuiteSetupRan(setup_process: alive_suite_setup_process(setup_process))
     [hook, ..rest] ->
-      case hook(suites) {
-        Ok(_) -> run_after_all_suites_hooks(rest, suites)
-        Error(message) -> Error(message)
-      }
+      suite_setup_result(
+        SuiteSetup(..setup, hooks: rest),
+        sandbox.run_in_setup_process(
+          setup_process,
+          setup.timeout_ms,
+          call_suite_hook,
+          SuiteHookCall(hook: hook, input: setup.input),
+        ),
+      )
+  }
+}
+
+fn suite_setup_result(
+  rest: SuiteSetup(input),
+  setup_process_result: SetupProcessResult(
+    SuiteHookCall(input),
+    Result(Nil, String),
+  ),
+) -> SuiteSetupResult(input) {
+  case setup_process_result {
+    SetupProcessReturned(setup_process: setup_process, value: Ok(Nil)) ->
+      run_suite_level_hooks(rest, Some(setup_process))
+    SetupProcessReturned(setup_process: setup_process, value: Error(message)) ->
+      SuiteSetupFailed(setup_process: Some(setup_process), message: message)
+    SetupProcessCaught(setup_process: setup_process, reason: reason) ->
+      SuiteSetupFailed(
+        setup_process: Some(setup_process),
+        message: suite_hook_crash_message(rest.scope, reason),
+      )
+    SetupProcessTimedOut ->
+      SuiteSetupFailed(
+        setup_process: None,
+        message: suite_hook_timeout_message(rest.scope),
+      )
+    SetupProcessExited(reason: reason) | SetupProcessLost(reason: reason) ->
+      SuiteSetupRan(
+        setup_process: Some(SuiteSetupProcessGone(reason: reason, not_run: [])),
+      )
+  }
+}
+
+/// End a suite-level scope: report a setup process that stopped while the suites
+/// ran, run every teardown hook (in the setup process while it is alive, else in
+/// a new setup process), then stop the setup process. Gives the failures in the order that
+/// they happened.
+fn finish_suite_scope(
+  teardown: SuiteTeardown(input),
+  setup_process: Option(SuiteScopeSetupProcess(input)),
+) -> List(HookFailure) {
+  case setup_process, teardown.hooks {
+    None, _ -> run_suite_teardown(teardown, None, [])
+    Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)), _ ->
+      run_suite_teardown(teardown, None, [
+        suite_setup_stopped(teardown, reason, not_run),
+      ])
+    Some(SuiteSetupProcessAlive(setup_process: alive)), [] ->
+      stop_checked_suite_setup_process(
+        teardown,
+        sandbox.check_setup_process(alive),
+      )
+    Some(SuiteSetupProcessAlive(setup_process: alive)), _ ->
+      run_suite_teardown(teardown, Some(alive), [])
+  }
+}
+
+/// Run the teardown hooks, then stop the last setup process.
+fn run_suite_teardown(
+  teardown: SuiteTeardown(input),
+  setup_process: Option(SuiteSetupProcess(input)),
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
+  let #(last_setup_process, next_failures_rev) =
+    run_suite_teardown_hooks(
+      teardown,
+      teardown.hooks,
+      setup_process,
+      failures_rev,
+    )
+  let _stopped = option.map(last_setup_process, sandbox.stop_setup_process)
+  list.reverse(next_failures_rev)
+}
+
+/// Stop the setup process of a scope with no teardown hook, or report that it
+/// stopped already.
+fn stop_checked_suite_setup_process(
+  teardown: SuiteTeardown(input),
+  checked: Result(SuiteSetupProcess(input), String),
+) -> List(HookFailure) {
+  case checked {
+    Ok(setup_process) -> {
+      sandbox.stop_setup_process(setup_process)
+      []
+    }
+    Error(reason) -> [suite_setup_stopped(teardown, reason, [])]
+  }
+}
+
+fn suite_setup_stopped(
+  teardown: SuiteTeardown(input),
+  reason: String,
+  not_run: List(List(String)),
+) -> HookFailure {
+  SetupStopped(
+    setup: teardown.setup,
+    path: teardown.scope,
+    reason: reason,
+    not_run: not_run,
+  )
+}
+
+/// Run every suite-level teardown hook, also after one fails, and give
+/// the failures newest first, in front of `failures_rev`. After a timeout
+/// or an exit of the setup process, the next hook runs in a new setup process. A setup process
+/// that stopped before a hook started means that the setup stopped: the
+/// hook runs again in a new setup process, so it never stays not run.
+fn run_suite_teardown_hooks(
+  teardown: SuiteTeardown(input),
+  hooks: List(fn(input) -> Result(Nil, String)),
+  setup_process: Option(SuiteSetupProcess(input)),
+  failures_rev: List(HookFailure),
+) -> #(Option(SuiteSetupProcess(input)), List(HookFailure)) {
+  case hooks {
+    [] -> #(setup_process, failures_rev)
+    [hook, ..rest] ->
+      suite_teardown_result(
+        teardown,
+        hook,
+        rest,
+        sandbox.run_in_setup_process(
+          setup_process,
+          teardown.timeout_ms,
+          call_suite_hook,
+          SuiteHookCall(hook: hook, input: teardown.input),
+        ),
+        failures_rev,
+      )
+  }
+}
+
+fn suite_teardown_result(
+  teardown: SuiteTeardown(input),
+  hook: fn(input) -> Result(Nil, String),
+  rest: List(fn(input) -> Result(Nil, String)),
+  setup_process_result: SetupProcessResult(
+    SuiteHookCall(input),
+    Result(Nil, String),
+  ),
+  failures_rev: List(HookFailure),
+) -> #(Option(SuiteSetupProcess(input)), List(HookFailure)) {
+  case setup_process_result {
+    SetupProcessReturned(setup_process: setup_process, value: Ok(Nil)) ->
+      run_suite_teardown_hooks(
+        teardown,
+        rest,
+        Some(setup_process),
+        failures_rev,
+      )
+    SetupProcessReturned(setup_process: setup_process, value: Error(message)) ->
+      run_suite_teardown_hooks(
+        teardown,
+        rest,
+        Some(setup_process),
+        add_hook_failure(teardown, message, failures_rev),
+      )
+    SetupProcessCaught(setup_process: setup_process, reason: reason) ->
+      run_suite_teardown_hooks(
+        teardown,
+        rest,
+        Some(setup_process),
+        add_hook_failure(
+          teardown,
+          suite_hook_crash_message(teardown.scope, reason),
+          failures_rev,
+        ),
+      )
+    SetupProcessTimedOut ->
+      run_suite_teardown_hooks(
+        teardown,
+        rest,
+        None,
+        add_hook_failure(
+          teardown,
+          suite_hook_timeout_message(teardown.scope),
+          failures_rev,
+        ),
+      )
+    SetupProcessExited(reason: reason) ->
+      run_suite_teardown_hooks(
+        teardown,
+        rest,
+        None,
+        add_hook_failure(
+          teardown,
+          suite_hook_crash_message(teardown.scope, reason),
+          failures_rev,
+        ),
+      )
+    SetupProcessLost(reason: reason) ->
+      run_suite_teardown_hooks(teardown, [hook, ..rest], None, [
+        suite_setup_stopped(teardown, reason, []),
+        ..failures_rev
+      ])
+  }
+}
+
+/// Put a failure of a teardown hook in front of `failures_rev`.
+fn add_hook_failure(
+  teardown: SuiteTeardown(input),
+  message: String,
+  failures_rev: List(HookFailure),
+) -> List(HookFailure) {
+  [
+    TeardownFailed(
+      hook: teardown.hook_kind,
+      path: teardown.scope,
+      message: message,
+    ),
+    ..failures_rev
+  ]
+}
+
+/// `hook crashed: <reason>` for a hook of the whole run, and
+/// `hook crashed in <suite>: <reason>` for a hook of one suite.
+fn suite_hook_crash_message(scope: List(String), reason: String) -> String {
+  suite_scope_message("hook crashed", scope) <> ": " <> reason
+}
+
+/// `hook timed out` for a hook of the whole run, and
+/// `hook timed out in <suite>` for a hook of one suite.
+fn suite_hook_timeout_message(scope: List(String)) -> String {
+  suite_scope_message("hook timed out", scope)
+}
+
+/// The text, then ` in <suite>` for a scope of one suite.
+fn suite_scope_message(text: String, scope: List(String)) -> String {
+  case scope {
+    [] -> text
+    _ -> text <> " in " <> string.join(scope, " > ")
   }
 }
 
 fn run_suites_with_hooks(
-  suite_runs: List(SuiteRun(ctx)),
-  suite_infos: List(types.SuiteInfo),
+  suite_runs: List(#(SuiteRun, types.SuiteInfo)),
   default_config: parallel.ParallelConfig,
   progress_reporter: Option(progress.ProgressReporter),
   output: Output,
@@ -999,139 +2020,354 @@ fn run_suites_with_hooks(
   completed: Int,
   before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
   after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  runner_before_each_test: List(fn(types.TestInfo, ctx) -> Result(ctx, String)),
-  runner_after_each_test: List(fn(types.TestInfo, ctx) -> Result(Nil, String)),
-  acc: List(TestResult),
-) -> #(List(TestResult), Int, Option(progress.ProgressReporter)) {
-  case suite_runs, suite_infos {
-    [], [] -> #(acc, completed, progress_reporter)
-    [SuiteRun(suite: suite, config_override: override), ..rest],
-      [suite_info, ..rest_infos]
-    -> {
-      let before_result =
-        run_before_each_suite_hooks(before_each_suite_hooks, suite_info)
-      case before_result {
-        Error(message) -> {
-          let failures =
-            build_failed_results_from_tests(
-              suite_info.tests,
-              "before_each_suite",
-              message,
-            )
-          let completed_after_failures =
-            emit_test_finished_progress_results(
-              progress_reporter,
-              output,
-              completed,
-              total,
-              failures,
-            )
-          let acc_with_failures = list.append(acc, failures)
-          let acc_after_after_each =
-            apply_after_each_suite_hooks(
-              after_each_suite_hooks,
-              suite_info,
-              acc_with_failures,
-            )
-          run_suites_with_hooks(
-            rest,
-            rest_infos,
-            default_config,
-            progress_reporter,
-            output,
-            total,
-            completed_after_failures,
-            before_each_suite_hooks,
-            after_each_suite_hooks,
-            runner_before_each_test,
-            runner_after_each_test,
-            acc_after_after_each,
-          )
-        }
-        Ok(_) -> {
-          let suite_config = suite_run_config(default_config, override)
-          let parallel_result =
-            parallel.run_root_parallel_with_reporter(
-              parallel.RunRootParallelWithReporterConfig(
-                config: suite_config,
-                suite: suite,
-                progress_reporter: progress_reporter,
-                write: output_out(output),
-                total: total,
-                completed: completed,
-                runner_before_each_test: runner_before_each_test,
-                runner_after_each_test: runner_after_each_test,
-              ),
-            )
-          let parallel.RunRootParallelWithReporterResult(
-            results: results,
-            completed: completed_after_suite,
-            progress_reporter: next_progress_reporter,
-          ) = parallel_result
-          let acc_with_results = list.append(acc, results)
-          let acc_after_after_each =
-            apply_after_each_suite_hooks(
-              after_each_suite_hooks,
-              suite_info,
-              acc_with_results,
-            )
-          run_suites_with_hooks(
-            rest,
-            rest_infos,
-            default_config,
-            next_progress_reporter,
-            output,
-            total,
-            completed_after_suite,
-            before_each_suite_hooks,
-            after_each_suite_hooks,
-            runner_before_each_test,
-            runner_after_each_test,
-            acc_after_after_each,
-          )
-        }
-      }
+  runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+  runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+  keep: Option(fn(TestInfo) -> Bool),
+  collected: Collected,
+  all_suites_setup_process: Option(
+    SuiteScopeSetupProcess(List(types.SuiteInfo)),
+  ),
+) -> #(Collected, Int, Option(SuiteScopeSetupProcess(List(types.SuiteInfo)))) {
+  let checked_setup_process =
+    refresh_suite_setup_process(all_suites_setup_process)
+  case suite_runs {
+    [] -> #(collected, completed, checked_setup_process)
+    [
+      #(SuiteRun(suite: suite, config_override: override, ..), suite_info),
+      ..rest
+    ] -> {
+      let suite_run =
+        SuiteTests(
+          suite: suite,
+          config: suite_run_config(default_config, override),
+          info: suite_info,
+          progress_reporter: progress_reporter,
+          output: output,
+          total: total,
+          completed: completed,
+          runner_before_each_test: runner_before_each_test,
+          runner_after_each_test: runner_after_each_test,
+          keep: keep,
+        )
+      let #(suite_collected, completed_after_suite, setup_process_after_suite) =
+        run_suite_in_run(
+          suite_run,
+          before_each_suite_hooks,
+          after_each_suite_hooks,
+          checked_setup_process,
+        )
+      run_suites_with_hooks(
+        rest,
+        default_config,
+        progress_reporter,
+        output,
+        total,
+        completed_after_suite,
+        before_each_suite_hooks,
+        after_each_suite_hooks,
+        runner_before_each_test,
+        runner_after_each_test,
+        keep,
+        Collected(
+          tests: list.append(collected.tests, suite_collected.tests),
+          hook_failures: list.append(
+            collected.hook_failures,
+            suite_collected.hook_failures,
+          ),
+        ),
+        setup_process_after_suite,
+      )
     }
-    _, _ -> #(acc, completed, progress_reporter)
   }
 }
 
-fn apply_after_each_suite_hooks(
-  hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
-  suite_info: types.SuiteInfo,
-  results: List(TestResult),
-) -> List(TestResult) {
-  case run_after_each_suite_hooks(hooks, suite_info) {
-    Ok(_) -> results
-    Error(message) ->
-      list.append(results, [
-        after_each_suite_failure_result(suite_info, message),
-      ])
+/// What stays the same while the tests of one suite run.
+type SuiteTests {
+  SuiteTests(
+    suite: TestSuite,
+    config: parallel.ParallelConfig,
+    info: types.SuiteInfo,
+    progress_reporter: Option(progress.ProgressReporter),
+    output: Output,
+    total: Int,
+    completed: Int,
+    runner_before_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    runner_after_each_test: List(fn(types.TestInfo) -> Result(Nil, String)),
+    keep: Option(fn(TestInfo) -> Bool),
+  )
+}
+
+/// Run one suite in the scope of the whole run. After the setup process of the
+/// run stopped, no suite-level hook runs.
+fn run_suite_in_run(
+  suite_run: SuiteTests,
+  before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  all_suites_setup_process: Option(
+    SuiteScopeSetupProcess(List(types.SuiteInfo)),
+  ),
+) -> #(Collected, Int, Option(SuiteScopeSetupProcess(List(types.SuiteInfo)))) {
+  case all_suites_setup_process {
+    Some(SuiteSetupProcessGone(..)) ->
+      run_suite_after_run_setup_stopped(suite_run, all_suites_setup_process)
+    _ ->
+      run_one_suite(
+        suite_run,
+        before_each_suite_hooks,
+        after_each_suite_hooks,
+        all_suites_setup_process,
+      )
   }
 }
 
-fn apply_after_all_suites_hooks(
-  hooks: List(fn(List(types.SuiteInfo)) -> Result(Nil, String)),
-  suites: List(types.SuiteInfo),
-  results: List(TestResult),
-) -> List(TestResult) {
-  case run_after_all_suites_hooks(hooks, suites) {
-    Ok(_) -> results
-    Error(message) ->
-      list.append(results, [after_all_suites_failure_result(message)])
+/// Run a suite after the setup process of the whole run stopped. No suite-level
+/// hook runs, and the executor gives `SetupFailed` to each test.
+fn run_suite_after_run_setup_stopped(
+  suite_run: SuiteTests,
+  all_suites_setup_process: Option(
+    SuiteScopeSetupProcess(List(types.SuiteInfo)),
+  ),
+) -> #(Collected, Int, Option(SuiteScopeSetupProcess(List(types.SuiteInfo)))) {
+  let result =
+    run_suite_tests(
+      suite_run,
+      outer_setup(BeforeAllSuitesHook, [], all_suites_setup_process),
+    )
+  #(
+    Collected(tests: result.results, hook_failures: result.hook_failures),
+    result.completed,
+    stopped_suite_setup_process(
+      all_suites_setup_process,
+      BeforeAllSuitesHook,
+      result.outer_setups,
+    ),
+  )
+}
+
+/// Run `before_each_suite`, then the tests of one suite, then
+/// `after_each_suite`. A failed `before_each_suite` hook gives
+/// `SetupFailed` to every test of the suite. The executor checks the setup process
+/// of the whole run and the setup process of the suite before each test starts.
+fn run_one_suite(
+  suite_run: SuiteTests,
+  before_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  after_each_suite_hooks: List(fn(types.SuiteInfo) -> Result(Nil, String)),
+  all_suites_setup_process: Option(
+    SuiteScopeSetupProcess(List(types.SuiteInfo)),
+  ),
+) -> #(Collected, Int, Option(SuiteScopeSetupProcess(List(types.SuiteInfo)))) {
+  let suite_scope = [suite_run.info.name]
+  let before_result =
+    run_suite_level_hooks(
+      SuiteSetup(
+        hooks: before_each_suite_hooks,
+        input: suite_run.info,
+        scope: suite_scope,
+        timeout_ms: suite_run.config.default_timeout_ms,
+      ),
+      None,
+    )
+  let #(
+    tests_collected,
+    completed_after_tests,
+    all_setup_process,
+    suite_setup_process,
+  ) = case before_result {
+    SuiteSetupFailed(setup_process: setup_process, message: message) -> {
+      let setup_failures =
+        setup_failed_results_from_tests(
+          suite_run.info.tests,
+          "before_each_suite",
+          message,
+        )
+      #(
+        Collected(tests: setup_failures, hook_failures: []),
+        emit_test_finished_progress_results(
+          suite_run.progress_reporter,
+          suite_run.output,
+          suite_run.completed,
+          suite_run.total,
+          setup_failures,
+        ),
+        all_suites_setup_process,
+        alive_suite_setup_process(setup_process),
+      )
+    }
+    SuiteSetupRan(setup_process: suite_setup_process) -> {
+      let result =
+        run_suite_tests(
+          suite_run,
+          list.append(
+            outer_setup(BeforeAllSuitesHook, [], all_suites_setup_process),
+            outer_setup(BeforeEachSuiteHook, suite_scope, suite_setup_process),
+          ),
+        )
+      #(
+        Collected(tests: result.results, hook_failures: result.hook_failures),
+        result.completed,
+        stopped_suite_setup_process(
+          all_suites_setup_process,
+          BeforeAllSuitesHook,
+          result.outer_setups,
+        ),
+        stopped_suite_setup_process(
+          suite_setup_process,
+          BeforeEachSuiteHook,
+          result.outer_setups,
+        ),
+      )
+    }
+  }
+  let after_each_failures =
+    finish_suite_scope(
+      SuiteTeardown(
+        hooks: after_each_suite_hooks,
+        input: suite_run.info,
+        scope: suite_scope,
+        timeout_ms: suite_run.config.default_timeout_ms,
+        hook_kind: AfterEachSuiteHook,
+        setup: BeforeEachSuiteHook,
+      ),
+      suite_setup_process,
+    )
+  #(
+    Collected(
+      tests: tests_collected.tests,
+      hook_failures: list.append(
+        tests_collected.hook_failures,
+        after_each_failures,
+      ),
+    ),
+    completed_after_tests,
+    all_setup_process,
+  )
+}
+
+/// Run the tests of one suite in the executor, inside `outer_setups`.
+fn run_suite_tests(
+  suite_run: SuiteTests,
+  outer_setups: List(parallel.OuterSetup),
+) -> parallel.RunTreeParallelWithReporterResult {
+  suite.run(
+    suite_run.suite,
+    suite.RunInput(
+      config: suite_run.config,
+      keep: suite_run.keep,
+      progress_reporter: suite_run.progress_reporter,
+      write: output_out(suite_run.output),
+      total: suite_run.total,
+      completed: suite_run.completed,
+      before_each_test: suite_run.runner_before_each_test,
+      after_each_test: suite_run.runner_after_each_test,
+      outer_setups: outer_setups,
+    ),
+  )
+}
+
+/// The suite-level setup of `setup_process` as the executor sees it: no setup
+/// when it has no setup process.
+fn outer_setup(
+  setup: SetupHook,
+  scope: List(String),
+  setup_process: Option(SuiteScopeSetupProcess(input)),
+) -> List(parallel.OuterSetup) {
+  case setup_process {
+    None -> []
+    Some(SuiteSetupProcessAlive(setup_process: alive)) -> [
+      parallel.SetupRunning(
+        setup: setup,
+        path: scope,
+        check_setup_process: fn() { check_suite_setup_process(alive) },
+      ),
+    ]
+    Some(SuiteSetupProcessGone(reason: reason, not_run: not_run)) -> [
+      parallel.SetupStopped(
+        setup: setup,
+        path: scope,
+        reason: reason,
+        not_run: not_run,
+      ),
+    ]
   }
 }
 
-fn build_failed_results_from_suites(
+fn check_suite_setup_process(
+  setup_process: SuiteSetupProcess(input),
+) -> Result(Nil, String) {
+  sandbox.check_setup_process(setup_process)
+  |> result.replace(Nil)
+}
+
+/// The setup process after the executor ran: gone when the executor saw the
+/// setup `setup` stopped. The check of the executor took the down message of
+/// the setup process, so its reason comes from `outer_setups`, with the tests that
+/// the executor did not run because of it.
+fn stopped_suite_setup_process(
+  setup_process: Option(SuiteScopeSetupProcess(input)),
+  setup: SetupHook,
+  outer_setups: List(parallel.OuterSetup),
+) -> Option(SuiteScopeSetupProcess(input)) {
+  case setup_process, find_stopped_setup_process(outer_setups, setup) {
+    Some(_), Ok(gone) -> Some(gone)
+    _, _ -> setup_process
+  }
+}
+
+/// The first of `outer_setups` that says the setup `setup` stopped, as
+/// a gone setup process.
+fn find_stopped_setup_process(
+  outer_setups: List(parallel.OuterSetup),
+  setup: SetupHook,
+) -> Result(SuiteScopeSetupProcess(input), Nil) {
+  case outer_setups {
+    [] -> Error(Nil)
+    [outer_setup, ..rest] ->
+      stopped_setup_process_or_next(
+        stopped_setup_process(outer_setup, setup),
+        rest,
+        setup,
+      )
+  }
+}
+
+fn stopped_setup_process_or_next(
+  found: Result(SuiteScopeSetupProcess(input), Nil),
+  rest: List(parallel.OuterSetup),
+  setup: SetupHook,
+) -> Result(SuiteScopeSetupProcess(input), Nil) {
+  case found {
+    Ok(gone) -> Ok(gone)
+    Error(Nil) -> find_stopped_setup_process(rest, setup)
+  }
+}
+
+fn stopped_setup_process(
+  outer_setup: parallel.OuterSetup,
+  setup: SetupHook,
+) -> Result(SuiteScopeSetupProcess(input), Nil) {
+  case outer_setup {
+    parallel.SetupStopped(
+      setup: stopped,
+      path: _,
+      reason: reason,
+      not_run: not_run,
+    )
+      if stopped == setup
+    -> Ok(SuiteSetupProcessGone(reason: reason, not_run: not_run))
+    _ -> Error(Nil)
+  }
+}
+
+fn setup_failed_results_from_suites(
   suites: List(types.SuiteInfo),
   operator: String,
   message: String,
 ) -> List(TestResult) {
-  build_failed_results_from_suites_rev(suites, operator, message, [])
+  setup_failed_results_from_suites_rev(suites, operator, message, [])
   |> list.reverse()
 }
 
-fn build_failed_results_from_suites_rev(
+fn setup_failed_results_from_suites_rev(
   suites: List(types.SuiteInfo),
   operator: String,
   message: String,
@@ -1140,11 +2376,11 @@ fn build_failed_results_from_suites_rev(
   case suites {
     [] -> acc_rev
     [suite, ..rest] ->
-      build_failed_results_from_suites_rev(
+      setup_failed_results_from_suites_rev(
         rest,
         operator,
         message,
-        build_failed_results_from_tests_rev(
+        setup_failed_results_from_tests_rev(
           suite.tests,
           operator,
           message,
@@ -1154,16 +2390,16 @@ fn build_failed_results_from_suites_rev(
   }
 }
 
-fn build_failed_results_from_tests(
+fn setup_failed_results_from_tests(
   tests: List(types.TestInfo),
   operator: String,
   message: String,
 ) -> List(TestResult) {
-  build_failed_results_from_tests_rev(tests, operator, message, [])
+  setup_failed_results_from_tests_rev(tests, operator, message, [])
   |> list.reverse()
 }
 
-fn build_failed_results_from_tests_rev(
+fn setup_failed_results_from_tests_rev(
   tests: List(types.TestInfo),
   operator: String,
   message: String,
@@ -1172,61 +2408,33 @@ fn build_failed_results_from_tests_rev(
   case tests {
     [] -> acc_rev
     [test_info, ..rest] ->
-      build_failed_results_from_tests_rev(rest, operator, message, [
-        failed_result_for_test_info(test_info, operator, message),
+      setup_failed_results_from_tests_rev(rest, operator, message, [
+        setup_failed_result_for_test_info(test_info, operator, message),
         ..acc_rev
       ])
   }
 }
 
-fn failed_result_for_test_info(
+fn setup_failed_result_for_test_info(
   info: types.TestInfo,
   operator: String,
   message: String,
 ) -> TestResult {
   let types.TestInfo(
     name: name,
-    full_name: full_name,
+    groups: groups,
     tags: tags,
     kind: kind,
     source: _source,
   ) = info
   types.TestResult(
     name: name,
-    full_name: full_name,
-    status: Failed,
+    groups: groups,
+    status: SetupFailed,
     duration_ms: 0,
     tags: tags,
     failures: [hook_failure(operator, message)],
     kind: kind,
-  )
-}
-
-fn after_all_suites_failure_result(message: String) -> TestResult {
-  types.TestResult(
-    name: "<after_all_suites>",
-    full_name: ["<after_all_suites>"],
-    status: Failed,
-    duration_ms: 0,
-    tags: [],
-    failures: [hook_failure("after_all_suites", message)],
-    kind: Unit,
-  )
-}
-
-fn after_each_suite_failure_result(
-  suite_info: types.SuiteInfo,
-  message: String,
-) -> TestResult {
-  let types.SuiteInfo(name: name, tests: _tests, source: _source) = suite_info
-  types.TestResult(
-    name: "<after_each_suite>",
-    full_name: [name, "<after_each_suite>"],
-    status: Failed,
-    duration_ms: 0,
-    tags: [],
-    failures: [hook_failure("after_each_suite", message)],
-    kind: Unit,
   )
 }
 
@@ -1247,7 +2455,7 @@ fn emit_test_finished_progress(
     Some(reporter) -> {
       write_progress_event(
         reporter,
-        reporter_types.TestFinished(
+        progress.TestFinishedProgress(
           completed: next_completed,
           total: total,
           result: result,
@@ -1289,162 +2497,86 @@ fn default_output() -> Output {
   Output(out: io.print, error: io.print_error)
 }
 
+/// The output of a silent run: normal output is dropped, and errors still
+/// go to the standard error stream.
 fn silent_output() -> Output {
-  Output(out: discard_output, error: discard_output)
+  Output(out: discard_output, error: io.print_error)
 }
 
 fn discard_output(_text: String) -> Nil {
   Nil
 }
 
-fn maybe_exit_on_failure(should_exit: Bool, results: List(TestResult)) -> Nil {
-  let should_halt = should_exit && has_failures(results)
-  case should_halt {
-    True -> halt(1)
+fn maybe_exit_on_failure(
+  should_exit: Bool,
+  report: RunReport,
+  coverage_succeeded: Bool,
+) -> Nil {
+  let should_stop =
+    should_exit && { types.failed(report) || !coverage_succeeded }
+  case should_stop {
+    // Gleam 1.13 and older halt the BEAM with status 0 at once when `main`
+    // returns. `end_program` does not return, so `main` does not return, no
+    // line after `runner.run` runs, and the status stays 1.
+    True -> end_program(1)
     False -> Nil
   }
 }
 
+/// The suite runs that keep at least one test, each with only the tests
+/// that the filter keeps. A suite with no test to run is left out, with or
+/// without a filter, so its suite hooks do not run.
 fn apply_test_filter(
-  suite_runs: List(SuiteRun(ctx)),
+  suite_runs: List(SuiteRun),
   predicate: Option(fn(TestInfo) -> Bool),
-) -> List(SuiteRun(ctx)) {
-  case predicate {
-    None -> suite_runs
-    Some(p) -> filter_suite_runs(suite_runs, p, [])
-  }
+) -> List(SuiteRun) {
+  filter_suite_runs(suite_runs, option.unwrap(predicate, keep_every_test), [])
+}
+
+fn keep_every_test(_info: TestInfo) -> Bool {
+  True
 }
 
 fn filter_suite_runs(
-  suite_runs: List(SuiteRun(ctx)),
-  predicate: fn(TestInfo) -> Bool,
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suite_runs: List(SuiteRun),
+  keep: fn(TestInfo) -> Bool,
+  kept_rev: List(SuiteRun),
+) -> List(SuiteRun) {
   case suite_runs {
-    [] -> list.reverse(acc_rev)
-    [SuiteRun(suite: suite, config_override: override), ..rest] -> {
-      let #(maybe, _has_tests) = filter_root(suite, predicate)
-      case maybe {
-        None -> filter_suite_runs(rest, predicate, acc_rev)
-        Some(filtered) ->
-          filter_suite_runs(rest, predicate, [
-            SuiteRun(suite: filtered, config_override: override),
-            ..acc_rev
-          ])
-      }
-    }
+    [] -> list.reverse(kept_rev)
+    [suite_run, ..rest] ->
+      filter_suite_runs(
+        rest,
+        keep,
+        add_kept_suite_run(
+          suite_run,
+          list.filter(suite_run.tests, keep),
+          kept_rev,
+        ),
+      )
   }
 }
 
-fn filter_root(
-  suite: TestSuite(ctx),
-  predicate: fn(TestInfo) -> Bool,
-) -> #(Option(TestSuite(ctx)), Bool) {
-  let Root(seed: seed, tree: tree) = suite
-  let #(maybe_tree, has_tests) = filter_node(tree, [], [], predicate)
-  case maybe_tree {
-    None -> #(None, has_tests)
-    Some(next_tree) -> #(Some(Root(seed: seed, tree: next_tree)), has_tests)
+/// Add the suite run with the tests `kept`, when there is at least one.
+fn add_kept_suite_run(
+  suite_run: SuiteRun,
+  kept: List(TestInfo),
+  kept_rev: List(SuiteRun),
+) -> List(SuiteRun) {
+  case kept {
+    [] -> kept_rev
+    _ -> [SuiteRun(..suite_run, tests: kept), ..kept_rev]
   }
 }
 
-fn filter_node(
-  node: Node(ctx),
-  scope: List(String),
-  inherited_tags: List(String),
-  predicate: fn(TestInfo) -> Bool,
-) -> #(Option(Node(ctx)), Bool) {
-  case node {
-    Test(
-      name: name,
-      tags: tags,
-      kind: kind,
-      run: run,
-      timeout_ms: timeout_ms,
-      source: source,
-    ) -> {
-      let full_name = list.append(scope, [name])
-      let effective_tags = list.append(inherited_tags, tags)
-      let info =
-        types.TestInfo(
-          name: name,
-          full_name: full_name,
-          tags: effective_tags,
-          kind: kind,
-          source: source,
-        )
-      case predicate(info) {
-        True -> #(
-          Some(Test(
-            name: name,
-            tags: tags,
-            kind: kind,
-            run: run,
-            timeout_ms: timeout_ms,
-            source: source,
-          )),
-          True,
-        )
-        False -> #(None, False)
-      }
-    }
-
-    Group(name: name, tags: tags, children: children) -> {
-      let next_scope = list.append(scope, [name])
-      let next_tags = list.append(inherited_tags, tags)
-      let #(filtered_children, has_tests) =
-        filter_children(children, next_scope, next_tags, predicate, [], False)
-      case has_tests {
-        True -> #(
-          Some(Group(name: name, tags: tags, children: filtered_children)),
-          True,
-        )
-        False -> #(None, False)
-      }
-    }
-
-    BeforeAll(..) -> #(Some(node), False)
-    BeforeEach(..) -> #(Some(node), False)
-    AfterEach(..) -> #(Some(node), False)
-    AfterAll(..) -> #(Some(node), False)
-  }
-}
-
-fn filter_children(
-  children: List(Node(ctx)),
-  scope: List(String),
-  inherited_tags: List(String),
-  predicate: fn(TestInfo) -> Bool,
-  acc_rev: List(Node(ctx)),
-  has_tests: Bool,
-) -> #(List(Node(ctx)), Bool) {
-  case children {
-    [] -> #(list.reverse(acc_rev), has_tests)
-    [child, ..rest] -> {
-      let #(maybe_child, child_has_tests) =
-        filter_node(child, scope, inherited_tags, predicate)
-      let next_has_tests = has_tests || child_has_tests
-      case maybe_child {
-        None ->
-          filter_children(
-            rest,
-            scope,
-            inherited_tags,
-            predicate,
-            acc_rev,
-            next_has_tests,
-          )
-        Some(kept) ->
-          filter_children(
-            rest,
-            scope,
-            inherited_tags,
-            predicate,
-            [kept, ..acc_rev],
-            next_has_tests,
-          )
-      }
-    }
+/// The hooks around all suites: none when no suite has a test to run.
+fn all_suites_hooks(
+  suite_runs: List(SuiteRun),
+  hooks: List(hook),
+) -> List(hook) {
+  case suite_runs {
+    [] -> []
+    _ -> hooks
   }
 }
 
@@ -1458,46 +2590,282 @@ fn suite_run_config(
   }
 }
 
-fn write_progress_event(
-  reporter: progress.ProgressReporter,
-  event: reporter_types.ReporterEvent,
-  output: Output,
-) -> Nil {
-  case progress.handle_event(reporter, event) {
-    None -> Nil
-    Some(text) -> output_out(output)(text)
+type CoverageState {
+  CoverageOff
+  CoverageRunning(session: CoverageSession, config: CoverageConfig)
+  CoverageStartFailed(error: coverage.CoverageError)
+}
+
+/// How the builder asks for coverage.
+type CoverageRequest {
+  NoCoverage
+  AlwaysCoverage(config: CoverageConfig)
+  CoverageFromEnvironment(config: CoverageConfig)
+}
+
+/// The environment variable read by `coverage_from_environment`.
+const coverage_environment_variable = "DREAM_TEST_COVERAGE"
+
+@external(erlang, "dream_test_coverage_ffi", "environment_variable")
+fn environment_variable(name: String) -> Result(String, Nil)
+
+fn start_coverage(request: CoverageRequest) -> CoverageState {
+  case request {
+    NoCoverage -> CoverageOff
+    AlwaysCoverage(config) -> start_coverage_with(config)
+    CoverageFromEnvironment(config) ->
+      start_coverage_from_environment(
+        environment_variable(coverage_environment_variable),
+        config,
+      )
   }
 }
 
-fn write_results_reporters(
-  reporters: List(reporter_types.ResultsReporter),
-  results: List(TestResult),
+fn start_coverage_with(config: CoverageConfig) -> CoverageState {
+  coverage_state_from_start(coverage.start(config), config)
+}
+
+fn start_coverage_from_environment(
+  value: Result(String, Nil),
+  config: CoverageConfig,
+) -> CoverageState {
+  case value {
+    Error(Nil) -> CoverageOff
+    Ok("1") | Ok("true") -> start_coverage_with(config)
+    Ok("0") | Ok("false") -> CoverageOff
+    Ok(other) ->
+      CoverageStartFailed(coverage.InvalidEnvironmentValue(
+        name: coverage_environment_variable,
+        value: other,
+      ))
+  }
+}
+
+fn coverage_state_from_start(
+  result: Result(CoverageSession, coverage.CoverageError),
+  config: CoverageConfig,
+) -> CoverageState {
+  case result {
+    Ok(session) -> CoverageRunning(session, config)
+    Error(error) -> CoverageStartFailed(error)
+  }
+}
+
+/// Print the coverage table to the reporter output, or the coverage failure
+/// block to the error output (once, after the results reporters).
+/// Returns `False` on error.
+fn finish_coverage(
+  state: CoverageState,
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
+  case state {
+    CoverageOff -> True
+    CoverageRunning(session, config) ->
+      write_coverage_result(coverage.finish(session), config, output, outcome)
+    CoverageStartFailed(error) -> write_coverage_error(error, output, outcome)
+  }
+}
+
+fn write_coverage_result(
+  result: Result(CoverageReport, coverage.CoverageError),
+  config: CoverageConfig,
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
+  case result {
+    Ok(report) -> {
+      output_out(output)(coverage_reporter.render(
+        report: report,
+        config: config,
+      ))
+      let total_met =
+        write_minimum_result(
+          coverage.check_minimum(config: config, report: report),
+          output,
+          outcome,
+        )
+      let each_file_met =
+        write_minimum_result(
+          coverage.check_minimum_per_file(config: config, report: report),
+          output,
+          outcome,
+        )
+      total_met && each_file_met
+    }
+    Error(error) -> write_coverage_error(error, output, outcome)
+  }
+}
+
+fn write_minimum_result(
+  result: Result(Nil, coverage.CoverageError),
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
+  case result {
+    Ok(Nil) -> True
+    Error(error) -> write_coverage_error(error, output, outcome)
+  }
+}
+
+fn write_coverage_error(
+  error: coverage.CoverageError,
+  output: Output,
+  outcome: coverage_reporter.RunOutcome,
+) -> Bool {
+  let Output(out: _out, error: write_error) = output
+  write_error(coverage_reporter.render_failure(error: error, outcome: outcome))
+  False
+}
+
+fn run_outcome(
+  report: RunReport,
+  exit_on_failure: Bool,
+) -> coverage_reporter.RunOutcome {
+  let tests = types.report_tests(report)
+  let counts = summary.count(report)
+  coverage_reporter.RunOutcome(
+    passed: list.count(tests, is_passed),
+    failed: list.count(tests, is_failure),
+    teardown_failed: counts.teardown_failed,
+    setup_stopped: counts.setup_stopped,
+    reporters_crashed: list.length(types.report_reporter_crashes(report)),
+    no_tests_ran: types.failed_with_no_tests(report),
+    exit_on_failure: exit_on_failure,
+  )
+}
+
+fn is_passed(result: TestResult) -> Bool {
+  result.status == Passed
+}
+
+fn is_failure(result: TestResult) -> Bool {
+  types.is_failure(result.status)
+}
+
+fn write_progress_event(
+  reporter: progress.ProgressReporter,
+  event: progress.ProgressEvent,
   output: Output,
 ) -> Nil {
-  write_results_reporters_loop(reporters, results, output_out(output))
+  output_out(output)(progress.line(reporter, event))
+}
+
+/// Write the report of each results reporter in list order, and return
+/// the reporters that crashed. A crash does not stop the run: the runner
+/// writes a named error to the error output and goes on with the next
+/// reporter. Positions start at 1 and count every reporter in the list.
+fn write_results_reporters(
+  reporters: List(reporter_types.ResultsReporter),
+  report: RunReport,
+  output: Output,
+) -> List(types.ReporterCrash) {
+  write_results_reporters_loop(reporters, report, output, 1, [])
 }
 
 fn write_results_reporters_loop(
   reporters: List(reporter_types.ResultsReporter),
-  results: List(TestResult),
-  write: fn(String) -> Nil,
-) -> Nil {
+  report: RunReport,
+  output: Output,
+  position: Int,
+  crashes_in_reverse: List(types.ReporterCrash),
+) -> List(types.ReporterCrash) {
   case reporters {
-    [] -> Nil
-    [reporter, ..rest] -> {
-      write(render_results_reporter(reporter, results))
-      write_results_reporters_loop(rest, results, write)
+    [] -> list.reverse(crashes_in_reverse)
+    [reporter, ..rest] ->
+      write_results_reporters_loop(
+        rest,
+        report,
+        output,
+        position + 1,
+        list.append(
+          write_results_reporter(reporter, report, output, position),
+          crashes_in_reverse,
+        ),
+      )
+  }
+}
+
+/// Write the report of one results reporter, and return its crash when
+/// its render function crashed, else `[]`.
+fn write_results_reporter(
+  reporter: reporter_types.ResultsReporter,
+  report: RunReport,
+  output: Output,
+  position: Int,
+) -> List(types.ReporterCrash) {
+  let Output(out: write_out, error: write_error) = output
+  case reporter {
+    reporter_types.Bdd(config) -> {
+      write_out(bdd.render(config, report))
+      []
+    }
+    reporter_types.Json(config) -> {
+      write_out(json.render(config, report))
+      []
+    }
+    reporter_types.Custom(render) ->
+      write_custom_report(
+        sandbox.run_catching(render, report),
+        write_out,
+        write_error,
+        position,
+      )
+  }
+}
+
+fn write_custom_report(
+  rendered: Result(String, String),
+  write_out: fn(String) -> Nil,
+  write_error: fn(String) -> Nil,
+  position: Int,
+) -> List(types.ReporterCrash) {
+  case rendered {
+    Ok(text) -> {
+      write_out(text)
+      []
+    }
+    Error(crash) -> {
+      write_error(custom_reporter_crash(position, crash))
+      [types.ReporterCrash(position: position, reason: crash)]
     }
   }
 }
 
-fn render_results_reporter(
-  reporter: reporter_types.ResultsReporter,
-  results: List(TestResult),
-) -> String {
-  case reporter {
-    reporter_types.Bdd(config) -> bdd.render(config, results)
-    reporter_types.Json(config) -> json.render(config, results)
+/// The most characters of a crash reason that the error output shows.
+const shown_crash_reason_length = 200
+
+fn custom_reporter_crash(position: Int, crash: String) -> String {
+  "\nResults reporter failed\n"
+  <> "  The Custom results reporter at position "
+  <> int.to_string(position)
+  <> " in runner.results_reporters crashed: "
+  <> shown_crash_reason(one_line(crash))
+  <> "\n"
+  <> "  Reason: its render function crashed, so this reporter wrote no report.\n"
+  <> "  Fix: make the render function return a String for every RunReport.\n"
+  <> "\n"
+}
+
+/// The lines of `text`, each without the spaces at its start, joined with
+/// one space.
+fn one_line(text: String) -> String {
+  text
+  |> string.split("\n")
+  |> list.map(string.trim_start)
+  |> string.join(" ")
+}
+
+/// `reason`, or its first `shown_crash_reason_length` characters and a
+/// note that says where the full reason is.
+fn shown_crash_reason(reason: String) -> String {
+  case string.length(reason) > shown_crash_reason_length {
+    True ->
+      string.slice(reason, 0, shown_crash_reason_length)
+      <> " ... (cut at "
+      <> int.to_string(shown_crash_reason_length)
+      <> " characters, and types.report_reporter_crashes has the full reason)"
+    False -> reason
   }
 }
 
@@ -1506,35 +2874,12 @@ fn output_out(output: Output) -> fn(String) -> Nil {
   out
 }
 
-fn count_total_tests(suite_runs: List(SuiteRun(ctx))) -> Int {
-  count_total_tests_from_list(suite_runs, 0)
+fn count_total_tests(suite_runs: List(SuiteRun)) -> Int {
+  list.fold(suite_runs, 0, add_test_count)
 }
 
-fn count_total_tests_from_list(
-  suite_runs: List(SuiteRun(ctx)),
-  acc: Int,
-) -> Int {
-  case suite_runs {
-    [] -> acc
-    [SuiteRun(suite: suite, config_override: _), ..rest] ->
-      count_total_tests_from_list(rest, acc + count_tests_in_suite(suite.tree))
-  }
-}
-
-fn count_tests_in_suite(node: Node(ctx)) -> Int {
-  case node {
-    Test(..) -> 1
-    Group(_, _, children) -> count_tests_in_children(children, 0)
-    _ -> 0
-  }
-}
-
-fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
-  case children {
-    [] -> acc
-    [child, ..rest] ->
-      count_tests_in_children(rest, acc + count_tests_in_suite(child))
-  }
+fn add_test_count(count: Int, suite_run: SuiteRun) -> Int {
+  count + list.length(suite_run.tests)
 }
 
 // ============================================================================
@@ -1542,14 +2887,14 @@ fn count_tests_in_children(children: List(Node(ctx)), acc: Int) -> Int {
 // ============================================================================
 
 fn suites_to_suite_runs_default(
-  suites: List(TestSuite(ctx)),
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+  acc_rev: List(SuiteRun),
+) -> List(SuiteRun) {
   case suites {
     [] -> list.reverse(acc_rev)
     [suite, ..rest] ->
       suites_to_suite_runs_default(rest, [
-        SuiteRun(suite: suite, config_override: None),
+        SuiteRun(suite: suite, config_override: None, tests: suite.tests(suite)),
         ..acc_rev
       ])
   }
@@ -1557,92 +2902,57 @@ fn suites_to_suite_runs_default(
 
 fn suites_to_suite_runs_with_override(
   config: parallel.ParallelConfig,
-  suites: List(TestSuite(ctx)),
-  acc_rev: List(SuiteRun(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+  acc_rev: List(SuiteRun),
+) -> List(SuiteRun) {
   case suites {
     [] -> list.reverse(acc_rev)
     [suite, ..rest] ->
       suites_to_suite_runs_with_override(config, rest, [
-        SuiteRun(suite: suite, config_override: Some(config)),
+        SuiteRun(
+          suite: suite,
+          config_override: Some(config),
+          tests: suite.tests(suite),
+        ),
         ..acc_rev
       ])
   }
 }
 
 fn append_suite_runs_default(
-  existing: List(SuiteRun(ctx)),
-  suites: List(TestSuite(ctx)),
-) -> List(SuiteRun(ctx)) {
+  existing: List(SuiteRun),
+  suites: List(TestSuite),
+) -> List(SuiteRun) {
   list.append(existing, suites_to_suite_runs_default(suites, []))
 }
 
 fn append_suite_runs_with_override(
-  existing: List(SuiteRun(ctx)),
+  existing: List(SuiteRun),
   config: parallel.ParallelConfig,
-  suites: List(TestSuite(ctx)),
-) -> List(SuiteRun(ctx)) {
+  suites: List(TestSuite),
+) -> List(SuiteRun) {
   list.append(existing, suites_to_suite_runs_with_override(config, suites, []))
 }
 
-/// Return `True` if the list contains any failing statuses.
-///
-/// This treats `Failed`, `SetupFailed`, and `TimedOut` as failures.
-///
-/// ## Example
-///
-/// ```gleam
-/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
-/// import dream_test/runner
-/// import dream_test/unit.{describe, it}
-///
-/// pub fn tests() {
-///   describe("has_failures", [
-///     it("passes", fn() { Ok(succeed()) }),
-///   ])
-/// }
-///
-/// fn failing_suite() {
-///   describe("failing suite", [
-///     it("fails", fn() {
-///       1
-///       |> should
-///       |> be_equal(2)
-///       |> or_fail_with("intentional failure for has_failures example")
-///     }),
-///   ])
-/// }
-///
-/// pub fn main() {
-///   let results = runner.new([failing_suite()]) |> runner.run()
-///
-///   results
-///   |> runner.has_failures()
-///   |> should
-///   |> be_equal(True)
-///   |> or_fail_with("expected failures to be present")
-/// }
-/// ```
-///
-/// ## Parameters
-///
-/// - `results`: list of `TestResult` values returned by `runner.run`
-///
-/// ## Returns
-///
-/// `True` when any result has status `Failed`, `SetupFailed`, or `TimedOut`.
-pub fn has_failures(results results: List(TestResult)) -> Bool {
-  case results {
-    [] -> False
-    [r, ..rest] ->
-      case r.status {
-        Failed -> True
-        SetupFailed -> True
-        TimedOut -> True
-        _ -> has_failures(rest)
-      }
-  }
-}
+/// `end_program`, typed as the result of `run`. It never returns.
+@external(erlang, "dream_test_runner_ffi", "end_program")
+fn end_program_in_run(status: Int) -> RunReport
 
-@external(erlang, "erlang", "halt")
-fn halt(exit_code: Int) -> Nil
+/// Whether this run is the outermost run in progress, and so reads the
+/// command line. The outermost run must call `finish_outermost_run`.
+@external(erlang, "dream_test_runner_ffi", "start_outermost_run")
+fn start_outermost_run() -> Bool
+
+/// End the outermost run, when `outermost` is `True`.
+@external(erlang, "dream_test_runner_ffi", "finish_outermost_run")
+fn finish_outermost_run(outermost: Bool) -> Nil
+
+/// The arguments after `--` of `gleam test -- ...`: the plain arguments
+/// of the BEAM.
+@external(erlang, "dream_test_runner_ffi", "command_line_arguments")
+fn command_line_arguments() -> List(String)
+
+/// Ask the BEAM to stop with `status`, then wait until the BEAM stops.
+/// Never returns.
+@external(erlang, "dream_test_runner_ffi", "end_program")
+fn end_program(status: Int) -> Nil

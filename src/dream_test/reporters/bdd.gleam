@@ -7,18 +7,25 @@
 //// (e.g. snapshot tests) or when you’re formatting results incrementally in a
 //// custom runner.
 
+import dream_test/internal/lines
+import dream_test/internal/only
+import dream_test/reporters/ansi
+import dream_test/reporters/diff
 import dream_test/reporters/gherkin as gherkin_reporter
+import dream_test/reporters/hook_failures
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/timing
 import dream_test/types.{
-  type AssertionFailure, type Status, type TestResult, BooleanFailure,
-  CollectionFailure, ComparisonFailure, CustomMatcherFailure, EqualityFailure,
-  Failed, OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
-  SnapshotFailure, StringMatchFailure, TimedOut,
+  type AssertionFailure, type RunReport, type Status, type TestResult,
+  BooleanFailure, CollectionFailure, ComparisonFailure, CustomMatcherFailure,
+  EqualityFailure, Failed, OptionFailure, Passed, Pending, ResultFailure,
+  SetupFailed, Skipped, SnapshotFailure, StepFailure, StringMatchFailure,
+  TimedOut,
 }
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/string
 
@@ -57,6 +64,28 @@ pub type FormatIncrementalPartsResult {
 ///
 /// This reporter prints at the end of the run, using the traversal-ordered results
 /// provided by the runner.
+///
+/// ## Example
+///
+/// ### Print the bdd report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn new() -> reporter_types.ResultsReporter {
   reporter_types.Bdd(reporter_types.BddReporterConfig(
     color: False,
@@ -65,6 +94,28 @@ pub fn new() -> reporter_types.ResultsReporter {
 }
 
 /// Enable ANSI color output for the BDD report.
+///
+/// ## Example
+///
+/// ### Print the bdd report in colour <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/color.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.color()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn color(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -78,7 +129,32 @@ pub fn color(
   }
 }
 
-/// Print only the summary line at the end of the run.
+/// Print only the summary line at the end of the run, after the
+/// `Setup and teardown failures:` section when a teardown hook failed or
+/// a setup stopped.
+///
+/// ## Example
+///
+/// ### Print only the summary line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/summary_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///       it("adds an item", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.summary_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn summary_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -92,7 +168,38 @@ pub fn summary_only(
   }
 }
 
-/// Print only repeated failures and the summary line at the end of the run.
+/// Print only the failed tests, the setup and teardown failures section
+/// (when there is one), and the summary line at the end of the run.
+/// A failed test here is one with the status `Failed`, `TimedOut` or
+/// `SetupFailed` (see `types.is_failure`).
+///
+/// ## Example
+///
+/// ### Print only the failed tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/failures_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///       it("counts two items", fn() {
+///         1
+///         |> should
+///         |> be_equal(2)
+///         |> or_fail_with("expected two items")
+///       }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([bdd.new() |> bdd.failures_only()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn failures_only(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -106,28 +213,71 @@ pub fn failures_only(
   }
 }
 
-/// Render the end-of-run BDD output for the given results.
+/// Render the end-of-run BDD output for a run report.
+///
+/// The output has the test results, then the failures (full mode), then a
+/// `Setup and teardown failures:` section when a teardown hook failed or
+/// a setup stopped (all modes), then the summary line.
+///
+/// ## Example
+///
+/// ### Render the summary line of a report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/reporters/bdd
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/types.{Passed, TestResult, Unit}
+///
+/// pub fn summary_of_one_passed_test() -> String {
+///   let report =
+///     types.run_report(
+///       tests: [
+///         TestResult(
+///           name: "starts empty",
+///           groups: ["Cart"],
+///           status: Passed,
+///           duration_ms: 3,
+///           tags: [],
+///           failures: [],
+///           kind: Unit,
+///         ),
+///       ],
+///       hook_failures: [],
+///       reporter_crashes: [],
+///     )
+///   bdd.render(
+///     config: reporter_types.BddReporterConfig(
+///       color: False,
+///       mode: reporter_types.BddSummaryOnly,
+///     ),
+///     report: report,
+///   )
+/// }
+/// ```
 pub fn render(
   config config: reporter_types.BddReporterConfig,
-  results results: List(TestResult),
+  report report: RunReport,
 ) -> String {
   let reporter_types.BddReporterConfig(color: color, mode: mode) = config
-  render_bdd_sections(color, mode, results)
+  render_bdd_sections(color, mode, report)
 }
 
 fn render_bdd_sections(
   color: Bool,
   mode: reporter_types.BddOutputMode,
-  results: List(TestResult),
+  report: RunReport,
 ) -> String {
-  let summary = format_summary(color, results)
+  let summary = format_summary(color, report)
+  let results = types.report_tests(report)
+  let teardown_text = format_teardown_section(color, report)
 
   case mode {
-    reporter_types.BddSummaryOnly -> summary
+    reporter_types.BddSummaryOnly ->
+      summary_with_teardown(teardown_text, summary)
     reporter_types.BddFailuresOnly -> {
       let failures = filter_failures(results, [])
       let failures_text = format_all_results(color, failures, [], "")
-      string.concat([failures_text, "\n", summary])
+      string.concat([failures_text, teardown_text, "\n", summary])
     }
     reporter_types.BddFull -> {
       let results_text = format_all_results(color, results, [], "")
@@ -140,8 +290,16 @@ fn render_bdd_sections(
           <> "\n"
           <> format_all_results(color, failures, [], "")
       }
-      string.concat([results_text, failures_text, "\n", summary])
+      string.concat([results_text, failures_text, teardown_text, "\n", summary])
     }
+  }
+}
+
+/// The summary line, after the teardown section when it has text.
+fn summary_with_teardown(teardown_text: String, summary: String) -> String {
+  case teardown_text {
+    "" -> summary
+    _ -> teardown_text <> "\n" <> summary
   }
 }
 
@@ -152,7 +310,7 @@ fn filter_failures(
   case results {
     [] -> list.reverse(acc_rev)
     [result, ..rest] -> {
-      case is_failure_status(result.status) {
+      case types.is_failure(result.status) {
         True -> filter_failures(rest, [result, ..acc_rev])
         False -> filter_failures(rest, acc_rev)
       }
@@ -160,56 +318,26 @@ fn filter_failures(
   }
 }
 
-fn is_failure_status(status: Status) -> Bool {
-  case status {
-    Failed -> True
-    SetupFailed -> True
-    TimedOut -> True
-    _ -> False
+fn format_summary(color: Bool, report: RunReport) -> String {
+  case color {
+    True -> summary.format_in_color(report)
+    False -> summary.format(report)
   }
 }
 
-fn ansi_wrap(code: String, text: String) -> String {
-  string.concat(["\u{1b}[", code, "m", text, "\u{1b}[0m"])
-}
-
-fn ansi_dim(text: String) -> String {
-  ansi_wrap("2", text)
-}
-
-fn ansi_red(text: String) -> String {
-  ansi_wrap("31", text)
-}
-
-fn ansi_green(text: String) -> String {
-  ansi_wrap("32", text)
-}
-
-fn ansi_yellow(text: String) -> String {
-  ansi_wrap("33", text)
-}
-
-fn ansi_cyan(text: String) -> String {
-  ansi_wrap("36", text)
-}
-
-fn ansi_magenta(text: String) -> String {
-  ansi_wrap("35", text)
-}
-
-fn ansi_bold(text: String) -> String {
-  ansi_wrap("1", text)
-}
-
-fn maybe(color: Bool, apply: fn(String) -> String, text: String) -> String {
-  case color {
-    True -> apply(text)
-    False -> text
+/// The teardown section with a blank line before it, or `""` when no
+/// teardown hook failed.
+fn format_teardown_section(color: Bool, report: RunReport) -> String {
+  case types.report_hook_failures(report), color {
+    [], _ -> ""
+    _, True ->
+      "\n" <> hook_failures.format_in_color(types.report_hook_failures(report))
+    _, False -> "\n" <> hook_failures.format(types.report_hook_failures(report))
   }
 }
 
 fn format_failures_header(color: Bool) -> String {
-  maybe(color, fn(t) { ansi_bold(ansi_red(t)) }, "Failures:")
+  ansi.apply_if(color, ansi.bold, ansi.apply_if(color, ansi.red, "Failures:"))
 }
 
 /// Format test results as a BDD-style report string.
@@ -226,7 +354,8 @@ fn format_failures_header(color: Bool) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to format
+/// - `report`: The run report to format: the test results and the
+///   hook failures
 ///
 /// ## Returns
 ///
@@ -234,26 +363,59 @@ fn format_failures_header(color: Bool) -> String {
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let report = bdd.format(sample_results())
+/// ### Format a report as text <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// report
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_format_report.snap")
-/// |> or_fail_with("expected formatted report snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn report_lists_the_passing_test() -> Result(AssertionResult, String) {
+///   let report =
+///     bdd.format(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///     )
+///
+///   report
+///   |> should
+///   |> be_equal(
+///     "Example Suite\n  ✓ passes\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n",
+///   )
+///   |> or_fail_with("expected the formatted report")
+/// }
 /// ```
 ///
-pub fn format(results results: List(TestResult)) -> String {
+pub fn format(report report: RunReport) -> String {
   // Split results by kind
-  let #(gherkin_results, unit_results) = partition_by_kind(results)
+  let #(gherkin_results, unit_results) =
+    partition_by_kind(types.report_tests(report))
 
   // Format each group with appropriate reporter
   let unit_text = format_unit_results(False, unit_results)
-  let gherkin_text = format_gherkin_results(gherkin_results)
+  let gherkin_text = gherkin_reporter.format_scenarios(gherkin_results)
 
   // Combine with single summary
-  let summary_text = format_summary(False, results)
-  string.concat([unit_text, gherkin_text, "\n", summary_text])
+  let summary_text = summary.format(report)
+  let teardown_text = format_teardown_section(False, report)
+  string.concat([unit_text, gherkin_text, teardown_text, "\n", summary_text])
 }
 
 fn partition_by_kind(
@@ -275,7 +437,10 @@ fn format_unit_results(color: Bool, results: List(TestResult)) -> String {
 }
 
 fn compare_by_full_name(a: TestResult, b: TestResult) -> order.Order {
-  compare_string_lists(a.full_name, b.full_name)
+  compare_string_lists(
+    types.full_name(a.groups, a.name),
+    types.full_name(b.groups, b.name),
+  )
 }
 
 fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
@@ -291,47 +456,6 @@ fn compare_string_lists(a: List(String), b: List(String)) -> order.Order {
   }
 }
 
-fn format_gherkin_results(results: List(TestResult)) -> String {
-  case results {
-    [] -> ""
-    _ -> {
-      let formatted = gherkin_reporter.format(results)
-      // Remove the gherkin reporter's own summary (we'll use combined summary)
-      remove_summary_line(formatted)
-    }
-  }
-}
-
-fn remove_summary_line(text: String) -> String {
-  // Find and remove the summary line (may have trailing empty lines)
-  let lines = string.split(text, "\n")
-  let without_summary = remove_gherkin_summary(lines, [])
-  string.join(without_summary, "\n")
-}
-
-fn remove_gherkin_summary(
-  lines: List(String),
-  accumulated: List(String),
-) -> List(String) {
-  case lines {
-    [] -> list.reverse(accumulated)
-    [line] -> {
-      // Check if this is the summary line or trailing empty line
-      case string.starts_with(line, "Summary:") || line == "" {
-        True -> list.reverse(accumulated)
-        False -> list.reverse([line, ..accumulated])
-      }
-    }
-    [line, ..rest] -> {
-      // Skip summary lines anywhere in the list
-      case string.starts_with(line, "Summary:") {
-        True -> remove_gherkin_summary(rest, accumulated)
-        False -> remove_gherkin_summary(rest, [line, ..accumulated])
-      }
-    }
-  }
-}
-
 /// Print test results using a provided writer function.
 ///
 /// This is the main entry point for most test runs. The writer function
@@ -340,41 +464,76 @@ fn remove_gherkin_summary(
 ///
 /// ## Example
 ///
+/// ### Write a report with a writer function <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// bdd.report([passing_result()], write_bdd_report_to_file)
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+/// import gleam/erlang/process
+/// import gleam/result
 ///
-/// use text <- result.try(
-///   file.read("test/tmp/bdd_report.txt")
-///   |> result.map_error(file.error_to_string),
-/// )
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
 ///
-/// text
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_report_file_output.snap")
-/// |> or_fail_with("expected report output snapshot match")
+/// pub fn report_writes_the_text() -> Result(AssertionResult, String) {
+///   let subject = process.new_subject()
+///   let _report =
+///     bdd.report(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///       process.send(subject, _),
+///     )
+///
+///   use text <- result.try(
+///     process.receive(subject, within: 100)
+///     |> result.replace_error("expected the report to write its text"),
+///   )
+///
+///   text
+///   |> should
+///   |> be_equal(
+///     "Example Suite\n  ✓ passes\n\nSummary: 1 run, 0 failed, 1 passed in 0ms\n",
+///   )
+///   |> or_fail_with("expected the written report")
+/// }
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `results`: List of test results from the runner
+/// - `report`: The run report from `runner.run`
 /// - `write`: Function that handles the formatted output string
 ///
 /// ## Returns
 ///
-/// Returns the input results unchanged, enabling pipeline composition.
+/// Returns the input report unchanged, enabling pipeline composition.
 ///
 pub fn report(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format(results))
-  results
+) -> RunReport {
+  write(format(report))
+  report
 }
 
 /// Format a single test result as BDD output, suitable for streaming.
 ///
-/// This is designed to be used with `ReporterEvent.TestFinished` so that BDD
-/// output can be printed as tests complete.
+/// Call it with each `TestResult` as the test finishes, so that BDD output
+/// can be printed as tests complete.
 ///
 /// - `previous_path` should be the describe-path (all but the leaf test name)
 ///   of the previously printed result.
@@ -390,28 +549,49 @@ pub fn report(
 ///
 /// A `FormatIncrementalResult` containing the text to print and the new
 /// describe/group path to pass as `previous_path` for the next call.
+///
+/// ## Example
+///
+/// ### Get the describe path of a result <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn new_path_is_the_describe_path() -> Result(AssertionResult, String) {
+///   let bdd.FormatIncrementalResult(text: _text, new_path: new_path) =
+///     bdd.format_incremental(passing_result(), [])
+///
+///   new_path
+///   |> should
+///   |> be_equal(["Example Suite"])
+///   |> or_fail_with("expected new_path to be the describe path")
+/// }
+/// ```
 pub fn format_incremental(
   result result: TestResult,
   previous_path previous_path: List(String),
 ) -> FormatIncrementalResult {
   let text = format_one_result_with_test_indent(False, result, previous_path, 0)
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalResult(text: text, new_path: new_path)
 }
 
-/// ## Example
-///
-/// ```gleam
-/// use first <- result.try(first_result([passing_result()]))
-///
-/// let bdd.FormatIncrementalResult(text: _text, new_path: new_path) =
-///   bdd.format_incremental(first, [])
-///
-/// new_path
-/// |> should
-/// |> be_equal(["Example Suite"])
-/// |> or_fail_with("expected new_path to be the describe path")
-/// ```
 /// Format a single test result as BDD output, allowing an extra indent level
 /// for the test line.
 ///
@@ -425,6 +605,41 @@ pub fn format_incremental(
 ///
 /// A `FormatIncrementalResult` containing the text to print and the new
 /// describe/group path to pass as `previous_path` for the next call.
+///
+/// ## Example
+///
+/// ### Format one result as it finishes <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental_with_test_indent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn first_result_prints_its_group() -> Result(AssertionResult, String) {
+///   let result = passing_result()
+///   let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
+///     bdd.format_incremental_with_test_indent(result, [], 0)
+///
+///   text
+///   |> should
+///   |> be_equal("Example Suite\n  ✓ passes\n")
+///   |> or_fail_with("expected the incremental output")
+/// }
+/// ```
 pub fn format_incremental_with_test_indent(
   result result: TestResult,
   previous_path previous_path: List(String),
@@ -437,24 +652,10 @@ pub fn format_incremental_with_test_indent(
       previous_path,
       extra_test_indent,
     )
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalResult(text: text, new_path: new_path)
 }
 
-/// ## Example
-///
-/// ```gleam
-/// let result = passing_result()
-/// let bdd.FormatIncrementalResult(text: text, new_path: _new_path) =
-///   bdd.format_incremental_with_test_indent(result, [], 0)
-///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental output snapshot match")
-/// ```
 /// Format a single incremental result as two parts:
 /// - `headers`: any new describe/group lines required for this result
 /// - `test_line`: the test line (and any failure details)
@@ -474,6 +675,47 @@ pub fn format_incremental_with_test_indent(
 /// - `headers`: any new describe/group lines required for this result
 /// - `test_line`: the test line (and any failure details)
 /// - `new_path`: the updated describe/group path to pass as `previous_path` for the next call
+///
+/// ## Example
+///
+/// ### Format the header and the test line apart <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_incremental_parts_with_test_indent.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn parts_hold_the_header_and_the_test_line() -> Result(
+///   AssertionResult,
+///   String,
+/// ) {
+///   let result = passing_result()
+///   let bdd.FormatIncrementalPartsResult(
+///     headers: headers,
+///     test_line: test_line,
+///     new_path: _new_path,
+///   ) = bdd.format_incremental_parts_with_test_indent(result, [], 0)
+///
+///   #(headers, test_line)
+///   |> should
+///   |> be_equal(#("Example Suite\n", "  ✓ passes\n"))
+///   |> or_fail_with("expected the incremental parts")
+/// }
+/// ```
 pub fn format_incremental_parts_with_test_indent(
   result result: TestResult,
   previous_path previous_path: List(String),
@@ -486,7 +728,7 @@ pub fn format_incremental_parts_with_test_indent(
       previous_path,
       extra_test_indent,
     )
-  let new_path = extract_describe_segments(result.full_name)
+  let new_path = result.groups
   FormatIncrementalPartsResult(
     headers: headers,
     test_line: test_line,
@@ -494,44 +736,62 @@ pub fn format_incremental_parts_with_test_indent(
   )
 }
 
-/// ## Example
-///
-/// ```gleam
-/// let result = passing_result()
-/// let text =
-///   bdd.format_incremental_parts_with_test_indent(result, [], 0)
-///   |> incremental_parts_text
-///
-/// text
-/// |> should
-/// |> match_snapshot(
-///   "./test/snapshots/bdd_format_incremental_parts_with_test_indent.snap",
-/// )
-/// |> or_fail_with("expected incremental parts snapshot match")
-/// ```
 /// Format only the trailing summary line (no per-test output).
+///
+/// This gives the same line as `summary.format` from
+/// `dream_test/reporters/summary`.
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to summarize
+/// - `report`: The run report to summarize
 ///
 /// ## Returns
 ///
 /// A single summary line as a `String` (including a trailing newline).
-pub fn format_summary_only(results results: List(TestResult)) -> String {
-  format_summary(False, results)
-}
-
+///
 /// ## Example
 ///
-/// ```gleam
-/// let summary = bdd.format_summary_only([passing_result()])
+/// ### Format only the summary line <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/bdd/format_summary_only.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// summary
-/// |> should
-/// |> match_snapshot("./test/snapshots/bdd_format_summary_only.snap")
-/// |> or_fail_with("expected summary snapshot match")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/reporters/bdd
+/// import dream_test/types.{
+///   type AssertionResult, type TestResult, Passed, TestResult, Unit,
+/// }
+///
+/// pub fn passing_result() -> TestResult {
+///   TestResult(
+///     name: "passes",
+///     groups: ["Example Suite"],
+///     status: Passed,
+///     duration_ms: 0,
+///     tags: [],
+///     failures: [],
+///     kind: Unit,
+///   )
+/// }
+///
+/// pub fn summary_counts_the_passing_test() -> Result(AssertionResult, String) {
+///   let summary =
+///     bdd.format_summary_only(
+///       types.run_report(
+///         tests: [passing_result()],
+///         hook_failures: [],
+///         reporter_crashes: [],
+///       ),
+///     )
+///
+///   summary
+///   |> should
+///   |> be_equal("Summary: 1 run, 0 failed, 1 passed in 0ms\n")
+///   |> or_fail_with("expected the summary line")
+/// }
 /// ```
+pub fn format_summary_only(report report: RunReport) -> String {
+  summary.format(report)
+}
+
 fn format_all_results(
   color: Bool,
   results: List(TestResult),
@@ -543,7 +803,7 @@ fn format_all_results(
     [result, ..rest] -> {
       let formatted = format_one_result(color, result, previous_path)
       let updated = string.concat([accumulated, formatted])
-      let new_path = extract_describe_segments(result.full_name)
+      let new_path = result.groups
       format_all_results(color, rest, new_path, updated)
     }
   }
@@ -579,7 +839,7 @@ fn format_one_result_parts_with_test_indent(
   previous_path: List(String),
   extra_test_indent: Int,
 ) -> #(String, String) {
-  let current_path = extract_describe_segments(result.full_name)
+  let current_path = result.groups
   let common_depth = count_common_prefix(previous_path, current_path, 0)
   let new_segments = list.drop(current_path, common_depth)
   let is_gherkin = gherkin_reporter.is_gherkin_result(result)
@@ -588,7 +848,7 @@ fn format_one_result_parts_with_test_indent(
       color,
       new_segments,
       common_depth,
-      is_gherkin,
+      feature_depth(result),
       "",
     )
   let test_line =
@@ -605,25 +865,26 @@ fn format_header_segments_for_kind(
   color: Bool,
   segments: List(String),
   depth: Int,
-  is_gherkin: Bool,
+  feature_depth: Option(Int),
   accumulated: String,
 ) -> String {
   case segments {
     [] -> accumulated
     [segment, ..rest] -> {
       let indent = build_indent(depth)
-      let label = case is_gherkin && depth == 0 {
+      let label = case feature_depth == Some(depth) {
         True -> "Feature: " <> segment
         False -> segment
       }
-      let styled = maybe(color, fn(t) { ansi_bold(ansi_cyan(t)) }, label)
+      let styled =
+        ansi.apply_if(color, ansi.bold, ansi.apply_if(color, ansi.cyan, label))
       let header = string.concat([indent, styled, "\n"])
       let updated = string.concat([accumulated, header])
       format_header_segments_for_kind(
         color,
         rest,
         depth + 1,
-        is_gherkin,
+        feature_depth,
         updated,
       )
     }
@@ -661,35 +922,27 @@ fn count_common_prefix_check(
   }
 }
 
-fn extract_describe_segments(full_name: List(String)) -> List(String) {
-  case list.reverse(full_name) {
-    [] -> []
-    [_] -> []
-    [_, ..rest] -> list.reverse(rest)
-  }
-}
-
 fn format_test_line_with_indent_for_kind(
   color: Bool,
   result: TestResult,
   extra_indent: Int,
   is_gherkin: Bool,
 ) -> String {
-  let depth = calculate_test_depth(result.full_name)
+  let depth = list.length(result.groups)
   let indent = build_indent(depth + extra_indent)
   let marker = status_marker(color, result.status)
   let name = case is_gherkin {
-    True -> "Scenario: " <> extract_test_name(result.full_name)
-    False -> extract_test_name(result.full_name)
+    True -> "Scenario: " <> result.name
+    False -> result.name
   }
   let duration = format_duration(result.duration_ms)
   let colored_name = case result.status {
     Passed -> name
-    Failed -> maybe(color, ansi_red, name)
-    SetupFailed -> maybe(color, ansi_red, name)
-    TimedOut -> maybe(color, ansi_red, name)
-    Skipped -> maybe(color, ansi_yellow, name)
-    Pending -> maybe(color, ansi_yellow, name)
+    Failed -> ansi.apply_if(color, ansi.red, name)
+    SetupFailed -> ansi.apply_if(color, ansi.red, name)
+    TimedOut -> ansi.apply_if(color, ansi.red, name)
+    Skipped -> ansi.apply_if(color, ansi.yellow, name)
+    Pending -> ansi.apply_if(color, ansi.yellow, name)
   }
   let test_line =
     string.concat([indent, marker, " ", colored_name, duration, "\n"])
@@ -705,14 +958,6 @@ fn format_duration(duration_ms: Int) -> String {
   }
 }
 
-fn calculate_test_depth(full_name: List(String)) -> Int {
-  case full_name {
-    [] -> 0
-    [_] -> 0
-    _ -> list.length(full_name) - 1
-  }
-}
-
 fn build_indent(level: Int) -> String {
   build_indent_recursive(level, "")
 }
@@ -724,21 +969,14 @@ fn build_indent_recursive(level: Int, accumulated: String) -> String {
   }
 }
 
-fn extract_test_name(full_name: List(String)) -> String {
-  case list.reverse(full_name) {
-    [last, ..] -> last
-    [] -> ""
-  }
-}
-
 fn status_marker(color: Bool, status: Status) -> String {
   case status {
-    Passed -> maybe(color, ansi_green, "✓")
-    Failed -> maybe(color, ansi_red, "✗")
-    Skipped -> maybe(color, ansi_yellow, "-")
-    Pending -> maybe(color, ansi_yellow, "~")
-    TimedOut -> maybe(color, ansi_red, "!")
-    SetupFailed -> maybe(color, ansi_red, "⚠")
+    Passed -> ansi.apply_if(color, ansi.green, "✓")
+    Failed -> ansi.apply_if(color, ansi.red, "✗")
+    Skipped -> ansi.apply_if(color, ansi.yellow, "-")
+    Pending -> ansi.apply_if(color, ansi.yellow, "~")
+    TimedOut -> ansi.apply_if(color, ansi.red, "!")
+    SetupFailed -> ansi.apply_if(color, ansi.red, "⚠")
   }
 }
 
@@ -747,12 +985,28 @@ fn format_failure_details(
   result: TestResult,
   indent_level: Int,
 ) -> String {
-  case result.status {
-    Failed -> format_all_failures(color, result.failures, indent_level, "")
-    SetupFailed -> format_all_failures(color, result.failures, indent_level, "")
-    TimedOut -> format_all_failures(color, result.failures, indent_level, "")
-    _ -> ""
+  case types.is_failure(result.status) {
+    True ->
+      format_all_failures(color, result.failures, indent_level, "")
+      <> format_run_alone(color, result, indent_level)
+    False -> ""
   }
+}
+
+/// The `Run it alone:` line of a failed test: the command that runs only
+/// this test.
+fn format_run_alone(
+  color: Bool,
+  result: TestResult,
+  indent_level: Int,
+) -> String {
+  string.concat([
+    build_indent(indent_level),
+    "  ",
+    ansi.apply_if(color, ansi.dim, "Run it alone: "),
+    only.command(types.full_name(result.groups, result.name)),
+    "\n",
+  ])
 }
 
 fn format_all_failures(
@@ -779,12 +1033,59 @@ fn format_one_failure(
   let base_indent = build_indent(indent_level)
 
   let operator_text =
-    maybe(color, fn(t) { ansi_bold(ansi_magenta(t)) }, failure.operator)
+    ansi.apply_if(
+      color,
+      ansi.bold,
+      ansi.apply_if(color, ansi.magenta, failure.operator),
+    )
   let header = string.concat([base_indent, "  ", operator_text, "\n"])
+  let step_text = format_step_line(color, failure.payload, base_indent)
   let message_text = format_failure_message(color, failure.message, base_indent)
-  let payload_text = format_failure_payload(color, failure.payload, base_indent)
+  let payload_text =
+    format_failure_payload(color, step_cause(failure.payload), base_indent)
 
-  string.concat([header, message_text, payload_text])
+  string.concat([header, step_text, message_text, payload_text])
+}
+
+/// The `Step:` line of a failure in a Gherkin step, or `""`.
+fn format_step_line(
+  color: Bool,
+  payload: Option(types.FailurePayload),
+  base_indent: String,
+) -> String {
+  case payload {
+    Some(StepFailure(keyword:, text:, file:, line:, ..)) ->
+      labelled_line(
+        color,
+        base_indent,
+        "    Step: ",
+        ansi.cyan,
+        keyword <> " " <> text <> step_place(file, line),
+      )
+    _ -> ""
+  }
+}
+
+/// The place of a step after its text: ` (file:line)`, ` (file)`,
+/// ` (line N)`, or `""` when neither is known.
+fn step_place(file: Option(String), line: Option(Int)) -> String {
+  case file, line {
+    Some(file), Some(line) -> " (" <> file <> ":" <> int.to_string(line) <> ")"
+    Some(file), None -> " (" <> file <> ")"
+    None, Some(line) -> " (line " <> int.to_string(line) <> ")"
+    None, None -> ""
+  }
+}
+
+/// The payload to show under the message: the payload inside a step
+/// failure, or the payload itself.
+fn step_cause(
+  payload: Option(types.FailurePayload),
+) -> Option(types.FailurePayload) {
+  case payload {
+    Some(StepFailure(cause:, ..)) -> cause
+    _ -> payload
+  }
 }
 
 fn format_failure_message(
@@ -794,12 +1095,27 @@ fn format_failure_message(
 ) -> String {
   case message {
     "" -> ""
-    _ -> {
-      let label = maybe(color, ansi_dim, "    Message: ")
-      let msg = maybe(color, ansi_red, message)
-      string.concat([base_indent, label, msg, "\n"])
-    }
+    _ -> labelled_line(color, base_indent, "    Message: ", ansi.red, message)
   }
+}
+
+/// One labelled value of a failure: `base_indent`, the label in dim, and
+/// the value in `style`. Each line of the value after the first starts at
+/// the column of the value, under its first line.
+fn labelled_line(
+  color: Bool,
+  base_indent: String,
+  label: String,
+  style: fn(String) -> String,
+  value: String,
+) -> String {
+  let margin = base_indent <> lines.margin_after(label)
+  string.concat([
+    base_indent,
+    ansi.apply_if(color, ansi.dim, label),
+    ansi.apply_if(color, style, lines.continue_under(value, margin)),
+    "\n",
+  ])
 }
 
 fn format_failure_payload(
@@ -838,35 +1154,35 @@ fn format_failure_payload(
     Some(CollectionFailure(actual, expected, operation)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi_dim, "    Operation: ")
-        <> maybe(color, ansi_cyan, operation)
+        <> ansi.apply_if(color, ansi.dim, "    Operation: ")
+        <> ansi.apply_if(color, ansi.cyan, operation)
         <> "\n"
       op_line <> format_expected_actual(color, base_indent, expected, actual)
     }
     Some(ComparisonFailure(actual, expected, operator)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi_dim, "    Operator: ")
-        <> maybe(color, ansi_cyan, operator)
+        <> ansi.apply_if(color, ansi.dim, "    Operator: ")
+        <> ansi.apply_if(color, ansi.cyan, operator)
         <> "\n"
       op_line <> format_expected_actual(color, base_indent, expected, actual)
     }
     Some(StringMatchFailure(actual, pattern, operation)) -> {
       let op_line =
         base_indent
-        <> maybe(color, ansi_dim, "    Operation: ")
-        <> maybe(color, ansi_cyan, operation)
+        <> ansi.apply_if(color, ansi.dim, "    Operation: ")
+        <> ansi.apply_if(color, ansi.cyan, operation)
         <> "\n"
       let pat_line =
-        base_indent
-        <> maybe(color, ansi_dim, "    Pattern:   ")
-        <> maybe(color, ansi_green, pattern)
-        <> "\n"
+        labelled_line(
+          color,
+          base_indent,
+          "    Pattern:   ",
+          ansi.green,
+          pattern,
+        )
       let actual_line =
-        base_indent
-        <> maybe(color, ansi_dim, "    Actual:    ")
-        <> maybe(color, ansi_red, actual)
-        <> "\n"
+        labelled_line(color, base_indent, "    Actual:    ", ansi.red, actual)
       op_line <> pat_line <> actual_line
     }
     Some(SnapshotFailure(actual, expected, snapshot_path, is_missing)) ->
@@ -880,15 +1196,15 @@ fn format_failure_payload(
       )
     Some(CustomMatcherFailure(actual, description)) -> {
       let desc_line =
-        base_indent
-        <> maybe(color, ansi_dim, "    Description: ")
-        <> maybe(color, ansi_cyan, description)
-        <> "\n"
+        labelled_line(
+          color,
+          base_indent,
+          "    Description: ",
+          ansi.cyan,
+          description,
+        )
       let actual_line =
-        base_indent
-        <> maybe(color, ansi_dim, "    Actual:      ")
-        <> maybe(color, ansi_red, actual)
-        <> "\n"
+        labelled_line(color, base_indent, "    Actual:      ", ansi.red, actual)
       desc_line <> actual_line
     }
     _ -> ""
@@ -901,16 +1217,34 @@ fn format_expected_actual(
   expected: String,
   actual: String,
 ) -> String {
-  let expected_label = maybe(color, ansi_dim, "    Expected: ")
-  let actual_label = maybe(color, ansi_dim, "    Actual:   ")
+  case diff.should_diff(expected: expected, actual: actual) {
+    True ->
+      diff.format(
+        expected: expected,
+        actual: actual,
+        indent: base_indent <> "    ",
+        color: color,
+      )
+    False -> format_expected_actual_lines(color, base_indent, expected, actual)
+  }
+}
+
+fn format_expected_actual_lines(
+  color: Bool,
+  base_indent: String,
+  expected: String,
+  actual: String,
+) -> String {
+  let expected_label = ansi.apply_if(color, ansi.dim, "    Expected: ")
+  let actual_label = ansi.apply_if(color, ansi.dim, "    Actual:   ")
   string.concat([
     base_indent,
     expected_label,
-    maybe(color, ansi_green, expected),
+    ansi.apply_if(color, ansi.green, expected),
     "\n",
     base_indent,
     actual_label,
-    maybe(color, ansi_red, actual),
+    ansi.apply_if(color, ansi.red, actual),
     "\n",
   ])
 }
@@ -927,119 +1261,30 @@ fn format_snapshot_failure(
     True ->
       string.concat([
         base_indent,
-        maybe(color, ansi_dim, "    Snapshot missing: "),
-        maybe(color, ansi_yellow, snapshot_path),
+        ansi.apply_if(color, ansi.dim, "    Snapshot missing: "),
+        ansi.apply_if(color, ansi.yellow, snapshot_path),
         "\n",
       ])
     False ->
       string.concat([
         base_indent,
-        maybe(color, ansi_dim, "    Snapshot: "),
-        maybe(color, ansi_cyan, snapshot_path),
+        ansi.apply_if(color, ansi.dim, "    Snapshot: "),
+        ansi.apply_if(color, ansi.cyan, snapshot_path),
         "\n",
         format_expected_actual(color, base_indent, expected, actual),
       ])
   }
 }
 
-fn format_summary(color: Bool, results: List(TestResult)) -> String {
-  let total = list.length(results)
-  let failed = count_by_status(results, Failed)
-  let skipped = count_by_status(results, Skipped)
-  let pending = count_by_status(results, Pending)
-  let timed_out = count_by_status(results, TimedOut)
-  let setup_failed = count_by_status(results, SetupFailed)
-  let passed = total - failed - skipped - pending - timed_out - setup_failed
-  let total_duration = sum_durations(results, 0)
-
-  string.concat([
-    maybe(color, fn(t) { ansi_bold(ansi_cyan(t)) }, "Summary: "),
-    maybe(color, ansi_cyan, int.to_string(total)),
-    " run, ",
-    maybe(color, ansi_red, int.to_string(failed)),
-    " failed, ",
-    maybe(color, ansi_green, int.to_string(passed)),
-    " passed",
-    build_summary_suffix(color, skipped, pending, timed_out, setup_failed),
-    " in ",
-    maybe(color, ansi_cyan, timing.format_duration_ms(total_duration)),
-    "\n",
-  ])
-}
-
-fn sum_durations(results: List(TestResult), total: Int) -> Int {
-  case results {
-    [] -> total
-    [result, ..rest] -> sum_durations(rest, total + result.duration_ms)
-  }
-}
-
-fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  count_matching_status(results, wanted, 0)
-}
-
-fn count_matching_status(
-  results: List(TestResult),
-  wanted: Status,
-  count: Int,
-) -> Int {
-  case results {
-    [] -> count
-    [result, ..rest] -> {
-      let next_count = increment_if_matches(result.status, wanted, count)
-      count_matching_status(rest, wanted, next_count)
-    }
-  }
-}
-
-fn increment_if_matches(status: Status, wanted: Status, count: Int) -> Int {
-  case status == wanted {
-    True -> count + 1
-    False -> count
-  }
-}
-
-fn build_summary_suffix(
-  color: Bool,
-  skipped: Int,
-  pending: Int,
-  timed_out: Int,
-  setup_failed: Int,
-) -> String {
-  let parts =
-    []
-    |> add_summary_part_if_nonzero(color, skipped, " skipped", ansi_yellow)
-    |> add_summary_part_if_nonzero(color, pending, " pending", ansi_yellow)
-    |> add_summary_part_if_nonzero(color, timed_out, " timed out", ansi_red)
-    |> add_summary_part_if_nonzero(
-      color,
-      setup_failed,
-      " setup failed",
-      ansi_red,
-    )
-
-  format_summary_parts(parts)
-}
-
-fn format_summary_parts(parts: List(String)) -> String {
-  case parts {
-    [] -> ""
-    _ -> string.concat([", ", string.join(parts, ", ")])
-  }
-}
-
-fn add_summary_part_if_nonzero(
-  parts: List(String),
-  color: Bool,
-  count: Int,
-  label: String,
-  paint: fn(String) -> String,
-) -> List(String) {
-  case count {
-    0 -> parts
-    _ -> [
-      string.concat([paint(int.to_string(count)), maybe(color, ansi_dim, label)]),
-      ..parts
-    ]
+/// The depth of the Feature group of a result: the group before its Rule
+/// group, or its last group outside a Rule. `None` when the result is in
+/// no Feature group: a unit test, or a scenario with `feature: None`.
+fn feature_depth(result: TestResult) -> Option(Int) {
+  let depth = list.length(result.groups)
+  case result.kind {
+    types.GherkinScenario(feature: Some(_), rule: Some(_), ..) ->
+      Some(depth - 2)
+    types.GherkinScenario(feature: Some(_), rule: None, ..) -> Some(depth - 1)
+    _ -> None
   }
 }

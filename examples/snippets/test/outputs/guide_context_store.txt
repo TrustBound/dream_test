@@ -1,0 +1,5 @@
+User store
+  ✓ finds a user by id
+  ✓ has no user 2
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

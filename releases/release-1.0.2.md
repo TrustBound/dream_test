@@ -22,7 +22,7 @@ describe("Feature", [
 
 Output:
 
-```
+```text
 Feature
   ✓ works correctly
   - not implemented yet

@@ -1,5 +1,5 @@
 import dream_test/gherkin/discover
-import dream_test/matchers.{contain, have_length, or_fail_with, should}
+import dream_test/matchers.{be_ok, contain, have_length, or_fail_with, should}
 import dream_test/unit.{describe, it}
 
 pub fn tests() {
@@ -8,6 +8,7 @@ pub fn tests() {
       discover.features("test/*.feature")
       |> discover.list_files()
       |> should
+      |> be_ok()
       |> contain("test/cart.feature")
       |> or_fail_with("expected list_files to include test/cart.feature")
     }),

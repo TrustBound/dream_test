@@ -8,20 +8,67 @@
 //// - `version`: schema version
 //// - `timestamp_ms`: when the report was created
 //// - `duration_ms`: total duration (sum of test durations)
-//// - `system`: `os`, `otp_version`, `gleam_version`
-//// - `summary`: counts by status
-//// - `tests`: per-test details (name, full_name, status, duration_ms, tags, kind, failures)
+//// - `system`: `os`, `otp_version`, and `gleam_stdlib_version`, the
+////   version of the `gleam_stdlib` package that the tests run with, or
+////   `"unknown"` when the `gleam_stdlib` application is not loaded. The
+////   report does not give the version of the Gleam compiler, because the
+////   compiled code does not record it.
+//// - `summary`: counts by status (`total`, `passed`, `failed`, `skipped`,
+////   `pending`, `timed_out`, `setup_failed`), `teardown_failed`, the
+////   number of teardown hooks that failed, and `setup_stopped`, the number
+////   of setups whose process stopped
+//// - `tests`: per-test details (name, full_name, only_path, run_alone,
+////   status, duration_ms, tags, kind, failures). `only_path` is the path
+////   of the test for `gleam test -- --only`, and `run_alone` is the
+////   command that runs only this test. `kind` is `"unit"` or `"gherkin:<scenario id>"`. The
+////   scenario id ends with a number that is unique in the run and changes
+////   from run to run, so do not compare `kind` of a Gherkin test between
+////   runs: use `full_name`. Only a Gherkin test has `feature` and `rule`,
+////   after `kind`. `feature` is the name of its Feature, for example
+////   `"Cart"`, or `null` for a scenario in no Feature group (the scenarios
+////   of `steps.Scenarios`). `rule` is the name of its Rule group, for
+////   example `"Rule: Stock"`, or `null` for a scenario outside a Rule.
+//// - `hook_failures`: one object for each teardown hook that failed
+////   and each setup that stopped, in the order that they happened. Each object
+////   has `kind`, `hook`, `path` and `message`:
+////   - `kind` `"teardown_failed"`: a teardown hook failed. `hook` is
+////     `"after_each_test"`, `"after_each"`, `"after_all"`,
+////     `"after_each_suite"`, `"after_all_suites"` or `"context teardown"`
+////     (the teardown of a tree with a context setup). `path` is a list of
+////     names: the group names from the top, and the test name last for
+////     a per-test hook. It is the full test name for `after_each` and
+////     `after_each_test`, the group path for `after_all`, the suite name
+////     for `after_each_suite`, the group path of the tree for
+////     `context teardown`, and `[]` for `after_all_suites`. `message` is
+////     the error message or the crash text.
+////   - `kind` `"setup_stopped"`: the process that keeps a setup alive
+////     exited while its tests ran. `hook` is the setup hook:
+////     `"before_all"`, `"before_each_suite"`, `"before_all_suites"` or
+////     `"context setup"`. `path` is the group path for `before_all`, the
+////     suite name for `before_each_suite`, the group path of the tree for
+////     `context setup`, `[]` for `before_all_suites`. `message` is the
+////     exit reason of the process. Only this kind has `not_run`: the
+////     tests that had not started when the setup stopped, so they were
+////     not run. Each one is its `full_name` list, as in `tests`.
+////
+//// The schema version is `"2.0"`. Version `"1.0"` had no `teardown_failed`
+//// or `setup_stopped` count and no `hook_failures` list: a failed teardown hook was a
+//// test with a name such as `<after_all>` in `tests`.
 ////
 //// ## Usage
+////
+//// ### Print a JSON report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```gleam
 //// import dream_test/matchers.{succeed}
 //// import dream_test/reporters/json
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("JSON Reporter", [
 ////     it("outputs JSON format", fn() {
 ////       // The json reporter prints machine-readable JSON at the end of the run.
@@ -34,7 +81,7 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([tests()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([json.new()])
@@ -43,13 +90,16 @@
 //// }
 //// ```
 
+import dream_test/internal/only
+import dream_test/reporters/summary
 import dream_test/reporters/types as reporter_types
 import dream_test/types.{
-  type AssertionFailure, type FailurePayload, type Status, type TestKind,
-  type TestResult, BooleanFailure, CollectionFailure, ComparisonFailure,
-  CustomMatcherFailure, EqualityFailure, Failed, GherkinScenario, Integration,
-  OptionFailure, Passed, Pending, ResultFailure, SetupFailed, Skipped,
-  SnapshotFailure, StringMatchFailure, TimedOut, Unit,
+  type AssertionFailure, type FailurePayload, type HookFailure, type RunReport,
+  type Status, type TestKind, type TestResult, BooleanFailure, CollectionFailure,
+  ComparisonFailure, CustomMatcherFailure, EqualityFailure, Failed,
+  GherkinScenario, OptionFailure, Passed, Pending, ResultFailure, SetupFailed,
+  SetupStopped, Skipped, SnapshotFailure, StepFailure, StringMatchFailure,
+  TeardownFailed, TimedOut, Unit,
 }
 import gleam/json.{type Json}
 import gleam/list
@@ -61,11 +111,55 @@ import gleam/string
 // ============================================================================
 
 /// Create a JSON results reporter (printed at the end of the run).
+///
+/// ## Example
+///
+/// ### Print the JSON report at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([json.new()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn new() -> reporter_types.ResultsReporter {
   reporter_types.Json(reporter_types.JsonReporterConfig(pretty: False))
 }
 
 /// Enable pretty-printed JSON output.
+///
+/// ## Example
+///
+/// ### Print pretty JSON at the end of the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/json
+/// import dream_test/runner
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.results_reporters([json.new() |> json.pretty()])
+///   |> runner.run()
+/// }
+/// ```
 pub fn pretty(
   reporter reporter: reporter_types.ResultsReporter,
 ) -> reporter_types.ResultsReporter {
@@ -77,52 +171,73 @@ pub fn pretty(
 }
 
 /// Render JSON output for a completed run.
+///
+/// ## Example
+///
+/// ### Render a report as compact JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/render.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/reporters/json
+/// import dream_test/reporters/types as reporter_types
+/// import dream_test/types.{type RunReport}
+///
+/// pub fn render_compact_json(report: RunReport) -> String {
+///   json.render(
+///     config: reporter_types.JsonReporterConfig(pretty: False),
+///     report: report,
+///   )
+/// }
+/// ```
 pub fn render(
   config config: reporter_types.JsonReporterConfig,
-  results results: List(TestResult),
+  report report: RunReport,
 ) -> String {
   let reporter_types.JsonReporterConfig(pretty: pretty) = config
   case pretty {
-    True -> format_pretty(results)
-    False -> format(results)
+    True -> format_pretty(report)
+    False -> format(report)
   }
 }
 
 /// Format test results as a compact JSON string.
 ///
-/// Returns a single-line JSON string suitable for machine parsing.
+/// Returns the JSON on one line, with a newline at the end.
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode into the JSON report
+/// - `report`: The run report to encode into the JSON report
 ///
 /// ## Returns
 ///
-/// A compact (single-line) JSON string.
+/// A compact JSON string: one line, with a newline at the end.
 ///
 /// ## Example
+///
+/// ### Format a report as JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/format.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   json.format(results)
+/// pub fn main() -> String {
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   json.format(report)
 /// }
 /// ```
 ///
-pub fn format(results results: List(TestResult)) -> String {
-  build_report_json(results)
+pub fn format(report report: RunReport) -> String {
+  build_report_json(report)
   |> json.to_string
+  <> "\n"
 }
 
 /// Format test results as pretty-printed JSON.
@@ -131,36 +246,41 @@ pub fn format(results results: List(TestResult)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode into the JSON report
+/// - `report`: The run report to encode into the JSON report
 ///
 /// ## Returns
 ///
-/// A pretty-printed JSON string with 2-space indentation.
+/// A pretty-printed JSON string with 2-space indentation and a newline at
+/// the end.
 ///
 /// ## Example
+///
+/// ### Format a report as indented JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/format_pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   json.format_pretty(results)
+/// pub fn main() -> String {
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   json.format_pretty(report)
 /// }
 /// ```
 ///
-pub fn format_pretty(results results: List(TestResult)) -> String {
-  build_report_json(results)
+pub fn format_pretty(report report: RunReport) -> String {
+  build_report_json(report)
   |> json.to_string
   |> prettify_json
+  <> "\n"
 }
 
 /// Print test results as JSON using a provided writer function.
@@ -170,39 +290,43 @@ pub fn format_pretty(results results: List(TestResult)) -> String {
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode and write
+/// - `report`: The run report to encode and write
 /// - `write`: Output sink for the JSON string (for example `io.print`)
 ///
 /// ## Returns
 ///
-/// Returns the input `results` unchanged, enabling pipeline composition.
+/// Returns the input `report` unchanged, enabling pipeline composition.
 ///
 /// ## Example
+///
+/// ### Print a report as JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   results |> json.report(io.print)
+/// pub fn main() -> RunReport {
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   report |> json.report(io.print)
 /// }
 /// ```
 pub fn report(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format(results))
-  results
+) -> RunReport {
+  write(format(report))
+  report
 }
 
 /// Print test results as pretty-printed JSON using a provided writer function.
@@ -211,56 +335,64 @@ pub fn report(
 ///
 /// ## Parameters
 ///
-/// - `results`: The test results to encode and write
+/// - `report`: The run report to encode and write
 /// - `write`: Output sink for the JSON string (for example `io.print`)
 ///
 /// ## Returns
 ///
-/// Returns the input `results` unchanged, enabling pipeline composition.
+/// Returns the input `report` unchanged, enabling pipeline composition.
 ///
 /// ## Example
+///
+/// ### Print a report as indented JSON <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/json/report_pretty.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/json
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/io
 ///
-/// fn example_suite() {
+/// pub fn example_suite() -> TestSuite {
 ///   describe("Example Suite", [
 ///     it("passes", fn() { Ok(succeed()) }),
 ///   ])
 /// }
 ///
-/// pub fn main() {
-///   let results = runner.new([example_suite()]) |> runner.run()
-///   results |> json.report_pretty(io.print)
+/// pub fn main() -> RunReport {
+///   let report = runner.new([example_suite()]) |> runner.run()
+///   report |> json.report_pretty(io.print)
 /// }
 /// ```
 ///
 pub fn report_pretty(
-  results results: List(TestResult),
+  report report: RunReport,
   write write: fn(String) -> Nil,
-) -> List(TestResult) {
-  write(format_pretty(results))
-  results
+) -> RunReport {
+  write(format_pretty(report))
+  report
 }
 
 // ============================================================================
 // JSON Building
 // ============================================================================
 
-fn build_report_json(results: List(TestResult)) -> Json {
-  let total_duration = calculate_total_duration(results)
+fn build_report_json(report: RunReport) -> Json {
+  let counts = summary.count(report)
 
   json.object([
-    #("version", json.string("1.0")),
+    #("version", json.string("2.0")),
     #("timestamp_ms", json.int(get_timestamp_ms())),
-    #("duration_ms", json.int(total_duration)),
+    #("duration_ms", json.int(counts.duration_ms)),
     #("system", build_system_json()),
-    #("summary", build_summary_json(results)),
-    #("tests", json.array(results, build_test_json)),
+    #("summary", build_summary_json(counts)),
+    #("tests", json.array(types.report_tests(report), build_test_json)),
+    #(
+      "hook_failures",
+      json.array(types.report_hook_failures(report), build_hook_failure_json),
+    ),
   ])
 }
 
@@ -268,40 +400,97 @@ fn build_system_json() -> Json {
   json.object([
     #("os", json.string(get_os())),
     #("otp_version", json.string(get_otp_version())),
-    #("gleam_version", json.string(get_gleam_version())),
+    #("gleam_stdlib_version", json.string(get_gleam_stdlib_version())),
   ])
 }
 
-fn build_summary_json(results: List(TestResult)) -> Json {
-  let total = list.length(results)
-  let passed = count_by_status(results, Passed)
-  let failed = count_by_status(results, Failed)
-  let skipped = count_by_status(results, Skipped)
-  let pending = count_by_status(results, Pending)
-  let timed_out = count_by_status(results, TimedOut)
-  let setup_failed = count_by_status(results, SetupFailed)
-
+fn build_summary_json(counts: summary.Counts) -> Json {
   json.object([
-    #("total", json.int(total)),
-    #("passed", json.int(passed)),
-    #("failed", json.int(failed)),
-    #("skipped", json.int(skipped)),
-    #("pending", json.int(pending)),
-    #("timed_out", json.int(timed_out)),
-    #("setup_failed", json.int(setup_failed)),
+    #("total", json.int(counts.run)),
+    #("passed", json.int(counts.passed)),
+    #("failed", json.int(counts.failed)),
+    #("skipped", json.int(counts.skipped)),
+    #("pending", json.int(counts.pending)),
+    #("timed_out", json.int(counts.timed_out)),
+    #("setup_failed", json.int(counts.setup_failed)),
+    #("teardown_failed", json.int(counts.teardown_failed)),
+    #("setup_stopped", json.int(counts.setup_stopped)),
   ])
+}
+
+fn build_hook_failure_json(failure: HookFailure) -> Json {
+  case failure {
+    TeardownFailed(hook: hook, path: path, message: message) ->
+      json.object(hook_failure_fields(
+        "teardown_failed",
+        types.teardown_hook_name(hook),
+        path,
+        message,
+      ))
+    SetupStopped(setup: setup, path: path, reason: reason, not_run: not_run) ->
+      json.object(
+        list.append(
+          hook_failure_fields(
+            "setup_stopped",
+            types.setup_hook_name(setup),
+            path,
+            reason,
+          ),
+          [#("not_run", json.array(not_run, full_name_json))],
+        ),
+      )
+  }
+}
+
+fn full_name_json(full_name: List(String)) -> Json {
+  json.array(full_name, json.string)
+}
+
+fn hook_failure_fields(
+  kind: String,
+  hook: String,
+  path: List(String),
+  message: String,
+) -> List(#(String, Json)) {
+  [
+    #("kind", json.string(kind)),
+    #("hook", json.string(hook)),
+    #("path", json.array(path, json.string)),
+    #("message", json.string(message)),
+  ]
 }
 
 fn build_test_json(result: TestResult) -> Json {
-  json.object([
-    #("name", json.string(result.name)),
-    #("full_name", json.array(result.full_name, json.string)),
-    #("status", json.string(status_to_string(result.status))),
-    #("duration_ms", json.int(result.duration_ms)),
-    #("tags", json.array(result.tags, json.string)),
-    #("kind", json.string(kind_to_string(result.kind))),
-    #("failures", json.array(result.failures, build_failure_json)),
-  ])
+  let names = types.full_name(result.groups, result.name)
+  json.object(
+    list.flatten([
+      [
+        #("name", json.string(result.name)),
+        #("full_name", json.array(names, json.string)),
+        #("only_path", json.string(only.path(names))),
+        #("run_alone", json.string(only.command(names))),
+        #("status", json.string(status_to_string(result.status))),
+        #("duration_ms", json.int(result.duration_ms)),
+        #("tags", json.array(result.tags, json.string)),
+        #("kind", json.string(kind_to_string(result.kind))),
+      ],
+      gherkin_fields(result.kind),
+      [#("failures", json.array(result.failures, build_failure_json))],
+    ]),
+  )
+}
+
+/// Only a Gherkin scenario has `feature` and `rule`: the name of its
+/// Feature, or `null` for a scenario in no Feature group, and the name of
+/// its Rule group, or `null` for a scenario outside a Rule.
+fn gherkin_fields(kind: TestKind) -> List(#(String, Json)) {
+  case kind {
+    GherkinScenario(feature: feature, rule: rule, ..) -> [
+      #("feature", json.nullable(feature, json.string)),
+      #("rule", json.nullable(rule, json.string)),
+    ]
+    _ -> []
+  }
 }
 
 fn build_failure_json(failure: AssertionFailure) -> Json {
@@ -360,6 +549,18 @@ fn build_payload_fields(
       #("actual", json.string(actual)),
       #("description", json.string(description)),
     ]
+    Some(StepFailure(keyword:, text:, file:, line:, cause:)) -> [
+      #(
+        "step",
+        json.object([
+          #("keyword", json.string(keyword)),
+          #("text", json.string(text)),
+          #("file", json.nullable(file, json.string)),
+          #("line", json.nullable(line, json.int)),
+        ]),
+      ),
+      ..build_payload_fields(cause)
+    ]
   }
 }
 
@@ -381,39 +582,7 @@ fn status_to_string(status: Status) -> String {
 fn kind_to_string(kind: TestKind) -> String {
   case kind {
     Unit -> "unit"
-    Integration -> "integration"
-    GherkinScenario(id) -> "gherkin:" <> id
-  }
-}
-
-fn count_by_status(results: List(TestResult), wanted: Status) -> Int {
-  count_by_status_loop(results, wanted, 0)
-}
-
-fn count_by_status_loop(
-  results: List(TestResult),
-  wanted: Status,
-  count: Int,
-) -> Int {
-  case results {
-    [] -> count
-    [result, ..rest] ->
-      case result.status == wanted {
-        True -> count_by_status_loop(rest, wanted, count + 1)
-        False -> count_by_status_loop(rest, wanted, count)
-      }
-  }
-}
-
-fn calculate_total_duration(results: List(TestResult)) -> Int {
-  calculate_total_duration_loop(results, 0)
-}
-
-fn calculate_total_duration_loop(results: List(TestResult), total: Int) -> Int {
-  case results {
-    [] -> total
-    [result, ..rest] ->
-      calculate_total_duration_loop(rest, total + result.duration_ms)
+    GherkinScenario(scenario_id: id, ..) -> "gherkin:" <> id
   }
 }
 
@@ -422,7 +591,18 @@ fn calculate_total_duration_loop(results: List(TestResult), total: Int) -> Int {
 // ============================================================================
 
 fn prettify_json(input: String) -> String {
-  prettify_chars(string.to_graphemes(input), 0, False, "")
+  prettify_chars(codepoint_strings(input), 0, False, "")
+}
+
+/// The code points of `input`, each one as a string. Graphemes would join
+/// a quote with a combining mark after it, so the quote would not open or
+/// close the JSON string.
+fn codepoint_strings(input: String) -> List(String) {
+  list.map(string.to_utf_codepoints(input), codepoint_string)
+}
+
+fn codepoint_string(codepoint: UtfCodepoint) -> String {
+  string.from_utf_codepoints([codepoint])
 }
 
 fn prettify_chars(
@@ -456,6 +636,7 @@ fn prettify_chars(
         acc <> "\n" <> spaces(new_indent) <> "}",
       )
     }
+    ["[", "]", ..rest] -> prettify_chars(rest, indent, False, acc <> "[]")
     ["[", ..rest] -> {
       let new_indent = indent + 2
       prettify_chars(
@@ -477,7 +658,6 @@ fn prettify_chars(
     [",", ..rest] ->
       prettify_chars(rest, indent, False, acc <> ",\n" <> spaces(indent))
     [":", ..rest] -> prettify_chars(rest, indent, False, acc <> ": ")
-    [" ", ..rest] -> prettify_chars(rest, indent, False, acc)
     [char, ..rest] -> prettify_chars(rest, indent, False, acc <> char)
   }
 }
@@ -496,8 +676,8 @@ fn get_os() -> String
 @external(erlang, "dream_test_reporter_json_ffi", "get_otp_version")
 fn get_otp_version() -> String
 
-@external(erlang, "dream_test_reporter_json_ffi", "get_gleam_version")
-fn get_gleam_version() -> String
+@external(erlang, "dream_test_reporter_json_ffi", "get_gleam_stdlib_version")
+fn get_gleam_stdlib_version() -> String
 
 @external(erlang, "dream_test_reporter_json_ffi", "get_timestamp_ms")
 fn get_timestamp_ms() -> Int

@@ -1,0 +1,835 @@
+//// A test suite, ready to run.
+////
+//// Every suite has the same type, `TestSuite`, whatever context its tests
+//// get. A suite keeps its typed tree and its context inside it, so one run
+//// can hold a `unit` suite, a `unit_context` suite and a Gherkin feature:
+////
+//// ### Run suites of different contexts together <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
+//// ```gleam
+//// import dream_test/context
+//// import dream_test/gherkin/feature.{feature, given, scenario, then}
+//// import dream_test/gherkin/steps.{type StepContext}
+//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+//// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult, type RunReport}
+//// import dream_test/unit
+//// import dream_test/unit_context
+////
+//// fn plain_suite() -> TestSuite {
+////   unit.describe("Plain", [unit.it("passes", fn() { Ok(succeed()) })])
+//// }
+////
+//// fn number_suite() -> TestSuite {
+////   unit_context.describe("Numbers", context.value(41), [
+////     unit_context.it("is 41", fn(number: Int) {
+////       number
+////       |> should
+////       |> be_equal(41)
+////       |> or_fail_with("expected 41")
+////     }),
+////   ])
+//// }
+////
+//// fn set_word(_word: String, _context: StepContext) -> Result(String, String) {
+////   Ok("hello")
+//// }
+////
+//// fn check_word(
+////   word: String,
+////   _context: StepContext,
+//// ) -> Result(AssertionResult, String) {
+////   word
+////   |> should
+////   |> be_equal("hello")
+////   |> or_fail_with("expected hello")
+//// }
+////
+//// fn word_feature() -> TestSuite {
+////   let steps =
+////     steps.new(initial: "")
+////     |> steps.given("the word hello", set_word)
+////     |> steps.then("the word is hello", check_word)
+////
+////   feature("Words", steps, [
+////     scenario("Keeping a word", [
+////       given("the word hello"),
+////       then("the word is hello"),
+////     ]),
+////   ])
+//// }
+////
+//// pub fn run_all_suites() -> RunReport {
+////   runner.new([plain_suite(), number_suite(), word_feature()])
+////   |> runner.run()
+//// }
+//// ```
+////
+//// Most code does not use this module directly: `unit.describe`,
+//// `unit_context.describe` and the Gherkin functions give a `TestSuite`,
+//// and the runner runs it. Use this module to make a suite from a tree that
+//// you build yourself (`from_tree`), to put suites in one group (`group`),
+//// or to read what a suite holds (`name`, `tests`).
+
+import dream_test/parallel.{
+  type OuterSetup, type ParallelConfig, type RunTreeParallelWithReporterResult,
+  RunTreeConfig, RunTreeParallelWithReporterResult,
+}
+import dream_test/reporters/progress.{type ProgressReporter}
+import dream_test/types.{
+  type Node, type SuiteContext, type TestInfo, AfterAll, AfterEach, BeforeAll,
+  BeforeEach, FixedContext, Group, Test, TestInfo,
+}
+import gleam/list
+import gleam/option.{type Option, None, Some}
+
+/// A suite that the runner can run.
+///
+/// Make one with `unit.describe`, `unit_context.describe`, the Gherkin
+/// functions or `from_tree`. The context of the tests is inside the suite,
+/// so it does not show in the type: suites with different contexts go in
+/// one list.
+pub opaque type TestSuite {
+  TestSuite(name: String, parts: List(Part))
+}
+
+/// One typed tree of a suite. A suite from `group` or `join` has a part for
+/// each tree in it, and each part keeps its own context.
+type Part {
+  Part(
+    place: Place,
+    tests: List(TestInfo),
+    tests_at: fn(Place) -> List(TestInfo),
+    run: fn(Place, RunInput) -> RunTreeParallelWithReporterResult,
+  )
+}
+
+/// Where a part runs: inside the groups `groups`, outermost first, and with
+/// `source` as the source of each test that has no source, when it is
+/// `Some`.
+type Place {
+  Place(groups: List(String), source: Option(String))
+}
+
+/// What `run` needs from the runner.
+///
+/// - `config`: the concurrency and the default timeout.
+/// - `keep`: `Some(predicate)` runs only the tests that the predicate keeps
+///   (see `runner.filter_tests`). A tree with no kept test does not run.
+///   `None` runs every test.
+/// - `progress_reporter`, `write`, `total`, `completed`: the progress
+///   output, as in `parallel.RunTreeParallelWithReporterConfig`.
+/// - `before_each_test`, `after_each_test`: the runner hooks around each
+///   test (see `runner.before_each_test`). They get the `TestInfo` of the
+///   test, not its context.
+/// - `outer_setups`: the setups around the suite (see
+///   `parallel.OuterSetup`).
+pub type RunInput {
+  RunInput(
+    config: ParallelConfig,
+    keep: Option(fn(TestInfo) -> Bool),
+    progress_reporter: Option(ProgressReporter),
+    write: fn(String) -> Nil,
+    total: Int,
+    completed: Int,
+    before_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    after_each_test: List(fn(TestInfo) -> Result(Nil, String)),
+    outer_setups: List(OuterSetup),
+  )
+}
+
+/// Make a suite from a typed tree that you build yourself.
+///
+/// The `initial` value of the tree is the context of the tests. `unit.describe`
+/// and `unit_context.describe` call this for you.
+///
+/// ## Parameters
+///
+/// - `tree`: the tree, with its name, tags, tests and context
+///
+/// ## Returns
+///
+/// A `TestSuite` with the tests of the tree.
+///
+/// ## Example
+///
+/// ### Make a suite from a tree <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/from_tree.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context
+///
+/// fn is_41(number: Int) -> Result(AssertionResult, String) {
+///   number
+///   |> should
+///   |> be_equal(41)
+///   |> or_fail_with("expected 41")
+/// }
+///
+/// pub fn numbers_suite() -> TestSuite {
+///   suite.from_tree(types.tree("numbers", 41, [unit_context.it("is 41", is_41)]))
+/// }
+/// ```
+pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
+  new(
+    name: tree.name,
+    tags: tree.tags,
+    tests: tree.tests,
+    context: FixedContext(tree.initial),
+  )
+}
+
+/// Make a suite from typed tests and the place where its tests get
+/// their context.
+///
+/// With `types.FixedContext(value)`, each test starts from `value`, as
+/// with `from_tree`. With `types.ContextFromSetup(setup, teardown)`, the
+/// setup runs once for the tree of this suite, before its first test, and
+/// only when at least one of its tests runs. A `join` or `group` keeps
+/// each tree apart, so each one runs its own setup. Its value is the context of every hook and test,
+/// and the teardown gets it after the last test (see
+/// `types.SuiteContext`). `unit_context.describe` calls this.
+///
+/// ## Parameters
+///
+/// - `name`: the name of the top-level group
+/// - `tags`: the tags of the top-level group
+/// - `tests`: the tests, groups and hooks
+/// - `context`: where the tests get their context
+///
+/// ## Example
+///
+/// ### Make a suite with a context from a setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit_context
+///
+/// pub type Server {
+///   Server(port: Int)
+/// }
+///
+/// fn start_server() -> Result(Server, String) {
+///   Ok(Server(port: 8080))
+/// }
+///
+/// fn stop_server(_server: Server) -> Result(Nil, String) {
+///   Ok(Nil)
+/// }
+///
+/// fn answers(server: Server) -> Result(AssertionResult, String) {
+///   server.port
+///   |> should
+///   |> be_equal(8080)
+///   |> or_fail_with("expected the server on port 8080")
+/// }
+///
+/// pub fn server_suite() -> TestSuite {
+///   suite.new(
+///     name: "server",
+///     tags: [],
+///     tests: [unit_context.it("answers", answers)],
+///     context: types.ContextFromSetup(setup: start_server, teardown: stop_server),
+///   )
+/// }
+/// ```
+pub fn new(
+  name name: String,
+  tags tags: List(String),
+  tests tests: List(Node(context)),
+  context context: SuiteContext(context),
+) -> TestSuite {
+  TestSuite(name: name, parts: [
+    tree_part(Tree(name: name, tags: tags, tests: tests, context: context)),
+  ])
+}
+
+/// The name of the suite: the name of its top-level group.
+///
+/// ## Example
+///
+/// ### Read the name of a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/suite
+/// import dream_test/unit
+///
+/// pub fn cart_name() -> String {
+///   suite.name(unit.describe("Cart", []))
+///   // -> "Cart"
+/// }
+/// ```
+pub fn name(suite suite: TestSuite) -> String {
+  suite.name
+}
+
+/// The `TestInfo` of each test of the suite, in the written order: each
+/// group gives its tests and child groups in the order that they are
+/// written. The run order can be different. In a run, the direct tests of
+/// a group run first, and then each child group, whatever the written
+/// order.
+///
+/// ## Example
+///
+/// ### List the test names of a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/tests_of_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit
+/// import gleam/list
+///
+/// fn is_empty() -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn cart_test_names() -> List(String) {
+///   suite.tests(unit.describe("Cart", [unit.it("is empty", is_empty)]))
+///   |> list.map(fn(info) { info.name })
+///   // -> ["is empty"]
+/// }
+/// ```
+pub fn tests(suite suite: TestSuite) -> List(TestInfo) {
+  list.flat_map(suite.parts, part_tests)
+}
+
+/// Put suites in one group with the name `name`.
+///
+/// The suites run one after the other, and each keeps its own context.
+/// `group` adds `name` to the start of the path of each test, so `name` is
+/// the first item of `groups` of each test, also in the progress output.
+/// It makes no `types.Group` value, so it gives the tests no tags and no
+/// hooks.
+///
+/// ## Example
+///
+/// ### Put suites in one group <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/context
+/// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+/// import dream_test/unit_context
+///
+/// fn plain_suite() -> TestSuite {
+///   unit.describe("Plain", [unit.it("passes", fn() { Ok(succeed()) })])
+/// }
+///
+/// fn number_suite() -> TestSuite {
+///   unit_context.describe("Numbers", context.value(41), [
+///     unit_context.it("is 41", fn(number: Int) {
+///       number
+///       |> should
+///       |> be_equal(41)
+///       |> or_fail_with("expected 41")
+///     }),
+///   ])
+/// }
+///
+/// pub fn all_suites() -> TestSuite {
+///   suite.group(name: "all", suites: [plain_suite(), number_suite()])
+/// }
+/// ```
+pub fn group(name name: String, suites suites: List(TestSuite)) -> TestSuite {
+  TestSuite(
+    name: name,
+    parts: put_in_group(list.flat_map(suites, suite_parts), name, []),
+  )
+}
+
+/// Put suites one after the other in one suite with the name `name`.
+///
+/// Unlike `group`, `join` adds no group: each test keeps its own groups,
+/// and each suite keeps its own context. The runner sees one suite, so
+/// `runner.before_each_suite` runs once for all of them.
+///
+/// ## Example
+///
+/// ### Join suites into one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/join.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+///
+/// fn cart_suite() -> TestSuite {
+///   unit.describe("Cart", [unit.it("starts empty", fn() { Ok(succeed()) })])
+/// }
+///
+/// fn payment_suite() -> TestSuite {
+///   unit.describe("Payment", [unit.it("takes a card", fn() { Ok(succeed()) })])
+/// }
+///
+/// pub fn checkout_suite() -> TestSuite {
+///   suite.join(name: "checkout", suites: [cart_suite(), payment_suite()])
+/// }
+/// ```
+pub fn join(name name: String, suites suites: List(TestSuite)) -> TestSuite {
+  TestSuite(name: name, parts: list.flat_map(suites, suite_parts))
+}
+
+/// Give each test of the suite that has no source the source `source`,
+/// for example the name of the module that made the suite. Module
+/// discovery does this. A test that already has a source keeps it, for
+/// example a Gherkin scenario keeps the path of its `.feature` file.
+///
+/// ## Example
+///
+/// ### Set the source of the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/with_source.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit
+///
+/// pub fn tests() -> TestSuite {
+///   unit.describe("Cart", [unit.it("is empty", fn() { Ok(succeed()) })])
+/// }
+///
+/// pub fn cart_suite_with_source() -> TestSuite {
+///   suite.with_source(suite: tests(), source: "cart_test")
+/// }
+/// ```
+pub fn with_source(suite suite: TestSuite, source source: String) -> TestSuite {
+  TestSuite(..suite, parts: set_source(suite.parts, source, []))
+}
+
+/// Run the tests of the suite. The runner calls this for each suite.
+///
+/// Each tree of the suite runs with its own context, one tree after the
+/// other. A tree with no test to run does not run.
+///
+/// ## Parameters
+///
+/// - `suite`: the suite to run
+/// - `input`: what the run needs (see `RunInput`)
+///
+/// ## Returns
+///
+/// The results and the hook failures of the suite, in the order that
+/// they ran, the new count of completed tests, and the outer setups as
+/// the executor saw them last.
+///
+/// ## Example
+///
+/// ### Run one suite directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/suite/run.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/parallel.{type RunTreeParallelWithReporterResult}
+/// import dream_test/suite.{RunInput}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// pub fn run_one_suite() -> RunTreeParallelWithReporterResult {
+///   let cart_suite =
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ])
+///   suite.run(
+///     suite: cart_suite,
+///     input: RunInput(
+///       config: parallel.default_config(),
+///       keep: None,
+///       progress_reporter: None,
+///       write: ignore_output,
+///       total: 1,
+///       completed: 0,
+///       before_each_test: [],
+///       after_each_test: [],
+///       outer_setups: [],
+///     ),
+///   )
+/// }
+///
+/// fn ignore_output(_text: String) -> Nil {
+///   Nil
+/// }
+/// ```
+pub fn run(
+  suite suite: TestSuite,
+  input input: RunInput,
+) -> RunTreeParallelWithReporterResult {
+  run_parts(suite.parts, input, nothing_ran(input))
+}
+
+// ============================================================================
+// Parts
+// ============================================================================
+
+fn suite_parts(suite: TestSuite) -> List(Part) {
+  suite.parts
+}
+
+fn part_tests(part: Part) -> List(TestInfo) {
+  part.tests
+}
+
+/// The parts, each inside one more group `name`.
+fn put_in_group(
+  parts: List(Part),
+  name: String,
+  moved_rev: List(Part),
+) -> List(Part) {
+  case parts {
+    [] -> list.reverse(moved_rev)
+    [part, ..rest] ->
+      put_in_group(rest, name, [
+        move_part(
+          part,
+          Place(..part.place, groups: [name, ..part.place.groups]),
+        ),
+        ..moved_rev
+      ])
+  }
+}
+
+/// The parts, each with `source` as the source of its tests when the part
+/// has no source yet. A source from an earlier `with_source` is kept.
+fn set_source(
+  parts: List(Part),
+  source: String,
+  moved_rev: List(Part),
+) -> List(Part) {
+  case parts {
+    [] -> list.reverse(moved_rev)
+    [part, ..rest] ->
+      set_source(rest, source, [
+        move_part(
+          part,
+          Place(
+            ..part.place,
+            source: option.or(part.place.source, Some(source)),
+          ),
+        ),
+        ..moved_rev
+      ])
+  }
+}
+
+fn move_part(part: Part, place: Place) -> Part {
+  Part(..part, place: place, tests: part.tests_at(place))
+}
+
+/// Run the parts one after the other, each after what `ran` holds.
+fn run_parts(
+  parts: List(Part),
+  input: RunInput,
+  ran: RunTreeParallelWithReporterResult,
+) -> RunTreeParallelWithReporterResult {
+  case parts {
+    [] -> ran
+    [part, ..rest] -> run_parts(rest, input, run_next_part(input, ran, part))
+  }
+}
+
+fn run_next_part(
+  input: RunInput,
+  ran: RunTreeParallelWithReporterResult,
+  part: Part,
+) -> RunTreeParallelWithReporterResult {
+  let next =
+    part.run(
+      part.place,
+      RunInput(
+        ..input,
+        progress_reporter: ran.progress_reporter,
+        completed: ran.completed,
+        outer_setups: ran.outer_setups,
+      ),
+    )
+  RunTreeParallelWithReporterResult(
+    results: list.append(ran.results, next.results),
+    hook_failures: list.append(ran.hook_failures, next.hook_failures),
+    completed: next.completed,
+    progress_reporter: next.progress_reporter,
+    outer_setups: next.outer_setups,
+  )
+}
+
+fn nothing_ran(input: RunInput) -> RunTreeParallelWithReporterResult {
+  RunTreeParallelWithReporterResult(
+    results: [],
+    hook_failures: [],
+    completed: input.completed,
+    progress_reporter: input.progress_reporter,
+    outer_setups: input.outer_setups,
+  )
+}
+
+// ============================================================================
+// Typed trees
+// ============================================================================
+
+/// A typed tree with its context.
+type Tree(context) {
+  Tree(
+    name: String,
+    tags: List(String),
+    tests: List(Node(context)),
+    context: SuiteContext(context),
+  )
+}
+
+fn tree_part(tree: Tree(context)) -> Part {
+  let place = Place(groups: [], source: None)
+  Part(
+    place: place,
+    tests: tree_tests(tree, place),
+    tests_at: fn(place) { tree_tests(tree, place) },
+    run: fn(place, input) { run_tree(tree, place, input) },
+  )
+}
+
+fn tree_tests(tree: Tree(context), place: Place) -> List(TestInfo) {
+  collect_tests(
+    placed_tests(tree.tests, place.source),
+    list.append(place.groups, [tree.name]),
+    tree.tags,
+    [],
+  )
+  |> list.reverse
+}
+
+fn run_tree(
+  tree: Tree(context),
+  place: Place,
+  input: RunInput,
+) -> RunTreeParallelWithReporterResult {
+  case
+    selected_tests(
+      placed_tests(tree.tests, place.source),
+      list.append(place.groups, [tree.name]),
+      tree.tags,
+      option.unwrap(input.keep, keep_every_test),
+    )
+  {
+    None -> nothing_ran(input)
+    Some(tests) ->
+      parallel.run_tree(RunTreeConfig(
+        config: input.config,
+        groups: place.groups,
+        name: tree.name,
+        tags: tree.tags,
+        tests: tests,
+        context: tree.context,
+        progress_reporter: input.progress_reporter,
+        write: input.write,
+        total: input.total,
+        completed: input.completed,
+        runner_before_each_test: input.before_each_test,
+        runner_after_each_test: input.after_each_test,
+        outer_setups: input.outer_setups,
+      ))
+  }
+}
+
+fn keep_every_test(_info: TestInfo) -> Bool {
+  True
+}
+
+/// The tests with `source` as the source of each test that has no
+/// source, when `source` is set.
+fn placed_tests(
+  tests: List(Node(context)),
+  source: Option(String),
+) -> List(Node(context)) {
+  case source {
+    None -> tests
+    Some(source) -> nodes_with_source(tests, source)
+  }
+}
+
+fn nodes_with_source(
+  nodes: List(Node(context)),
+  source: String,
+) -> List(Node(context)) {
+  case nodes {
+    [] -> []
+    [node, ..rest] -> [
+      node_with_source(node, source),
+      ..nodes_with_source(rest, source)
+    ]
+  }
+}
+
+fn node_with_source(node: Node(context), source: String) -> Node(context) {
+  case node {
+    Group(name: name, tags: tags, tests: tests) ->
+      Group(name: name, tags: tags, tests: nodes_with_source(tests, source))
+    Test(source: None, ..) -> Test(..node, source: Some(source))
+    Test(..) | BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) ->
+      node
+  }
+}
+
+fn collect_node(
+  node: Node(context),
+  groups: List(String),
+  inherited_tags: List(String),
+  tests_rev: List(TestInfo),
+) -> List(TestInfo) {
+  case node {
+    Test(name: name, tags: tags, kind: kind, source: source, ..) -> [
+      TestInfo(
+        name: name,
+        groups: groups,
+        tags: list.append(inherited_tags, tags),
+        kind: kind,
+        source: source,
+      ),
+      ..tests_rev
+    ]
+    Group(name: name, tags: tags, tests: tests) ->
+      collect_tests(
+        tests,
+        list.append(groups, [name]),
+        list.append(inherited_tags, tags),
+        tests_rev,
+      )
+    BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) -> tests_rev
+  }
+}
+
+fn collect_tests(
+  tests: List(Node(context)),
+  groups: List(String),
+  inherited_tags: List(String),
+  tests_rev: List(TestInfo),
+) -> List(TestInfo) {
+  case tests {
+    [] -> tests_rev
+    [child, ..rest] ->
+      collect_tests(
+        rest,
+        groups,
+        inherited_tags,
+        collect_node(child, groups, inherited_tags, tests_rev),
+      )
+  }
+}
+
+/// The tests to run: the ones that `keep` keeps, with the groups and
+/// hooks around them. A group with no kept test is left out, so its hooks
+/// do not run. `None` when `keep` keeps no test.
+fn selected_tests(
+  tests: List(Node(context)),
+  groups: List(String),
+  tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+) -> Option(List(Node(context))) {
+  case filter_tests(tests, groups, tags, keep) {
+    #(kept, True) -> Some(kept)
+    #(_, False) -> None
+  }
+}
+
+/// The tests that `keep` keeps, and whether a test is among them.
+fn filter_tests(
+  tests: List(Node(context)),
+  groups: List(String),
+  inherited_tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+) -> #(List(Node(context)), Bool) {
+  let #(kept_rev, has_tests) =
+    filter_each_child(tests, groups, inherited_tags, keep, #([], False))
+  #(list.reverse(kept_rev), has_tests)
+}
+
+/// Add each child that `keep` keeps to `filtered`, newest first.
+fn filter_each_child(
+  tests: List(Node(context)),
+  groups: List(String),
+  inherited_tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+  filtered: #(List(Node(context)), Bool),
+) -> #(List(Node(context)), Bool) {
+  case tests {
+    [] -> filtered
+    [child, ..rest] ->
+      filter_each_child(
+        rest,
+        groups,
+        inherited_tags,
+        keep,
+        add_filtered(filtered, child, groups, inherited_tags, keep),
+      )
+  }
+}
+
+fn add_filtered(
+  filtered: #(List(Node(context)), Bool),
+  child: Node(context),
+  groups: List(String),
+  inherited_tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+) -> #(List(Node(context)), Bool) {
+  let #(kept_rev, has_tests) = filtered
+  let #(kept, child_has_tests) =
+    filter_node(child, groups, inherited_tags, keep)
+  #(list.append(option.values([kept]), kept_rev), has_tests || child_has_tests)
+}
+
+fn filter_node(
+  node: Node(context),
+  groups: List(String),
+  inherited_tags: List(String),
+  keep: fn(TestInfo) -> Bool,
+) -> #(Option(Node(context)), Bool) {
+  case node {
+    Test(name: name, tags: tags, kind: kind, source: source, ..) ->
+      kept_test(
+        node,
+        keep(TestInfo(
+          name: name,
+          groups: groups,
+          tags: list.append(inherited_tags, tags),
+          kind: kind,
+          source: source,
+        )),
+      )
+    Group(name: name, tags: tags, tests: tests) ->
+      kept_group(
+        name,
+        tags,
+        filter_tests(
+          tests,
+          list.append(groups, [name]),
+          list.append(inherited_tags, tags),
+          keep,
+        ),
+      )
+    BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) -> #(
+      Some(node),
+      False,
+    )
+  }
+}
+
+fn kept_test(
+  node: Node(context),
+  kept: Bool,
+) -> #(Option(Node(context)), Bool) {
+  case kept {
+    True -> #(Some(node), True)
+    False -> #(None, False)
+  }
+}
+
+fn kept_group(
+  name: String,
+  tags: List(String),
+  filtered: #(List(Node(context)), Bool),
+) -> #(Option(Node(context)), Bool) {
+  case filtered {
+    #(tests, True) -> #(Some(Group(name: name, tags: tags, tests: tests)), True)
+    #(_, False) -> #(None, False)
+  }
+}

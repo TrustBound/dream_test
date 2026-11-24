@@ -1,8 +1,13 @@
 //// Process helpers for tests that need actors or async operations.
 ////
-//// When Dream Test runs a test, it runs in an isolated BEAM process. Any
-//// processes you spawn inside a test can be *linked* to that test process, so
-//// they automatically die when the test ends (pass, fail, timeout, crash).
+//// When Dream Test runs a test, it runs the test body and its `before_each`
+//// and `after_each` hooks in one isolated BEAM process. A process that you
+//// start there and *link* to that test process stops when the test ends
+//// (pass, fail, timeout, crash): the test process exits with reason
+//// `shutdown`, or is killed on a timeout. A process that a `before_all`
+//// hook starts links to the setup process of its group instead, and
+//// stops when that setup process exits with reason `shutdown` after the
+//// last test of the group.
 ////
 //// This module gives you a few “batteries included” patterns:
 ////
@@ -14,17 +19,26 @@
 //// ## Example
 //// Use this inside an `it` block.
 ////
-//// ```gleam
-//// let counter = process.start_counter()
-//// process.increment(counter)
-//// process.increment(counter)
+//// ### Count with a counter actor <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_counter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
-//// process.get_count(counter)
-//// |> should
-//// |> be_equal(2)
-//// |> or_fail_with("expected counter to be 2")
+//// ```gleam
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/process
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn two_increments_count_two() -> Result(AssertionResult, String) {
+////   let counter = process.start_counter()
+////   process.increment(counter)
+////   process.increment(counter)
+////
+////   process.get_count(counter)
+////   |> should
+////   |> be_equal(2)
+////   |> or_fail_with("expected counter to be 2")
+//// }
 //// ```
 
+import dream_test/timing
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/otp/actor
@@ -37,16 +51,25 @@ import gleam/otp/actor
 /// ## Example
 /// Use this inside an `it` block.
 ///
+/// ### Send messages to the counter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/counter_message.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let counter = process.start_counter()
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/erlang/process as erlang_process
 ///
-/// erlang_process.send(counter, process.Increment)
-/// erlang_process.send(counter, process.SetCount(10))
+/// pub fn messages_set_the_count() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter()
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(10)
-/// |> or_fail_with("expected counter to be 10 after SetCount")
+///   erlang_process.send(counter, process.Increment)
+///   erlang_process.send(counter, process.SetCount(10))
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(10)
+///   |> or_fail_with("expected counter to be 10 after SetCount")
+/// }
 /// ```
 ///
 pub type CounterMessage {
@@ -58,8 +81,8 @@ pub type CounterMessage {
 
 /// Start a counter actor initialized to 0.
 ///
-/// The counter is linked to the test process and will be automatically cleaned
-/// up when the test ends.
+/// The counter is linked to the calling process. Started in a test, it stops
+/// when the test ends.
 ///
 /// ## Returns
 ///
@@ -69,15 +92,23 @@ pub type CounterMessage {
 /// ## Example
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter()
-/// process.increment(counter)
-/// process.increment(counter)
+/// ### Start a counter and increment it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_counter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(2)
-/// |> or_fail_with("expected counter to be 2")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn two_increments_count_two() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter()
+///   process.increment(counter)
+///   process.increment(counter)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(2)
+///   |> or_fail_with("expected counter to be 2")
+/// }
 /// ```
 ///
 pub fn start_counter() -> Subject(CounterMessage) {
@@ -97,14 +128,22 @@ pub fn start_counter() -> Subject(CounterMessage) {
 /// ## Example
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter_with(10)
-/// process.decrement(counter)
+/// ### Start a counter at ten <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_counter_with.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(9)
-/// |> or_fail_with("expected counter to be 9 after decrement")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn decrement_from_ten_gives_nine() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter_with(10)
+///   process.decrement(counter)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(9)
+///   |> or_fail_with("expected counter to be 9 after decrement")
+/// }
 /// ```
 ///
 pub fn start_counter_with(initial initial: Int) -> Subject(CounterMessage) {
@@ -147,14 +186,22 @@ fn handle_counter_message(
 ///
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter()
-/// process.increment(counter)
+/// ### Read the count <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/get_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(1)
-/// |> or_fail_with("expected counter to be 1")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn one_increment_counts_one() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter()
+///   process.increment(counter)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(1)
+///   |> or_fail_with("expected counter to be 1")
+/// }
 /// ```
 ///
 pub fn get_count(counter counter: Subject(CounterMessage)) -> Int {
@@ -177,15 +224,23 @@ pub fn get_count(counter counter: Subject(CounterMessage)) -> Int {
 ///
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter()
-/// process.increment(counter)
-/// process.increment(counter)
+/// ### Increment a counter twice <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_counter.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(2)
-/// |> or_fail_with("expected counter to be 2")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn two_increments_count_two() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter()
+///   process.increment(counter)
+///   process.increment(counter)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(2)
+///   |> or_fail_with("expected counter to be 2")
+/// }
 /// ```
 ///
 pub fn increment(counter counter: Subject(CounterMessage)) -> Nil {
@@ -208,14 +263,22 @@ pub fn increment(counter counter: Subject(CounterMessage)) -> Nil {
 ///
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter_with(10)
-/// process.decrement(counter)
+/// ### Decrement a counter <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_counter_with.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(9)
-/// |> or_fail_with("expected counter to be 9 after decrement")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn decrement_from_ten_gives_nine() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter_with(10)
+///   process.decrement(counter)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(9)
+///   |> or_fail_with("expected counter to be 9 after decrement")
+/// }
 /// ```
 ///
 pub fn decrement(counter counter: Subject(CounterMessage)) -> Nil {
@@ -239,14 +302,22 @@ pub fn decrement(counter counter: Subject(CounterMessage)) -> Nil {
 ///
 /// Use this inside an `it` block.
 ///
-/// ```gleam
-/// let counter = process.start_counter()
-/// process.set_count(counter, 42)
+/// ### Set the count <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/set_count.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// process.get_count(counter)
-/// |> should
-/// |> be_equal(42)
-/// |> or_fail_with("expected counter to be 42 after set_count")
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn set_count_sets_forty_two() -> Result(AssertionResult, String) {
+///   let counter = process.start_counter()
+///   process.set_count(counter, 42)
+///
+///   process.get_count(counter)
+///   |> should
+///   |> be_equal(42)
+///   |> or_fail_with("expected counter to be 42 after set_count")
+/// }
 /// ```
 ///
 pub fn set_count(
@@ -267,11 +338,19 @@ pub fn set_count(
 ///
 /// Use this anywhere you need a port selection value.
 ///
+/// ### Make a fixed port selection <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/port_selection.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.Port(1234)
-/// |> should
-/// |> be_equal(process.Port(1234))
-/// |> or_fail_with("expected PortSelection to be constructible")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn port_holds_its_number() -> Result(AssertionResult, String) {
+///   process.Port(1234)
+///   |> should
+///   |> be_equal(process.Port(1234))
+///   |> or_fail_with("expected PortSelection to be constructible")
+/// }
 /// ```
 ///
 pub type PortSelection {
@@ -294,11 +373,19 @@ pub type PortSelection {
 ///
 /// Use this in test setup, before starting a server.
 ///
+/// ### Get a port in the safe range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/unique_port.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.unique_port()
-/// |> should
-/// |> be_between(10_000, 60_000)
-/// |> or_fail_with("expected unique_port to be within 10k..60k")
+/// import dream_test/matchers.{be_between, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn unique_port_is_in_the_safe_range() -> Result(AssertionResult, String) {
+///   process.unique_port()
+///   |> should
+///   |> be_between(10_000, 60_000)
+///   |> or_fail_with("expected unique_port to be within 10k..60k")
+/// }
 /// ```
 ///
 pub fn unique_port() -> Int {
@@ -309,8 +396,8 @@ pub fn unique_port() -> Int {
 
 /// Start a generic actor with custom state and message handler.
 ///
-/// The actor is linked to the test process and will be automatically
-/// cleaned up when the test ends.
+/// The actor is linked to the calling process. Started in a test, it stops
+/// when the test ends.
 ///
 /// ## Parameters
 ///
@@ -323,16 +410,45 @@ pub fn unique_port() -> Int {
 ///
 /// ## Example
 ///
+/// ### Start a todo list actor <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_actor.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let todos = process.start_actor([], handle_todo_message)
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/erlang/process as erlang_process
+/// import gleam/list
+/// import gleam/otp/actor
 ///
-/// erlang_process.send(todos, Add("Write tests"))
-/// erlang_process.send(todos, Add("Run tests"))
+/// pub type TodoMessage {
+///   Add(String)
+///   GetAll(erlang_process.Subject(List(String)))
+/// }
 ///
-/// process.call_actor(todos, GetAll, 1000)
-/// |> should
-/// |> be_equal(["Write tests", "Run tests"])
-/// |> or_fail_with("expected items to be preserved in insertion order")
+/// fn handle_todo_message(
+///   items: List(String),
+///   message: TodoMessage,
+/// ) -> actor.Next(List(String), TodoMessage) {
+///   case message {
+///     Add(item) -> actor.continue(list.append(items, [item]))
+///     GetAll(reply_to) -> {
+///       erlang_process.send(reply_to, items)
+///       actor.continue(items)
+///     }
+///   }
+/// }
+///
+/// pub fn todos_keep_insertion_order() -> Result(AssertionResult, String) {
+///   let todos = process.start_actor([], handle_todo_message)
+///
+///   erlang_process.send(todos, Add("Write tests"))
+///   erlang_process.send(todos, Add("Run tests"))
+///
+///   process.call_actor(todos, GetAll, 1000)
+///   |> should
+///   |> be_equal(["Write tests", "Run tests"])
+///   |> or_fail_with("expected items to be preserved in insertion order")
+/// }
 /// ```
 ///
 pub fn start_actor(
@@ -364,11 +480,45 @@ pub fn start_actor(
 ///
 /// ## Example
 ///
+/// ### Call the todo list actor <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/start_actor.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.call_actor(todos, GetAll, 1000)
-/// |> should
-/// |> be_equal(["Write tests", "Run tests"])
-/// |> or_fail_with("expected items to be preserved in insertion order")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/erlang/process as erlang_process
+/// import gleam/list
+/// import gleam/otp/actor
+///
+/// pub type TodoMessage {
+///   Add(String)
+///   GetAll(erlang_process.Subject(List(String)))
+/// }
+///
+/// fn handle_todo_message(
+///   items: List(String),
+///   message: TodoMessage,
+/// ) -> actor.Next(List(String), TodoMessage) {
+///   case message {
+///     Add(item) -> actor.continue(list.append(items, [item]))
+///     GetAll(reply_to) -> {
+///       erlang_process.send(reply_to, items)
+///       actor.continue(items)
+///     }
+///   }
+/// }
+///
+/// pub fn todos_keep_insertion_order() -> Result(AssertionResult, String) {
+///   let todos = process.start_actor([], handle_todo_message)
+///
+///   erlang_process.send(todos, Add("Write tests"))
+///   erlang_process.send(todos, Add("Run tests"))
+///
+///   process.call_actor(todos, GetAll, 1000)
+///   |> should
+///   |> be_equal(["Write tests", "Run tests"])
+///   |> or_fail_with("expected items to be preserved in insertion order")
+/// }
 /// ```
 ///
 pub fn call_actor(
@@ -389,16 +539,26 @@ pub fn call_actor(
 ///
 /// ## Fields
 ///
-/// - `timeout_ms` - Maximum time to wait before giving up
-/// - `interval_ms` - How often to check the condition
+/// - `timeout_ms` - Maximum time to wait before giving up, on the monotonic
+///   clock. The time that the check takes counts too.
+/// - `interval_ms` - How long to wait between two checks. With 0, the check
+///   runs again at once, and the timeout still applies.
 ///
 /// ## Example
 ///
+/// ### Read the default poll config <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/default_poll_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.default_poll_config()
-/// |> should
-/// |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
-/// |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn default_waits_five_seconds() -> Result(AssertionResult, String) {
+///   process.default_poll_config()
+///   |> should
+///   |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
+///   |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
+/// }
 /// ```
 ///
 pub type PollConfig {
@@ -423,11 +583,19 @@ pub type PollConfig {
 ///
 /// ## Example
 ///
+/// ### Read the default poll config <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/default_poll_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.default_poll_config()
-/// |> should
-/// |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
-/// |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn default_waits_five_seconds() -> Result(AssertionResult, String) {
+///   process.default_poll_config()
+///   |> should
+///   |> be_equal(process.PollConfig(timeout_ms: 5000, interval_ms: 50))
+///   |> or_fail_with("expected default_poll_config to be 5000ms/50ms")
+/// }
 /// ```
 ///
 pub fn default_poll_config() -> PollConfig {
@@ -447,11 +615,19 @@ pub fn default_poll_config() -> PollConfig {
 ///
 /// ## Example
 ///
+/// ### Read the quick poll config <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/quick_poll_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.quick_poll_config()
-/// |> should
-/// |> be_equal(process.PollConfig(timeout_ms: 1000, interval_ms: 10))
-/// |> or_fail_with("expected quick_poll_config to be 1000ms/10ms")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn quick_waits_one_second() -> Result(AssertionResult, String) {
+///   process.quick_poll_config()
+///   |> should
+///   |> be_equal(process.PollConfig(timeout_ms: 1000, interval_ms: 10))
+///   |> or_fail_with("expected quick_poll_config to be 1000ms/10ms")
+/// }
 /// ```
 ///
 pub fn quick_poll_config() -> PollConfig {
@@ -496,18 +672,34 @@ pub type PollResult(a) {
 ///
 /// ## Example
 ///
+/// ### Wait until a check is true <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/await_ready.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.await_ready(process.quick_poll_config(), always_true)
-/// |> should
-/// |> be_equal(process.Ready(True))
-/// |> or_fail_with("expected await_ready to return Ready(True)")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// fn always_true() -> Bool {
+///   True
+/// }
+///
+/// pub fn ready_when_check_is_true() -> Result(AssertionResult, String) {
+///   process.await_ready(process.quick_poll_config(), always_true)
+///   |> should
+///   |> be_equal(process.Ready(True))
+///   |> or_fail_with("expected await_ready to return Ready(True)")
+/// }
 /// ```
 ///
 pub fn await_ready(
   config config: PollConfig,
   check check: fn() -> Bool,
 ) -> PollResult(Bool) {
-  poll_until_true(config.timeout_ms, config.interval_ms, check)
+  poll_until_true(
+    timing.now_ms() + config.timeout_ms,
+    config.interval_ms,
+    check,
+  )
 }
 
 /// Wait until a function returns Ok.
@@ -532,66 +724,87 @@ pub fn await_ready(
 ///
 /// ## Example
 ///
+/// ### Wait until a check gives Ok <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/process/await_some.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// process.await_some(process.default_poll_config(), always_ok_42)
-/// |> should
-/// |> be_equal(process.Ready(42))
-/// |> or_fail_with("expected await_some to return Ready(42)")
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/process
+/// import dream_test/types.{type AssertionResult}
+///
+/// fn always_forty_two() -> Result(Int, Nil) {
+///   Ok(42)
+/// }
+///
+/// pub fn ready_with_the_ok_value() -> Result(AssertionResult, String) {
+///   process.await_some(process.default_poll_config(), always_forty_two)
+///   |> should
+///   |> be_equal(process.Ready(42))
+///   |> or_fail_with("expected await_some to return Ready(42)")
+/// }
 /// ```
 ///
 pub fn await_some(
   config config: PollConfig,
   check check: fn() -> Result(a, e),
 ) -> PollResult(a) {
-  poll_until_ok(config.timeout_ms, config.interval_ms, check)
+  poll_until_ok(timing.now_ms() + config.timeout_ms, config.interval_ms, check)
 }
 
+/// Check until `check` gives `True` or the monotonic clock reaches
+/// `deadline_ms`. The time in `check` counts toward the timeout.
 fn poll_until_true(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Bool,
 ) -> PollResult(Bool) {
-  case remaining_ms <= 0 {
+  case timing.now_ms() >= deadline_ms {
     True -> TimedOut
-    False -> poll_check_bool(remaining_ms, interval_ms, check)
+    False -> poll_check_bool(deadline_ms, interval_ms, check)
   }
 }
 
 fn poll_check_bool(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Bool,
 ) -> PollResult(Bool) {
   case check() {
     True -> Ready(True)
     False -> {
-      process.sleep(interval_ms)
-      poll_until_true(remaining_ms - interval_ms, interval_ms, check)
+      sleep_before_next_check(deadline_ms, interval_ms)
+      poll_until_true(deadline_ms, interval_ms, check)
     }
   }
 }
 
+/// Check until `check` gives `Ok` or the monotonic clock reaches
+/// `deadline_ms`. The time in `check` counts toward the timeout.
 fn poll_until_ok(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Result(a, e),
 ) -> PollResult(a) {
-  case remaining_ms <= 0 {
+  case timing.now_ms() >= deadline_ms {
     True -> TimedOut
-    False -> poll_check_result(remaining_ms, interval_ms, check)
+    False -> poll_check_result(deadline_ms, interval_ms, check)
   }
 }
 
 fn poll_check_result(
-  remaining_ms: Int,
+  deadline_ms: Int,
   interval_ms: Int,
   check: fn() -> Result(a, e),
 ) -> PollResult(a) {
   case check() {
     Ok(value) -> Ready(value)
     Error(_) -> {
-      process.sleep(interval_ms)
-      poll_until_ok(remaining_ms - interval_ms, interval_ms, check)
+      sleep_before_next_check(deadline_ms, interval_ms)
+      poll_until_ok(deadline_ms, interval_ms, check)
     }
   }
+}
+
+/// Sleep for the interval, but not past the deadline.
+fn sleep_before_next_check(deadline_ms: Int, interval_ms: Int) -> Nil {
+  process.sleep(int.max(0, int.min(interval_ms, deadline_ms - timing.now_ms())))
 }

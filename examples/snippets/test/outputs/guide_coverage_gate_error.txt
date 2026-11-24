@@ -1,0 +1,7 @@
+
+Coverage failed
+  Coverage 60.0% is below the minimum 90.0% (needs 2 more lines).
+  Reason: 3 of 5 executable lines ran, and the minimum needs 5.
+  Fix: add tests for the lines that did not run (coverage.show_missing() lists them), or lower coverage.minimum_percent(...).
+
+Tests: 2 passed. Exit status 1, because coverage is below the minimum.

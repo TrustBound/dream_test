@@ -1,0 +1,6 @@
+Forecast
+  ✓ gives the forecast for Oslo (2ms)
+  ✓ gives the forecast for Lisbon (2ms)
+  ✓ reports a city that the API does not know (2ms)
+
+Summary: 3 run, 0 failed, 3 passed in 6ms

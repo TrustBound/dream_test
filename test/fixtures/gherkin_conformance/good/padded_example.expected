@@ -1,0 +1,10 @@
+feature "test"
+  scenario "Scenario" "test"
+    step "Given" "a <color> ball with:"
+      table
+        row "type" "diameter"
+        row "football" "69"
+        row "pool" "5.6"
+    examples ""
+      header "color"
+      row "red"

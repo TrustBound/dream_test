@@ -1,0 +1,8 @@
+feature "DataTables"
+  scenario "Scenario" "some whitespace is important"
+    step "Given" "3 lines of poetry on 5 lines"
+      table
+        row "\nraindrops--\nher last kiss\ngoodbye.\n"
+    step "Given" "an example of negative space"
+      table
+        row "lost        i n        space"

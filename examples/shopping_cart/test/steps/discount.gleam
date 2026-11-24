@@ -3,23 +3,21 @@
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_float, get_int,
 }
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{succeed}
-import dream_test/types.{type AssertionResult}
 import gleam/int
+import gleam/option.{Some}
 import gleam/result
-import shopping_cart/cart
 import shopping_cart/pricing
 import shopping_cart/types as cart_types
+import steps/cart_state.{type CartState, CartState}
 
 // ============================================================================
 // Step Registration
 // ============================================================================
 
-pub fn register(registry: StepRegistry) -> StepRegistry {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
-  |> steps.step("I apply a {int}% discount", step_apply_percent_discount)
-  |> steps.step("I apply a ${float} discount", step_apply_fixed_discount)
+  |> steps.when("I apply a {int}% discount", step_apply_percent_discount)
+  |> steps.when("I apply a ${float} discount", step_apply_fixed_discount)
 }
 
 // ============================================================================
@@ -27,39 +25,31 @@ pub fn register(registry: StepRegistry) -> StepRegistry {
 // ============================================================================
 
 fn step_apply_percent_discount(
+  state: CartState,
   context: StepContext,
-) -> Result(AssertionResult, String) {
-  let percent = get_int(context.captures, 0) |> result.unwrap(0)
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-  let discount = cart_types.PercentOff(int.to_float(percent))
-
-  case pricing.apply_discount(the_cart, discount) {
-    Ok(updated) -> {
-      put(context.world, "cart", updated)
-      Ok(succeed())
-    }
-    Error(_) -> {
-      put(context.world, "last_error", "discount failed")
-      Ok(succeed())
-    }
-  }
+) -> Result(CartState, String) {
+  use percent <- result.try(get_int(context.captures, 0))
+  Ok(apply_discount(state, cart_types.PercentOff(int.to_float(percent))))
 }
 
 fn step_apply_fixed_discount(
+  state: CartState,
   context: StepContext,
-) -> Result(AssertionResult, String) {
-  let amount = get_float(context.captures, 0) |> result.unwrap(0.0)
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-  let discount = cart_types.FixedAmount(amount)
+) -> Result(CartState, String) {
+  use amount <- result.try(get_float(context.captures, 0))
+  Ok(apply_discount(state, cart_types.FixedAmount(amount)))
+}
 
-  case pricing.apply_discount(the_cart, discount) {
-    Ok(updated) -> {
-      put(context.world, "cart", updated)
-      Ok(succeed())
-    }
-    Error(_) -> {
-      put(context.world, "last_error", "discount failed")
-      Ok(succeed())
-    }
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn apply_discount(
+  state: CartState,
+  discount: cart_types.Discount,
+) -> CartState {
+  case pricing.apply_discount(state.cart, discount) {
+    Ok(updated) -> CartState(..state, cart: updated)
+    Error(_) -> CartState(..state, last_error: Some("discount failed"))
   }
 }

@@ -1,0 +1,43 @@
+Failures
+  ✗ a different value
+    be_equal
+      Message: the string should split at each separator
+      Expected: ["a", "b", "c"]
+      Actual:   ["a", "b;c"]
+    Run it alone: gleam test -- --only "Failures/a different value"
+  ✗ an Error where an Ok was expected
+    be_ok
+      Message: 1 / 0 should be Ok(0)
+      Expected: Ok(_)
+      Actual:   Error("Cannot divide by zero")
+    Run it alone: gleam test -- --only "Failures/an Error where an Ok was expected"
+  ✗ a None where a Some was expected
+    be_some
+      Message: alice should be 30
+      Expected: Some(_)
+      Actual:   None
+    Run it alone: gleam test -- --only "Failures/a None where a Some was expected"
+  ✗ a missing item
+    contain
+      Message: the list should hold 4
+      Operation: contain
+      Expected: 4
+      Actual:   [1, 2, 3]
+    Run it alone: gleam test -- --only "Failures/a missing item"
+  ✗ a string with another start
+    start_with
+      Message: the text should start with HELLO
+      Operation: start_with
+      Pattern:   HELLO
+      Actual:    hello world
+    Run it alone: gleam test -- --only "Failures/a string with another start"
+  ✗ a failure from your own logic
+    fail_with
+      Message: 9 / 2 should not round down
+    Run it alone: gleam test -- --only "Failures/a failure from your own logic"
+  ✗ an Error from the test body
+    error
+      Message: Cannot divide by zero
+    Run it alone: gleam test -- --only "Failures/an Error from the test body"
+
+Summary: 7 run, 7 failed, 0 passed in 0ms

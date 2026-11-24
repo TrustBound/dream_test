@@ -3,51 +3,60 @@
 //// Use this module to:
 //// - find `.feature` files via a glob pattern
 //// - parse them (`load`) for inspection, or
-//// - convert them into runnable `TestSuite`s (`to_suite`) when you provide a
-////   step registry (your Given/When/Then handlers).
+//// - convert them into runnable `TestSuite`s (`to_suite`) after you attach a
+////   step registry (your Given/When/Then handlers) with `with_registry`.
 ////
 //// ## Example
 ////
+//// ### Run all cart feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/gherkin/discover
-//// import dream_test/gherkin/steps.{type StepContext, get_int, step}
-//// import dream_test/gherkin/world.{get_or, put}
-//// import dream_test/matchers.{be_equal, or_fail_with, should, succeed}
+//// import dream_test/gherkin/steps.{type StepContext, get_int}
+//// import dream_test/matchers.{be_equal, or_fail_with, should}
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type AssertionResult}
 //// import gleam/result
 ////
-//// fn step_server_running(context: StepContext) {
-////   put(context.world, "server_running", True)
-////   Ok(succeed())
+//// pub type Cart {
+////   Cart(server_running: Bool, items: Int)
 //// }
 ////
-//// fn step_empty_cart(context: StepContext) {
-////   put(context.world, "cart", 0)
-////   Ok(succeed())
+//// fn step_server_running(
+////   cart: Cart,
+////   _context: StepContext,
+//// ) -> Result(Cart, String) {
+////   Ok(Cart(..cart, server_running: True))
 //// }
 ////
-//// fn step_add_items(context: StepContext) {
-////   let current = get_or(context.world, "cart", 0)
-////   let to_add = get_int(context.captures, 0) |> result.unwrap(0)
-////   put(context.world, "cart", current + to_add)
-////   Ok(succeed())
+//// fn step_empty_cart(cart: Cart, _context: StepContext) -> Result(Cart, String) {
+////   Ok(Cart(..cart, items: 0))
 //// }
 ////
-//// fn step_verify_count(context: StepContext) {
-////   let expected = get_int(context.captures, 0) |> result.unwrap(0)
-////   get_or(context.world, "cart", 0)
+//// fn step_add_items(cart: Cart, context: StepContext) -> Result(Cart, String) {
+////   use added <- result.try(get_int(context.captures, 0))
+////   Ok(Cart(..cart, items: cart.items + added))
+//// }
+////
+//// fn step_verify_count(
+////   cart: Cart,
+////   context: StepContext,
+//// ) -> Result(AssertionResult, String) {
+////   use expected <- result.try(get_int(context.captures, 0))
+////   cart.items
 ////   |> should
 ////   |> be_equal(expected)
 ////   |> or_fail_with("Cart count mismatch")
 //// }
 ////
-//// pub fn tests() {
-////   // Define step handlers
+//// pub fn cart_features() -> TestSuite {
+////   // Define the steps and the state each scenario starts from
 ////   let steps =
-////     steps.new()
-////     |> step("the server is running", step_server_running)
-////     |> step("the cart is empty", step_empty_cart)
-////     |> step("I add {int} items", step_add_items)
-////     |> step("the cart should have {int} items", step_verify_count)
+////     steps.new(initial: Cart(server_running: False, items: 0))
+////     |> steps.given("the server is running", step_server_running)
+////     |> steps.given("the cart is empty", step_empty_cart)
+////     |> steps.when("I add {int} items", step_add_items)
+////     |> steps.then("the cart should have {int} items", step_verify_count)
 ////
 ////   // Discover and load all .feature files
 ////   discover.features("test/*.feature")
@@ -56,17 +65,17 @@
 //// }
 //// ```
 
-import dream_test/gherkin/feature.{FeatureConfig, to_test_suite}
-import dream_test/gherkin/parser
+import dream_test/gherkin/parser.{type FeatureFileError}
 import dream_test/gherkin/steps.{type StepRegistry}
 import dream_test/gherkin/types as gherkin_types
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure, Test, Tree,
+  Unit,
 }
 import gleam/list
-import gleam/option.{type Option, None, Some}
-import gleam/string
+import gleam/option.{None, Some}
+import gleam/result
 
 // ============================================================================
 // Types
@@ -74,7 +83,8 @@ import gleam/string
 
 /// Builder for discovering and loading feature files.
 ///
-/// Use `features()` to create a discovery, then chain with `with_registry()` and
+/// Use `features()` to create a discovery. Pipe it into `list_files` or
+/// `load` to inspect the files, or into `with_registry()` and then
 /// `to_suite()` to build a runnable `TestSuite`.
 ///
 /// This is opaque so callers can’t depend on internal fields that may change.
@@ -82,12 +92,39 @@ pub opaque type FeatureDiscovery {
   FeatureDiscovery(
     /// Glob pattern for finding feature files
     pattern: String,
-    /// Step registry (set via with_registry)
-    registry: Option(StepRegistry),
-    /// Parsed features (populated during to_suite)
-    features: List(gherkin_types.Feature),
-    /// Parse errors encountered
-    errors: List(String),
+  )
+}
+
+/// A feature discovery with a step registry attached.
+///
+/// `with_registry` gives this value, and `to_suite` takes it. A suite thus
+/// always has the step definitions it needs to run its scenarios.
+///
+/// ## Example
+///
+/// ### Build a suite from feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepRegistry}
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn cart_features(steps: StepRegistry(state)) -> TestSuite {
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
+/// ```
+///
+/// This is opaque so callers can’t depend on internal fields that may change.
+/// `state` is the scenario state type of the step registry.
+pub opaque type RunnableDiscovery(state) {
+  RunnableDiscovery(
+    /// Glob pattern for finding feature files
+    pattern: String,
+    /// Step definitions used to run the scenarios
+    registry: StepRegistry(state),
   )
 }
 
@@ -99,9 +136,14 @@ pub opaque type FeatureDiscovery {
 /// ## Fields
 ///
 /// - `features`: successfully parsed feature values
-/// - `errors`: parse errors as strings (typically `"path: message"`)
+/// - `errors`: one `parser.FeatureFileError` for each file that could not be
+///   read or parsed. Use `parser.feature_file_error_to_string` to get the
+///   message (`"path: line N: ..."`).
 pub type LoadResult {
-  LoadResult(features: List(gherkin_types.Feature), errors: List(String))
+  LoadResult(
+    features: List(gherkin_types.Feature),
+    errors: List(FeatureFileError),
+  )
 }
 
 // ============================================================================
@@ -110,12 +152,20 @@ pub type LoadResult {
 
 /// Start discovering features matching a glob pattern.
 ///
-/// Use Erlang’s `filelib:wildcard/1` semantics (see `wildcard/1` below).
+/// The pattern uses the glob syntax of Erlang’s `filelib:wildcard/1`: `*`,
+/// `?`, `**`, `[...]` and `{a,b}`. A relative pattern is read from the
+/// current directory.
 ///
 /// ## Example
 ///
+/// ### Find feature files by a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/features.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.features("test/*.feature")
+/// import dream_test/gherkin/discover.{type FeatureDiscovery}
+///
+/// pub fn feature_files() -> FeatureDiscovery {
+///   discover.features("test/*.feature")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -125,31 +175,74 @@ pub type LoadResult {
 /// ## Returns
 ///
 /// A `FeatureDiscovery` builder you can pipe into `with_registry`, `load`,
-/// `list_files`, or `to_suite`.
+/// or `list_files`.
 pub fn features(pattern pattern: String) -> FeatureDiscovery {
-  FeatureDiscovery(pattern: pattern, registry: None, features: [], errors: [])
+  FeatureDiscovery(pattern: pattern)
 }
 
 /// Attach a step registry to the discovery.
 ///
-/// The step registry is the set of step definitions (Given/When/Then handlers)
-/// used to execute scenarios. It is required before calling `to_suite`.
+/// The step registry is the set of step definitions (Given/When/Then steps)
+/// used to execute scenarios. `to_suite` takes the `RunnableDiscovery` that
+/// this function gives, so a suite cannot exist without step definitions.
 ///
 /// ## Example
 ///
-/// ```gleam
-/// // Define step handlers
-/// let steps =
-///   steps.new()
-///   |> step("the server is running", step_server_running)
-///   |> step("the cart is empty", step_empty_cart)
-///   |> step("I add {int} items", step_add_items)
-///   |> step("the cart should have {int} items", step_verify_count)
+/// ### Attach steps and build a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/module.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// // Discover and load all .feature files
-/// discover.features("test/*.feature")
-/// |> discover.with_registry(steps)
-/// |> discover.to_suite("cart_features")
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepContext, get_int}
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import gleam/result
+///
+/// pub type Cart {
+///   Cart(server_running: Bool, items: Int)
+/// }
+///
+/// fn step_server_running(
+///   cart: Cart,
+///   _context: StepContext,
+/// ) -> Result(Cart, String) {
+///   Ok(Cart(..cart, server_running: True))
+/// }
+///
+/// fn step_empty_cart(cart: Cart, _context: StepContext) -> Result(Cart, String) {
+///   Ok(Cart(..cart, items: 0))
+/// }
+///
+/// fn step_add_items(cart: Cart, context: StepContext) -> Result(Cart, String) {
+///   use added <- result.try(get_int(context.captures, 0))
+///   Ok(Cart(..cart, items: cart.items + added))
+/// }
+///
+/// fn step_verify_count(
+///   cart: Cart,
+///   context: StepContext,
+/// ) -> Result(AssertionResult, String) {
+///   use expected <- result.try(get_int(context.captures, 0))
+///   cart.items
+///   |> should
+///   |> be_equal(expected)
+///   |> or_fail_with("Cart count mismatch")
+/// }
+///
+/// pub fn cart_features() -> TestSuite {
+///   // Define the steps and the state each scenario starts from
+///   let steps =
+///     steps.new(initial: Cart(server_running: False, items: 0))
+///     |> steps.given("the server is running", step_server_running)
+///     |> steps.given("the cart is empty", step_empty_cart)
+///     |> steps.when("I add {int} items", step_add_items)
+///     |> steps.then("the cart should have {int} items", step_verify_count)
+///
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -159,20 +252,23 @@ pub fn features(pattern pattern: String) -> FeatureDiscovery {
 ///
 /// ## Returns
 ///
-/// The updated discovery.
+/// A `RunnableDiscovery` to pipe into `to_suite`.
 pub fn with_registry(
   discovery discovery: FeatureDiscovery,
-  registry registry: StepRegistry,
-) -> FeatureDiscovery {
-  FeatureDiscovery(..discovery, registry: Some(registry))
+  registry registry: StepRegistry(state),
+) -> RunnableDiscovery(state) {
+  RunnableDiscovery(pattern: discovery.pattern, registry: registry)
 }
 
 /// Build a TestSuite from discovered features.
 ///
-/// Panics if `with_registry()` was not called.
-///
 /// Parse errors are converted into failing unit tests tagged with
-/// `"parse-error"`.
+/// `"parse-error"`. A pattern that matches no files gives one failing test
+/// tagged `"no-feature-files"`, named
+/// `No feature files match the pattern "<pattern>"`. A pattern that cannot
+/// be searched gives one failing test tagged `"invalid-feature-pattern"`,
+/// named
+/// `Cannot search for feature files with the pattern "<pattern>": <reason>`.
 ///
 /// ## What does this produce?
 ///
@@ -181,45 +277,56 @@ pub fn with_registry(
 ///
 /// ## Example
 ///
+/// ### Build a suite from feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// // Discover and load all .feature files
-/// discover.features("test/*.feature")
-/// |> discover.with_registry(steps)
-/// |> discover.to_suite("cart_features")
+/// import dream_test/gherkin/discover
+/// import dream_test/gherkin/steps.{type StepRegistry}
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn cart_features(steps: StepRegistry(state)) -> TestSuite {
+///   // Discover and load all .feature files
+///   discover.features("test/*.feature")
+///   |> discover.with_registry(steps)
+///   |> discover.to_suite("cart_features")
+/// }
 /// ```
 ///
 /// ## Parameters
 ///
-/// - `discovery`: a `FeatureDiscovery` with a registry attached via `with_registry`
+/// - `discovery`: a `RunnableDiscovery` from `with_registry`
 /// - `suite_name`: name to show for the top-level suite/group in reports
 ///
 /// ## Returns
 ///
-/// A `TestSuite(Nil)` containing one test per discovered scenario, plus failing
-/// tests for any parse errors (tagged `"parse-error"`).
+/// A `TestSuite` containing one test per discovered scenario, plus failing
+/// tests for any parse errors (tagged `"parse-error"`), or one failing test
+/// when no file matches (tagged `"no-feature-files"`) or the pattern cannot
+/// be searched (tagged `"invalid-feature-pattern"`).
 pub fn to_suite(
-  discovery discovery: FeatureDiscovery,
+  discovery discovery: RunnableDiscovery(state),
   suite_name suite_name: String,
-) -> TestSuite(Nil) {
-  let registry = case discovery.registry {
-    Some(r) -> r
-    None ->
-      panic as "FeatureDiscovery requires a registry. Call with_registry() first."
-  }
+) -> TestSuite {
+  let found = discover_files(discovery.pattern)
+  let parsed = parse_all_features(result.unwrap(found, []))
 
-  let files = discover_files(discovery.pattern)
-  let load_result = load_all_features(files)
-
-  let children = features_to_groups(load_result.features, registry, [])
-  let error_nodes = errors_to_nodes(load_result.errors, [])
-  Root(
-    seed: Nil,
-    tree: Group(
+  let features = list.map(parsed.features, steps.Feature)
+  let error_nodes = errors_to_nodes(parsed.failures, [])
+  let missing_nodes = missing_files_nodes(discovery.pattern, found)
+  suite.join(name: suite_name, suites: [
+    suite.from_tree(Tree(
+      initial: Nil,
       name: suite_name,
       tags: [],
-      children: list.append(children, error_nodes),
+      tests: list.append(error_nodes, missing_nodes),
+    )),
+    steps.to_suite(
+      registry: discovery.registry,
+      name: suite_name,
+      tags: [],
+      tests: features,
     ),
-  )
+  ])
 }
 
 /// Load features and return detailed results.
@@ -230,13 +337,21 @@ pub fn to_suite(
 ///
 /// ## Example
 ///
-/// ```gleam
-/// let result = discover.features("test/*.feature") |> discover.load()
+/// ### Load and parse feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/load.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// result.features
-/// |> should
-/// |> have_length(1)
-/// |> or_fail_with("expected one parsed feature")
+/// ```gleam
+/// import dream_test/gherkin/discover
+/// import dream_test/matchers.{have_length, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn load_parses_one_feature() -> Result(AssertionResult, String) {
+///   let result = discover.features("test/*.feature") |> discover.load()
+///
+///   result.features
+///   |> should
+///   |> have_length(1)
+///   |> or_fail_with("expected one parsed feature")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -245,10 +360,20 @@ pub fn to_suite(
 ///
 /// ## Returns
 ///
-/// A `LoadResult` containing parsed features and any parse errors.
+/// A `LoadResult` containing parsed features and any parse errors. A pattern
+/// that matches no files gives the error
+/// `parser.NoMatchingFeatureFiles(pattern)`, and a pattern that cannot be
+/// searched gives `parser.InvalidFeatureFilePattern(pattern, reason)`.
 pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
-  let files = discover_files(discovery.pattern)
-  load_all_features(files)
+  let found = discover_files(discovery.pattern)
+  let parsed = parse_all_features(result.unwrap(found, []))
+  LoadResult(
+    features: parsed.features,
+    errors: list.append(
+      missing_files_errors(discovery.pattern, found),
+      list.map(parsed.failures, failure_error),
+    ),
+  )
 }
 
 /// Get the list of files matching the discovery pattern.
@@ -257,12 +382,21 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 ///
 /// ## Example
 ///
+/// ### List matching feature files <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/gherkin/discover/list_files.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.features("test/*.feature")
-/// |> discover.list_files()
-/// |> should
-/// |> contain("test/cart.feature")
-/// |> or_fail_with("expected list_files to include test/cart.feature")
+/// import dream_test/gherkin/discover
+/// import dream_test/matchers.{be_ok, contain, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn list_files_finds_the_cart_feature() -> Result(AssertionResult, String) {
+///   discover.features("test/*.feature")
+///   |> discover.list_files()
+///   |> should
+///   |> be_ok()
+///   |> contain("test/cart.feature")
+///   |> or_fail_with("expected list_files to include test/cart.feature")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -271,8 +405,12 @@ pub fn load(discovery discovery: FeatureDiscovery) -> LoadResult {
 ///
 /// ## Returns
 ///
-/// A list of file paths matching the glob pattern.
-pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
+/// `Ok` with the file paths that match the glob pattern. A pattern that
+/// matches no files gives `Ok([])`. A pattern that cannot be searched gives
+/// `Error(parser.InvalidFeatureFilePattern(pattern, reason))`.
+pub fn list_files(
+  discovery discovery: FeatureDiscovery,
+) -> Result(List(String), FeatureFileError) {
   discover_files(discovery.pattern)
 }
 
@@ -280,62 +418,158 @@ pub fn list_files(discovery discovery: FeatureDiscovery) -> List(String) {
 // Internal Helpers
 // ============================================================================
 
-fn discover_files(pattern: String) -> List(String) {
-  wildcard(pattern)
-}
-
-fn load_all_features(files: List(String)) -> LoadResult {
-  load_all_features_loop(files, [], [])
-}
-
-fn load_all_features_loop(
-  files: List(String),
-  features_rev: List(gherkin_types.Feature),
-  errors_rev: List(String),
-) -> LoadResult {
-  case files {
-    [] ->
-      LoadResult(
-        features: list.reverse(features_rev),
-        errors: list.reverse(errors_rev),
-      )
-    [path, ..rest] -> {
-      case parse_feature_file(path) {
-        Ok(feature) ->
-          load_all_features_loop(rest, [feature, ..features_rev], errors_rev)
-        Error(error) ->
-          load_all_features_loop(rest, features_rev, [error, ..errors_rev])
-      }
-    }
+fn discover_files(pattern: String) -> Result(List(String), FeatureFileError) {
+  case wildcard(pattern) {
+    Ok(files) -> Ok(files)
+    Error(reason) ->
+      Error(parser.InvalidFeatureFilePattern(pattern: pattern, reason: reason))
   }
 }
 
-fn parse_feature_file(path: String) -> Result(gherkin_types.Feature, String) {
-  case parser.parse_file(path) {
-    Ok(feature) -> Ok(feature)
-    Error(e) -> Error(path <> ": " <> e)
-  }
-}
-
-fn error_to_node(error: String) -> Node(Nil) {
-  Test(
-    name: "Parse Error: " <> error,
-    tags: ["parse-error"],
-    kind: Unit,
-    run: parse_error_test_run,
-    timeout_ms: None,
-    source: source_from_parse_error(error),
+/// A pattern that matches no files, or that cannot be searched: the
+/// error, the tag of its failing test, and the run of that test.
+type MissingFiles {
+  MissingFiles(
+    error: FeatureFileError,
+    tag: String,
+    run: fn() -> Result(AssertionResult, String),
   )
 }
 
-fn source_from_parse_error(error: String) -> Option(String) {
-  case string.split_once(error, ": ") {
-    Ok(#(path, _message)) -> Some(path)
-    Error(_) -> None
+/// A pattern that matches no files, or that cannot be searched, is an
+/// error, so a wrong pattern cannot give a run that passes with no tests.
+/// The failing test for a pattern that matches no files is tagged
+/// `no-feature-files`. The failing test for a pattern that cannot be
+/// searched is tagged `invalid-feature-pattern`.
+fn missing_files(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(MissingFiles) {
+  case found {
+    Error(error) -> [
+      MissingFiles(
+        error: error,
+        tag: "invalid-feature-pattern",
+        run: invalid_pattern_test_run,
+      ),
+    ]
+    Ok([]) -> [
+      MissingFiles(
+        error: parser.NoMatchingFeatureFiles(pattern: pattern),
+        tag: "no-feature-files",
+        run: no_feature_files_test_run,
+      ),
+    ]
+    Ok(_) -> []
   }
 }
 
-fn parse_error_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn missing_files_errors(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(FeatureFileError) {
+  list.map(missing_files(pattern, found), missing_files_error)
+}
+
+fn missing_files_error(missing: MissingFiles) -> FeatureFileError {
+  missing.error
+}
+
+fn missing_files_nodes(
+  pattern: String,
+  found: Result(List(String), FeatureFileError),
+) -> List(Node(Nil)) {
+  list.map(missing_files(pattern, found), missing_files_node)
+}
+
+fn missing_files_node(missing: MissingFiles) -> Node(Nil) {
+  Test(
+    name: parser.feature_file_error_to_string(missing.error),
+    tags: [missing.tag],
+    kind: Unit,
+    run: types.NoInput(missing.run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn no_feature_files_test_run() -> Result(AssertionResult, String) {
+  Ok(
+    AssertionFailed(AssertionFailure(
+      operator: "discover",
+      message: "No feature files found for the pattern (see test name for the cause)",
+      payload: None,
+    )),
+  )
+}
+
+fn invalid_pattern_test_run() -> Result(AssertionResult, String) {
+  Ok(
+    AssertionFailed(AssertionFailure(
+      operator: "discover",
+      message: "The feature file pattern cannot be searched (see test name for the cause)",
+      payload: None,
+    )),
+  )
+}
+
+/// A feature file that did not parse: its path and the parser message.
+type ParseFailure {
+  ParseFailure(path: String, error: FeatureFileError)
+}
+
+/// The features that parsed and the files that did not, in file order.
+type ParsedFeatures {
+  ParsedFeatures(
+    features: List(gherkin_types.Feature),
+    failures: List(ParseFailure),
+  )
+}
+
+fn parse_all_features(files: List(String)) -> ParsedFeatures {
+  let reversed =
+    list.fold(files, ParsedFeatures(features: [], failures: []), parse_into)
+  ParsedFeatures(
+    features: list.reverse(reversed.features),
+    failures: list.reverse(reversed.failures),
+  )
+}
+
+/// Parse one file and put the result at the front of the matching list.
+fn parse_into(parsed: ParsedFeatures, path: String) -> ParsedFeatures {
+  case parser.parse_file(path) {
+    Ok(feature) ->
+      ParsedFeatures(..parsed, features: [feature, ..parsed.features])
+    Error(error) ->
+      ParsedFeatures(..parsed, failures: [
+        ParseFailure(path: path, error: error),
+        ..parsed.failures
+      ])
+  }
+}
+
+fn failure_error(failure: ParseFailure) -> FeatureFileError {
+  failure.error
+}
+
+/// A parse error starts with the path, and a read error names the path, so
+/// the message is complete.
+fn format_parse_failure(failure: ParseFailure) -> String {
+  parser.feature_file_error_to_string(failure.error)
+}
+
+fn error_to_node(failure: ParseFailure) -> Node(Nil) {
+  Test(
+    name: "Parse Error: " <> format_parse_failure(failure),
+    tags: ["parse-error"],
+    kind: Unit,
+    run: types.NoInput(parse_error_test_run),
+    timeout_ms: None,
+    source: Some(failure.path),
+  )
+}
+
+fn parse_error_test_run() -> Result(AssertionResult, String) {
   Ok(parse_error_assertion())
 }
 
@@ -347,42 +581,15 @@ fn parse_error_assertion() -> AssertionResult {
   ))
 }
 
-fn features_to_groups(
-  features: List(gherkin_types.Feature),
-  registry: StepRegistry,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case features {
-    [] -> list.reverse(acc_rev)
-    [feature, ..rest] -> {
-      let group = feature_to_group(feature, registry)
-      features_to_groups(rest, registry, [group, ..acc_rev])
-    }
-  }
-}
-
-fn feature_to_group(
-  feature: gherkin_types.Feature,
-  registry: StepRegistry,
-) -> Node(Nil) {
-  let config = FeatureConfig(feature: feature, step_registry: registry)
-  let feature_suite = to_test_suite(config)
-  root_to_group(feature_suite)
-}
-
 fn errors_to_nodes(
-  errors: List(String),
+  failures: List(ParseFailure),
   acc_rev: List(Node(Nil)),
 ) -> List(Node(Nil)) {
-  case errors {
+  case failures {
     [] -> list.reverse(acc_rev)
-    [error, ..rest] -> errors_to_nodes(rest, [error_to_node(error), ..acc_rev])
+    [failure, ..rest] ->
+      errors_to_nodes(rest, [error_to_node(failure), ..acc_rev])
   }
-}
-
-fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  let Root(_seed, tree) = suite
-  tree
 }
 
 // ============================================================================
@@ -391,4 +598,4 @@ fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
 
 /// Find files matching a glob pattern using Erlang's filelib:wildcard/1.
 @external(erlang, "dream_test_gherkin_discover_ffi", "wildcard")
-fn wildcard(pattern: String) -> List(String)
+fn wildcard(pattern: String) -> Result(List(String), String)

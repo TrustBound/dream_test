@@ -1,0 +1,8 @@
+Forecast
+  ✓ gives the forecast for Oslo
+  ✓ gives the forecast for Lisbon
+  ✓ reports a city that the API does not know
+Alert feed
+  ✓ reads the message of each alert
+
+Summary: 4 run, 0 failed, 4 passed in 0ms

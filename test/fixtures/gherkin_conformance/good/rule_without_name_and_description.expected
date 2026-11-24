@@ -1,0 +1,4 @@
+feature ""
+  rule ""
+    scenario "Scenario" ""
+      step "Given" "text"

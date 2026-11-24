@@ -34,7 +34,17 @@ This project contains **small, compile-ready examples** for every `dream_test` f
   - **Progress bar (live)**: `test/snippets/reporters/progress_reporter.gleam`
   - **Gherkin formatting**: `test/snippets/reporters/gherkin_reporter.gleam` (runs, then formats results)
   - **JSON (formatting)**: `test/snippets/reporters/json_formatting.gleam`
-  - **Reporter events (advanced/custom tooling)**: `test/snippets/reporters/reporter_api_handle_event.gleam`
+  - **Reporter events (advanced/custom tooling)**: `test/snippets/reporters/reporter_api_progress_line.gleam`
+- **Coverage (opt-in, minimums, exclusions, markers, table options, output files, server recipe)**:
+  - `test/snippets/coverage/runner_coverage.gleam`
+  - `test/snippets/coverage/coverage_environment.gleam`
+  - `test/snippets/coverage/coverage_minimum.gleam`
+  - `test/snippets/coverage/coverage_exclusions.gleam`
+  - `test/snippets/coverage/coverage_markers.gleam`
+  - `test/snippets/coverage/coverage_table.gleam`
+  - `test/snippets/coverage/coverage_outputs.gleam`
+  - `test/snippets/coverage/coverage_server.gleam`
+  - `test/snippets/coverage/coverage_start_finish.gleam` (runs `coverage.start` and `coverage.finish` for real)
 - **Sandboxing (timeouts + crash isolation)**:
   - `test/snippets/utils/sandboxing.gleam`
 - **Timing helpers**:
@@ -60,4 +70,4 @@ This project contains **small, compile-ready examples** for every `dream_test` f
   - `test/snippets/gherkin/gherkin_discover.gleam` (glob discovery)
 - **Context-aware tests (`unit_context`)**:
   - `test/snippets/hooks/context_aware_tests.gleam`
-    - Note: uses a custom context type, so it’s run standalone via `gleam run -m snippets/hooks/context_aware_tests`.
+    - Note: `gleam test` runs it with the other snippets. It also has a `main`, so `gleam run -m snippets/hooks/context_aware_tests` runs it alone.

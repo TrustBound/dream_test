@@ -42,14 +42,14 @@ All contributions are valued, no matter how small.
 
 ### Prerequisites
 
-- [Gleam](https://gleam.run/) v1.17.0+ — required, not just recommended. CI runs `gleam format --check` with the 1.17 formatter, and earlier formatters produce different output, so code formatted with an older Gleam will fail CI (and code formatted with 1.17 will fail the pre-commit hook on an older local Gleam).
-- Erlang/OTP 28+ (the version CI tests against)
+- [Gleam](https://gleam.run/) v1.19.0+ — required, not just recommended. CI runs Gleam 1.19.2. Coverage line numbers are exact only from Gleam 1.19, and the coverage tests expect exact line numbers. CI also runs `gleam format --check`, and other formatter versions can produce different output.
+- Erlang/OTP 28+ (the version CI tests against) with the JIT. Coverage counts lines with the native line counters of the BEAM, which need Erlang/OTP 27+ with the JIT, and the test run measures its own coverage code with them. `erl -noshell -eval 'io:format("~p~n", [code:coverage_support()]), halt().'` must print `true`.
 - Git
 - Make (optional but recommended)
 
 ### Setup
 
-```bash
+```bash illustration
 # Clone your fork
 git clone https://github.com/YOUR_USERNAME/dream_test.git
 cd dream_test
@@ -69,7 +69,7 @@ If everything passes, you're ready to contribute.
 
 ### 1. Create a branch
 
-```bash
+```bash illustration
 git checkout main
 git pull upstream main
 git checkout -b feature/your-feature-name
@@ -86,12 +86,27 @@ Use `feature/` for new features, `fix/` for bug fixes.
 
 ### 3. Test
 
-```bash
-make all          # Full build + test + format
-make test         # Tests only
-make build        # Compile only
-make format       # Format code
+`make all` runs what CI runs, then the other example projects. `make check` runs only what CI runs, with this script:
+
+#### What CI runs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/scripts/check.sh"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```sh
+#!/bin/sh
+# What CI runs: the format check, the build, the tests with line coverage,
+# the docs build, and the tests of the snippets project, which also check
+# every code block of the docs. "make check" runs this script.
+set -eu
+
+gleam format --check src test
+gleam build
+gleam test
+gleam docs build
+cd examples/snippets
+gleam format --check
+gleam test
 ```
+
+The other targets: `make test` runs the dream_test tests only, `make snippets` runs the tests of the snippets project, `make check-snippets` runs only the check of the code blocks of the docs, `make examples` runs the other example projects, `make build` compiles, and `make format` formats the code.
 
 ### 4. Commit
 
@@ -99,7 +114,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 **Format:**
 
-```
+```text illustration
 <type>[optional scope]: <description>
 
 ## Why This Change Was Made
@@ -128,15 +143,11 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 | `ci`       | CI configuration                                        |
 | `chore`    | Other changes that don't modify src or test             |
 
-**Scope:** If your branch has an issue number (e.g., `feature/SVC-123`), use it as the scope:
-
-```
-feat(SVC-123): add timeout support to test runner
-```
+**Scope:** If the change has an issue in the project's tracker, use the issue's identifier as the scope. Otherwise, name the part of the project that the change touches, as in `feat(runner): add timeout support to test runner`.
 
 **Example:**
 
-```
+```text illustration
 feat: add timeout support to test runner
 
 ## Why This Change Was Made
@@ -154,19 +165,11 @@ feat: add timeout support to test runner
 - Yes, we considered using a monad for this. No, we didn't.
 ```
 
-**Breaking changes:** Add `!` after type:
-
-```
-feat!: remove deprecated assertion API
-```
+**Breaking changes:** Add `!` after the type, as in `feat!: remove deprecated assertion API`.
 
 ### 5. Push and open PR
 
-```bash
-git push origin feature/your-feature-name
-```
-
-Then open a pull request on GitHub.
+Push your branch to your fork, for example with `git push origin feature/your-feature-name`. Then open a pull request on GitHub.
 
 ---
 
@@ -180,19 +183,22 @@ Add tests in the appropriate `test/dream_test/` subdirectory matching the source
 
 ### Test structure
 
-```gleam
-import dream_test/unit.{describe, it}
-import dream_test/matchers.{should, , fail_with, or_fail_with}
-import dream_test/types.{AssertionOk, MatchFailed, MatchOk}
+#### A test module <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/contributing/test_structure.gleam#L1-L17"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
-pub fn tests() {
+```gleam
+import dream_test/matchers.{fail_with}
+import dream_test/suite.{type TestSuite}
+import dream_test/types.{AssertionOk, MatchFailed, MatchOk}
+import dream_test/unit.{describe, it}
+
+pub fn tests() -> TestSuite {
   describe("Feature name", [
     it("does something when condition", fn() {
       let result = some_function()
 
       case result {
-        MatchOk(_) -> AssertionOk
-        MatchFailed(_) -> fail_with("Expected success")
+        MatchOk(_) -> Ok(AssertionOk)
+        MatchFailed(_) -> Ok(fail_with("Expected success"))
       }
     }),
   ])
@@ -217,6 +223,8 @@ Dream Test maintains high documentation standards. Contributions must match the 
 ### Module-level docs (`////`)
 
 New modules need comprehensive module docs at the top of the file:
+
+#### Module docs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/contributing/module_docs.gleam#L1-L24"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ````gleam
 //// Brief description of what this module does.
@@ -253,6 +261,8 @@ Every public function needs:
 2. **Behavior details** — what it returns, edge cases
 3. **Example** — runnable code showing typical usage
 
+#### Function docs <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/contributing/function_docs.gleam#L8-L26"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ````gleam
 /// Checks if the value equals the expected value.
 ///
@@ -267,8 +277,11 @@ Every public function needs:
 /// |> be_equal(42)
 /// |> or_fail_with("Should be 42")
 /// ```
-pub fn be_equal(result: MatchResult(a), expected: a) -> MatchResult(a) {
-  // ...
+pub fn be_equal(
+  value_or_result value_or_result: MatchResult(a),
+  expected expected: a,
+) -> MatchResult(a) {
+  matchers.be_equal(value_or_result, expected)
 }
 ````
 

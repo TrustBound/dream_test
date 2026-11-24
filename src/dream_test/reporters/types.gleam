@@ -1,31 +1,11 @@
-//// Reporter event types emitted during a run.
+//// Configuration types of the results reporters.
 ////
-//// These types are produced by Dream Test’s runner/executors and consumed by
-//// reporters (see `dream_test/reporters`). You usually don’t construct events
-//// yourself; you pattern match on them if you’re implementing a custom
-//// reporter.
-////
-//// ## Terminology
-////
-//// - **scope**: the describe/group path for where something happened
-////   (example: `["file", "delete"]`)
-//// - **test_name**: the leaf `it(...)` name for per-test hooks
-//// - **completed / total**: counts for progress UIs; `completed` is 1-based and
-////   increases monotonically
-////
-//// ## Event model
-////
-//// A typical run looks like:
-////
-//// - `RunStarted(total)`
-//// - many `TestFinished(completed, total, result)` (in completion order)
-//// - `RunFinished(completed, total, results)`
-////
-//// Hook events (`HookStarted` / `HookFinished`) can be interleaved when you use
-//// lifecycle hooks.
+//// `runner.results_reporters(...)` takes a list of `ResultsReporter`
+//// values. Each one formats the run report once, at the end of the run.
+//// The live progress bar has its own event type,
+//// `dream_test/reporters/progress.ProgressEvent`.
 
-import dream_test/types.{type TestResult}
-import gleam/option.{type Option}
+import dream_test/types.{type RunReport}
 
 // ============================================================================
 // Results reporter configuration (end-of-run)
@@ -35,9 +15,11 @@ import gleam/option.{type Option}
 pub type BddOutputMode {
   /// Print the full hierarchical results, then repeat failures, then summary.
   BddFull
-  /// Print failures (repeated) and summary only.
+  /// Print failures (repeated), the setup and teardown failures, and the
+  /// summary.
   BddFailuresOnly
-  /// Print summary only.
+  /// Print the summary, after the setup and teardown failures when there
+  /// are any.
   BddSummaryOnly
 }
 
@@ -54,83 +36,65 @@ pub type JsonReporterConfig {
 /// Results reporters format the end-of-run results into one output block each.
 ///
 /// They are executed in the order provided to `runner.results_reporters(...)`.
+/// The runner writes every report before it checks coverage, and before
+/// `runner.exit_on_failure()` ends the program. Thus each report prints,
+/// also when the run fails.
 pub type ResultsReporter {
+  /// The BDD report. Make it with `dream_test/reporters/bdd.new()`.
   Bdd(BddReporterConfig)
+  /// The JSON report. Make it with `dream_test/reporters/json.new()`.
   Json(JsonReporterConfig)
-}
-
-/// Which lifecycle hook is running.
-///
-/// ## Example
-///
-/// ```gleam
-/// let event =
-///   reporter_types.HookFinished(
-///     kind: reporter_types.AfterEach,
-///     scope: ["file"],
-///     test_name: Some("delete"),
-///     outcome: reporter_types.HookError(message: "boom"),
-///   )
-/// ```
-pub type HookKind {
-  BeforeAll
-  BeforeEach
-  AfterEach
-  AfterAll
-}
-
-/// Whether a hook succeeded or failed.
-///
-/// ## Example
-///
-/// ```gleam
-/// use message <- result.try(hook_error_message(event))
-///
-/// message
-/// |> should
-/// |> be_equal("boom")
-/// |> or_fail_with("expected hook error message 'boom'")
-/// ```
-pub type HookOutcome {
-  HookOk
-  HookError(message: String)
-}
-
-/// Events emitted during a test run, suitable for progress indicators.
-///
-/// `scope` is the describe/group path (e.g. `["file", "delete"]`).
-/// For per-test hooks, `test_name` is the leaf `it` name.
-///
-/// ## Example
-///
-/// ```gleam
-/// use total <- result.try(
-///   run_started_total(reporter_types.RunStarted(total: 3)),
-/// )
-///
-/// total
-/// |> should
-/// |> be_equal(3)
-/// |> or_fail_with("expected total to be 3")
-/// ```
-pub type ReporterEvent {
-  /// The run is starting, and this many tests will be attempted.
-  RunStarted(total: Int)
-  /// One test finished (pass/fail/skip/timeout/setup failure).
+  /// Your own report format. At the end of the run, the runner calls
+  /// `render` one time with the run report, and writes the text that it
+  /// returns. The runner adds no newline, so end the text with `"\n"`.
+  /// The runner calls `render` in the process of the run, so `render` must
+  /// return. An abnormal exit signal sent to the process of the run, for
+  /// example from a linked process that `render` starts, is not caught and
+  /// ends the run.
   ///
-  /// `completed` is 1-based and increases monotonically until it reaches `total`.
-  TestFinished(completed: Int, total: Int, result: TestResult)
-  /// A hook is about to run.
-  HookStarted(kind: HookKind, scope: List(String), test_name: Option(String))
-  /// A hook finished running.
-  HookFinished(
-    kind: HookKind,
-    scope: List(String),
-    test_name: Option(String),
-    outcome: HookOutcome,
-  )
-  /// The run finished. `completed` should equal `total`.
+  /// If `render` crashes, the runner writes a `Results reporter failed`
+  /// error to the error output, also in a silent run. The error names the
+  /// position of the reporter in the list and the crash, on one line: the
+  /// lines of the crash, each without the spaces at its start, joined with
+  /// one space. When that line is longer than 200 characters, the error
+  /// shows the first 200 characters and then ` ... (cut at 200 characters,
+  /// and types.report_reporter_crashes has the full reason)`. The first reporter in the list is at position
+  /// 1, and every reporter counts, `Bdd` and `Json` included. The runner
+  /// then goes on with the next reporter and with coverage. The report that
+  /// `runner.run` returns has the crash (see
+  /// `types.report_reporter_crashes`), so `types.failed` is `True`. With
+  /// `runner.exit_on_failure()`, the program ends with exit status 1 after
+  /// all the output is written.
   ///
-  /// `results` are in traversal order (deterministic), regardless of parallel execution.
-  RunFinished(completed: Int, total: Int, results: List(TestResult))
+  /// ### Add a custom report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/reporters/types/custom.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+  ///
+  /// ```gleam
+  /// import dream_test/matchers.{succeed}
+  /// import dream_test/reporters/types as reporter_types
+  /// import dream_test/runner
+  /// import dream_test/suite.{type TestSuite}
+  /// import dream_test/types.{type RunReport}
+  /// import dream_test/unit.{describe, it}
+  ///
+  /// pub fn tests() -> TestSuite {
+  ///   describe("Example", [
+  ///     it("works", fn() { Ok(succeed()) }),
+  ///   ])
+  /// }
+  ///
+  /// pub fn my_report(report: RunReport) -> String {
+  ///   case types.failed(report) {
+  ///     True -> "My report: failed\n"
+  ///     False -> "My report: passed\n"
+  ///   }
+  /// }
+  ///
+  /// pub fn main() -> RunReport {
+  ///   runner.new([tests()])
+  ///   |> runner.results_reporters([reporter_types.Custom(my_report)])
+  ///   |> runner.exit_on_failure()
+  ///   |> runner.run()
+  /// }
+  /// ```
+  Custom(render: fn(RunReport) -> String)
 }

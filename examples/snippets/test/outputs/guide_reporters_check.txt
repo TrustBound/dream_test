@@ -1,0 +1,5 @@
+github_annotations
+  ✓ writes one error line for a failed test
+  ✓ writes nothing for a run that passed
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

@@ -1,0 +1,32 @@
+Forecast
+  ✗ gives the forecast for Bergen
+    fail_with
+      Message: No recording matches GET http://localhost:19801/v1/forecast/bergen
+               No recording in test/recordings/http has this method and path
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
+  ✗ gives the forecast for Oslo on another port
+    fail_with
+      Message: No recording matches GET http://localhost:19802/v1/forecast/oslo
+               Nearest recording: test/recordings/http/GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json
+                 origin:
+                 - http://localhost:19801
+                 + http://localhost:19802
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Oslo on another port"
+
+Failures:
+Forecast
+  ✗ gives the forecast for Bergen
+    fail_with
+      Message: No recording matches GET http://localhost:19801/v1/forecast/bergen
+               No recording in test/recordings/http has this method and path
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
+  ✗ gives the forecast for Oslo on another port
+    fail_with
+      Message: No recording matches GET http://localhost:19802/v1/forecast/oslo
+               Nearest recording: test/recordings/http/GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json
+                 origin:
+                 - http://localhost:19801
+                 + http://localhost:19802
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Oslo on another port"
+
+Summary: 2 run, 2 failed, 0 passed in 0ms

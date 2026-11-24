@@ -1,0 +1,91 @@
+{
+  "version": "2.0",
+  "timestamp_ms": 0,
+  "duration_ms": 0,
+  "system": {
+    "os": "unix",
+    "otp_version": "<release>",
+    "gleam_stdlib_version": "1.0.3"
+  },
+  "summary": {
+    "total": 4,
+    "passed": 1,
+    "failed": 1,
+    "skipped": 1,
+    "pending": 1,
+    "timed_out": 0,
+    "setup_failed": 0,
+    "teardown_failed": 0,
+    "setup_stopped": 0
+  },
+  "tests": [
+    {
+      "name": "totals the cart",
+      "full_name": [
+        "Checkout",
+        "totals the cart"
+      ],
+      "only_path": "Checkout/totals the cart",
+      "run_alone": "gleam test -- --only \"Checkout/totals the cart\"",
+      "status": "passed",
+      "duration_ms": 0,
+      "tags": [
+        "smoke"
+      ],
+      "kind": "unit",
+      "failures": []
+    },
+    {
+      "name": "adds the tax",
+      "full_name": [
+        "Checkout",
+        "adds the tax"
+      ],
+      "only_path": "Checkout/adds the tax",
+      "run_alone": "gleam test -- --only \"Checkout/adds the tax\"",
+      "status": "failed",
+      "duration_ms": 0,
+      "tags": [],
+      "kind": "unit",
+      "failures": [
+        {
+          "operator": "be_equal",
+          "message": "20% tax on 1250 should be 1525",
+          "expected": "1525",
+          "actual": "1500"
+        }
+      ]
+    },
+    {
+      "name": "charges the card",
+      "full_name": [
+        "Checkout",
+        "payment",
+        "charges the card"
+      ],
+      "only_path": "Checkout/payment/charges the card",
+      "run_alone": "gleam test -- --only \"Checkout/payment/charges the card\"",
+      "status": "skipped",
+      "duration_ms": 0,
+      "tags": [],
+      "kind": "unit",
+      "failures": []
+    },
+    {
+      "name": "refunds a cancelled order",
+      "full_name": [
+        "Checkout",
+        "payment",
+        "refunds a cancelled order"
+      ],
+      "only_path": "Checkout/payment/refunds a cancelled order",
+      "run_alone": "gleam test -- --only \"Checkout/payment/refunds a cancelled order\"",
+      "status": "pending",
+      "duration_ms": 0,
+      "tags": [],
+      "kind": "unit",
+      "failures": []
+    }
+  ],
+  "hook_failures": []
+}

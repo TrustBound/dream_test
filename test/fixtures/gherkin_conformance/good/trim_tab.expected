@@ -1,0 +1,3 @@
+feature "Minimal"
+  scenario "Scenario" "minimalistic"
+    step "Given" "the minimalism"

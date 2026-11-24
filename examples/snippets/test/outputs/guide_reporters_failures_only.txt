@@ -1,0 +1,9 @@
+Checkout
+  ✗ adds the tax
+    be_equal
+      Message: 20% tax on 1250 should be 1525
+      Expected: 1525
+      Actual:   1500
+    Run it alone: gleam test -- --only "Checkout/adds the tax"
+
+Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms

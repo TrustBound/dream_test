@@ -8,12 +8,19 @@
 ////
 //// ## Example
 ////
+//// ### Unwrap Ok and check the value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/result/be_ok.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// Ok("hello")
-//// |> should
-//// |> be_ok()
-//// |> be_equal("hello")
-//// |> or_fail_with("expected Ok(\"hello\")")
+//// import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn ok_holds_hello() -> Result(AssertionResult, String) {
+////   Ok("hello")
+////   |> should
+////   |> be_ok()
+////   |> be_equal("hello")
+////   |> or_fail_with("expected Ok(\"hello\")")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -29,12 +36,19 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Unwrap Ok and check the value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/result/be_ok.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Ok("hello")
-/// |> should
-/// |> be_ok()
-/// |> be_equal("hello")
-/// |> or_fail_with("expected Ok(\"hello\")")
+/// import dream_test/matchers.{be_equal, be_ok, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ok_holds_hello() -> Result(AssertionResult, String) {
+///   Ok("hello")
+///   |> should
+///   |> be_ok()
+///   |> be_equal("hello")
+///   |> or_fail_with("expected Ok(\"hello\")")
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -82,12 +96,19 @@ fn check_is_ok(actual: Result(a, e)) -> MatchResult(a) {
 ///
 /// ## Example
 ///
+/// ### Unwrap Error and check the error value <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/result/be_error.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// Error("nope")
-/// |> should
-/// |> be_error()
-/// |> be_equal("nope")
-/// |> or_fail_with("expected Error(\"nope\")")
+/// import dream_test/matchers.{be_equal, be_error, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn error_holds_nope() -> Result(AssertionResult, String) {
+///   Error("nope")
+///   |> should
+///   |> be_error()
+///   |> be_equal("nope")
+///   |> or_fail_with("expected Error(\"nope\")")
+/// }
 /// ```
 ///
 /// ## Parameters

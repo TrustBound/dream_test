@@ -1,0 +1,6 @@
+No test has the --only path "Forecast/gives the forecast for Olso"
+  Closest paths:
+    gleam test -- --only "Forecast/gives the forecast for Oslo"
+    gleam test -- --only "Forecast/gives the forecast for Lisbon"
+    gleam test -- --only "Tasks/gives the share token of a task"
+  Fix: use the full path: the suite name, the group names and the test name, joined with /. Write a / in a name as \/.

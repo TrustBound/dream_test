@@ -1,11 +1,15 @@
+import dream_test/context
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/process as dt_process
+import dream_test/runner
 import dream_test/types
 import dream_test/unit.{describe, it}
+import dream_test/unit_context
 import gleam/erlang/process as beam_process
 import gleam/int
 import gleam/option.{None}
 import gleam/otp/actor
+import gleam/result
 
 pub type Msg {
   Add(String)
@@ -27,6 +31,69 @@ fn handle_list_actor(
 
 pub fn tests() {
   describe("dream_test/process", [
+    it("a linked counter stops when its test ends", fn() {
+      // Each test starts a counter that links to its test process and
+      // sends the counter process out. The tests pass, fail and crash.
+      // When the run returns, each counter must stop.
+      let counters = beam_process.new_subject()
+      runner.new([
+        describe("linked", [
+          it("passes", fn() {
+            start_counter_then(counters, Ok(types.AssertionOk))
+          }),
+          it("fails", fn() { start_counter_then(counters, Error("fails")) }),
+          it("crashes", fn() { start_counter_then_crash(counters) }),
+        ]),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) {
+        [receive_down(counters), receive_down(counters), receive_down(counters)]
+      }
+      |> should
+      |> be_equal([Ok(Nil), Ok(Nil), Ok(Nil)])
+      |> or_fail_with("each linked counter should stop with its test")
+    }),
+
+    it("a linked counter that a context setup starts stops after the run", fn() {
+      // The setup starts a counter that links to the setup process and
+      // does not trap exits. The teardown leaves it alone. When the run
+      // returns, the counter must stop with the setup process.
+      let counters = beam_process.new_subject()
+      runner.new([
+        unit_context.describe(
+          "setup",
+          context.setup(
+            fn() { start_counter_in_setup(counters) },
+            leave_counter,
+          ),
+          [unit_context.it("passes", counter_context_passes)],
+        ),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) { receive_down(counters) }
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("the counter of the setup should stop after the run")
+    }),
+
+    it("a linked counter that before_all starts stops after the run", fn() {
+      let counters = beam_process.new_subject()
+      runner.new([
+        describe("before_all", [
+          unit.before_all(fn() { start_counter_in_before_all(counters) }),
+          it("passes", passes),
+        ]),
+      ])
+      |> runner.silent()
+      |> runner.run()
+      |> fn(_report) { receive_down(counters) }
+      |> should
+      |> be_equal(Ok(Nil))
+      |> or_fail_with("the counter of before_all should stop after the run")
+    }),
+
     it("counter helpers work", fn() {
       let counter = dt_process.start_counter()
 
@@ -112,6 +179,36 @@ pub fn tests() {
       }
     }),
 
+    it("await_ready times out with an interval of 0", fn() {
+      dt_process.await_ready(
+        dt_process.PollConfig(timeout_ms: 20, interval_ms: 0),
+        fn() { False },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut with interval_ms: 0")
+    }),
+
+    it("await_some times out with an interval of 0", fn() {
+      dt_process.await_some(
+        dt_process.PollConfig(timeout_ms: 20, interval_ms: 0),
+        fn() { Error(Nil) },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut with interval_ms: 0")
+    }),
+
+    it("await_ready does not call the check with a timeout of 0", fn() {
+      dt_process.await_ready(
+        dt_process.PollConfig(timeout_ms: 0, interval_ms: 10),
+        fn() { True },
+      )
+      |> should
+      |> be_equal(dt_process.TimedOut)
+      |> or_fail_with("expected TimedOut before any check")
+    }),
+
     it("await_ready returns TimedOut when the check never succeeds", fn() {
       let config = dt_process.PollConfig(timeout_ms: 2, interval_ms: 1)
       case dt_process.await_ready(config, fn() { False }) {
@@ -157,4 +254,74 @@ pub fn tests() {
       }
     }),
   ])
+}
+
+fn start_counter_then(
+  counters: beam_process.Subject(beam_process.Pid),
+  result: Result(types.AssertionResult, String),
+) -> Result(types.AssertionResult, String) {
+  let counter = dt_process.start_counter()
+  let assert Ok(pid) = beam_process.subject_owner(counter)
+  beam_process.send(counters, pid)
+  result
+}
+
+fn start_counter_then_crash(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(types.AssertionResult, String) {
+  let _ = start_counter_then(counters, Ok(types.AssertionOk))
+  panic as "crashes"
+}
+
+/// Take the next counter process, and wait until it has stopped. Gives an
+/// error when it does not stop.
+fn receive_down(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(Nil, String) {
+  case beam_process.receive(counters, 60_000) {
+    Ok(pid) -> wait_for_down(pid)
+    Error(Nil) -> Error("no counter")
+  }
+}
+
+fn wait_for_down(pid: beam_process.Pid) -> Result(Nil, String) {
+  let monitor = beam_process.monitor(pid)
+  beam_process.new_selector()
+  |> beam_process.select_specific_monitor(monitor, ignore_down)
+  |> beam_process.selector_receive(60_000)
+  |> result.replace_error("the counter is still alive")
+}
+
+fn ignore_down(_down: beam_process.Down) -> Nil {
+  Nil
+}
+
+fn start_counter_in_setup(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(beam_process.Pid, String) {
+  let counter = dt_process.start_counter()
+  let assert Ok(pid) = beam_process.subject_owner(counter)
+  beam_process.send(counters, pid)
+  Ok(pid)
+}
+
+fn leave_counter(_counter: beam_process.Pid) -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn counter_context_passes(
+  _counter: beam_process.Pid,
+) -> Result(types.AssertionResult, String) {
+  Ok(types.AssertionOk)
+}
+
+fn start_counter_in_before_all(
+  counters: beam_process.Subject(beam_process.Pid),
+) -> Result(Nil, String) {
+  start_counter_in_setup(counters)
+  |> result.replace(Nil)
+}
+
+fn passes() -> Result(types.AssertionResult, String) {
+  Ok(types.AssertionOk)
 }

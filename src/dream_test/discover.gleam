@@ -8,17 +8,25 @@
 ////
 //// - You provide one or more **module path globs** (e.g. `"unit/**_test.gleam"`).
 //// - Dream Test finds matching modules under `./test/` that export `tests/0`.
-//// - It calls `tests/0` to get `TestSuite(Nil)` values.
+//// - It calls `tests/0` to get `TestSuite` values.
+//// - A module can return any suite: from `unit`, from `unit_context` with
+////   its own context, or a Gherkin feature. Each suite keeps its own
+////   context and setup.
 ////
 //// ## Example
+////
+//// ### Discover test modules and run them <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```gleam
 //// import dream_test/discover.{from_path, to_suites}
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
-//// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
+//// import dream_test/runner.{
+////   exit_on_failure, progress_reporter, results_reporters, run,
+//// }
+//// import dream_test/types.{type RunReport}
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   let suites =
 ////     discover.new()
 ////     |> from_path("snippets/unit/**.gleam")
@@ -34,12 +42,14 @@
 ////
 //// <sub>Note: discovery requires compiled BEAM modules.</sub>
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AssertionFailed,
-  AssertionFailure, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AssertionFailed, AssertionFailure, NoInput,
+  Test, Tree, Unit,
 }
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{None}
+import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -56,9 +66,15 @@ import gleam/string
 ///
 /// ## Example
 ///
+/// ### Load the suites of a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/test_discovery.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// discover.tests("snippets/unit/**.gleam")
-/// |> discover.load()
+/// import dream_test/discover.{type LoadResult}
+///
+/// pub fn load_unit_snippets() -> LoadResult {
+///   discover.tests("snippets/unit/**.gleam")
+///   |> discover.load()
+/// }
 /// ```
 pub opaque type TestDiscovery {
   TestDiscovery(patterns: List(String))
@@ -76,13 +92,21 @@ pub opaque type TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### Take the loaded suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/load_result.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let discover.LoadResult(suites: suites, errors: _errors) =
-///   discover.tests("snippets/**.gleam")
-///   |> discover.load()
+/// import dream_test/discover
+/// import dream_test/suite.{type TestSuite}
+///
+/// pub fn loaded_suites() -> List(TestSuite) {
+///   let discover.LoadResult(suites: suites, errors: _errors) =
+///     discover.tests("snippets/**.gleam")
+///     |> discover.load()
+///   suites
+/// }
 /// ```
 pub type LoadResult {
-  LoadResult(suites: List(TestSuite(Nil)), errors: List(String))
+  LoadResult(suites: List(TestSuite), errors: List(String))
 }
 
 // ============================================================================
@@ -99,14 +123,18 @@ pub type LoadResult {
 ///
 /// ## Example
 ///
+/// ### Start an empty discovery and add a pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -138,14 +166,18 @@ pub fn new() -> TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### Add a pattern to a discovery <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -185,14 +217,18 @@ pub fn from_path(
 ///
 /// ## Example
 ///
+/// ### Discover the tests of one pattern <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/tests_pattern.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.tests("snippets/unit/**.gleam")
 ///     |> discover.to_suites()
@@ -211,7 +247,8 @@ pub fn tests(pattern pattern: String) -> TestDiscovery {
 /// List module names discovered for the configured pattern.
 ///
 /// This returns the discovered module names (as strings) or an aggregated error
-/// message if discovery failed.
+/// message if discovery failed. A pattern that matches no test module, and a
+/// test module that does not load, are errors (see `load` for the texts).
 ///
 /// ## Parameters
 ///
@@ -224,10 +261,12 @@ pub fn tests(pattern pattern: String) -> TestDiscovery {
 ///
 /// ## Example
 ///
+/// ### List the discovered modules <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/list_modules.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover
 ///
-/// pub fn main() {
+/// pub fn main() -> Result(List(String), String) {
 ///   discover.tests("snippets/unit/**.gleam")
 ///   |> discover.list_modules()
 /// }
@@ -245,6 +284,19 @@ pub fn list_modules(
 /// Load discovered suites and return both suites and errors.
 ///
 /// This never panics; discovery errors are returned in `LoadResult.errors`.
+/// Each error starts with the pattern or the module name and `: `, then
+/// the cause:
+///
+/// - `<pattern>: no test module matches the pattern` when no test module
+///   matches a pattern, so a wrong pattern never gives a run that passes
+///   with no tests;
+/// - `<pattern>: cannot search for test modules: <class>:<reason>` for a
+///   pattern that cannot be searched;
+/// - `<module>: cannot load the module: <reason>` for a test module whose
+///   beam file does not load;
+/// - `<module>: tests() crashed: <class>:<reason>` when `tests()` crashes;
+/// - `<module>: tests() did not return a test suite: <value>` when its
+///   value is not a test suite.
 ///
 /// ## Parameters
 ///
@@ -253,15 +305,17 @@ pub fn list_modules(
 /// ## Returns
 ///
 /// A `LoadResult` with:
-/// - `suites`: successfully loaded `TestSuite(Nil)` values
+/// - `suites`: successfully loaded `TestSuite` values
 /// - `errors`: discovery or load errors (as strings)
 ///
 /// ## Example
 ///
-/// ```gleam
-/// import dream_test/discover
+/// ### Load the suites and the errors <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/load.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// pub fn main() {
+/// ```gleam
+/// import dream_test/discover.{type LoadResult}
+///
+/// pub fn main() -> LoadResult {
 ///   discover.tests("snippets/unit/**.gleam")
 ///   |> discover.load()
 /// }
@@ -291,14 +345,18 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///
 /// ## Example
 ///
+/// ### Run the discovered suites <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/new.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/discover.{from_path, to_suites}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suites =
 ///     discover.new()
 ///     |> from_path("snippets/unit/**.gleam")
@@ -311,7 +369,7 @@ pub fn load(discovery discovery: TestDiscovery) -> LoadResult {
 ///   |> run()
 /// }
 /// ```
-pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
+pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite) {
   let LoadResult(suites: suites, errors: errors) = load(discovery)
 
   case list.is_empty(errors) {
@@ -332,20 +390,25 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 ///
 /// ## Returns
 ///
-/// A single `TestSuite(Nil)` containing:
-/// - all discovered suites, and
+/// A single `TestSuite` containing:
+/// - each discovered suite as a group inside it, with its own context and
+///   setup, and
 /// - any errors as failing tests tagged `"discovery-error"`.
 ///
 /// ## Example
+///
+/// ### Run the discovered suites as one suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/discover/to_suite.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/discover
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
-/// import dream_test/runner.{exit_on_failure, progress_reporter, results_reporters, run}
-/// import gleam/io
+/// import dream_test/runner.{
+///   exit_on_failure, progress_reporter, results_reporters, run,
+/// }
+/// import dream_test/types.{type RunReport}
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   let suite =
 ///     discover.tests("snippets/unit/**.gleam")
 ///     |> discover.to_suite("discovered tests")
@@ -360,21 +423,30 @@ pub fn to_suites(discovery discovery: TestDiscovery) -> List(TestSuite(Nil)) {
 pub fn to_suite(
   discovery discovery: TestDiscovery,
   suite_name suite_name: String,
-) -> TestSuite(Nil) {
+) -> TestSuite {
   let LoadResult(suites: suites, errors: errors) = load(discovery)
-
-  let suite_nodes = suites_to_nodes(suites, [])
-
-  let error_nodes = errors_to_nodes(errors, [])
-
-  Root(
-    seed: Nil,
-    tree: Group(
-      name: suite_name,
-      tags: [],
-      children: list.append(suite_nodes, error_nodes),
-    ),
+  suite.join(
+    name: suite_name,
+    suites: list.append(errors_at_top(suite_name, errors), [
+      suite.group(name: suite_name, suites: suites),
+    ]),
   )
+}
+
+/// The load errors as failing tests directly inside the suite `name`, or
+/// no suite when there is no error.
+fn errors_at_top(name: String, errors: List(String)) -> List(TestSuite) {
+  case errors {
+    [] -> []
+    _ -> [
+      suite.from_tree(Tree(
+        initial: Nil,
+        name: name,
+        tags: [],
+        tests: errors_to_nodes(errors, []),
+      )),
+    ]
+  }
 }
 
 // ============================================================================
@@ -409,7 +481,7 @@ fn ensure_beam_extension(path: String) -> String {
 
 fn load_suites_from_modules(
   module_names: List(String),
-  suites_rev: List(TestSuite(Nil)),
+  suites_rev: List(TestSuite),
   errors_rev: List(String),
 ) -> LoadResult {
   case module_names {
@@ -427,14 +499,14 @@ fn load_suites_from_modules(
 fn load_suites_from_modules_next(
   module_name: String,
   rest: List(String),
-  suites_rev: List(TestSuite(Nil)),
+  suites_rev: List(TestSuite),
   errors_rev: List(String),
 ) -> LoadResult {
   case call_tests(module_name) {
     Ok(suite) ->
       load_suites_from_modules(
         rest,
-        [suite_with_source(suite, module_name), ..suites_rev],
+        [suite.with_source(suite: suite, source: module_name), ..suites_rev],
         errors_rev,
       )
     Error(message) ->
@@ -481,15 +553,45 @@ fn discover_all_modules_loop_next(
 ) -> #(List(String), List(String)) {
   let beam_glob = to_beam_glob(pattern)
   case discover_test_modules(beam_glob) {
-    Ok(mods) -> {
-      let #(seen2, acc2) = add_unique_modules(mods, seen, acc_rev)
-      discover_all_modules_loop(rest, seen2, acc2, errors_rev)
+    Ok([]) ->
+      discover_all_modules_loop(rest, seen, acc_rev, [
+        format_discover_error(pattern, "no test module matches the pattern"),
+        ..errors_rev
+      ])
+    Ok(found) -> {
+      let #(seen2, acc2) =
+        add_unique_modules(result.values(found), seen, acc_rev)
+      discover_all_modules_loop(
+        rest,
+        seen2,
+        acc2,
+        list.fold(unloaded_modules(found), errors_rev, add_unique_error),
+      )
     }
     Error(message) ->
       discover_all_modules_loop(rest, seen, acc_rev, [
         format_discover_error(pattern, message),
         ..errors_rev
       ])
+  }
+}
+
+/// Add an error that is not in the list yet. Two patterns can match the
+/// same module, and its load error is reported one time, as the module is
+/// found one time.
+fn add_unique_error(errors_rev: List(String), error: String) -> List(String) {
+  case list.contains(errors_rev, error) {
+    True -> errors_rev
+    False -> [error, ..errors_rev]
+  }
+}
+
+/// The error of each found module that does not load.
+fn unloaded_modules(found: List(Result(String, String))) -> List(String) {
+  case found {
+    [] -> []
+    [Ok(_module_name), ..rest] -> unloaded_modules(rest)
+    [Error(message), ..rest] -> [message, ..unloaded_modules(rest)]
   }
 }
 
@@ -517,16 +619,6 @@ fn add_unique_modules_next(
   }
 }
 
-fn suites_to_nodes(
-  suites: List(TestSuite(Nil)),
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case suites {
-    [] -> list.reverse(acc_rev)
-    [suite, ..rest] -> suites_to_nodes(rest, [root_to_group(suite), ..acc_rev])
-  }
-}
-
 fn errors_to_nodes(
   errors: List(String),
   acc_rev: List(Node(Nil)),
@@ -537,61 +629,13 @@ fn errors_to_nodes(
   }
 }
 
-fn errors_suite(errors: List(String)) -> TestSuite(Nil) {
-  Root(
-    seed: Nil,
-    tree: Group(
-      name: "Discovery Errors",
-      tags: ["discovery-error"],
-      children: errors_to_nodes(errors, []),
-    ),
-  )
-}
-
-fn root_to_group(suite: TestSuite(Nil)) -> Node(Nil) {
-  let Root(_seed, tree) = suite
-  tree
-}
-
-fn suite_with_source(suite: TestSuite(Nil), source: String) -> TestSuite(Nil) {
-  let Root(seed, tree) = suite
-  Root(seed: seed, tree: node_with_source(tree, source))
-}
-
-fn node_with_source(node: Node(Nil), source: String) -> Node(Nil) {
-  case node {
-    Group(name, tags, children) ->
-      Group(
-        name: name,
-        tags: tags,
-        children: children_with_source(children, source, []),
-      )
-    Test(name, tags, kind, run, timeout_ms, _source) ->
-      Test(
-        name: name,
-        tags: tags,
-        kind: kind,
-        run: run,
-        timeout_ms: timeout_ms,
-        source: Some(source),
-      )
-    other -> other
-  }
-}
-
-fn children_with_source(
-  children: List(Node(Nil)),
-  source: String,
-  acc_rev: List(Node(Nil)),
-) -> List(Node(Nil)) {
-  case children {
-    [] -> list.reverse(acc_rev)
-    [child, ..rest] ->
-      children_with_source(rest, source, [
-        node_with_source(child, source),
-        ..acc_rev
-      ])
-  }
+fn errors_suite(errors: List(String)) -> TestSuite {
+  suite.from_tree(Tree(
+    initial: Nil,
+    name: "Discovery Errors",
+    tags: ["discovery-error"],
+    tests: errors_to_nodes(errors, []),
+  ))
 }
 
 fn error_to_node(error: String) -> Node(Nil) {
@@ -599,13 +643,13 @@ fn error_to_node(error: String) -> Node(Nil) {
     name: "Discovery Error: " <> error,
     tags: ["discovery-error"],
     kind: Unit,
-    run: discovery_error_run,
+    run: NoInput(discovery_error_run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn discovery_error_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn discovery_error_run() -> Result(AssertionResult, String) {
   Ok(discovery_error_assertion())
 }
 
@@ -622,7 +666,9 @@ fn discovery_error_assertion() -> AssertionResult {
 // ============================================================================
 
 @external(erlang, "dream_test_test_discovery_ffi", "discover_test_modules")
-fn discover_test_modules(beam_glob: String) -> Result(List(String), String)
+fn discover_test_modules(
+  beam_glob: String,
+) -> Result(List(Result(String, String)), String)
 
 @external(erlang, "dream_test_test_discovery_ffi", "call_tests")
-fn call_tests(module_name: String) -> Result(TestSuite(Nil), String)
+fn call_tests(module_name: String) -> Result(TestSuite, String)

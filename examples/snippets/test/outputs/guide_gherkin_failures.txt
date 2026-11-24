@@ -1,0 +1,15 @@
+Feature: Shopping Cart
+  Scenario: Adding items ✗
+      ✗ be_equal
+        Step: Then I should have 5 items total
+        Message: the cart should hold the expected number of items
+        Expected: 5
+        Actual:   4
+      Run it alone: gleam test -- --only "Shopping Cart/Adding items"
+  Scenario: Removing items ✗
+      ✗ step
+        Step: When I remove 1 item
+        Message: Undefined step: When I remove 1 item
+      Run it alone: gleam test -- --only "Shopping Cart/Removing items"
+
+Summary: 2 run, 2 failed, 0 passed in 0ms

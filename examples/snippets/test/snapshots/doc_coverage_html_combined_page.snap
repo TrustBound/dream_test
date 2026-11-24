@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coverage</title>
+<style>
+:root { color-scheme: light dark; --text: #1f2328; --background: #ffffff; --border: #d0d7de; --muted: #59636e; --hit: #dafbe1; --missed: #ffebe9; --ignored: #eaeef2; --complete: #1a7f37; --partial: #9a6700; --low: #cf222e; }
+@media (prefers-color-scheme: dark) { :root { --text: #e6edf3; --background: #0d1117; --border: #30363d; --muted: #9198a1; --hit: #12261e; --missed: #301418; --ignored: #1c2128; --complete: #3fb950; --partial: #d29922; --low: #f85149; } }
+body { margin: 16px; font-family: system-ui, sans-serif; color: var(--text); background: var(--background); }
+a { color: inherit; }
+table { border-collapse: collapse; }
+th, td { padding: 2px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.number { text-align: right; }
+.complete { color: var(--complete); }
+.partial { color: var(--partial); }
+.low { color: var(--low); }
+.source td { border-bottom: 0; font-family: ui-monospace, monospace; white-space: pre; }
+.source td.number { color: var(--muted); }
+tr.hit { background: var(--hit); }
+tr.missed { background: var(--missed); }
+tr.ignored { background: var(--ignored); }
+</style>
+</head>
+<body>
+<h1>Coverage</h1>
+<table>
+<thead><tr><th>File</th><th class="number">Lines</th><th class="number">Cover</th><th>Missing</th><th>Excluded</th></tr></thead>
+<tbody>
+<tr><td><a href="#file-src~2Fa.gleam">src/a.gleam</a></td><td class="number">1/1</td><td class="number complete">100.0%</td><td></td><td></td></tr>
+</tbody>
+<tfoot><tr><td>Total</td><td class="number">1/1</td><td class="number complete">100.0%</td><td></td><td></td></tr>
+</tfoot>
+</table>
+<section id="file-src~2Fa.gleam">
+<h2>src/a.gleam</h2>
+<p>Lines: 1/1. Cover: <span class="complete">100.0%</span>.</p>
+<table class="source">
+<thead><tr><th class="number">Line</th><th class="number">Hits</th><th>Source</th></tr></thead>
+<tbody>
+<tr class="hit"><td class="number">1</td><td class="number">1</td><td>pub fn a() { 1 }</td></tr>
+</tbody>
+</table>
+</section>
+</body>
+</html>

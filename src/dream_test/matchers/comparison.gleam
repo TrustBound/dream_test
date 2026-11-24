@@ -8,11 +8,18 @@
 ////
 //// ## Example
 ////
+//// ### Assert that an integer is greater than another <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_greater_than.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
-//// 10
-//// |> should
-//// |> be_greater_than(0)
-//// |> or_fail_with("expected 10 to be greater than 0")
+//// import dream_test/matchers.{be_greater_than, or_fail_with, should}
+//// import dream_test/types.{type AssertionResult}
+////
+//// pub fn ten_is_greater_than_zero() -> Result(AssertionResult, String) {
+////   10
+////   |> should
+////   |> be_greater_than(0)
+////   |> or_fail_with("expected 10 to be greater than 0")
+//// }
 //// ```
 
 import dream_test/types.{
@@ -35,11 +42,18 @@ import gleam/option.{Some}
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is greater than another <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_greater_than.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10
-/// |> should
-/// |> be_greater_than(0)
-/// |> or_fail_with("expected 10 to be greater than 0")
+/// import dream_test/matchers.{be_greater_than, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ten_is_greater_than_zero() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_greater_than(0)
+///   |> or_fail_with("expected 10 to be greater than 0")
+/// }
 /// ```
 ///
 pub fn be_greater_than(
@@ -85,11 +99,18 @@ fn check_greater_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is less than another <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_less_than.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10
-/// |> should
-/// |> be_less_than(100)
-/// |> or_fail_with("expected 10 to be less than 100")
+/// import dream_test/matchers.{be_less_than, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ten_is_less_than_one_hundred() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_less_than(100)
+///   |> or_fail_with("expected 10 to be less than 100")
+/// }
 /// ```
 ///
 pub fn be_less_than(
@@ -135,11 +156,18 @@ fn check_less_than(actual: Int, threshold: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is at least a minimum <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_at_least.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10
-/// |> should
-/// |> be_at_least(10)
-/// |> or_fail_with("expected 10 to be at least 10")
+/// import dream_test/matchers.{be_at_least, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ten_is_at_least_ten() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_at_least(10)
+///   |> or_fail_with("expected 10 to be at least 10")
+/// }
 /// ```
 ///
 pub fn be_at_least(
@@ -185,11 +213,18 @@ fn check_at_least(actual: Int, minimum: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is at most a maximum <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_at_most.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10
-/// |> should
-/// |> be_at_most(10)
-/// |> or_fail_with("expected 10 to be at most 10")
+/// import dream_test/matchers.{be_at_most, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ten_is_at_most_ten() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_at_most(10)
+///   |> or_fail_with("expected 10 to be at most 10")
+/// }
 /// ```
 ///
 pub fn be_at_most(
@@ -238,11 +273,18 @@ fn check_at_most(actual: Int, maximum: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is between two bounds <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_between.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 5
-/// |> should
-/// |> be_between(1, 10)
-/// |> or_fail_with("expected 5 to be between 1 and 10")
+/// import dream_test/matchers.{be_between, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn five_is_between_one_and_ten() -> Result(AssertionResult, String) {
+///   5
+///   |> should
+///   |> be_between(1, 10)
+///   |> or_fail_with("expected 5 to be between 1 and 10")
+/// }
 /// ```
 ///
 pub fn be_between(
@@ -292,11 +334,18 @@ fn check_between(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that an integer is in a range <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_in_range.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 10
-/// |> should
-/// |> be_in_range(0, 100)
-/// |> or_fail_with("expected 10 to be in range 0..100")
+/// import dream_test/matchers.{be_in_range, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn ten_is_in_range_zero_to_one_hundred() -> Result(AssertionResult, String) {
+///   10
+///   |> should
+///   |> be_in_range(0, 100)
+///   |> or_fail_with("expected 10 to be in range 0..100")
+/// }
 /// ```
 ///
 pub fn be_in_range(
@@ -343,11 +392,18 @@ fn check_in_range(actual: Int, min: Int, max: Int) -> MatchResult(Int) {
 ///
 /// ## Example
 ///
+/// ### Assert that a float is greater than another <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_greater_than_float.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 0.5
-/// |> should
-/// |> be_greater_than_float(0.0)
-/// |> or_fail_with("expected 0.5 to be greater than 0.0")
+/// import dream_test/matchers.{be_greater_than_float, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn half_is_greater_than_zero() -> Result(AssertionResult, String) {
+///   0.5
+///   |> should
+///   |> be_greater_than_float(0.0)
+///   |> or_fail_with("expected 0.5 to be greater than 0.0")
+/// }
 /// ```
 ///
 pub fn be_greater_than_float(
@@ -396,11 +452,18 @@ fn check_greater_than_float(
 ///
 /// ## Example
 ///
+/// ### Assert that a float is less than another <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/matchers/comparison/be_less_than_float.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// 0.5
-/// |> should
-/// |> be_less_than_float(1.0)
-/// |> or_fail_with("expected 0.5 to be less than 1.0")
+/// import dream_test/matchers.{be_less_than_float, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn half_is_less_than_one() -> Result(AssertionResult, String) {
+///   0.5
+///   |> should
+///   |> be_less_than_float(1.0)
+///   |> or_fail_with("expected 0.5 to be less than 1.0")
+/// }
 /// ```
 ///
 pub fn be_less_than_float(

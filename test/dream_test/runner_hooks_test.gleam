@@ -1,18 +1,20 @@
+import dream_test/context
 import dream_test/discover
 import dream_test/file
 import dream_test/gherkin/discover as gherkin_discover
-import dream_test/gherkin/steps.{type StepContext, new, step}
+import dream_test/gherkin/steps.{type StepContext, new}
 import dream_test/matchers.{be_equal, fail_with, or_fail_with, should}
 import dream_test/runner
 import dream_test/types.{
-  type AssertionResult, type TestResult, AssertionFailure, AssertionOk, Failed,
-  Passed, SetupFailed, Unit,
+  type TestResult, AfterAllSuitesHook, AfterEachSuiteHook, AfterEachTestHook,
+  AssertionOk, Passed, SetupFailed, TeardownFailed, Unit,
 }
 import dream_test/unit.{describe, group, it, with_tags}
 import dream_test/unit_context.{
   after_all, after_each, before_all, before_each, describe as ctx_describe,
   it as ctx_it,
 }
+import gleam/list
 import gleam/option.{type Option, None, Some}
 
 pub fn tests() {
@@ -21,7 +23,7 @@ pub fn tests() {
       let log_path = "test/fixtures/file/temp/runner_hooks_order.txt"
 
       let suite =
-        ctx_describe("root", Nil, [
+        ctx_describe("root", context.value(Nil), [
           before_all(fn(_ctx: Nil) { write_string(log_path, "") }),
           before_each(fn(_ctx: Nil) { append_line(log_path, "suite_before\n") }),
           after_each(fn(_ctx: Nil) { append_line(log_path, "suite_after\n") }),
@@ -31,13 +33,14 @@ pub fn tests() {
       let results =
         runner.new([suite])
         |> runner.max_concurrency(1)
-        |> runner.before_each_test(fn(_info, ctx: Nil) {
-          log_and_keep_context(log_path, "runner_before\n", ctx)
+        |> runner.before_each_test(fn(_info) {
+          append_line(log_path, "runner_before\n")
         })
-        |> runner.after_each_test(fn(_info, _ctx: Nil) {
+        |> runner.after_each_test(fn(_info) {
           append_line(log_path, "runner_after\n")
         })
         |> runner.run()
+        |> types.report_tests
 
       let assert [_r] = results
 
@@ -59,18 +62,20 @@ pub fn tests() {
 
       let results =
         runner.new([suite])
-        |> runner.before_each_test(fn(info, ctx: Nil) {
+        |> runner.before_each_test(fn(info) {
           case
             info.name == "leaf"
-            && info.full_name == ["root", "group", "leaf"]
+            && types.full_name(info.groups, info.name)
+            == ["root", "group", "leaf"]
             && info.tags == ["group", "leaf"]
             && info.kind == Unit
           {
-            True -> Ok(ctx)
+            True -> Ok(Nil)
             False -> Error("metadata mismatch")
           }
         })
         |> runner.run()
+        |> types.report_tests
 
       let assert [r1] = results
 
@@ -86,7 +91,7 @@ pub fn tests() {
       let _ = write_string(log_path, "")
 
       let suite =
-        ctx_describe("suite_one", Nil, [
+        ctx_describe("suite_one", context.value(Nil), [
           before_all(fn(_ctx: Nil) {
             append_line(log_path, "suite_before_all\n")
           }),
@@ -104,6 +109,7 @@ pub fn tests() {
           append_line(log_path, "runner_after_suite\n")
         })
         |> runner.run()
+        |> types.report_tests
 
       let assert [_r] = results
 
@@ -115,97 +121,118 @@ pub fn tests() {
       |> or_fail_with("runner suite hooks should wrap suite hooks")
     }),
 
-    it(
-      "before_all_suites failure skips tests and records after_all_suites failure",
-      fn() {
-        let suite_one =
-          describe("suite_one", [
-            it("a", fn() { panic as "should not run" }),
-          ])
+    it("a before_all_suites failure gives SetupFailed to every test", fn() {
+      runner.new([
+        describe("suite_one", [it("a", fn() { panic as "should not run" })]),
+        describe("suite_two", [it("b", fn() { panic as "should not run" })]),
+      ])
+      |> runner.before_all_suites(fn(_suites) { Error("nope") })
+      |> runner.run()
+      |> types.report_tests
+      |> status_and_operators
+      |> should
+      |> be_equal([
+        #("a", SetupFailed, ["before_all_suites"]),
+        #("b", SetupFailed, ["before_all_suites"]),
+      ])
+      |> or_fail_with("every test should be SetupFailed")
+    }),
 
-        let suite_two =
-          describe("suite_two", [
-            it("b", fn() { panic as "should not run" }),
-          ])
+    it("after_all_suites runs after a before_all_suites failure", fn() {
+      runner.new([describe("suite", [it("a", fn() { Ok(AssertionOk) })])])
+      |> runner.before_all_suites(fn(_suites) { Error("nope") })
+      |> runner.after_all_suites(fn(_suites) { Error("cleanup") })
+      |> runner.run()
+      |> types.report_hook_failures
+      |> should
+      |> be_equal([
+        TeardownFailed(hook: AfterAllSuitesHook, path: [], message: "cleanup"),
+      ])
+      |> or_fail_with("after_all_suites should run and its failure be kept")
+    }),
 
-        let results =
-          runner.new([suite_one, suite_two])
-          |> runner.before_all_suites(fn(_suites) { Error("nope") })
-          |> runner.after_all_suites(fn(_suites) { Error("cleanup") })
-          |> runner.run()
+    it("an after_all_suites failure adds no test result", fn() {
+      runner.new([describe("suite", [it("a", fn() { Ok(AssertionOk) })])])
+      |> runner.after_all_suites(fn(_suites) { Error("cleanup") })
+      |> runner.run()
+      |> types.report_tests
+      |> status_and_operators
+      |> should
+      |> be_equal([#("a", Passed, [])])
+      |> or_fail_with("a failing after_all_suites should add no test result")
+    }),
 
-        let assert [r1, r2, r3] = results
+    it("an after_all_suites failure does not stop the next one", fn() {
+      runner.new([describe("suite", [it("a", fn() { Ok(AssertionOk) })])])
+      |> runner.after_all_suites(fn(_suites) { Error("first") })
+      |> runner.after_all_suites(fn(_suites) { Error("second") })
+      |> runner.run()
+      |> types.report_hook_failures
+      |> should
+      |> be_equal([
+        TeardownFailed(hook: AfterAllSuitesHook, path: [], message: "first"),
+        TeardownFailed(hook: AfterAllSuitesHook, path: [], message: "second"),
+      ])
+      |> or_fail_with("every after_all_suites hook should run")
+    }),
 
-        let _ =
-          #(r1.status, first_failure_operator(r1))
-          |> should
-          |> be_equal(#(Failed, Some("before_all_suites")))
-          |> or_fail_with("first test should fail due to before_all_suites")
+    it("a before_each_suite failure gives SetupFailed to its suite only", fn() {
+      runner.new([
+        describe("suite_one", [it("boom", fn() { panic as "should not run" })]),
+        describe("suite_two", [it("ok", fn() { Ok(AssertionOk) })]),
+      ])
+      |> runner.before_each_suite(fail_for_suite_one)
+      |> runner.run()
+      |> types.report_tests
+      |> status_and_operators
+      |> should
+      |> be_equal([
+        #("boom", SetupFailed, ["before_each_suite"]),
+        #("ok", Passed, []),
+      ])
+      |> or_fail_with("only the tests of suite_one should be SetupFailed")
+    }),
 
-        let _ =
-          #(r2.status, first_failure_operator(r2))
-          |> should
-          |> be_equal(#(Failed, Some("before_all_suites")))
-          |> or_fail_with("second test should fail due to before_all_suites")
+    it("after_each_suite runs after a before_each_suite failure", fn() {
+      runner.new([
+        describe("suite_one", [it("boom", fn() { panic as "should not run" })]),
+      ])
+      |> runner.before_each_suite(fail_for_suite_one)
+      |> runner.after_each_suite(fail_for_suite_one)
+      |> runner.run()
+      |> types.report_hook_failures
+      |> should
+      |> be_equal([
+        TeardownFailed(
+          hook: AfterEachSuiteHook,
+          path: ["suite_one"],
+          message: "suite_one failed",
+        ),
+      ])
+      |> or_fail_with("after_each_suite should run and its failure be kept")
+    }),
 
-        let _ =
-          #(r3.name, first_failure_operator(r3))
-          |> should
-          |> be_equal(#("<after_all_suites>", Some("after_all_suites")))
-          |> or_fail_with("after_all_suites failure should be reported")
-      },
-    ),
-
-    it(
-      "before_each_suite failure skips suite tests and runs after_each_suite",
-      fn() {
-        let suite_one =
-          describe("suite_one", [
-            it("boom", fn() { panic as "should not run" }),
-          ])
-
-        let suite_two =
-          describe("suite_two", [
-            it("ok", fn() { Ok(AssertionOk) }),
-          ])
-
-        let results =
-          runner.new([suite_one, suite_two])
-          |> runner.before_each_suite(fn(suite) {
-            case suite.name == "suite_one" {
-              True -> Error("boom")
-              False -> Ok(Nil)
-            }
-          })
-          |> runner.after_each_suite(fn(suite) {
-            case suite.name == "suite_one" {
-              True -> Error("cleanup")
-              False -> Ok(Nil)
-            }
-          })
-          |> runner.run()
-
-        let assert [r1, r2, r3] = results
-
-        let _ =
-          #(r1.status, first_failure_operator(r1))
-          |> should
-          |> be_equal(#(Failed, Some("before_each_suite")))
-          |> or_fail_with("suite_one test should fail due to before_each_suite")
-
-        let _ =
-          #(r2.name, first_failure_operator(r2))
-          |> should
-          |> be_equal(#("<after_each_suite>", Some("after_each_suite")))
-          |> or_fail_with("after_each_suite failure should be reported")
-
-        let _ =
-          r3.status
-          |> should
-          |> be_equal(Passed)
-          |> or_fail_with("suite_two test should pass")
-      },
-    ),
+    it("an after_each_suite failure does not stop the next one", fn() {
+      runner.new([describe("suite", [it("a", fn() { Ok(AssertionOk) })])])
+      |> runner.after_each_suite(fn(_suite) { Error("first") })
+      |> runner.after_each_suite(fn(_suite) { Error("second") })
+      |> runner.run()
+      |> types.report_hook_failures
+      |> should
+      |> be_equal([
+        TeardownFailed(
+          hook: AfterEachSuiteHook,
+          path: ["suite"],
+          message: "first",
+        ),
+        TeardownFailed(
+          hook: AfterEachSuiteHook,
+          path: ["suite"],
+          message: "second",
+        ),
+      ])
+      |> or_fail_with("every after_each_suite hook should run")
+    }),
 
     it(
       "before_each_test failure yields SetupFailed under parallel execution",
@@ -219,13 +246,14 @@ pub fn tests() {
         let results =
           runner.new([suite])
           |> runner.max_concurrency(2)
-          |> runner.before_each_test(fn(info, ctx: Nil) {
+          |> runner.before_each_test(fn(info) {
             case info.name == "fail" {
               True -> Error("nope")
-              False -> Ok(ctx)
+              False -> Ok(Nil)
             }
           })
           |> runner.run()
+          |> types.report_tests
 
         case find_result_by_name(results, "fail") {
           Some(result) ->
@@ -238,28 +266,37 @@ pub fn tests() {
       },
     ),
 
-    it("after_each_test failure marks test Failed", fn() {
-      let suite =
-        describe("after_suite", [
-          it("after", fn() { Ok(AssertionOk) }),
-        ])
+    it("an after_each_test failure keeps the status of the test", fn() {
+      runner.new([describe("suite", [it("after", fn() { Ok(AssertionOk) })])])
+      |> runner.after_each_test(fn(_info) { Error("boom") })
+      |> runner.run()
+      |> types.report_tests
+      |> status_and_operators
+      |> should
+      |> be_equal([#("after", Passed, [])])
+      |> or_fail_with("a failing after_each_test should not change the status")
+    }),
 
-      let results =
-        runner.new([suite])
-        |> runner.after_each_test(fn(info, _ctx: Nil) {
-          case info.name == "after" {
-            True -> Error("boom")
-            False -> Ok(Nil)
-          }
-        })
-        |> runner.run()
-
-      let assert [r1] = results
-      let _ =
-        #(r1.status, first_failure_operator(r1))
-        |> should
-        |> be_equal(#(Failed, Some("after_each_test")))
-        |> or_fail_with("after_each_test failure should mark test Failed")
+    it("after_each_test runs after a failing after_each_test", fn() {
+      runner.new([describe("suite", [it("after", fn() { Ok(AssertionOk) })])])
+      |> runner.after_each_test(fn(_info) { Error("first") })
+      |> runner.after_each_test(fn(_info) { Error("second") })
+      |> runner.run()
+      |> types.report_hook_failures
+      |> should
+      |> be_equal([
+        TeardownFailed(
+          hook: AfterEachTestHook,
+          path: ["suite", "after"],
+          message: "first",
+        ),
+        TeardownFailed(
+          hook: AfterEachTestHook,
+          path: ["suite", "after"],
+          message: "second",
+        ),
+      ])
+      |> or_fail_with("every after_each_test hook should run")
     }),
 
     it("unit discovery populates source with module name", fn() {
@@ -281,6 +318,7 @@ pub fn tests() {
               }
             })
             |> runner.run()
+            |> types.report_tests
 
           file.read(log_path)
           |> should
@@ -299,8 +337,8 @@ pub fn tests() {
       let _ = file.write(feature_path, content)
 
       let registry =
-        new()
-        |> step("ok", step_ok)
+        new(initial: Nil)
+        |> steps.given("ok", step_ok)
 
       let suite =
         gherkin_discover.features(feature_path)
@@ -312,17 +350,18 @@ pub fn tests() {
 
       let _ =
         runner.new([suite])
-        |> runner.before_each_test(fn(info, ctx: Nil) {
+        |> runner.before_each_test(fn(info) {
           case info.source {
             Some(value) ->
               case write_string(log_path, value) {
-                Ok(_) -> Ok(ctx)
+                Ok(_) -> Ok(Nil)
                 Error(e) -> Error(e)
               }
             None -> Error("missing source")
           }
         })
         |> runner.run()
+        |> types.report_tests
 
       file.read(log_path)
       |> should
@@ -346,17 +385,6 @@ fn write_string(path: String, content: String) -> Result(Nil, String) {
   }
 }
 
-fn log_and_keep_context(
-  path: String,
-  line: String,
-  ctx: Nil,
-) -> Result(Nil, String) {
-  case append_line(path, line) {
-    Ok(_) -> Ok(ctx)
-    Error(e) -> Error(e)
-  }
-}
-
 fn find_result_by_name(
   results: List(TestResult),
   name: String,
@@ -371,14 +399,25 @@ fn find_result_by_name(
   }
 }
 
-fn first_failure_operator(result: TestResult) -> Option(String) {
-  case result.failures {
-    [] -> None
-    [AssertionFailure(operator: operator, message: _message, payload: _), ..] ->
-      Some(operator)
+fn step_ok(_state: Nil, _context: StepContext) -> Result(Nil, String) {
+  Ok(Nil)
+}
+
+fn fail_for_suite_one(suite: types.SuiteInfo) -> Result(Nil, String) {
+  case suite.name == "suite_one" {
+    True -> Error("suite_one failed")
+    False -> Ok(Nil)
   }
 }
 
-fn step_ok(_context: StepContext) -> Result(AssertionResult, String) {
-  Ok(AssertionOk)
+fn status_and_operators(
+  results: List(TestResult),
+) -> List(#(String, types.Status, List(String))) {
+  list.map(results, fn(result) {
+    #(
+      result.name,
+      result.status,
+      list.map(result.failures, fn(failure) { failure.operator }),
+    )
+  })
 }

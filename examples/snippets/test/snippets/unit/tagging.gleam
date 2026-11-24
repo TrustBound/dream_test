@@ -2,14 +2,20 @@ import dream_test/matchers.{succeed}
 import dream_test/reporters/bdd
 import dream_test/reporters/progress
 import dream_test/runner
-import dream_test/unit.{describe, it, with_tags}
+import dream_test/unit.{describe, group, it, with_tags}
 
 pub fn tests() {
   describe("Tagged tests", [
-    it("fast", fn() { Ok(succeed()) })
-      |> with_tags(["unit", "fast"]),
-    it("slow", fn() { Ok(succeed()) })
+    // Tag a whole group (all tests inside inherit these tags)
+    group("integration", [
+      it("slow path", fn() { Ok(succeed()) }),
+      it("another slow path", fn() { Ok(succeed()) }),
+    ])
       |> with_tags(["integration", "slow"]),
+
+    // Or tag a single test
+    it("smoke", fn() { Ok(succeed()) })
+      |> with_tags(["smoke"]),
   ])
 }
 

@@ -1,0 +1,7 @@
+Tasks
+  ✓ lists a new task as open
+  ✓ completes tasks in one transaction
+  ✓ rolls back when one task does not exist
+  ✓ gives the share token of a task
+
+Summary: 4 run, 0 failed, 4 passed in 0ms

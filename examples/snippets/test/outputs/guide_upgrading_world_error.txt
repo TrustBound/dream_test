@@ -1,0 +1,41 @@
+warning: Unused function argument
+  ┌─ build/compile_errors/upgrade_world/src/upgrade_world.gleam:8:24
+  │
+8 │ pub fn step_have_items(context: StepContext) {
+  │                        ^^^^^^^ This argument is never used
+
+Hint: You can ignore it with an underscore: `_context`.
+
+error: Unknown module
+  ┌─ build/compile_errors/upgrade_world/src/upgrade_world.gleam:6:1
+  │
+6 │ import dream_test/gherkin/world.{put}
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `dream_test/gherkin/world`.
+
+error: Unknown variable
+  ┌─ build/compile_errors/upgrade_world/src/upgrade_world.gleam:9:3
+  │
+9 │   put(context.world, "cart", 3)
+  │   ^^^
+
+The name `put` is not in scope here.
+
+error: Unknown record field
+  ┌─ build/compile_errors/upgrade_world/src/upgrade_world.gleam:9:15
+  │
+9 │   put(context.world, "cart", 3)
+  │               ^^^^^ This field does not exist
+
+The value being accessed has this type:
+
+    StepContext
+
+It has these accessible fields:
+
+    .captures
+    .doc_string
+    .scenario_id
+    .table
+

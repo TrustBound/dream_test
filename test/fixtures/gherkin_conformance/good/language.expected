@@ -1,0 +1,3 @@
+feature "Explicit language specification"
+  scenario "Scenario" "minimalistic"
+    step "Given" "the minimalism"

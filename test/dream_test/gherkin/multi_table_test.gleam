@@ -5,7 +5,7 @@ import dream_test/gherkin/types as gtypes
 import dream_test/matchers.{fail_with}
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/result
 
 pub fn tests() {
@@ -43,6 +43,7 @@ pub fn tests() {
 
 fn parse_content(content: String) -> Result(gtypes.Feature, String) {
   parser.parse_string(content)
+  |> result.map_error(parser.parse_error_to_string)
 }
 
 fn get_single_scenario(
@@ -57,11 +58,7 @@ fn get_single_scenario(
 fn get_two_steps(
   scenario: gtypes.Scenario,
 ) -> Result(#(gtypes.Step, gtypes.Step), String) {
-  case scenario {
-    gtypes.Scenario(_, _, steps) -> extract_two_steps(steps)
-    gtypes.ScenarioOutline(_, _, _, _) ->
-      Error("Expected Scenario, got ScenarioOutline")
-  }
+  extract_two_steps(scenario.steps)
 }
 
 fn extract_two_steps(
@@ -77,9 +74,9 @@ fn get_step_table(
   step: gtypes.Step,
   step_name: String,
 ) -> Result(List(List(String)), String) {
-  case step.argument {
+  case step.data_table {
     Some(gtypes.DataTable(rows)) -> Ok(rows)
-    _ -> Error(step_name <> " has no table")
+    None -> Error(step_name <> " has no table")
   }
 }
 

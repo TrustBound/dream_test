@@ -1,0 +1,6 @@
+2/2 [███████████████████████████████████████████████████████████████] 100% done 
+The calculator tests
+  ✓ fail the run when a test fails
+  ✓ report the failing test by its name
+
+Summary: 2 run, 0 failed, 2 passed in 0ms

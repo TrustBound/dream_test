@@ -16,6 +16,11 @@
 //// `run_isolated` runs the function in a separate BEAM process, so the caller
 //// stays healthy even if the function crashes.
 ////
+//// `run_in_setup_process` runs functions one after another in a setup process that
+//// stays alive between them, so a resource that one function starts lives
+//// for the next one. The runner uses one setup process for the setup and teardown hooks of
+//// each group, each suite and the whole run.
+////
 //// ## Selective crash reports
 ////
 //// When a test process crashes (e.g. `panic as "boom"`), Erlang can print a
@@ -29,34 +34,45 @@
 ////
 //// ## Example
 ////
+//// ### Run functions in an isolated process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_isolated.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/sandbox.{
 ////   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 //// }
+//// import dream_test/suite.{type TestSuite}
 //// import dream_test/unit.{describe, it}
 ////
-//// fn loop_forever() {
-////   loop_forever()
+//// fn double(number: Int) -> Int {
+////   number * 2
 //// }
 ////
-//// pub fn tests() {
+//// fn loop_forever(_input: Nil) -> Nil {
+////   loop_forever(Nil)
+//// }
+////
+//// fn crash(message: String) -> Int {
+////   panic as message
+//// }
+////
+//// pub fn tests() -> TestSuite {
 ////   describe("Sandboxing", [
 ////     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-////       let result = sandbox.run_isolated(config, fn() { 123 })
+////       let result = sandbox.run_isolated(config, double, 61)
 ////
 ////       result
 ////       |> should
-////       |> be_equal(SandboxCompleted(123))
-////       |> or_fail_with("expected SandboxCompleted(123)")
+////       |> be_equal(SandboxCompleted(122))
+////       |> or_fail_with("expected SandboxCompleted(122)")
 ////     }),
 ////
 ////     it(
 ////       "run_isolated returns SandboxTimedOut when the function is too slow",
 ////       fn() {
 ////         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-////         let result = sandbox.run_isolated(config, loop_forever)
+////         let result = sandbox.run_isolated(config, loop_forever, Nil)
 ////
 ////         result
 ////         |> should
@@ -67,7 +83,7 @@
 ////
 ////     it("run_isolated returns SandboxCrashed when the function panics", fn() {
 ////       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-////       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+////       let result = sandbox.run_isolated(config, crash, "boom")
 ////
 ////       let did_crash = case result {
 ////         SandboxCrashed(_) -> True
@@ -83,10 +99,15 @@
 //// }
 //// ```
 
+import gleam/dynamic.{type Dynamic}
+import gleam/erlang/atom
 import gleam/erlang/process.{
-  type Pid, type Selector, type Subject, kill, monitor, new_selector,
-  new_subject, select, select_monitors, selector_receive, send, spawn_unlinked,
+  type Monitor, type Pid, type Selector, type Subject, demonitor_process, kill,
+  monitor, new_selector, new_subject, receive_forever, select, select_map,
+  select_specific_monitor, selector_receive, selector_receive_forever, send,
+  spawn_unlinked,
 }
+import gleam/option.{type Option, None, Some}
 import gleam/string
 
 /// Configuration for sandboxed test execution.
@@ -96,10 +117,14 @@ import gleam/string
 ///
 /// ## Example
 ///
-/// ```gleam
-/// import dream_test/sandbox.{SandboxConfig}
+/// ### Make a sandbox configuration <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/sandbox_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
-/// let config = SandboxConfig(timeout_ms: 1_000, show_crash_reports: False)
+/// ```gleam
+/// import dream_test/sandbox.{type SandboxConfig, SandboxConfig}
+///
+/// pub fn one_second_config() -> SandboxConfig {
+///   SandboxConfig(timeout_ms: 1000, show_crash_reports: False)
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -139,45 +164,109 @@ type WorkerMessage(a) {
   WorkerDown(reason: String)
 }
 
-@external(erlang, "sandbox_ffi", "run_catching")
-fn run_catching(test_function: fn() -> a) -> Result(a, String)
-
-/// Run a test function in an isolated process with timeout.
+/// Run a function with its input in the calling process, and turn a crash
+/// into an `Error`.
 ///
-/// The test function runs in a separate BEAM process that is monitored.
+/// Use this function for code that must run in the calling process, for
+/// example a hook that starts a resource which must live as long as the
+/// caller. A process that the function links to, and an ETS table that it
+/// makes, stay alive after the function returns.
+///
+/// No new process starts, so no timeout applies: a function that never
+/// returns blocks the caller. A crash (`panic`, `erlang:error`, `throw` or
+/// `exit` in the calling process) becomes `Error` with the class and the
+/// reason. An exit signal that another process sends is not caught.
+///
+/// ## Example
+///
+/// ### Catch a crash in the calling process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_catching.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// pub fn tests() -> TestSuite {
+///   describe("run_catching", [
+///     it("returns the value of a function that returns", fn() {
+///       sandbox.run_catching(double, 61)
+///       |> should
+///       |> be_equal(Ok(122))
+///       |> or_fail_with("expected Ok(122)")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `run`: the function to run in the calling process
+/// - `input`: the argument that `run` gets
+///
+/// ## Returns
+///
+/// `Ok(value)` when `run` returns, or `Error("class:reason")` when it
+/// crashes, for example `Error("error:boom")`.
+@external(erlang, "sandbox_ffi", "run_catching")
+pub fn run_catching(
+  run run: fn(input) -> a,
+  input input: input,
+) -> Result(a, String)
+
+/// Run a function with its input in an isolated process with timeout.
+///
+/// The function runs in a separate BEAM process that is monitored, and gets
+/// `input` as its argument. Give the data that the function needs as
+/// `input`, so the function can be a named function.
 /// If the process completes normally, its result is returned.
 /// If the process crashes or times out, an appropriate SandboxResult is returned.
 ///
 /// ## Example
+///
+/// ### Run a function in an isolated process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_isolated.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/sandbox.{
 ///   SandboxCompleted, SandboxConfig, SandboxCrashed, SandboxTimedOut,
 /// }
+/// import dream_test/suite.{type TestSuite}
 /// import dream_test/unit.{describe, it}
 ///
-/// fn loop_forever() {
-///   loop_forever()
+/// fn double(number: Int) -> Int {
+///   number * 2
 /// }
 ///
-/// pub fn tests() {
+/// fn loop_forever(_input: Nil) -> Nil {
+///   loop_forever(Nil)
+/// }
+///
+/// fn crash(message: String) -> Int {
+///   panic as message
+/// }
+///
+/// pub fn tests() -> TestSuite {
 ///   describe("Sandboxing", [
 ///     it("run_isolated returns SandboxCompleted(value) on success", fn() {
 ///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-///       let result = sandbox.run_isolated(config, fn() { 123 })
+///       let result = sandbox.run_isolated(config, double, 61)
 ///
 ///       result
 ///       |> should
-///       |> be_equal(SandboxCompleted(123))
-///       |> or_fail_with("expected SandboxCompleted(123)")
+///       |> be_equal(SandboxCompleted(122))
+///       |> or_fail_with("expected SandboxCompleted(122)")
 ///     }),
 ///
 ///     it(
 ///       "run_isolated returns SandboxTimedOut when the function is too slow",
 ///       fn() {
 ///         let config = SandboxConfig(timeout_ms: 10, show_crash_reports: False)
-///         let result = sandbox.run_isolated(config, loop_forever)
+///         let result = sandbox.run_isolated(config, loop_forever, Nil)
 ///
 ///         result
 ///         |> should
@@ -188,7 +277,7 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 ///
 ///     it("run_isolated returns SandboxCrashed when the function panics", fn() {
 ///       let config = SandboxConfig(timeout_ms: 100, show_crash_reports: False)
-///       let result = sandbox.run_isolated(config, fn() { panic as "boom" })
+///       let result = sandbox.run_isolated(config, crash, "boom")
 ///
 ///       let did_crash = case result {
 ///         SandboxCrashed(_) -> True
@@ -207,64 +296,75 @@ fn run_catching(test_function: fn() -> a) -> Result(a, String)
 /// ## Parameters
 ///
 /// - `config`: sandbox configuration (timeout + crash report behavior)
-/// - `test_function`: function to run in an isolated process
+/// - `run`: function to run in an isolated process
+/// - `input`: the argument that `run` gets
 ///
 /// ## Returns
 ///
 /// A `SandboxResult(a)` describing completion, timeout, or crash.
 pub fn run_isolated(
   config config: SandboxConfig,
-  test_function test_function: fn() -> a,
+  run run: fn(input) -> a,
+  input input: input,
 ) -> SandboxResult(a) {
   let result_subject = new_subject()
   let worker_pid =
-    spawn_worker(result_subject, test_function, config.show_crash_reports)
+    spawn_worker(result_subject, run, input, config.show_crash_reports)
   let worker_monitor = monitor(worker_pid)
-  let selector =
-    build_result_selector(result_subject, config.show_crash_reports)
+  let selector = build_result_selector(result_subject, worker_monitor)
 
-  wait_for_result(config, selector, worker_pid, worker_monitor)
+  wait_for_result(config, selector, result_subject, worker_pid, worker_monitor)
 }
 
-/// Spawn a worker process that runs the test and sends the result.
+/// Spawn a worker process that runs the function and sends the result.
 fn spawn_worker(
   result_subject: Subject(WorkerMessage(a)),
-  test_function: fn() -> a,
+  run: fn(input) -> a,
+  input: input,
   show_crash_reports: Bool,
 ) -> Pid {
   spawn_unlinked(fn() {
-    case show_crash_reports {
-      True -> {
-        let result = test_function()
-        send(result_subject, TestCompleted(result))
-      }
-
-      False ->
-        case run_catching(test_function) {
-          Ok(result) -> send(result_subject, TestCompleted(result))
-          Error(reason) -> send(result_subject, WorkerDown(reason))
-        }
-    }
+    run_worker(result_subject, run, input, show_crash_reports)
   })
 }
 
+/// The body of the worker process: run the function and send its result.
+/// With crash reports off, a crash is caught and sent as `WorkerDown`.
+fn run_worker(
+  result_subject: Subject(WorkerMessage(a)),
+  run: fn(input) -> a,
+  input: input,
+  show_crash_reports: Bool,
+) -> Nil {
+  case show_crash_reports {
+    True -> send(result_subject, TestCompleted(run(input)))
+    False -> send(result_subject, caught_message(run_catching(run, input)))
+  }
+}
+
+/// The worker message for the result of a caught run.
+fn caught_message(result: Result(a, String)) -> WorkerMessage(a) {
+  case result {
+    Ok(value) -> TestCompleted(value)
+    Error(reason) -> WorkerDown(reason)
+  }
+}
+
 /// Build a selector that waits for either test completion or process down.
+///
+/// Only the down message of this worker's monitor is selected, so down
+/// messages of other monitors of the calling process stay in its mailbox.
+/// The worker sends its result before it exits, so the result comes before
+/// the down message of a normal exit. The down message is needed in both
+/// modes: an exit signal (for example from a linked process that crashed)
+/// stops the worker before it can send anything.
 fn build_result_selector(
   result_subject: Subject(WorkerMessage(a)),
-  show_crash_reports: Bool,
+  worker_monitor: Monitor,
 ) -> Selector(WorkerMessage(a)) {
-  case show_crash_reports {
-    True ->
-      new_selector()
-      |> select(result_subject)
-      |> select_monitors(map_down_to_message)
-
-    False ->
-      // In quiet mode the worker always sends a WorkerMessage, so we don't need
-      // to listen to monitor down messages (which would otherwise include Normal).
-      new_selector()
-      |> select(result_subject)
-  }
+  new_selector()
+  |> select(result_subject)
+  |> select_specific_monitor(worker_monitor, map_down_to_message)
 }
 
 /// Map a process down event to a WorkerMessage.
@@ -273,12 +373,66 @@ fn map_down_to_message(down: process.Down) -> WorkerMessage(a) {
   WorkerDown(reason: reason)
 }
 
-/// Format an exit reason as a string for error reporting.
-fn format_exit_reason(reason: process.ExitReason) -> String {
+/// Render a process exit reason as text, the same way dream_test does.
+///
+/// `run_isolated` puts this text in `SandboxCrashed` when a worker exits
+/// before it sends a result, and the parallel executor puts it in the
+/// failure message of a test whose worker stops. Use it in a custom runner,
+/// or with your own process monitors, to show a crash reason in the same
+/// form as dream_test.
+///
+/// - `Normal` gives `"normal"`.
+/// - `Killed` gives `"killed"`.
+/// - `Abnormal(noproc)`, the reason that a monitor gives for a process that
+///   had already stopped when the monitor was made, gives
+///   `"the process had already stopped"`.
+/// - Any other `Abnormal(reason)` gives `string.inspect(reason)`.
+///
+/// ## Example
+///
+/// ### Format an abnormal exit reason <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/format_exit_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/dynamic
+/// import gleam/erlang/process
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Exit reasons", [
+///     it("format_exit_reason shows an abnormal reason as Gleam text", fn() {
+///       process.Abnormal(dynamic.string("boom"))
+///       |> sandbox.format_exit_reason
+///       |> should
+///       |> be_equal("\"boom\"")
+///       |> or_fail_with("expected the quoted reason")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `reason`: the exit reason from a `process.Down` message or an exit
+///   signal
+///
+/// ## Returns
+///
+/// The exit reason as text.
+pub fn format_exit_reason(reason: process.ExitReason) -> String {
   case reason {
     process.Normal -> "normal"
     process.Killed -> "killed"
-    process.Abnormal(dynamic_reason) -> string.inspect(dynamic_reason)
+    process.Abnormal(dynamic_reason) -> abnormal_reason_text(dynamic_reason)
+  }
+}
+
+fn abnormal_reason_text(reason: Dynamic) -> String {
+  case reason == atom.to_dynamic(atom.create("noproc")) {
+    True -> "the process had already stopped"
+    False -> string.inspect(reason)
   }
 }
 
@@ -286,13 +440,18 @@ fn format_exit_reason(reason: process.ExitReason) -> String {
 fn wait_for_result(
   config: SandboxConfig,
   selector: Selector(WorkerMessage(a)),
+  result_subject: Subject(WorkerMessage(a)),
   worker_pid: Pid,
-  _worker_monitor: process.Monitor,
+  worker_monitor: Monitor,
 ) -> SandboxResult(a) {
-  case selector_receive(selector, config.timeout_ms) {
+  let result = case selector_receive(selector, config.timeout_ms) {
     Ok(message) -> handle_worker_message(message)
-    Error(Nil) -> handle_timeout(worker_pid)
+    Error(Nil) -> handle_timeout(worker_pid, result_subject)
   }
+  // Remove the monitor and any down message it left in the mailbox, so the
+  // caller's mailbox does not fill up and a later selector cannot see it.
+  demonitor_process(worker_monitor)
+  result
 }
 
 /// Handle a message from the worker or monitor.
@@ -303,10 +462,76 @@ fn handle_worker_message(message: WorkerMessage(a)) -> SandboxResult(a) {
   }
 }
 
-/// Handle timeout by killing the worker and returning timeout result.
-fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
-  kill(worker_pid)
+/// Handle timeout by killing the worker, waiting until it has exited, and
+/// returning timeout result.
+///
+/// The worker can send its result after the time-out and before the kill.
+/// That result is late, and the caller does not use it. It is removed from
+/// the caller's mailbox, so it does not stay there for good. The worker has
+/// exited when `kill_and_wait` returns, and a message from a process
+/// arrives before its exit, so a receive with no wait finds a late result.
+/// No test shows this: a result that arrives in the short time between the
+/// time-out and the kill depends on timing.
+fn handle_timeout(
+  worker_pid: Pid,
+  result_subject: Subject(WorkerMessage(a)),
+) -> SandboxResult(a) {
+  kill_and_wait(worker_pid)
+  let _late_result = process.receive(result_subject, 0)
   SandboxTimedOut
+}
+
+/// Kill a process and wait until it has exited.
+///
+/// `process.kill` only sends the kill signal. `kill_and_wait` returns when
+/// the process is gone: its ETS tables are deleted, its registered name is
+/// free, and the processes that link to it got the exit signal. Use it
+/// before code that needs what the killed process held, for example a
+/// teardown hook that makes a table with the same name.
+///
+/// A process that has exited already is not an error.
+///
+/// ## Example
+///
+/// ### Kill a process and wait until it is gone <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/kill_and_wait.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/erlang/process
+///
+/// pub fn tests() -> TestSuite {
+///   describe("kill_and_wait", [
+///     it("returns when the process is gone", fn() {
+///       let pid = process.spawn_unlinked(process.sleep_forever)
+///       sandbox.kill_and_wait(pid)
+///
+///       process.is_alive(pid)
+///       |> should
+///       |> be_equal(False)
+///       |> or_fail_with("expected the process to be gone")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `pid`: the process to kill
+///
+/// ## Returns
+///
+/// `Nil`, after the process has exited.
+pub fn kill_and_wait(pid pid: Pid) -> Nil {
+  let pid_monitor = monitor(pid)
+  kill(pid)
+  let _down =
+    new_selector()
+    |> select_specific_monitor(pid_monitor, format_down_reason)
+    |> selector_receive_forever
+  Nil
 }
 
 /// Default configuration with a 5 second timeout.
@@ -320,6 +545,18 @@ fn handle_timeout(worker_pid: Pid) -> SandboxResult(a) {
 /// ## Parameters
 ///
 /// None.
+///
+/// ## Example
+///
+/// ### Use the default sandbox settings <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/default_config.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/sandbox.{type SandboxConfig}
+///
+/// pub fn config_for_most_tests() -> SandboxConfig {
+///   sandbox.default_config()
+/// }
+/// ```
 pub fn default_config() -> SandboxConfig {
   SandboxConfig(timeout_ms: 5000, show_crash_reports: False)
 }
@@ -330,8 +567,14 @@ pub fn default_config() -> SandboxConfig {
 ///
 /// ## Example
 ///
+/// ### Turn on crash reports <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/with_crash_reports.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
-/// let config = sandbox.default_config() |> sandbox.with_crash_reports()
+/// import dream_test/sandbox.{type SandboxConfig}
+///
+/// pub fn debugging_config() -> SandboxConfig {
+///   sandbox.default_config() |> sandbox.with_crash_reports()
+/// }
 /// ```
 ///
 /// ## Parameters
@@ -343,4 +586,489 @@ pub fn default_config() -> SandboxConfig {
 /// A new `SandboxConfig` with `show_crash_reports: True`.
 pub fn with_crash_reports(config config: SandboxConfig) -> SandboxConfig {
   SandboxConfig(..config, show_crash_reports: True)
+}
+
+// =============================================================================
+// Setup processes
+// =============================================================================
+
+/// A process that runs functions one after another and stays alive between
+/// them, so that what a function starts lives until the setup process stops.
+///
+/// A setup process is the process of one group, one suite or the whole run:
+/// for example, the `before_all`
+/// hook of a group starts a pool in the setup process, the tests of the group use
+/// the pool, and the `after_all` hook stops the pool in the same setup process. A
+/// process that a function links to, and an ETS table that it makes, live
+/// as long as the setup process.
+///
+/// Get a setup process from `run_in_setup_process`, and stop it with `stop_setup_process`. The
+/// value is opaque, so only a setup process that answered can be used again.
+///
+/// Any process can use a setup process value, and it can use the same value
+/// again after the setup process stopped: each call watches the setup process
+/// itself, so a call never waits for a setup process that is gone. The exit
+/// reason of a setup process that stopped is known only once, and only in the
+/// process that started the setup process. A later call, or a call in another
+/// process, gives the reason `"the process had already stopped"`.
+pub opaque type SetupProcess(input, output) {
+  SetupProcess(
+    pid: Pid,
+    monitor: Monitor,
+    requests: Subject(SetupProcessRequest(input, output)),
+  )
+}
+
+/// The result of `run_in_setup_process`.
+///
+/// ## Variants
+///
+/// - `SetupProcessReturned(setup_process, value)`: the function returned `value`. The
+///   setup process is alive and can run the next function.
+/// - `SetupProcessCaught(setup_process, reason)`: the function crashed (`panic`,
+///   `erlang:error`, `throw` or `exit` in the setup process) and the setup process caught
+///   the crash. `reason` is `"class:reason"`, as from `run_catching`. The
+///   setup process is alive and can run the next function.
+/// - `SetupProcessTimedOut`: the function did not return in time. The setup process was
+///   killed, so a process that links to it stops too.
+/// - `SetupProcessExited(reason)`: the setup process stopped after the function started
+///   and before it returned, for example because a process that links to
+///   it crashed. `reason` is the exit reason as text, from
+///   `format_exit_reason`.
+/// - `SetupProcessLost(reason)`: the setup process had stopped before it started the
+///   function, so the function did not run. This comes only for
+///   `Some(setup_process)`: the setup process stopped after the function before, for
+///   example because a process that links to it crashed. Run the function
+///   again with `None` to run it in a new setup process. `reason` is the exit
+///   reason as text, or `"the process had already stopped"` when the exit
+///   was told before (see `SetupProcess`).
+pub type SetupProcessResult(input, output) {
+  SetupProcessReturned(
+    setup_process: SetupProcess(input, output),
+    value: output,
+  )
+  SetupProcessCaught(setup_process: SetupProcess(input, output), reason: String)
+  SetupProcessTimedOut
+  SetupProcessExited(reason: String)
+  SetupProcessLost(reason: String)
+}
+
+/// A message to a setup process: run a function, or stop.
+///
+/// Before the setup process runs the function, it sends the subject for later
+/// requests to `started`. When the function returns or crashes, it sends
+/// the result to `reply`. The caller then knows if the function started.
+type SetupProcessRequest(input, output) {
+  RunRequest(
+    run: fn(input) -> output,
+    input: input,
+    started: Subject(Subject(SetupProcessRequest(input, output))),
+    reply: Subject(Result(output, String)),
+  )
+  StopRequest
+}
+
+/// What the caller gets while it waits for the setup process to start the
+/// function.
+type StartEvent(input, output) {
+  FunctionStarted(requests: Subject(SetupProcessRequest(input, output)))
+  StoppedBeforeStart(reason: String)
+}
+
+/// What the caller gets while it waits for the function to finish.
+type FinishEvent(output) {
+  FunctionFinished(result: Result(output, String))
+  StoppedDuringFunction(reason: String)
+}
+
+/// Run a function with its input in a setup process, and wait for it with
+/// a timeout.
+///
+/// With `None`, a new setup process starts and runs the function. With
+/// `Some(setup_process)`, that setup process runs the function, so the function sees what
+/// earlier functions started there. The caller monitors the setup process, so a
+/// crash of the setup process never stops the caller.
+///
+/// ## Example
+///
+/// ### Run a function in a new setup process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/run_in_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn value(result: sandbox.SetupProcessResult(Int, Int)) -> Result(Int, Nil) {
+///   case result {
+///     SetupProcessReturned(setup_process: setup_process, value: value) -> {
+///       sandbox.stop_setup_process(setup_process)
+///       Ok(value)
+///     }
+///     _ -> Error(Nil)
+///   }
+/// }
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Setup processes", [
+///     it("run_in_setup_process returns the value of the function", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
+///       |> value
+///       |> should
+///       |> be_equal(Ok(42))
+///       |> or_fail_with("expected Ok(42)")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `setup_process`: the setup process that runs the function, or `None` for a new setup process
+/// - `timeout_ms`: how long to wait before the setup process is killed
+/// - `run`: the function to run in the setup process
+/// - `input`: the argument that `run` gets
+///
+/// ## Returns
+///
+/// An `SetupProcessResult`: the value or caught crash with the setup process that is still
+/// alive, or the timeout or exit of the setup process.
+pub fn run_in_setup_process(
+  setup_process setup_process: Option(SetupProcess(input, output)),
+  timeout_ms timeout_ms: Int,
+  run run: fn(input) -> output,
+  input input: input,
+) -> SetupProcessResult(input, output) {
+  let started = new_subject()
+  let reply = new_subject()
+  let request =
+    RunRequest(run: run, input: input, started: started, reply: reply)
+  let watch = send_setup_process_request(setup_process, request)
+  let selector =
+    new_selector()
+    |> select_map(started, FunctionStarted)
+    |> select_watch(watch, stopped_before_start)
+  case selector_receive(selector, timeout_ms) {
+    Ok(FunctionStarted(requests: requests)) ->
+      wait_for_function(watch, requests, reply, timeout_ms)
+    Ok(StoppedBeforeStart(reason: reason)) -> {
+      forget_setup_process(watch)
+      SetupProcessLost(reason: reason)
+    }
+    Error(Nil) -> time_out_setup_process(watch)
+  }
+}
+
+/// The monitors of one call to a setup process. `setup_process_monitor` is the monitor
+/// that the process which started the setup process made, and only that process
+/// gets its down message. `call_monitor` is new for this call, so the
+/// calling process always gets a down message when the setup process is gone.
+type Watch {
+  Watch(pid: Pid, setup_process_monitor: Monitor, call_monitor: Monitor)
+}
+
+/// Select the down message of both monitors of a call.
+fn select_watch(
+  selector: Selector(message),
+  watch: Watch,
+  mapping: fn(process.Down) -> message,
+) -> Selector(message) {
+  selector
+  |> select_specific_monitor(watch.setup_process_monitor, mapping)
+  |> select_specific_monitor(watch.call_monitor, mapping)
+}
+
+/// Remove the monitor of a call to a setup process that is still alive.
+fn end_call(watch: Watch) -> Nil {
+  demonitor_process(watch.call_monitor)
+}
+
+/// Remove both monitors of a call to a setup process that is gone, with their
+/// down messages.
+fn forget_setup_process(watch: Watch) -> Nil {
+  demonitor_process(watch.setup_process_monitor)
+  demonitor_process(watch.call_monitor)
+}
+
+/// Wait for the function that the setup process started, until `timeout_ms`.
+fn wait_for_function(
+  watch: Watch,
+  requests: Subject(SetupProcessRequest(input, output)),
+  reply: Subject(Result(output, String)),
+  timeout_ms: Int,
+) -> SetupProcessResult(input, output) {
+  let selector =
+    new_selector()
+    |> select_map(reply, FunctionFinished)
+    |> select_watch(watch, stopped_during_function)
+  case selector_receive(selector, timeout_ms) {
+    Ok(FunctionFinished(result: result)) -> {
+      end_call(watch)
+      finished(
+        SetupProcess(
+          pid: watch.pid,
+          monitor: watch.setup_process_monitor,
+          requests: requests,
+        ),
+        result,
+      )
+    }
+    Ok(StoppedDuringFunction(reason: reason)) -> {
+      forget_setup_process(watch)
+      SetupProcessExited(reason: reason)
+    }
+    Error(Nil) -> time_out_setup_process(watch)
+  }
+}
+
+/// The result of a function that returned or crashed in a setup process that is
+/// still alive.
+fn finished(
+  setup_process: SetupProcess(input, output),
+  result: Result(output, String),
+) -> SetupProcessResult(input, output) {
+  case result {
+    Ok(value) ->
+      SetupProcessReturned(setup_process: setup_process, value: value)
+    Error(reason) ->
+      SetupProcessCaught(setup_process: setup_process, reason: reason)
+  }
+}
+
+/// Kill a setup process that did not answer in time, and wait until it has
+/// exited, so that what it held is free before the caller goes on.
+fn time_out_setup_process(watch: Watch) -> SetupProcessResult(input, output) {
+  kill_and_wait(watch.pid)
+  forget_setup_process(watch)
+  SetupProcessTimedOut
+}
+
+/// Give the request to the setup process, or start a new setup process with it. Gives the
+/// monitors of the call.
+fn send_setup_process_request(
+  setup_process: Option(SetupProcess(input, output)),
+  request: SetupProcessRequest(input, output),
+) -> Watch {
+  case setup_process {
+    Some(SetupProcess(
+      pid: pid,
+      monitor: setup_process_monitor,
+      requests: requests,
+    )) -> {
+      let call_monitor = monitor(pid)
+      send(requests, request)
+      Watch(
+        pid: pid,
+        setup_process_monitor: setup_process_monitor,
+        call_monitor: call_monitor,
+      )
+    }
+    None -> {
+      let pid = spawn_unlinked(fn() { start_setup_process(request) })
+      Watch(
+        pid: pid,
+        setup_process_monitor: monitor(pid),
+        call_monitor: monitor(pid),
+      )
+    }
+  }
+}
+
+fn stopped_before_start(down: process.Down) -> StartEvent(input, output) {
+  StoppedBeforeStart(reason: format_exit_reason(down.reason))
+}
+
+fn stopped_during_function(down: process.Down) -> FinishEvent(output) {
+  StoppedDuringFunction(reason: format_exit_reason(down.reason))
+}
+
+/// The body of a setup process: make the subject for later requests, then
+/// serve the first request.
+fn start_setup_process(first: SetupProcessRequest(input, output)) -> Nil {
+  serve_setup_process(new_subject(), first)
+}
+
+/// Run each request in the setup process until a `StopRequest`. A crash of
+/// a function is caught, so the setup process stays alive. On a
+/// `StopRequest` the setup process exits with reason `shutdown`, so a
+/// process that links to it stops with it, also when it does not trap
+/// exits. A normal exit would not stop it.
+fn serve_setup_process(
+  requests: Subject(SetupProcessRequest(input, output)),
+  request: SetupProcessRequest(input, output),
+) -> Nil {
+  case request {
+    RunRequest(run: run, input: input, started: started, reply: reply) -> {
+      send(started, requests)
+      send(reply, run_catching(run, input))
+      serve_setup_process(requests, receive_forever(requests))
+    }
+    StopRequest -> exit(atom.create("shutdown"))
+  }
+}
+
+/// Exit the calling process with `reason`.
+@external(erlang, "erlang", "exit")
+fn exit(reason: atom.Atom) -> Nil
+
+/// Check that a setup process is still alive before the caller gives it more
+/// work.
+///
+/// A setup process can stop between two functions, for example when a process
+/// that links to it crashes while its tests run. Use this
+/// function before the teardown hooks run, to report that exit and to
+/// run the teardown in a new setup process.
+///
+/// ## Example
+///
+/// ### Check that a setup process is alive <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/check_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn is_alive(setup_process: sandbox.SetupProcess(Int, Int)) -> Bool {
+///   case sandbox.check_setup_process(setup_process) {
+///     Ok(_setup_process) -> True
+///     Error(_reason) -> False
+///   }
+/// }
+///
+/// fn still_alive(result: sandbox.SetupProcessResult(Int, Int)) -> Bool {
+///   case result {
+///     SetupProcessReturned(setup_process: setup_process, value: _) -> {
+///       let alive = is_alive(setup_process)
+///       sandbox.stop_setup_process(setup_process)
+///       alive
+///     }
+///     _ -> False
+///   }
+/// }
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Setup processes", [
+///     it("check_setup_process gives back a setup process that is alive", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
+///       |> still_alive
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("expected the setup process to be alive")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `setup_process`: a setup process from `run_in_setup_process`
+///
+/// ## Returns
+///
+/// `Ok(setup_process)` when the setup process is alive, or `Error(reason)` with the exit
+/// reason as text when it stopped. The reason is
+/// `"the process had already stopped"` when the exit
+/// was told before or the caller is not the process that started the
+/// setup process (see `SetupProcess`). After `Error`, `run_in_setup_process` with the setup process gives
+/// `SetupProcessLost`, and `stop_setup_process` returns at once.
+pub fn check_setup_process(
+  setup_process setup_process: SetupProcess(input, output),
+) -> Result(SetupProcess(input, output), String) {
+  case process.is_alive(setup_process.pid) {
+    True -> Ok(setup_process)
+    False -> Error(wait_for_exit(setup_process))
+  }
+}
+
+/// Wait until a setup process has exited, and give its exit reason as text.
+fn wait_for_exit(setup_process: SetupProcess(input, output)) -> String {
+  let watch =
+    Watch(
+      pid: setup_process.pid,
+      setup_process_monitor: setup_process.monitor,
+      call_monitor: monitor(setup_process.pid),
+    )
+  let reason =
+    new_selector()
+    |> select_watch(watch, format_down_reason)
+    |> selector_receive_forever
+  forget_setup_process(watch)
+  reason
+}
+
+fn format_down_reason(down: process.Down) -> String {
+  format_exit_reason(down.reason)
+}
+
+/// Stop a setup process and wait until it has exited.
+///
+/// The setup process exits with reason `shutdown`. An ETS table that it made
+/// is deleted, and a process that links to it, such as an actor or a
+/// supervisor, gets the exit signal and stops. When `stop_setup_process` returns,
+/// the setup process has exited, so a later setup can make a table with the same
+/// name. A setup process that stopped already is not an error, and any process can
+/// stop a setup process.
+///
+/// ## Example
+///
+/// ### Stop a setup process <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/sandbox/stop_setup_process.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/sandbox.{SetupProcessReturned}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/unit.{describe, it}
+/// import gleam/option.{None}
+///
+/// fn double(number: Int) -> Int {
+///   number * 2
+/// }
+///
+/// fn stop(result: sandbox.SetupProcessResult(Int, Int)) -> Bool {
+///   case result {
+///     SetupProcessReturned(setup_process: setup_process, value: _) -> {
+///       sandbox.stop_setup_process(setup_process)
+///       True
+///     }
+///     _ -> False
+///   }
+/// }
+///
+/// pub fn tests() -> TestSuite {
+///   describe("Setup processes", [
+///     it("stop_setup_process stops a setup process", fn() {
+///       sandbox.run_in_setup_process(None, 100, double, 21)
+///       |> stop
+///       |> should
+///       |> be_equal(True)
+///       |> or_fail_with("expected the setup process to stop")
+///     }),
+///   ])
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `setup_process`: a setup process from `run_in_setup_process`
+///
+/// ## Returns
+///
+/// `Nil`, after the setup process has exited.
+pub fn stop_setup_process(
+  setup_process setup_process: SetupProcess(input, output),
+) -> Nil {
+  send(setup_process.requests, StopRequest)
+  let _reason = wait_for_exit(setup_process)
+  Nil
 }

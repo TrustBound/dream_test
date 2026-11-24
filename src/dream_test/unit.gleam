@@ -5,10 +5,11 @@
 ////
 //// - Tests are written as `it("does something", fn() { ... })`
 //// - Hooks are also **0‑argument** functions (`before_each(fn() { ... })`)
-//// - All hooks/tests return `Result(AssertionResult, String)` so you can abort
-////   early with `Error("message")` when prerequisites fail.
+//// - Test bodies return `Result(AssertionResult, String)`, and hooks return
+////   `Result(Nil, String)`, so you can abort early with `Error("message")`
+////   when prerequisites fail.
 ////
-//// This module builds a `dream_test/types.TestSuite(Nil)` under the hood.
+//// This module builds a `dream_test/suite.TestSuite` under the hood.
 ////
 //// ## When should I use this module?
 ////
@@ -18,15 +19,19 @@
 ////
 //// ## Example
 ////
+//// ### Write a suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+////
 //// ```gleam
 //// import dream_test/matchers.{be_equal, or_fail_with, should}
 //// import dream_test/reporters/bdd
 //// import dream_test/reporters/progress
 //// import dream_test/runner
+//// import dream_test/suite.{type TestSuite}
+//// import dream_test/types.{type RunReport}
 //// import dream_test/unit.{describe, it}
 //// import gleam/string
 ////
-//// pub fn tests() {
+//// pub fn tests() -> TestSuite {
 ////   describe("String utilities", [
 ////     it("trims whitespace", fn() {
 ////       "  hello  "
@@ -45,7 +50,7 @@
 ////   ])
 //// }
 ////
-//// pub fn main() {
+//// pub fn main() -> RunReport {
 ////   runner.new([tests()])
 ////   |> runner.progress_reporter(progress.new())
 ////   |> runner.results_reporters([bdd.new()])
@@ -54,9 +59,10 @@
 //// }
 //// ```
 
+import dream_test/suite.{type TestSuite}
 import dream_test/types.{
-  type AssertionResult, type Node, type TestSuite, AfterAll, AfterEach,
-  AssertionSkipped, BeforeAll, BeforeEach, Group, Root, Test, Unit,
+  type AssertionResult, type Node, AfterAll, AfterEach, AssertionPending,
+  AssertionSkipped, BeforeAll, BeforeEach, Group, NoInput, Test, Tree, Unit,
 }
 import gleam/option.{None}
 
@@ -78,15 +84,19 @@ pub type UnitNode =
 ///
 /// ## Example
 ///
+/// ### Write a suite and run it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
 /// import gleam/string
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("String utilities", [
 ///     it("trims whitespace", fn() {
 ///       "  hello  "
@@ -105,7 +115,7 @@ pub type UnitNode =
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -117,16 +127,13 @@ pub type UnitNode =
 /// ## Parameters
 ///
 /// - `name`: the suite name (shown in reports)
-/// - `children`: the suite contents (tests, groups, and hooks)
+/// - `tests`: the suite contents (tests, groups, and hooks)
 ///
 /// ## Returns
 ///
-/// A `TestSuite(Nil)` you can pass to `runner.new([ ... ])`.
-pub fn describe(
-  name name: String,
-  children children: List(UnitNode),
-) -> TestSuite(Nil) {
-  Root(seed: Nil, tree: Group(name: name, tags: [], children: children))
+/// A `TestSuite` you can pass to `runner.new([ ... ])`.
+pub fn describe(name name: String, tests tests: List(UnitNode)) -> TestSuite {
+  suite.from_tree(Tree(initial: Nil, name: name, tags: [], tests: tests))
 }
 
 /// Create a nested group inside a suite.
@@ -136,15 +143,18 @@ pub fn describe(
 ///
 /// ## Example
 ///
+/// ### Group tests inside a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/group.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, group, it}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Calculator", [
 ///     group("addition", [
 ///       it("adds small numbers", fn() {
@@ -171,7 +181,7 @@ pub fn describe(
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -182,14 +192,14 @@ pub fn describe(
 ///
 /// ## Parameters
 ///
-/// - `name`: the group name (shown in reports and in `runner.TestInfo.full_name`)
-/// - `children`: nested tests/groups/hooks under this group
+/// - `name`: the group name (shown in reports and in `types.TestInfo.groups`)
+/// - `tests`: nested tests/groups/hooks under this group
 ///
 /// ## Returns
 ///
-/// A `UnitNode` you include in a parent `describe`/`group` children list.
-pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
-  Group(name: name, tags: [], children: children)
+/// A `UnitNode` you include in the tests of a parent `describe` or `group`.
+pub fn group(name name: String, tests tests: List(UnitNode)) -> UnitNode {
+  Group(name: name, tags: [], tests: tests)
 }
 
 /// Define a single test case.
@@ -200,16 +210,19 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Write tests with it <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/describe.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it}
-/// import gleam/io
 /// import gleam/string
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("String utilities", [
 ///     it("trims whitespace", fn() {
 ///       "  hello  "
@@ -228,7 +241,7 @@ pub fn group(name name: String, children children: List(UnitNode)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -253,13 +266,13 @@ pub fn it(
     name: name,
     tags: [],
     kind: Unit,
-    run: fn(_nil: Nil) { run() },
+    run: NoInput(run),
     timeout_ms: None,
     source: None,
   )
 }
 
-fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
+fn skipped_test_run() -> Result(AssertionResult, String) {
   Ok(AssertionSkipped)
 }
 
@@ -273,15 +286,18 @@ fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
 ///
 /// ## Example
 ///
+/// ### Skip a test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/skip.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it, skip}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Skipping tests", [
 ///     it("runs normally", fn() {
 ///       2 + 3
@@ -305,7 +321,7 @@ fn skipped_test_run(_nil: Nil) -> Result(AssertionResult, String) {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -340,7 +356,7 @@ pub fn skip(
         name: name,
         tags: tags,
         kind: kind,
-        run: skipped_test_run,
+        run: NoInput(skipped_test_run),
         timeout_ms: timeout_ms,
         source: source,
       )
@@ -350,23 +366,29 @@ pub fn skip(
 
 /// Run once before any tests in the current suite/group.
 ///
-/// - Runs in a sandboxed process.
-/// - If it returns `Error("message")`, all tests under this scope become
-///   `SetupFailed`.
+/// - Runs in the setup process of the group, so a resource that it starts
+///   (for example a pool that links to the caller, or an ETS table) lives
+///   for all the tests of the group. It gets the default timeout.
+/// - If it returns `Error("message")` or crashes, all tests under this
+///   group become `SetupFailed`, and the `after_all` hooks still run.
+/// - It does not run for a group that has no test after filtering.
 ///
 /// ## Example
+///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -399,23 +421,23 @@ pub fn skip(
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -432,33 +454,33 @@ pub fn skip(
 ///
 /// A `UnitNode` representing a `before_all` hook.
 pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeAll(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeAll(NoInput(setup))
 }
 
 /// Run before each test in the current scope.
 ///
-/// - Runs in a sandboxed process.
+/// - Runs in the process of the test, before the body, so a resource that
+///   it starts lives for the body and the `after_each` hooks. It gets the
+///   default timeout.
 /// - If it returns `Error("message")`, that test becomes `SetupFailed` and the
 ///   body does not run.
 ///
 /// ## Example
+///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -491,23 +513,23 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -524,32 +546,35 @@ pub fn before_all(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing a `before_each` hook.
 pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
-  BeforeEach(fn(_nil: Nil) {
-    case setup() {
-      Ok(_) -> Ok(Nil)
-      Error(message) -> Error(message)
-    }
-  })
+  BeforeEach(NoInput(setup))
 }
 
 /// Run after each test in the current scope.
 ///
 /// This is useful for cleanup that must always run (even after assertion
-/// failures).
+/// failures). Every `after_each` hook runs, also after one fails. If it
+/// returns `Error("message")` or crashes, the status of the test does not
+/// change: the run report gets a `types.TeardownFailed` with hook
+/// `AfterEachHook`, and the run fails. It runs in the process of the test
+/// with the default timeout. If the body times out or the test process
+/// stops, it still runs, in a new process.
 ///
 /// ## Example
+///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -582,23 +607,23 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -615,24 +640,34 @@ pub fn before_each(setup setup: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_each` hook.
 pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterEach(fn(_nil: Nil) { teardown() })
+  AfterEach(NoInput(teardown))
 }
 
-/// Run once after all tests in the current scope.
+/// Run once after all tests in the current group.
+///
+/// It runs in the setup process of the group, with the default timeout,
+/// so it can stop a resource that `before_all` started. It does not run for
+/// a group that has no test after filtering. Every `after_all` hook runs, also
+/// after one fails. If it returns `Error("message")` or crashes, the run
+/// report gets a `types.TeardownFailed` with hook `AfterAllHook` and the
+/// group path in `path`, and the run fails. No test result is added.
 ///
 /// ## Example
+///
+/// ### Set up and tear down with hooks <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/before_all.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/matchers.{be_empty, or_fail_with, should}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{
 ///   after_all, after_each, before_all, before_each, describe, it,
 /// }
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Database tests", [
 ///     before_all(fn() {
 ///       // Start database once for all tests
@@ -665,23 +700,23 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// fn start_database() {
+/// fn start_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn stop_database() {
+/// fn stop_database() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn begin_transaction() {
+/// fn begin_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// fn rollback_transaction() {
+/// fn rollback_transaction() -> Result(Nil, String) {
 ///   Ok(Nil)
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -698,7 +733,7 @@ pub fn after_each(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// A `UnitNode` representing an `after_all` hook.
 pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
-  AfterAll(fn(_nil: Nil) { teardown() })
+  AfterAll(NoInput(teardown))
 }
 
 /// Attach tags to a node.
@@ -708,15 +743,18 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///
 /// ## Example
 ///
+/// ### Tag tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/with_tags.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
 /// ```gleam
 /// import dream_test/matchers.{succeed}
 /// import dream_test/reporters/bdd
 /// import dream_test/reporters/progress
 /// import dream_test/runner
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type RunReport}
 /// import dream_test/unit.{describe, it, with_tags}
-/// import gleam/io
 ///
-/// pub fn tests() {
+/// pub fn tests() -> TestSuite {
 ///   describe("Tagged tests", [
 ///     it("fast", fn() { Ok(succeed()) })
 ///       |> with_tags(["unit", "fast"]),
@@ -725,7 +763,7 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 ///   ])
 /// }
 ///
-/// pub fn main() {
+/// pub fn main() -> RunReport {
 ///   runner.new([tests()])
 ///   |> runner.progress_reporter(progress.new())
 ///   |> runner.results_reporters([bdd.new()])
@@ -744,8 +782,7 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// The updated `UnitNode` with tags set.
 pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
   case node {
-    Group(name, _, children) ->
-      Group(name: name, tags: tags, children: children)
+    Group(name, _, tests) -> Group(name: name, tags: tags, tests: tests)
     Test(name, _, kind, run, timeout_ms, source) ->
       Test(
         name: name,
@@ -757,4 +794,56 @@ pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
       )
     other -> other
   }
+}
+
+/// Define a pending test: a test with a name and no body yet.
+///
+/// Use it to write the skeleton of a suite first and fill in the tests
+/// later. A pending test has the status `Pending`. The reporters show it
+/// with `~` and count it as pending, and the run still passes, as with a
+/// skipped test.
+///
+/// ## Parameters
+///
+/// - `name`: the test name
+///
+/// ## Returns
+///
+/// A test whose status is `Pending` (`AssertionPending`).
+///
+/// ## Example
+///
+/// ### Add pending tests to a suite <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/unit/pending.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/suite.{type TestSuite}
+/// import dream_test/types.{type AssertionResult}
+/// import dream_test/unit.{describe, it, pending}
+///
+/// fn adds_an_item() -> Result(AssertionResult, String) {
+///   Ok(succeed())
+/// }
+///
+/// pub fn cart_suite() -> TestSuite {
+///   describe("Cart", [
+///     it("adds an item", adds_an_item),
+///     pending("removes an item"),
+///     pending("empties the cart"),
+///   ])
+/// }
+/// ```
+pub fn pending(name name: String) -> UnitNode {
+  Test(
+    name: name,
+    tags: [],
+    kind: Unit,
+    run: NoInput(pending_test_run),
+    timeout_ms: None,
+    source: None,
+  )
+}
+
+fn pending_test_run() -> Result(AssertionResult, String) {
+  Ok(AssertionPending)
 }

@@ -3,117 +3,98 @@
 import dream_test/gherkin/steps.{
   type StepContext, type StepRegistry, get_int, get_string,
 }
-import dream_test/gherkin/world.{get_or, put}
-import dream_test/matchers.{succeed}
-import dream_test/types.{type AssertionResult}
+import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import shopping_cart/cart
 import shopping_cart/products
 import shopping_cart/types as cart_types
+import steps/cart_state.{type CartState, CartState}
 
 // ============================================================================
 // Step Registration
 // ============================================================================
 
-pub fn register(registry: StepRegistry) -> StepRegistry {
+pub fn register(registry: StepRegistry(CartState)) -> StepRegistry(CartState) {
   registry
-  |> steps.step("I have an empty cart", step_empty_cart)
-  |> steps.step("I add {int} {word} to the cart", step_add_product)
-  |> steps.step("I try to add {int} {word} to the cart", step_try_add_product)
-  |> steps.step("I update the {word} quantity to {int}", step_update_quantity)
-  |> steps.step("I remove {word} from the cart", step_remove_product)
+  |> steps.given("I have an empty cart", step_empty_cart)
+  |> steps.given("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I add {int} {word} to the cart", step_add_product)
+  |> steps.when("I try to add {int} {word} to the cart", step_try_add_product)
+  |> steps.when("I update the {word} quantity to {int}", step_update_quantity)
+  |> steps.when("I remove {word} from the cart", step_remove_product)
 }
 
 // ============================================================================
 // Step Implementations
 // ============================================================================
 
-fn step_empty_cart(context: StepContext) -> Result(AssertionResult, String) {
-  put(context.world, "cart", cart.new())
-  Ok(succeed())
+fn step_empty_cart(
+  state: CartState,
+  _context: StepContext,
+) -> Result(CartState, String) {
+  Ok(CartState(..state, cart: cart.new()))
 }
 
-fn step_add_product(context: StepContext) -> Result(AssertionResult, String) {
-  let quantity = get_int(context.captures, 0) |> result.unwrap(0)
-  let product =
-    get_string(context.captures, 1) |> result.unwrap("") |> lookup_product()
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-
+fn step_add_product(
+  state: CartState,
+  context: StepContext,
+) -> Result(CartState, String) {
+  use quantity <- result.try(get_int(context.captures, 0))
+  use product_name <- result.try(get_string(context.captures, 1))
   use updated <- result.try(
-    cart.add_item(the_cart, product, quantity)
+    cart.add_item(state.cart, lookup_product(product_name), quantity)
     |> result.map_error(add_item_error_to_string),
   )
-
-  put(context.world, "cart", updated)
-  Ok(succeed())
+  Ok(CartState(..state, cart: updated))
 }
 
 fn step_try_add_product(
+  state: CartState,
   context: StepContext,
-) -> Result(AssertionResult, String) {
-  let quantity = get_int(context.captures, 0) |> result.unwrap(0)
-  let product =
-    get_string(context.captures, 1) |> result.unwrap("") |> lookup_product()
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-
-  case cart.add_item(the_cart, product, quantity) {
-    Ok(updated) -> {
-      put(context.world, "cart", updated)
-      put(context.world, "last_error", "")
-      Ok(succeed())
-    }
-
-    Error(e) -> {
-      put(context.world, "last_error", add_item_error_to_string(e))
-      Ok(succeed())
-    }
+) -> Result(CartState, String) {
+  use quantity <- result.try(get_int(context.captures, 0))
+  use product_name <- result.try(get_string(context.captures, 1))
+  case cart.add_item(state.cart, lookup_product(product_name), quantity) {
+    Ok(updated) -> Ok(CartState(..state, cart: updated, last_error: None))
+    Error(error) ->
+      Ok(CartState(..state, last_error: Some(add_item_error_to_string(error))))
   }
 }
 
-fn add_item_error_to_string(e) -> String {
-  case e {
+fn add_item_error_to_string(error: cart_types.CartError) -> String {
+  case error {
     cart_types.InvalidQuantity -> "invalid quantity"
     _ -> "add_item failed"
   }
 }
 
 fn step_update_quantity(
+  state: CartState,
   context: StepContext,
-) -> Result(AssertionResult, String) {
-  let product_name = get_string(context.captures, 0) |> result.unwrap("")
-  let quantity = get_int(context.captures, 1) |> result.unwrap(0)
-  let product_id = normalize_product_id(product_name)
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-
-  case cart.update_quantity(the_cart, product_id, quantity) {
-    Ok(updated) -> {
-      put(context.world, "cart", updated)
-      Ok(succeed())
-    }
-    Error(_) -> {
-      put(context.world, "last_error", "update failed")
-      Ok(succeed())
-    }
+) -> Result(CartState, String) {
+  use product_name <- result.try(get_string(context.captures, 0))
+  use quantity <- result.try(get_int(context.captures, 1))
+  case
+    cart.update_quantity(
+      state.cart,
+      normalize_product_id(product_name),
+      quantity,
+    )
+  {
+    Ok(updated) -> Ok(CartState(..state, cart: updated))
+    Error(_) -> Ok(CartState(..state, last_error: Some("update failed")))
   }
 }
 
 fn step_remove_product(
+  state: CartState,
   context: StepContext,
-) -> Result(AssertionResult, String) {
-  let product_name = get_string(context.captures, 0) |> result.unwrap("")
-  let product_id = normalize_product_id(product_name)
-  let the_cart: cart_types.Cart = get_or(context.world, "cart", cart.new())
-
-  case cart.remove_item(the_cart, product_id) {
-    Ok(updated) -> {
-      put(context.world, "cart", updated)
-      Ok(succeed())
-    }
-    Error(_) -> {
-      put(context.world, "last_error", "remove failed")
-      Ok(succeed())
-    }
+) -> Result(CartState, String) {
+  use product_name <- result.try(get_string(context.captures, 0))
+  case cart.remove_item(state.cart, normalize_product_id(product_name)) {
+    Ok(updated) -> Ok(CartState(..state, cart: updated))
+    Error(_) -> Ok(CartState(..state, last_error: Some("remove failed")))
   }
 }
 

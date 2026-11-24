@@ -8,12 +8,16 @@ on:
         required: false
         type: string
 
+env:
+  # A read-only Hex key. With it, dependency lookups do not hit the limit for requests with no key.
+  HEXPM_READ_API_KEY: ${{ secrets.HEX_READ_API_KEY }}
+
 jobs:
   publish-docs:
     name: Publish Documentation to Hex
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Allow creating git tags
+      contents: read
 
     steps:
       - name: Checkout code
@@ -31,23 +35,6 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing docs for version: $VERSION"
-
-      - name: Create git tag if needed
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${VERSION}"
-
-          # Check if tag already exists
-          if git rev-parse "${TAG}" >/dev/null 2>&1; then
-            echo "✓ Tag ${TAG} already exists"
-          else
-            echo "Creating git tag: ${TAG}"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "${TAG}" -m "Release dream_test ${VERSION}"
-            git push origin "${TAG}"
-            echo "✓ Successfully created and pushed tag: ${TAG}"
-          fi
 
       - name: Verify package exists on Hex
         run: |
@@ -72,7 +59,7 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.17.0"
+          gleam-version: "1.19.2"
           rebar3-version: "3"
 
       - name: Download dependencies
