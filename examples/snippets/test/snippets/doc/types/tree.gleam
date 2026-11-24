@@ -2,7 +2,7 @@ import dream_test/types
 import gleam/option.{None}
 
 pub fn math_tree() -> types.Tree(Nil) {
-  types.Tree(initial: Nil, name: "math", tags: [], children: [
+  types.Tree(initial: Nil, name: "math", tags: [], tests: [
     types.Test(
       name: "adds",
       tags: [],

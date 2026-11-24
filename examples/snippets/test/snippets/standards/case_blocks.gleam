@@ -30,9 +30,9 @@ fn names_of_node(
   case node {
     Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-    Group(name: name, children: children, ..) -> {
+    Group(name: name, tests: tests, ..) -> {
       let new_prefix = list.append(name_prefix, [name])
-      collect_test_names(new_prefix, children, [])
+      collect_test_names(new_prefix, tests, [])
     }
 
     _ -> []
@@ -45,7 +45,7 @@ pub fn tests() {
       // Arrange
       let nodes = [
         it("adds", fn() { Ok(succeed()) }),
-        Group(name: "nested", tags: [], children: [
+        Group(name: "nested", tags: [], tests: [
           it("subtracts", fn() { Ok(succeed()) }),
         ]),
       ]

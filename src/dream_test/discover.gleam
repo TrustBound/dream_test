@@ -443,7 +443,7 @@ fn errors_at_top(name: String, errors: List(String)) -> List(TestSuite) {
         initial: Nil,
         name: name,
         tags: [],
-        children: errors_to_nodes(errors, []),
+        tests: errors_to_nodes(errors, []),
       )),
     ]
   }
@@ -634,7 +634,7 @@ fn errors_suite(errors: List(String)) -> TestSuite {
     initial: Nil,
     name: "Discovery Errors",
     tags: ["discovery-error"],
-    children: errors_to_nodes(errors, []),
+    tests: errors_to_nodes(errors, []),
   ))
 }
 

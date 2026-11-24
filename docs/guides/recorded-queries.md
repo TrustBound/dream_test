@@ -139,7 +139,7 @@ This is the one thing that makes recordings easy. The test decides which connect
 
 You record on your machine, and CI plays back. So the mode comes from an environment variable, `RECORDER_MODE`. `recorder.parse_mode` turns the text into a `recorder.Mode`. It accepts `record`, `playback` and `passthrough`, and gives an `Error` that names any other text. With no variable, the tests play back.
 
-A recorder is a process, so something must start it before the first test and stop it after the last test. In Dream Test, that is the `start` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. Here the context is `Database`: the connection and its recorder:
+A recorder is a process, so something must start it before the first test and stop it after the last test. In Dream Test, that is the `setup` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. Here the context is `Database`: the connection and its recorder:
 
 ### Start the recorder and connect <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/database_setup.gleam#L16-L62"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

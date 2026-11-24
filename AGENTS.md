@@ -51,9 +51,9 @@ It is **not** user-facing documentation. It exists to reduce repeated mistakes.
     case node {
       Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-      Group(name: name, children: children, ..) -> {
+      Group(name: name, tests: tests, ..) -> {
         let new_prefix = list.append(name_prefix, [name])
-        collect_test_names(new_prefix, children, [])
+        collect_test_names(new_prefix, tests, [])
       }
 
       _ -> []

@@ -504,7 +504,7 @@ pub fn to_suite(
   suite.new(
     name: name,
     tags: tags,
-    tests: children_to_nodes(tests, registry),
+    tests: tests_to_nodes(tests, registry),
     context: registry.start,
   )
 }
@@ -601,21 +601,21 @@ pub fn feature_suite(
   suite.new(
     name: feature.name,
     tags: feature.tags,
-    tests: feature_children(feature, registry, Some(feature.name)),
+    tests: feature_tests(feature, registry, Some(feature.name)),
     context: registry.start,
   )
 }
 
-fn children_to_nodes(
-  children: List(SuiteChild(state)),
+fn tests_to_nodes(
+  tests: List(SuiteChild(state)),
   registry: StepRegistry(state),
 ) -> List(dream_types.Node(state)) {
-  case children {
+  case tests {
     [] -> []
     [child, ..rest] ->
       list.append(
         child_to_nodes(child, registry),
-        children_to_nodes(rest, registry),
+        tests_to_nodes(rest, registry),
       )
   }
 }
@@ -629,15 +629,15 @@ fn child_to_nodes(
       dream_types.Group(
         name: feature.name,
         tags: feature.tags,
-        children: feature_children(feature, registry, Some(feature.name)),
+        tests: feature_tests(feature, registry, Some(feature.name)),
       ),
     ]
-    Scenarios(feature) -> feature_children(feature, registry, None)
+    Scenarios(feature) -> feature_tests(feature, registry, None)
     Group(name: name, tags: tags, tests: tests) -> [
       dream_types.Group(
         name: name,
         tags: tags,
-        children: children_to_nodes(tests, registry),
+        tests: tests_to_nodes(tests, registry),
       ),
     ]
     Node(node) -> [node]
@@ -1236,7 +1236,7 @@ fn list_at_loop(items: List(a), target: Int, current: Int) -> Option(a) {
 /// The tests of the scenarios of `feature`, and a group for each Rule.
 /// `feature_group` is the name of the Feature when these nodes go into the
 /// group of the Feature, and `None` when they go into another group.
-fn feature_children(
+fn feature_tests(
   feature: types.Feature,
   registry: StepRegistry(state),
   feature_group: Option(String),
@@ -1310,7 +1310,7 @@ fn rule_to_node(
   dream_types.Group(
     name: group_name,
     tags: rule.tags,
-    children: scenarios_to_nodes(rule_scope, rule.scenarios, []),
+    tests: scenarios_to_nodes(rule_scope, rule.scenarios, []),
   )
 }
 

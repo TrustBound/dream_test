@@ -561,7 +561,7 @@ pub fn tests() {
 
 ## Run the executor directly
 
-The runner uses `dream_test/parallel` to run each tree. It's public so tools can embed the executor, but most projects never call it. The executor runs a typed tree, a `types.Tree(context)`: one top-level group with its children and one context. Build one with `types.tree`, not with `unit.describe`, which gives a `TestSuite`. `parallel.run_tree_parallel` returns a `RunReport`.
+The runner uses `dream_test/parallel` to run each tree. It's public so tools can embed the executor, but most projects never call it. The executor runs a typed tree, a `types.Tree(context)`: one top-level group with its tests and one context. Build one with `types.tree`, not with `unit.describe`, which gives a `TestSuite`. `parallel.run_tree_parallel` returns a `RunReport`.
 
 ### Run the executor directly <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/utils/parallel_direct.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 

@@ -25,7 +25,7 @@ pub fn tests() {
 
     it("tree builds a Tree with a top-level Group", fn() {
       let tree = types.tree("r", Nil, [])
-      let types.Tree(initial: initial, name: _, tags: _, children: _) = tree
+      let types.Tree(initial: initial, name: _, tags: _, tests: _) = tree
 
       initial
       |> should
@@ -33,13 +33,13 @@ pub fn tests() {
       |> or_fail_with("the initial value should be kept")
     }),
 
-    it("tree keeps the name, no tags and the children", fn() {
+    it("tree keeps the name, no tags and the tests", fn() {
       let tree = types.tree("r", Nil, [])
 
-      #(tree.name, tree.tags, tree.children)
+      #(tree.name, tree.tags, tree.tests)
       |> should
       |> be_equal(#("r", [], []))
-      |> or_fail_with("expected the name r, no tags and no children")
+      |> or_fail_with("expected the name r, no tags and no tests")
     }),
 
     it("full_name gives the group names, then the test name", fn() {

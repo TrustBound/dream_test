@@ -37,7 +37,7 @@ pub fn tests() {
       // Assert
       math
       |> should
-      |> be_equal(types.Tree(initial: 0, name: "math", tags: [], children: []))
+      |> be_equal(types.Tree(initial: 0, name: "math", tags: [], tests: []))
       |> or_fail_with("expected a tree named math with context 0")
     }),
     it("be_even keeps an even number", fn() {
@@ -81,7 +81,7 @@ pub fn tests() {
       let math = tree.math_tree()
 
       // Assert
-      #(math.name, list.length(math.children))
+      #(math.name, list.length(math.tests))
       |> should
       |> be_equal(#("math", 1))
       |> or_fail_with("expected the math group with one test")

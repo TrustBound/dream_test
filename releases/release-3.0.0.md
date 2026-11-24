@@ -78,8 +78,8 @@ hook starts now lives for the tests of its group. A test runs its
   Gherkin scenarios, for example to start one server for all the
   scenarios of a feature.
 - The new module `dream_test/context` makes the context of
-  `unit_context.describe`: `context.value(start)` for a fixed start value,
-  and `context.setup(start, teardown:)` for a value from a setup.
+  `unit_context.describe`: `context.value(value)` for a fixed start value,
+  and `context.setup(setup, teardown:)` for a value from a setup.
 - `steps.to_suite` makes one suite from several Features with one
   registry, so one setup serves all of them. Its tests
   (`steps.SuiteChild`) are `Feature`, `Scenarios`, `Group`
@@ -247,7 +247,7 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   A `case` on a `ResultsReporter` needs a branch for it.
 - `sandbox.run_isolated` takes the function and its input as two parameters.
 - `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`:
-  a tree is one top-level group with its children and one context, and a
+  a tree is one top-level group with its tests and one context, and a
   suite holds one or more trees. The `parallel` functions take the tree
   with the label `tree:` in place of `suite:`.
 - `unit_context.describe` takes a `dream_test/context.Context` in place
@@ -257,8 +257,9 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   `describe(name:, context:, tests:)`.
 - The label `children` is now `tests` in `unit.describe`, `unit.group`,
   `unit_context.describe`, `unit_context.group`, `suite.new`,
-  `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels
-  does not change.
+  `types.tree`, `steps.to_suite` and `steps.Group`, and the field
+  `children` of `types.Group` is now `tests`. A call without labels does
+  not change.
 - The start value of a tree has the label `initial` in place of `seed`,
   as in `steps.new(initial:)`: `types.tree(name:, initial:, tests:)` and
   the field `types.Tree.initial`.

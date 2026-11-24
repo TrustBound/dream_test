@@ -318,7 +318,7 @@ pub fn to_suite(
       initial: Nil,
       name: suite_name,
       tags: [],
-      children: list.append(error_nodes, missing_nodes),
+      tests: list.append(error_nodes, missing_nodes),
     )),
     steps.to_suite(
       registry: discovery.registry,

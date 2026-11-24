@@ -381,7 +381,7 @@ pub fn checkout_group(feature: Feature) -> SuiteChild(Nil) {
 }
 
 pub fn plain_group() -> Node(Nil) {
-  NodeGroup(name: "plain", tags: [], children: [])
+  NodeGroup(name: "plain", tags: [], tests: [])
 }
 
 pub fn first_scenarios(feature: Feature) -> List(Scenario) {
@@ -415,7 +415,7 @@ pub fn tests() {
       |> should
       |> be_equal(#(
         Group(name: "Checkout", tags: [], tests: [Scenarios(feature)]),
-        NodeGroup(name: "plain", tags: [], children: []),
+        NodeGroup(name: "plain", tags: [], tests: []),
         test_types.Unit,
       ))
       |> or_fail_with("both groups and the kind should be made")
@@ -455,8 +455,8 @@ pub fn nested_tree(
   nested: List(dream_types.Node(Nil)),
 ) -> dream_types.Tree(Nil) {
   let tree =
-    dream_types.Tree(initial: Nil, name: name, tags: [], children: [
-      dream_types.Group(name: "nested", tags: [], children: nested),
+    dream_types.Tree(initial: Nil, name: name, tags: [], tests: [
+      dream_types.Group(name: "nested", tags: [], tests: nested),
     ])
   tree
 }
@@ -470,8 +470,8 @@ pub fn nested_tree(
 // Good: Clean unqualified usage
 pub fn nested_tree(name: String, nested: List(Node(Nil))) -> Tree(Nil) {
   let tree =
-    Tree(initial: Nil, name: name, tags: [], children: [
-      Group(name: "nested", tags: [], children: nested),
+    Tree(initial: Nil, name: name, tags: [], tests: [
+      Group(name: "nested", tags: [], tests: nested),
     ])
   tree
 }
@@ -524,9 +524,9 @@ fn names_of_node(
   case node {
     Test(name: name, ..) -> [full_name(groups: name_prefix, name: name)]
 
-    Group(name: name, children: children, ..) -> {
+    Group(name: name, tests: tests, ..) -> {
       let new_prefix = list.append(name_prefix, [name])
-      collect_test_names(new_prefix, children, [])
+      collect_test_names(new_prefix, tests, [])
     }
 
     _ -> []

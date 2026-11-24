@@ -15,8 +15,7 @@ pub const child_timeout_ms = 60_000
 /// Give every test in `node` the timeout `child_timeout_ms`.
 pub fn with_child_timeout(node: Node(context)) -> Node(context) {
   case node {
-    Group(..) ->
-      Group(..node, children: list.map(node.children, with_child_timeout))
+    Group(..) -> Group(..node, tests: list.map(node.tests, with_child_timeout))
     Test(..) -> Test(..node, timeout_ms: Some(child_timeout_ms))
     other -> other
   }
@@ -26,7 +25,7 @@ pub fn with_child_timeout(node: Node(context)) -> Node(context) {
 /// `child_timeout_ms`.
 pub fn describe_with_child_timeout(
   name: String,
-  children: List(Node(Nil)),
+  tests: List(Node(Nil)),
 ) -> TestSuite {
-  unit.describe(name, list.map(children, with_child_timeout))
+  unit.describe(name, list.map(tests, with_child_timeout))
 }

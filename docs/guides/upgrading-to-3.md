@@ -47,15 +47,15 @@ Code that uses only `unit` and the runner with its default reporters compiles wi
 - filter predicates and other code that reads `full_name` of a `TestInfo` or a `TestResult`
 - `runner.has_failures`
 - code that uses the result of `runner.run` as a list
-- each `unit_context.describe` call, which takes a `context.value(start)` in place of the start value
-- the label `children:` of `describe` and `group`, which is now `tests:`
+- each `unit_context.describe` call, which takes a `context.value(value)` in place of the start value
+- the label `children:` of `describe` and `group`, and the field `children` of `types.Group`, which are now `tests:`
 
 Most projects need only Steps 1 to 4. Do the steps in order. The first ones affect the most projects.
 
 | Your code uses | What changed | Step |
 |:---|:---|:---|
 | Gherkin steps | Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` and `FeatureConfig` are removed: use `steps.feature_suite`. | [Step 3](#step-3-port-the-gherkin-step-definitions) |
-| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases, also for a run with no test (`runner.allow_no_tests()` allows one). `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. `unit_context.describe` takes a `context.value(start)` in place of the start value. The label `children` of `describe` and `group` is now `tests`, and `types.Tree` has `initial` in place of `seed`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
+| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases, also for a run with no test (`runner.allow_no_tests()` allows one). `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. `unit_context.describe` takes a `context.value(value)` in place of the start value. The label `children` of `describe` and `group` and the field `children` of `types.Group` are now `tests`, and `types.Tree` has `initial` in place of `seed`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
 | Hooks | A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. | [Step 5](#step-5-check-the-hook-failures) |
 | Reporters | The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`, and `FailurePayload` the new variant `StepFailure`. | [Step 6](#step-6-update-the-reporters) |
 | The JSON report | The JSON report has schema version `2.0`. | [Step 7](#step-7-update-the-tools-that-read-the-json-report) |
@@ -825,7 +825,7 @@ fn test_label(info: TestInfo) -> String {
 
 ### `types.Root` is now `types.Tree`
 
-This change affects only code that uses `types.Root` or `dream_test/parallel` directly. A `Root` was one tree of tests, not a whole suite, so it has a new name. `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`. A tree is one top-level group with its children and one context. A suite holds one or more trees. The `parallel` functions take the tree with the label `tree:`. In 2.x the label was `suite:`.
+This change affects only code that uses `types.Root` or `dream_test/parallel` directly. A `Root` was one tree of tests, not a whole suite, so it has a new name. `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`. A tree is one top-level group with its tests and one context. A suite holds one or more trees. The `parallel` functions take the tree with the label `tree:`. In 2.x the label was `suite:`.
 
 #### 2.x: the tree with the label `suite:` <a href="https://github.com/TrustBound/dream_test/blob/2.1.3/examples/snippets/test/snippets/utils/parallel_with_reporter.gleam#L32-L44"><img align="right" alt="Code at 2.1.3" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-2.1.3-lightgrey.svg?style=flat-square"></a>
 
@@ -1109,7 +1109,7 @@ pub fn main() {
 
 ### Suites built by hand
 
-This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(initial:, name:, tags:, children:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
+This change affects only code that builds `types.Root` or `types.Node` values directly, for example a generator of table tests. `Root` is now `Tree` (see [`types.Root` is now `types.Tree`](#typesroot-is-now-typestree)). `Tree` holds the fields of its top-level group: `Tree(initial:, name:, tags:, tests:)`. The `run` field of `Test`, `BeforeAll`, `BeforeEach`, `AfterEach` and `AfterAll` is a `types.Callback`. Use `NoInput(f)` for a function with no argument. Use `WithInput(f)` for a function that takes the context. Give the `Tree` to `suite.from_tree` to get a `TestSuite` for the runner.
 
 No file at the 2.1.3 tag builds a table of tests by hand. The 2.1.3 source of `unit.describe` and `unit.it` builds the same values: a `Root` with `seed` and `tree`, and a `Test` whose `run` takes the context.
 
@@ -1181,7 +1181,7 @@ fn doubling_test(pair: #(Int, Int)) -> Node(Nil) {
 
 pub fn tests() -> TestSuite {
   suite.from_tree(
-    Tree(initial: Nil, name: "doubling", tags: [], children: [
+    Tree(initial: Nil, name: "doubling", tags: [], tests: [
       BeforeAll(NoInput(check_tables)),
       ..list.map(doubling_cases(), doubling_test)
     ]),
@@ -1191,9 +1191,9 @@ pub fn tests() -> TestSuite {
 
 ### `unit_context.describe` takes a context, and `children` is now `tests`
 
-`unit_context.describe` takes a `dream_test/context.Context` in place of the start value. Put the start value in `context.value`: `unit_context.describe("counter", 0, [...])` is now `unit_context.describe("counter", context.value(0), [...])`, with `import dream_test/context`. With labels, `describe(name:, seed:, children:)` is now `describe(name:, context:, tests:)`. A start value that a setup makes and a teardown stops goes in `context.setup(start, teardown:)` (see [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup)).
+`unit_context.describe` takes a `dream_test/context.Context` in place of the start value. Put the start value in `context.value`: `unit_context.describe("counter", 0, [...])` is now `unit_context.describe("counter", context.value(0), [...])`, with `import dream_test/context`. With labels, `describe(name:, seed:, children:)` is now `describe(name:, context:, tests:)`. A start value that a setup makes and a teardown stops goes in `context.setup(setup, teardown:)` (see [Share a context between tests](https://github.com/TrustBound/dream_test/blob/main/docs/guides/context-aware-tests.md#step-3-get-the-context-from-a-setup)).
 
-The label `children` is now `tests` in `unit.describe`, `unit.group`, `unit_context.describe`, `unit_context.group`, `suite.new`, `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels, such as `unit.describe("math", [...])`, does not change. Change only the label.
+The label `children` is now `tests` in `unit.describe`, `unit.group`, `unit_context.describe`, `unit_context.group`, `suite.new`, `types.tree`, `steps.to_suite` and `steps.Group`. The field `children` of `types.Group` is now `tests` too, so a pattern or a record update with the label `children:` changes in the same way. A call without labels, such as `unit.describe("math", [...])`, does not change. Change only the label.
 
 The start value of `types.tree` and the field of `types.Tree` have the label `initial` in place of `seed`, as in `steps.new(initial:)`: `types.tree(name:, initial:, tests:)`.
 

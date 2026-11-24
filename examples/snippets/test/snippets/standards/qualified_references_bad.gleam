@@ -12,8 +12,8 @@ pub fn nested_tree(
   nested: List(dream_types.Node(Nil)),
 ) -> dream_types.Tree(Nil) {
   let tree =
-    dream_types.Tree(initial: Nil, name: name, tags: [], children: [
-      dream_types.Group(name: "nested", tags: [], children: nested),
+    dream_types.Tree(initial: Nil, name: name, tags: [], tests: [
+      dream_types.Group(name: "nested", tags: [], tests: nested),
     ])
   tree
 }
@@ -28,8 +28,8 @@ pub fn tests() {
       tree
       |> should
       |> be_equal(
-        dream_types.Tree(initial: Nil, name: "root", tags: [], children: [
-          dream_types.Group(name: "nested", tags: [], children: []),
+        dream_types.Tree(initial: Nil, name: "root", tags: [], tests: [
+          dream_types.Group(name: "nested", tags: [], tests: []),
         ]),
       )
       |> or_fail_with("the tree should hold the nested group")

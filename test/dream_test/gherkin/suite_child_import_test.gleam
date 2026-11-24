@@ -1,6 +1,6 @@
-//// The children of `steps.to_suite` work next to an unqualified
+//// The tests of `steps.to_suite` work next to an unqualified
 //// `dream_test/types.Group`. `steps.Group` and `types.Group` have the same
-//// name, so this module writes the children qualified: `steps.Group(...)`.
+//// name, so this module writes them qualified: `steps.Group(...)`.
 
 import dream_test/gherkin/parser
 import dream_test/gherkin/steps.{type StepContext, type StepRegistry}
@@ -25,7 +25,7 @@ pub fn tests() {
           steps.Feature(shop_feature("Invoice")),
         ]),
         steps.Node(
-          Group(name: "Plain", tags: [], children: [
+          Group(name: "Plain", tags: [], tests: [
             unit_context.it("starts from 3", starts_from_3),
           ]),
         ),

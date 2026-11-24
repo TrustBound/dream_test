@@ -66,7 +66,7 @@ pub fn tests() {
           unit_context.describe(
             "empty",
             context: context.setup(
-              start: fn() { send_and_give(events, "setup", 7) },
+              setup: fn() { send_and_give(events, "setup", 7) },
               teardown: fn(_value: Int) { send_ok(events, "teardown") },
             ),
             tests: [],
@@ -197,7 +197,7 @@ pub fn tests() {
           unit_context.describe(
             "server",
             context: context.setup(
-              start: fn() { Ok(7) },
+              setup: fn() { Ok(7) },
               teardown: fn(_value: Int) { Error("port still open") },
             ),
             tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
@@ -224,7 +224,7 @@ pub fn tests() {
         runner.new([
           unit_context.describe(
             "server",
-            context: context.setup(start: fn() { Ok(7) }, teardown: crash_with),
+            context: context.setup(setup: fn() { Ok(7) }, teardown: crash_with),
             tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
           ),
         ])
@@ -243,7 +243,7 @@ pub fn tests() {
           unit_context.describe(
             "Server",
             context: context.setup(
-              start: fn() { Ok(7) },
+              setup: fn() { Ok(7) },
               teardown: fn(_value: Int) { Error("port still open") },
             ),
             tests: [unit_context.it("passes", fn(_value) { Ok(succeed()) })],
@@ -310,7 +310,7 @@ pub fn tests() {
           unit_context.describe(
             "server",
             context: context.setup(
-              start: fn() { Ok(process.self()) },
+              setup: fn() { Ok(process.self()) },
               teardown: fn(_setup_process: Pid) { send_ok(events, "teardown") },
             ),
             tests: [
@@ -400,7 +400,7 @@ fn counted_suite(events: Subject(String)) {
   unit_context.describe(
     "server",
     context: context.setup(
-      start: fn() { send_and_give(events, "setup", 7) },
+      setup: fn() { send_and_give(events, "setup", 7) },
       teardown: fn(value: Int) {
         send_ok(events, "teardown got " <> int.to_string(value))
       },
@@ -420,7 +420,7 @@ fn counted_suite(events: Subject(String)) {
 fn broken_suite(events: Subject(String), setup: fn() -> Result(Int, String)) {
   unit_context.describe(
     "broken",
-    context: context.setup(start: setup, teardown: fn(_value: Int) {
+    context: context.setup(setup: setup, teardown: fn(_value: Int) {
       send_ok(events, "teardown")
     }),
     tests: [

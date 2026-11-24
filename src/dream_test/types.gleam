@@ -66,7 +66,7 @@
 //// that the executor runs.
 ////
 //// - `Tree(context)` holds the initial value and the top-level group:
-////   its name, tags and children. The top level is always a group. A
+////   its name, tags and tests. The top level is always a group. A
 ////   suite holds one or more trees.
 //// - `Node(context)` represents groups, tests, and lifecycle hooks.
 ////
@@ -465,9 +465,9 @@ pub type SuiteInfo {
 
 /// One tree of tests in the unified execution model.
 ///
-/// A `Tree(context)` is one top-level group with its children and one
+/// A `Tree(context)` is one top-level group with its tests and one
 /// context source. It stores the `initial` context value and the
-/// top-level group: its `name`, its `tags`, and its `children` (groups,
+/// top-level group: its `name`, its `tags`, and its `tests` (groups,
 /// tests and hooks). The top level is always a group, so a tree cannot be
 /// a single test. A suite holds one or more trees.
 ///
@@ -480,7 +480,7 @@ pub type SuiteInfo {
 /// import gleam/option.{None}
 ///
 /// pub fn math_tree() -> types.Tree(Nil) {
-///   types.Tree(initial: Nil, name: "math", tags: [], children: [
+///   types.Tree(initial: Nil, name: "math", tags: [], tests: [
 ///     types.Test(
 ///       name: "adds",
 ///       tags: [],
@@ -497,7 +497,7 @@ pub type Tree(context) {
     initial: context,
     name: String,
     tags: List(String),
-    children: List(Node(context)),
+    tests: List(Node(context)),
   )
 }
 
@@ -505,8 +505,8 @@ pub type Tree(context) {
 ///
 /// Most users build these values via `dream_test/unit` or `dream_test/unit_context`.
 pub type Node(context) {
-  /// A named group containing child nodes.
-  Group(name: String, tags: List(String), children: List(Node(context)))
+  /// A named group of tests, groups and hooks.
+  Group(name: String, tags: List(String), tests: List(Node(context)))
 
   /// A runnable test leaf.
   Test(
@@ -637,11 +637,11 @@ pub type SuiteContext(context) {
 ///
 /// ## Returns
 ///
-/// A `Tree(context)` with the name, no tags, and the children.
+/// A `Tree(context)` with the name, no tags, and the tests.
 ///
 /// ## Example
 ///
-/// ### Build a tree with no children <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/tree_function.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+/// ### Build a tree with no tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/tree_function.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_test/types.{type Tree}
@@ -655,7 +655,7 @@ pub fn tree(
   initial initial: context,
   tests tests: List(Node(context)),
 ) -> Tree(context) {
-  Tree(initial: initial, name: name, tags: [], children: tests)
+  Tree(initial: initial, name: name, tags: [], tests: tests)
 }
 
 /// The complete name of a test: its group names, then its own name.

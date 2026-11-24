@@ -77,8 +77,8 @@ pub type ContextNode(context) =
 ///
 /// The `context` says where the hooks and tests get their context:
 ///
-/// - `context.value(start)`: each test starts from the fixed value `start`.
-/// - `context.setup(start, teardown)`: `start` makes the value once, before
+/// - `context.value(value)`: each test starts from the fixed value `value`.
+/// - `context.setup(setup, teardown)`: `setup` makes the value once, before
 ///   the first test of the suite, and `teardown` gets the value after the
 ///   last test (see `context.setup`).
 ///
@@ -217,7 +217,7 @@ pub fn group(
   name name: String,
   tests tests: List(ContextNode(context)),
 ) -> ContextNode(context) {
-  Group(name: name, tags: [], children: tests)
+  Group(name: name, tags: [], tests: tests)
 }
 
 /// Define a context-aware test case.
@@ -574,8 +574,7 @@ pub fn with_tags(
   tags tags: List(String),
 ) -> ContextNode(context) {
   case node {
-    Group(name, _, children) ->
-      Group(name: name, tags: tags, children: children)
+    Group(name, _, tests) -> Group(name: name, tags: tags, tests: tests)
     Test(name, _, kind, run, timeout_ms, source) ->
       Test(
         name: name,

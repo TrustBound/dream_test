@@ -19,7 +19,7 @@ pub fn run_suite_in_group() -> parallel.RunTreeParallelWithReporterResult {
       groups: ["all"],
       name: "suite",
       tags: [],
-      children: [unit.it("passes", passes)],
+      tests: [unit.it("passes", passes)],
       context: types.FixedContext(Nil),
       progress_reporter: None,
       write: ignore,

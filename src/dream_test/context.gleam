@@ -4,7 +4,7 @@
 //// functions:
 ////
 //// - `value(a)`: each test starts from a fixed value.
-//// - `setup(start, teardown)`: `start` makes the value once, before the
+//// - `setup(setup, teardown)`: `setup` makes the value once, before the
 ////   first test of the suite, and `teardown` gets the value after the last
 ////   test.
 ////
@@ -43,12 +43,12 @@ pub opaque type Context(a) {
 
 /// A context that is a fixed value.
 ///
-/// Each test of the suite starts from `start`. A `before_all` or
+/// Each test of the suite starts from `value`. A `before_all` or
 /// `before_each` hook can change the value before a test gets it.
 ///
 /// ## Parameters
 ///
-/// - `start`: the value that each test starts from
+/// - `value`: the value that each test starts from
 ///
 /// ## Returns
 ///
@@ -76,33 +76,33 @@ pub opaque type Context(a) {
 ///   describe("Cart", context.value([]), [it("starts empty", is_empty)])
 /// }
 /// ```
-pub fn value(start: a) -> Context(a) {
-  Context(suite_context: FixedContext(start))
+pub fn value(value: a) -> Context(a) {
+  Context(suite_context: FixedContext(value))
 }
 
 /// A context that a setup makes, and that a teardown gets after the last
 /// test.
 ///
-/// `start` runs once for the suite, before its first test, and only when
+/// `setup` runs once for the suite, before its first test, and only when
 /// at least one of its tests runs. A `suite.join` or `suite.group` of two
-/// such suites runs two setups. The value of `start` is the context of
+/// such suites runs two setups. The value that `setup` returns is the context of
 /// every hook and test. `teardown` gets the same value after the last
 /// test. The setup and the teardown run in one process that lives while
-/// the tests run, so a process that `start` starts and links stays alive.
+/// the tests run, so a process that `setup` starts and links stays alive.
 ///
-/// - When `start` returns `Error`, crashes or times out, each test is
+/// - When `setup` returns `Error`, crashes or times out, each test is
 ///   `SetupFailed` with the operator `context setup` and the error text,
 ///   and `teardown` does not run.
 /// - When the process of the setup stops, the tests that did not start
 ///   are `SetupFailed`, and the run report gets a `types.SetupStopped`
 ///   with the setup `types.ContextSetupHook`. `teardown` still runs when
-///   `start` returned.
+///   `setup` returned.
 /// - When `teardown` returns `Error`, crashes or times out, the run report
 ///   gets a `types.TeardownFailed` with the hook `types.ContextTeardownHook`.
 ///
 /// ## Parameters
 ///
-/// - `start`: makes the context, or gives `Error` with a message
+/// - `setup`: makes the context, or gives `Error` with a message
 /// - `teardown`: gets the context after the last test
 ///
 /// ## Returns
@@ -146,10 +146,10 @@ pub fn value(start: a) -> Context(a) {
 /// }
 /// ```
 pub fn setup(
-  start start: fn() -> Result(a, String),
+  setup setup: fn() -> Result(a, String),
   teardown teardown: fn(a) -> Result(Nil, String),
 ) -> Context(a) {
-  Context(suite_context: ContextFromSetup(setup: start, teardown: teardown))
+  Context(suite_context: ContextFromSetup(setup: setup, teardown: teardown))
 }
 
 /// The `types.SuiteContext` of a context, for `suite.new`.

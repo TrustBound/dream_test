@@ -7,8 +7,8 @@ import dream_test/unit.{describe, it}
 // Good: Clean unqualified usage
 pub fn nested_tree(name: String, nested: List(Node(Nil))) -> Tree(Nil) {
   let tree =
-    Tree(initial: Nil, name: name, tags: [], children: [
-      Group(name: "nested", tags: [], children: nested),
+    Tree(initial: Nil, name: name, tags: [], tests: [
+      Group(name: "nested", tags: [], tests: nested),
     ])
   tree
 }
@@ -23,8 +23,8 @@ pub fn tests() {
       tree
       |> should
       |> be_equal(
-        Tree(initial: Nil, name: "root", tags: [], children: [
-          Group(name: "nested", tags: [], children: []),
+        Tree(initial: Nil, name: "root", tags: [], tests: [
+          Group(name: "nested", tags: [], tests: []),
         ]),
       )
       |> or_fail_with("the tree should hold the nested group")

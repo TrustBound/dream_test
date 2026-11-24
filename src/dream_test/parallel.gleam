@@ -152,7 +152,7 @@ pub type RunTreeParallelWithReporterConfig(context) {
 ///   Each test result, each `TestInfo` that a runner hook gets and each
 ///   progress line has them in front of the names of the tree. Give `[]`
 ///   for a tree that is not inside a group.
-/// - `name`, `tags`, `children`: the name, the tags and the children of the
+/// - `name`, `tags`, `tests`: the name, the tags and the tests of the
 ///   top-level group of the tree.
 /// - `context`: where the tests get their context, a
 ///   `types.FixedContext(value)` or a `types.ContextFromSetup(setup,
@@ -163,7 +163,7 @@ pub type RunTreeConfig(context) {
     groups: List(String),
     name: String,
     tags: List(String),
-    children: List(Node(context)),
+    tests: List(Node(context)),
     context: SuiteContext(context),
     progress_reporter: Option(progress.ProgressReporter),
     write: fn(String) -> Nil,
@@ -617,7 +617,7 @@ pub fn run_tree_parallel(
   config config: ParallelConfig,
   tree tree: Tree(context),
 ) -> RunReport {
-  let Tree(initial: initial, name: name, tags: tags, children: children) = tree
+  let Tree(initial: initial, name: name, tags: tags, tests: tests) = tree
   let executor_input =
     ExecuteNodeConfig(
       config: config,
@@ -628,7 +628,7 @@ pub fn run_tree_parallel(
       inherited_after_each: [],
       runner_before_each_test: [],
       runner_after_each_test: [],
-      node: Group(name: name, tags: tags, children: children),
+      node: Group(name: name, tags: tags, tests: tests),
       progress_output: None,
       total: 0,
       completed: 0,
@@ -728,14 +728,13 @@ pub fn run_tree_parallel(
 pub fn run_tree_parallel_with_reporter(
   config config: RunTreeParallelWithReporterConfig(context),
 ) -> RunTreeParallelWithReporterResult {
-  let Tree(initial: initial, name: name, tags: tags, children: children) =
-    config.tree
+  let Tree(initial: initial, name: name, tags: tags, tests: tests) = config.tree
   run_tree(RunTreeConfig(
     config: config.config,
     groups: [],
     name: name,
     tags: tags,
-    children: children,
+    tests: tests,
     context: FixedContext(initial),
     progress_reporter: config.progress_reporter,
     write: config.write,
@@ -790,7 +789,7 @@ pub fn run_tree_parallel_with_reporter(
 ///       groups: ["all"],
 ///       name: "suite",
 ///       tags: [],
-///       children: [unit.it("passes", passes)],
+///       tests: [unit.it("passes", passes)],
 ///       context: types.FixedContext(Nil),
 ///       progress_reporter: None,
 ///       write: ignore,
@@ -837,7 +836,7 @@ pub fn run_tree(
 
 /// The top-level group of the tree of a suite.
 fn tree_node(config: RunTreeConfig(context)) -> Node(context) {
-  Group(name: config.name, tags: config.tags, children: config.children)
+  Group(name: config.name, tags: config.tags, tests: config.tests)
 }
 
 /// The executor input for the tree of a suite with its context.
@@ -1059,7 +1058,7 @@ fn execute_node(
   ) = executor_input
 
   case node {
-    Group(name, tags, children) -> {
+    Group(name, tags, group_tests) -> {
       let group_scope = list.append(scope, [name])
       let combined_tags = list.append(inherited_tags, tags)
       let empty_hooks =
@@ -1070,7 +1069,7 @@ fn execute_node(
           after_all: [],
         )
       let #(hooks, tests, groups) =
-        collect_children(children, empty_hooks, [], [])
+        collect_tests(group_tests, empty_hooks, [], [])
       case
         run_before_all_chain(
           config,
@@ -1579,7 +1578,7 @@ fn fail_group_nodes(
 ) -> List(TestResult) {
   case nodes {
     [] -> acc_rev
-    [Group(name, tags, children), ..rest] -> {
+    [Group(name, tags, group_tests), ..rest] -> {
       let group_scope = list.append(scope, [name])
       let combined_tags = list.append(inherited_tags, tags)
       let empty_hooks =
@@ -1590,7 +1589,7 @@ fn fail_group_nodes(
           after_all: [],
         )
       let #(_hooks, tests, groups) =
-        collect_children(children, empty_hooks, [], [])
+        collect_tests(group_tests, empty_hooks, [], [])
       let next =
         fail_tests_due_to_before_all(
           group_scope,
@@ -1616,18 +1615,18 @@ type GroupHooks(context) {
   )
 }
 
-fn collect_children(
-  children: List(Node(context)),
+fn collect_tests(
+  tests: List(Node(context)),
   hooks: GroupHooks(context),
   tests_rev: List(TestCase(context)),
   groups_rev: List(Node(context)),
 ) -> #(GroupHooks(context), List(TestCase(context)), List(Node(context))) {
-  case children {
+  case tests {
     [] -> #(hooks, list.reverse(tests_rev), list.reverse(groups_rev))
     [child, ..rest] ->
       case child {
         BeforeAll(run) ->
-          collect_children(
+          collect_tests(
             rest,
             GroupHooks(
               ..hooks,
@@ -1637,7 +1636,7 @@ fn collect_children(
             groups_rev,
           )
         BeforeEach(run) ->
-          collect_children(
+          collect_tests(
             rest,
             GroupHooks(
               ..hooks,
@@ -1647,7 +1646,7 @@ fn collect_children(
             groups_rev,
           )
         AfterEach(run) ->
-          collect_children(
+          collect_tests(
             rest,
             GroupHooks(
               ..hooks,
@@ -1657,21 +1656,21 @@ fn collect_children(
             groups_rev,
           )
         AfterAll(run) ->
-          collect_children(
+          collect_tests(
             rest,
             GroupHooks(..hooks, after_all: list.append(hooks.after_all, [run])),
             tests_rev,
             groups_rev,
           )
         Test(name, tags, kind, run, timeout_ms, source) ->
-          collect_children(
+          collect_tests(
             rest,
             hooks,
             [TestCase(name, tags, kind, run, timeout_ms, source), ..tests_rev],
             groups_rev,
           )
         Group(..) ->
-          collect_children(rest, hooks, tests_rev, [child, ..groups_rev])
+          collect_tests(rest, hooks, tests_rev, [child, ..groups_rev])
       }
   }
 }

@@ -58,9 +58,9 @@ store. This release has breaking changes. Read
   `parallel.run_tree_parallel`. `types.allow_no_tests` allows it, and
   `types.failed_with_no_tests` tells this failure apart.
 - `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`.
-  A tree is one top-level group with its children and one context; a
+  A tree is one top-level group with its tests and one context; a
   suite holds one or more trees. The tree holds the top-level group
-  itself: `Tree(initial:, name:, tags:, children:)` in place of
+  itself: `Tree(initial:, name:, tags:, tests:)` in place of
   `Root(seed:, tree: Group(name:, tags:, children:))`.
 - `unit_context.describe` takes a `dream_test/context.Context` in place
   of the start value: `describe(name, 0, tests)` is now
@@ -69,8 +69,9 @@ store. This release has breaking changes. Read
   `describe(name:, context:, tests:)`.
 - The label `children` is now `tests` in `unit.describe`, `unit.group`,
   `unit_context.describe`, `unit_context.group`, `suite.new`,
-  `types.tree`, `steps.to_suite` and `steps.Group`. A call without labels
-  does not change.
+  `types.tree`, `steps.to_suite` and `steps.Group`, and the field
+  `children` of `types.Group` is now `tests`. A call without labels does
+  not change.
 - The start value of a tree has the label `initial` in place of `seed`:
   `types.tree(name:, initial:, tests:)` and the field
   `types.Tree.initial`, the same label as `steps.new(initial:)`.
@@ -345,9 +346,10 @@ the guide labels them.
 - `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`.
 - `feature.to_test_suite` and `FeatureConfig` are removed. Use
   `steps.feature_suite(registry:, feature:)`.
-- `unit_context.describe` takes `context.value(start)` in place of the
+- `unit_context.describe` takes `context.value(value)` in place of the
   start value, and `types.tree` takes `initial:` in place of `seed:`.
-- The label `children` of `describe` and `group` is now `tests`.
+- The label `children` of `describe` and `group`, and the field `children`
+  of `types.Group`, are now `tests`.
 - `StepContext` has `scenario_id` in place of `world`.
 - `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`.
 - A pattern registered two times in one phase is an error.
@@ -446,7 +448,7 @@ the guide labels them.
   - `parallel.run_tree` runs a typed tree inside groups, with the new
     config type `parallel.RunTreeConfig`: the fields of
     `RunTreeParallelWithReporterConfig`, the tree as `name`, `tags`,
-    `children` and `context`, and the groups around it
+    `tests` and `context`, and the groups around it
   - Module discovery loads suites with a context, and `discover.to_suite`
     keeps the context of each module suite
 
@@ -460,9 +462,9 @@ the guide labels them.
 - **A context from a setup**
 
   - The module `dream_test/context` makes the context of
-    `unit_context.describe(name:, context:, tests:)`: `context.value(start)`
-    is a fixed start value, and `context.setup(start:, teardown:)` makes a
-    suite whose context is the value of `start`
+    `unit_context.describe(name:, context:, tests:)`: `context.value(value)`
+    is a fixed start value, and `context.setup(setup:, teardown:)` makes a
+    suite whose context is the value that `setup` returns
   - `steps.new_with_setup(setup:, teardown:)` makes a step registry whose
     scenarios start from the value of `setup`. `gherkin/discover.to_suite`
     runs the setup one time for the scenarios of all its files.

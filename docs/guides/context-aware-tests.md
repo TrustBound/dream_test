@@ -41,8 +41,8 @@ The store example uses `gleam_erlang` for processes. The outputs on this page ar
 | Your situation | Use | Why |
 |:---|:---|:---|
 | The tests need no shared value | `dream_test/unit` | The simplest. Hooks return `Ok(Nil)`. |
-| The tests share a value you can build up front, and hooks change it | `unit_context.describe(name, context.value(start), tests)` | Every hook and test gets the value. |
-| The value comes from a setup that must run once and be undone, such as a process or a pool | `unit_context.describe(name, context.setup(start, teardown:), tests)` | The setup runs once, its value is the context, and the teardown gets it after the last test. |
+| The tests share a value you can build up front, and hooks change it | `unit_context.describe(name, context.value(value), tests)` | Every hook and test gets the value. |
+| The value comes from a setup that must run once and be undone, such as a process or a pool | `unit_context.describe(name, context.setup(setup, teardown:), tests)` | The setup runs once, its value is the context, and the teardown gets it after the last test. |
 | Gherkin scenarios that share a server | `steps.new_with_setup` | The same idea for features. See [Write Gherkin features](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#step-6-start-a-server-once-for-all-scenarios). |
 
 When the setup is tiny and reads well inside the test, stay with `unit`. A context earns its place when the setup makes a value that many tests use.
@@ -65,7 +65,7 @@ import dream_test/matchers.{succeed}
 import dream_test/unit_context.{describe, it}
 ```
 
-Two things change. `describe` takes a context, `describe(name, context.value(start), tests)`, and each `it` body takes the context, `it(name, fn(context) { ... })`. `dream_test/context` makes the context: `context.value` for a fixed start value, and `context.setup` for a value from a setup (Step 3). Pick one DSL for each test module: if you import the unqualified names of both, `describe` and `it` clash.
+Two things change. `describe` takes a context, `describe(name, context.value(value), tests)`, and each `it` body takes the context, `it(name, fn(context) { ... })`. `dream_test/context` makes the context: `context.value` for a fixed start value, and `context.setup` for a value from a setup (Step 3). Pick one DSL for each test module: if you import the unqualified names of both, `describe` and `it` clash.
 
 Why a context in `describe`? Gleam must know the type of the context when it checks `fn(context) { ... }`, and the suite is built before any hook runs. The context fixes that type when the suite is built, so every hook and test is type-checked against it. No hook has to be "the one that makes the context".
 
@@ -144,7 +144,7 @@ Note the annotation `fn(context: Context)`. Gleam lets you read a record field s
 
 ## Step 3: Get the context from a setup
 
-A counter you can write up front. A running process you can't: something has to start it, and something has to stop it. `context.setup` takes a `start` function that returns `Ok(context)`, and a `teardown` function that gets the context back. Give it to `describe` in place of `context.value`. Here the setup starts a user store, a small process that holds names by id:
+A counter you can write up front. A running process you can't: something has to start it, and something has to stop it. `context.setup` takes a `setup` function that returns `Ok(context)`, and a `teardown` function that gets the context back. Give it to `describe` in place of `context.value`. Here the setup starts a user store, a small process that holds names by id:
 
 ### A store that every test gets <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/context_store.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -362,7 +362,7 @@ Summary: 2 run, 0 failed, 2 passed in 0ms
 
 **Tests that change a shared resource.** *Symptom:* tests of a suite with `context.setup` pass alone and fail together. *Fix:* the tests run in parallel against one resource. Give each test its own keys or rows, or run the suite with lower concurrency.
 
-**A resource started in `before_all` of a context suite.** *Symptom:* you need the value in the tests, but `before_all` can only change the context of the group. *Fix:* start the resource in the `start` function of `context.setup`, which runs once and hands its value to every test.
+**A resource started in `before_all` of a context suite.** *Symptom:* you need the value in the tests, but `before_all` can only change the context of the group. *Fix:* start the resource in the `setup` function of `context.setup`, which runs once and hands its value to every test.
 
 **A vague setup error.** *Symptom:* `Message: failed` under every test. *Fix:* return `Error` with what failed and why, as in `the store did not start: port 7000 is in use`.
 

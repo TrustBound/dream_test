@@ -16,7 +16,7 @@ pub fn checkout_group(feature: Feature) -> SuiteChild(Nil) {
 }
 
 pub fn plain_group() -> Node(Nil) {
-  NodeGroup(name: "plain", tags: [], children: [])
+  NodeGroup(name: "plain", tags: [], tests: [])
 }
 
 pub fn first_scenarios(feature: Feature) -> List(Scenario) {
@@ -50,7 +50,7 @@ pub fn tests() {
       |> should
       |> be_equal(#(
         Group(name: "Checkout", tags: [], tests: [Scenarios(feature)]),
-        NodeGroup(name: "plain", tags: [], children: []),
+        NodeGroup(name: "plain", tags: [], tests: []),
         test_types.Unit,
       ))
       |> or_fail_with("both groups and the kind should be made")

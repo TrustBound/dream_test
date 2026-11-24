@@ -148,7 +148,7 @@ Playback is the default on purpose. A run that forgets the variable sends nothin
 
 ## Step 3: Start the recorder in the suite setup
 
-A recorder is a process. Something must start it before the first test and stop it after the last test. In Dream Test, that is the `start` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. The teardown gets the same value after the last test. `start_api` is the setup, and `stop_api` is the teardown:
+A recorder is a process. Something must start it before the first test and stop it after the last test. In Dream Test, that is the `setup` and the `teardown` of `context.setup`, which `unit_context.describe` takes. The setup runs one time for the suite, and its value is the context of each test. The teardown gets the same value after the last test. `start_api` is the setup, and `stop_api` is the teardown:
 
 ### Start and stop the recorder <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/api_setup.gleam#L33-L69"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -586,7 +586,7 @@ To refresh the recordings, a developer runs the record script on their machine, 
 
 **A token in a recording.** *Symptom:* the API token shows in a file in your repository. *Fix:* remove the header with a request transformer, and add a test that reads the files. Then change the token, because the history of the repository still holds it.
 
-**A setup that uses the wrong hooks.** *Symptom:* the tests cannot get the recorder, or each test starts its own. *Fix:* start the recorder in the `start` function of `context.setup`, and stop it in the `teardown`. Each test then gets it in its context.
+**A setup that uses the wrong hooks.** *Symptom:* the tests cannot get the recorder, or each test starts its own. *Fix:* start the recorder in the `setup` function of `context.setup`, and stop it in the `teardown`. Each test then gets it in its context.
 
 **A test that passes only against the live API.** *Symptom:* a test passes in a record run and fails in playback, or the other way. *Fix:* the test depends on something that changes on each run, such as the current time. Check only the stable parts, or remove the changing data with a response transformer.
 

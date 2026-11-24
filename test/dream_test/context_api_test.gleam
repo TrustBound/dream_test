@@ -140,7 +140,7 @@ pub fn tests() {
       let suites = [
         unit_context.describe(
           name: "context",
-          context: context.setup(start: fn() { Ok(1) }, teardown: fn(_value) {
+          context: context.setup(setup: fn() { Ok(1) }, teardown: fn(_value) {
             Ok(Nil)
           }),
           tests: [

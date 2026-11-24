@@ -146,7 +146,7 @@ pub type RunInput {
 ///
 /// ## Parameters
 ///
-/// - `tree`: the tree, with its name, tags, children and context
+/// - `tree`: the tree, with its name, tags, tests and context
 ///
 /// ## Returns
 ///
@@ -177,7 +177,7 @@ pub fn from_tree(tree tree: types.Tree(context)) -> TestSuite {
   new(
     name: tree.name,
     tags: tree.tags,
-    tests: tree.children,
+    tests: tree.tests,
     context: FixedContext(tree.initial),
   )
 }
@@ -245,7 +245,7 @@ pub fn new(
   context context: SuiteContext(context),
 ) -> TestSuite {
   TestSuite(name: name, parts: [
-    tree_part(Tree(name: name, tags: tags, children: tests, context: context)),
+    tree_part(Tree(name: name, tags: tags, tests: tests, context: context)),
   ])
 }
 
@@ -573,7 +573,7 @@ type Tree(context) {
   Tree(
     name: String,
     tags: List(String),
-    children: List(Node(context)),
+    tests: List(Node(context)),
     context: SuiteContext(context),
   )
 }
@@ -589,8 +589,8 @@ fn tree_part(tree: Tree(context)) -> Part {
 }
 
 fn tree_tests(tree: Tree(context), place: Place) -> List(TestInfo) {
-  collect_children(
-    placed_children(tree.children, place.source),
+  collect_tests(
+    placed_tests(tree.tests, place.source),
     list.append(place.groups, [tree.name]),
     tree.tags,
     [],
@@ -604,21 +604,21 @@ fn run_tree(
   input: RunInput,
 ) -> RunTreeParallelWithReporterResult {
   case
-    selected_children(
-      placed_children(tree.children, place.source),
+    selected_tests(
+      placed_tests(tree.tests, place.source),
       list.append(place.groups, [tree.name]),
       tree.tags,
       option.unwrap(input.keep, keep_every_test),
     )
   {
     None -> nothing_ran(input)
-    Some(children) ->
+    Some(tests) ->
       parallel.run_tree(RunTreeConfig(
         config: input.config,
         groups: place.groups,
         name: tree.name,
         tags: tree.tags,
-        children: children,
+        tests: tests,
         context: tree.context,
         progress_reporter: input.progress_reporter,
         write: input.write,
@@ -635,15 +635,15 @@ fn keep_every_test(_info: TestInfo) -> Bool {
   True
 }
 
-/// The children with `source` as the source of each test that has no
+/// The tests with `source` as the source of each test that has no
 /// source, when `source` is set.
-fn placed_children(
-  children: List(Node(context)),
+fn placed_tests(
+  tests: List(Node(context)),
   source: Option(String),
 ) -> List(Node(context)) {
   case source {
-    None -> children
-    Some(source) -> nodes_with_source(children, source)
+    None -> tests
+    Some(source) -> nodes_with_source(tests, source)
   }
 }
 
@@ -662,12 +662,8 @@ fn nodes_with_source(
 
 fn node_with_source(node: Node(context), source: String) -> Node(context) {
   case node {
-    Group(name: name, tags: tags, children: children) ->
-      Group(
-        name: name,
-        tags: tags,
-        children: nodes_with_source(children, source),
-      )
+    Group(name: name, tags: tags, tests: tests) ->
+      Group(name: name, tags: tags, tests: nodes_with_source(tests, source))
     Test(source: None, ..) -> Test(..node, source: Some(source))
     Test(..) | BeforeAll(..) | BeforeEach(..) | AfterEach(..) | AfterAll(..) ->
       node
@@ -691,9 +687,9 @@ fn collect_node(
       ),
       ..tests_rev
     ]
-    Group(name: name, tags: tags, children: children) ->
-      collect_children(
-        children,
+    Group(name: name, tags: tags, tests: tests) ->
+      collect_tests(
+        tests,
         list.append(groups, [name]),
         list.append(inherited_tags, tags),
         tests_rev,
@@ -702,16 +698,16 @@ fn collect_node(
   }
 }
 
-fn collect_children(
-  children: List(Node(context)),
+fn collect_tests(
+  tests: List(Node(context)),
   groups: List(String),
   inherited_tags: List(String),
   tests_rev: List(TestInfo),
 ) -> List(TestInfo) {
-  case children {
+  case tests {
     [] -> tests_rev
     [child, ..rest] ->
-      collect_children(
+      collect_tests(
         rest,
         groups,
         inherited_tags,
@@ -720,42 +716,42 @@ fn collect_children(
   }
 }
 
-/// The children to run: the tests that `keep` keeps, with the groups and
+/// The tests to run: the ones that `keep` keeps, with the groups and
 /// hooks around them. A group with no kept test is left out, so its hooks
 /// do not run. `None` when `keep` keeps no test.
-fn selected_children(
-  children: List(Node(context)),
+fn selected_tests(
+  tests: List(Node(context)),
   groups: List(String),
   tags: List(String),
   keep: fn(TestInfo) -> Bool,
 ) -> Option(List(Node(context))) {
-  case filter_children(children, groups, tags, keep) {
+  case filter_tests(tests, groups, tags, keep) {
     #(kept, True) -> Some(kept)
     #(_, False) -> None
   }
 }
 
-/// The children that `keep` keeps, and whether a test is among them.
-fn filter_children(
-  children: List(Node(context)),
+/// The tests that `keep` keeps, and whether a test is among them.
+fn filter_tests(
+  tests: List(Node(context)),
   groups: List(String),
   inherited_tags: List(String),
   keep: fn(TestInfo) -> Bool,
 ) -> #(List(Node(context)), Bool) {
   let #(kept_rev, has_tests) =
-    filter_each_child(children, groups, inherited_tags, keep, #([], False))
+    filter_each_child(tests, groups, inherited_tags, keep, #([], False))
   #(list.reverse(kept_rev), has_tests)
 }
 
 /// Add each child that `keep` keeps to `filtered`, newest first.
 fn filter_each_child(
-  children: List(Node(context)),
+  tests: List(Node(context)),
   groups: List(String),
   inherited_tags: List(String),
   keep: fn(TestInfo) -> Bool,
   filtered: #(List(Node(context)), Bool),
 ) -> #(List(Node(context)), Bool) {
-  case children {
+  case tests {
     [] -> filtered
     [child, ..rest] ->
       filter_each_child(
@@ -799,12 +795,12 @@ fn filter_node(
           source: source,
         )),
       )
-    Group(name: name, tags: tags, children: children) ->
+    Group(name: name, tags: tags, tests: tests) ->
       kept_group(
         name,
         tags,
-        filter_children(
-          children,
+        filter_tests(
+          tests,
           list.append(groups, [name]),
           list.append(inherited_tags, tags),
           keep,
@@ -833,10 +829,7 @@ fn kept_group(
   filtered: #(List(Node(context)), Bool),
 ) -> #(Option(Node(context)), Bool) {
   case filtered {
-    #(children, True) -> #(
-      Some(Group(name: name, tags: tags, children: children)),
-      True,
-    )
+    #(tests, True) -> #(Some(Group(name: name, tags: tags, tests: tests)), True)
     #(_, False) -> #(None, False)
   }
 }

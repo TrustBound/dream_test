@@ -133,7 +133,7 @@ pub type UnitNode =
 ///
 /// A `TestSuite` you can pass to `runner.new([ ... ])`.
 pub fn describe(name name: String, tests tests: List(UnitNode)) -> TestSuite {
-  suite.from_tree(Tree(initial: Nil, name: name, tags: [], children: tests))
+  suite.from_tree(Tree(initial: Nil, name: name, tags: [], tests: tests))
 }
 
 /// Create a nested group inside a suite.
@@ -199,7 +199,7 @@ pub fn describe(name name: String, tests tests: List(UnitNode)) -> TestSuite {
 ///
 /// A `UnitNode` you include in the tests of a parent `describe` or `group`.
 pub fn group(name name: String, tests tests: List(UnitNode)) -> UnitNode {
-  Group(name: name, tags: [], children: tests)
+  Group(name: name, tags: [], tests: tests)
 }
 
 /// Define a single test case.
@@ -782,8 +782,7 @@ pub fn after_all(teardown teardown: fn() -> Result(Nil, String)) -> UnitNode {
 /// The updated `UnitNode` with tags set.
 pub fn with_tags(node node: UnitNode, tags tags: List(String)) -> UnitNode {
   case node {
-    Group(name, _, children) ->
-      Group(name: name, tags: tags, children: children)
+    Group(name, _, tests) -> Group(name: name, tags: tags, tests: tests)
     Test(name, _, kind, run, timeout_ms, source) ->
       Test(
         name: name,
