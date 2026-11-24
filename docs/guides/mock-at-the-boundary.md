@@ -190,7 +190,7 @@ A hand-written fixture holds what its author expected. A real dependency gives w
 
 The file holds three headers that the server added and the test never wrote. A fixture written by hand often leaves such details out.
 
-Playback makes the run repeatable. It is fast, it needs no network and no database, and it gives the same answers each time. A request or a query with no recording fails, and the report names it. So a test cannot pass by accident against a missing recording.
+Playback makes the run repeatable. It is fast, it needs no network and no database, and it gives the same answers each time. A request or a query with no recording fails. The report names it, and shows the nearest recording and the parts that differ. So a test cannot pass by accident against a missing recording.
 
 A fixture server still has a place. It can give a rare case on purpose, such as an error that the real service gives only rarely. The HTTP guide records a local fixture server, a mock server with fixed routes. The database guide records a real PostgreSQL server in Docker.
 
@@ -293,7 +293,7 @@ A recording is a copy of one moment. Know what each run proves:
 
 - A playback run that passes proves how your code handles the captured interaction. It does not prove that the dependency still behaves that way.
 - A live run checks whether the dependency still behaves that way.
-- A harmless change to your own SQL or to an HTTP request can also need a new recording. The recorder finds a recording by a match key, such as the method and the URL, or the SQL and its parameters. When the key changes, playback finds no recording and the test fails, also when the behavior is the same.
+- A harmless change to your own SQL or to an HTTP request can also need a new recording. The recorder finds a recording by a match key, such as the method and the URL, or the SQL and its parameters. When the key changes, playback finds no recording and the test fails, also when the behavior is the same. The report shows the nearest recording and the part that changed, so you see which change it was.
 
 So run the live suite at times, and record again when the code or the dependency changes.
 

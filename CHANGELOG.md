@@ -788,13 +788,16 @@ the guide labels them.
     `dream_http_client`, and plays them back with no network. It covers
     the recorder in the setup of `context.setup`, the mode from an
     environment variable with `recorder.parse_mode`, a mock server for the
-    record run, a request with no recording, streams, and how to keep a
-    token out of the files
+    record run, streams, and how to keep a token out of the files. Its
+    report of a request with no recording shows the nearest recording and
+    the parts that differ, from `client.transport_error_to_string`
   - "Test database code with recorded queries" shows the same pattern for
     PostgreSQL with the recorder of `dream_postgres`: playback with no
     database, a transaction that rolls back, the `RecorderError` of a
     query with no recording, a secret kept out of the file, and a suite
-    that runs with `max_concurrency: 1`
+    that runs with `max_concurrency: 1`. Its report of a query with no
+    recording shows the nearest recording and its parameters, from
+    `recorder.describe_error`
   - The new project `examples/recording` holds the tested code of both
     guides and its committed recordings. A new CI job runs its tests in
     playback mode, with no network and no database. Its tests compare

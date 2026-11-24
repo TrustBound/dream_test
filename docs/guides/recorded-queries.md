@@ -47,7 +47,7 @@ The code of this guide is the project `examples/recording` in the Dream Test rep
 
 ```toml
 # Switched to a Hex version range once it is published.
-dream_postgres = { git = "https://github.com/TrustBound/dream_postgres.git", ref = "6653fd483ea6317a7ed20d176a1641cfea0dff29" }
+dream_postgres = { git = "https://github.com/TrustBound/dream_postgres.git", ref = "ee7d9c8cc16be3154895a39e942f5cafc62caa09" }
 dream_postgres_client = ">= 1.0.0 and < 2.0.0"
 ```
 
@@ -224,17 +224,17 @@ fn create_schema(db: Connection) -> Result(Nil, String) {
   })
 }
 
-/// The `RecorderError` of a query that the recorder failed, or the query
-/// error of the database.
+/// The text of the `RecorderError` of a query that the recorder failed,
+/// or the query error of the database.
 pub fn describe_query_error(error: dream_postgres_client.QueryError) -> String {
   case recorder.error(error) {
-    Ok(recorder_error) -> string.inspect(recorder_error)
+    Ok(recorder_error) -> recorder.describe_error(recorder_error)
     Error(Nil) -> string.inspect(error)
   }
 }
 ```
 
-So the setup has the same code in each mode. In playback, the schema queries get their recorded results, and nothing runs. `describe_query_error` makes the message of a failed setup readable: [Step 8](#step-8-read-a-query-with-no-recording) shows `recorder.error`.
+So the setup has the same code in each mode. In playback, the schema queries get their recorded results, and nothing runs. `describe_query_error` makes the message of a failed setup readable: [Step 8](#step-8-read-a-query-with-no-recording) shows `recorder.error` and `recorder.describe_error`.
 
 ## Step 4: Write the tests and run them one at a time
 
@@ -433,9 +433,9 @@ How it works:
 
 ## Step 8: Read a query with no recording
 
-In playback mode, a query with no recording never reaches a database. It fails with the query error `InterceptorFailed`. `recorder.error` reads the `recorder.RecorderError` back from that error. Here is a test that asks for the share token of task 42, a query that the record run did not run:
+In playback mode, a query with no recording never reaches a database. It fails with the query error `InterceptorFailed`. `recorder.error` reads the `recorder.RecorderError` back from that error, and `recorder.describe_error` gives its text. `describe_query_error` of Step 3 does both. Here is a test that asks for the share token of task 42, a query that the record run did not run:
 
-### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/miss_tests.gleam#L16-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/miss_tests.gleam#L15-L31"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
@@ -447,47 +447,52 @@ pub fn tests() -> TestSuite {
     ),
     [
       it("finds the share token of task 42", fn(database: Database) {
-        tasks.share_token(database.db, 42)
-        |> result.map_error(recorder.error)
-        |> should
-        |> be_ok()
-        |> or_fail_with("task 42 should have a share token")
+        case tasks.share_token(database.db, 42) {
+          Ok(_token) -> Ok(succeed())
+          Error(error) -> Ok(fail_with(describe_query_error(error)))
+        }
       }),
     ],
   )
 }
 ```
 
-The test fails, and the report names the SQL, the parameters and the file:
+The test gives the text to `fail_with`, so the report shows each line of the text. The test fails, and the report names the SQL and the parameters. Then it names the nearest recording in the file, and shows its parameters on the `-` line and the parameters of the query on the `+` line:
 
 ### The report of a query with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs/queries_miss.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Tasks
   ✗ finds the share token of task 42
-    be_ok
-      Message: task 42 should have a share token
-      Expected: Ok(_)
-      Actual:   Error(Ok(NoRecording("SELECT share_token FROM tasks WHERE id = $1", "[42]", "test/recordings/queries/tasks.json")))
+    fail_with
+      Message: No recording matches SELECT share_token FROM tasks WHERE id = $1 with [42]
+Nearest recording in test/recordings/queries/tasks.json:
+  parameters:
+  - [5]
+  + [42]
     Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Failures:
 Tasks
   ✗ finds the share token of task 42
-    be_ok
-      Message: task 42 should have a share token
-      Expected: Ok(_)
-      Actual:   Error(Ok(NoRecording("SELECT share_token FROM tasks WHERE id = $1", "[42]", "test/recordings/queries/tasks.json")))
+    fail_with
+      Message: No recording matches SELECT share_token FROM tasks WHERE id = $1 with [42]
+Nearest recording in test/recordings/queries/tasks.json:
+  parameters:
+  - [5]
+  + [42]
     Run it alone: gleam test -- --only "Tasks/finds the share token of task 42"
 
 Summary: 1 run, 1 failed, 0 passed in 0ms
 ```
 
+The record run asked for the share token of task 5, so the nearest recording has `[5]`. A nearest recording has the same SQL, as the match key sees it. When no recording in the file has the SQL, the second line is `No recording in <path> has this SQL`.
+
 `recorder.error` gives `Ok(RecorderError)` when the recorder failed the query, and `Error(Nil)` for an error of the database. These are the errors of the recorder:
 
 | Error | When | What to do |
 |:---|:---|:---|
-| `NoRecording(sql:, parameters:, path:)` | Playback: no recording in the file at `path` matches the query. | Record again, or fix the query. |
+| `NoRecording(sql:, parameters:, path:, nearest:)` | Playback: no recording in the file at `path` matches the query. `nearest` holds at most 3 recordings with the same SQL. | Record again, or fix the query. |
 | `PlayedAlready(sql:, parameters:, path:)` | Playback: the query ran more times than the file has results for it. | Record again, so the file has a result for each run of the query. |
 | `WriteFailed(path:, reason:)` | Record: the recorder could not write the file. The query ran on the database. | Make sure the directory exists and can be written. |
 | `NotRecordable(sql:, reason:)` | A parameter or a value of the result is a term that a recording cannot hold, such as a process. | Give the query plain values. |
@@ -606,7 +611,7 @@ The project proves that playback never connects: its CI job has no database, and
 
 ## Common pitfalls
 
-**A query that changed after the record run.** *Symptom:* playback fails, and `recorder.error` gives `Ok(NoRecording(...))` with the new SQL. *Fix:* record again. A change of the schema SQL fails the setup, so each test of the suite shows the error.
+**A query that changed after the record run.** *Symptom:* playback fails with `No recording matches` and the new SQL. When the SQL changed, the second line is `No recording in <path> has this SQL`. When only the parameters changed, the report shows the nearest recording with the old parameters. *Fix:* record again. A change of the schema SQL fails the setup, so each test of the suite shows the error.
 
 **A test that runs a query more often than in the record run.** *Symptom:* `recorder.error` gives `Ok(PlayedAlready(...))`. *Fix:* each recording answers one query. Record again.
 

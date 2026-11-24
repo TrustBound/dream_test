@@ -173,7 +173,9 @@ with recordings: "Test HTTP calls with recordings" (`recorded-http.md`)
 records the calls of an API client with `dream_http_client`, and "Test
 database code with recorded queries" (`recorded-queries.md`) records
 PostgreSQL queries with `dream_postgres`. Both play back in CI with no
-network and no database. Their steps are tests, so they end with the CI
+network and no database. A request or a query with no recording fails,
+and the report shows the nearest recording and the parts that differ.
+Their steps are tests, so they end with the CI
 job in place of a "Test your code" section. Their code is the new project
 `examples/recording`, and a new CI job runs its tests in playback mode.
 A third new guide, "Mock at the system boundary"

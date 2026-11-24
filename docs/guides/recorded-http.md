@@ -45,7 +45,7 @@ The code of this guide is the project `examples/recording` in the Dream Test rep
 
 ```toml
 # Switched to a Hex version range once it is published.
-dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "e21fed7cb8758443caf1def60db6bb0356fed8a3" }
+dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "d1382f9660b980ee9c17d3ed097affb911ce42ff" }
 ```
 
 The tests also need the mock server for the record run, and `envoy` to read an environment variable. These lines are under `[dev-dependencies]`:
@@ -335,9 +335,9 @@ The playback recorder finds the file of each request by its match key. By defaul
 
 ## Step 7: Read a request with no recording
 
-In playback mode, a request with no file is not sent. It fails with the transport error `NoRecording`, which names the method and the URL. Here is a test for Bergen, a city that the record run did not ask for:
+In playback mode, a request with no file is not sent. It fails with the transport error `NoRecording`. The error names the method and the URL, and the recordings nearest to the request. A nearest recording has the same method and path, and the error shows each part that differs. Here are two tests with no recording. The first asks for Bergen, a city that the record run did not ask for. The second asks for Oslo on another port:
 
-### A test with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/miss_tests.gleam#L14-L30"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Tests with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/miss_tests.gleam#L17-L45"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
 pub fn tests() -> TestSuite {
@@ -349,49 +349,75 @@ pub fn tests() -> TestSuite {
     ),
     [
       it("gives the forecast for Bergen", fn(api: Api) {
-        forecast(api.base, "bergen")
-        |> should
-        |> be_ok()
-        |> or_fail_with("Bergen should have a forecast")
+        forecast(api.base, "bergen") |> have_forecast
+      }),
+      it("gives the forecast for Oslo on another port", fn(api: Api) {
+        forecast(api.base |> client.port(19_802), "oslo") |> have_forecast
       }),
     ],
   )
 }
+
+// The failure message is the text of the error, so the report shows each
+// line of a miss
+fn have_forecast(
+  result: Result(Forecast, ForecastError),
+) -> Result(AssertionResult, String) {
+  case result {
+    Ok(_forecast) -> Ok(succeed())
+    Error(RequestFailed(reason:)) -> Ok(fail_with(reason))
+    Error(error) -> Ok(fail_with(string.inspect(error)))
+  }
+}
 ```
 
-The test fails, and the report shows the request:
+`forecast` turns the transport error into text with `client.transport_error_to_string`. `have_forecast` gives that text to `fail_with`, so the report shows each line of the text. The two tests fail:
 
-### The report of a request with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs/http_miss.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The report of requests with no recording <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs/http_miss.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Forecast
   ✗ gives the forecast for Bergen
-    be_ok
-      Message: Bergen should have a forecast
-      Expected: Ok(_)
-      Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+    fail_with
+      Message: No recording matches GET http://localhost:19801/v1/forecast/bergen
+No recording in test/recordings/http has this method and path
     Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
+  ✗ gives the forecast for Oslo on another port
+    fail_with
+      Message: No recording matches GET http://localhost:19802/v1/forecast/oslo
+Nearest recording: test/recordings/http/GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json
+  origin:
+  - http://localhost:19801
+  + http://localhost:19802
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Oslo on another port"
 
 Failures:
 Forecast
   ✗ gives the forecast for Bergen
-    be_ok
-      Message: Bergen should have a forecast
-      Expected: Ok(_)
-      Actual:   Error(RequestFailed("No recording matches GET http://localhost:19801/v1/forecast/bergen"))
+    fail_with
+      Message: No recording matches GET http://localhost:19801/v1/forecast/bergen
+No recording in test/recordings/http has this method and path
     Run it alone: gleam test -- --only "Forecast/gives the forecast for Bergen"
+  ✗ gives the forecast for Oslo on another port
+    fail_with
+      Message: No recording matches GET http://localhost:19802/v1/forecast/oslo
+Nearest recording: test/recordings/http/GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json
+  origin:
+  - http://localhost:19801
+  + http://localhost:19802
+    Run it alone: gleam test -- --only "Forecast/gives the forecast for Oslo on another port"
 
-Summary: 1 run, 1 failed, 0 passed in 0ms
+Summary: 2 run, 2 failed, 0 passed in 0ms
 ```
 
-`forecast` turns the transport error into text with `client.transport_error_to_string`, so the report shows `No recording matches` and the URL. Code that keeps the error as a value gets `RequestError(NoRecording(method, url))` from `client.send`.
+The report of Bergen names the directory, because no recording in it has the method and the path. The report of Oslo names the nearest recording. Then it shows the part that differs, with the recorded value on the `-` line and the value of the request on the `+` line. Code that keeps the error as a value gets `RequestError(NoRecording(method, url, directory, nearest))` from `client.send`.
 
 You see this failure in two cases:
 
-1. A new test calls an endpoint that the record run did not call. Record again.
-2. The request changed after the record run, for example with a new query parameter. Record again, or fix the request.
+1. A new test calls an endpoint that the record run did not call. The report names no nearest recording. Record again.
+2. The request changed after the record run, for example with a new query parameter or another port. The report shows the part that changed. Record again, or fix the request.
 
-The test runs in playback mode even in a record run, because its setup gives `recorder.Playback`. The main run leaves it out, because it fails on purpose. A test of the project runs it and compares its report with the output above.
+The tests run in playback mode even in a record run, because their setup gives `recorder.Playback`. The main run leaves them out, because they fail on purpose. A test of the project runs them and compares their report with the output above.
 
 ## Step 8: Record a stream
 
@@ -580,11 +606,11 @@ To refresh the recordings, a developer runs the record script on their machine, 
 
 ## Common pitfalls
 
-**A recording that is not committed.** *Symptom:* the tests pass on your machine, and fail in CI with `No recording matches`. *Fix:* commit the directory of the recordings with the tests.
+**A recording that is not committed.** *Symptom:* the tests pass on your machine, and fail in CI with `No recording matches` and `has this method and path`. *Fix:* commit the directory of the recordings with the tests.
 
 **Two files for one request.** *Symptom:* playback fails with `Ambiguous recording match` for a request. *Fix:* a record run replaces the files of each request that it records, so the second file came from somewhere else, such as a file written by hand or copied in. Remove one of the files, or record that request again.
 
-**A different port in playback.** *Symptom:* `No recording matches` for a URL that has a file, with another port. *Fix:* the default key holds the port. Keep the port of the tests in a constant, and use it in both modes.
+**A different port in playback.** *Symptom:* `No recording matches`, and the nearest recording shows an `origin` with another port. *Fix:* the default key holds the port. Keep the port of the tests in a constant, and use it in both modes.
 
 **A token in a recording.** *Symptom:* the API token shows in a file in your repository. *Fix:* remove the header with a request transformer, and add a test that reads the files. Then change the token, because the history of the repository still holds it.
 

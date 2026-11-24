@@ -10,9 +10,9 @@ gleam_json = ">= 3.0.2 and < 4.0.0"
 gleam_otp = ">= 1.2.0 and < 2.0.0"
 gleam_yielder = ">= 1.1.0 and < 2.0.0"
 # Switched to a Hex version range once it is published.
-dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "e21fed7cb8758443caf1def60db6bb0356fed8a3" }
+dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "d1382f9660b980ee9c17d3ed097affb911ce42ff" }
 # Switched to a Hex version range once it is published.
-dream_postgres = { git = "https://github.com/TrustBound/dream_postgres.git", ref = "6653fd483ea6317a7ed20d176a1641cfea0dff29" }
+dream_postgres = { git = "https://github.com/TrustBound/dream_postgres.git", ref = "ee7d9c8cc16be3154895a39e942f5cafc62caa09" }
 dream_postgres_client = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]

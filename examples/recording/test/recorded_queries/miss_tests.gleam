@@ -5,12 +5,11 @@
 import app/tasks
 import dream_postgres/recorder
 import dream_test/context
-import dream_test/matchers.{be_ok, or_fail_with, should}
+import dream_test/matchers.{fail_with, succeed}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit_context.{describe, it}
-import gleam/result
 import recorded_queries/database_setup.{
-  type Database, start_database, stop_database,
+  type Database, describe_query_error, start_database, stop_database,
 }
 
 pub fn tests() -> TestSuite {
@@ -22,11 +21,10 @@ pub fn tests() -> TestSuite {
     ),
     [
       it("finds the share token of task 42", fn(database: Database) {
-        tasks.share_token(database.db, 42)
-        |> result.map_error(recorder.error)
-        |> should
-        |> be_ok()
-        |> or_fail_with("task 42 should have a share token")
+        case tasks.share_token(database.db, 42) {
+          Ok(_token) -> Ok(succeed())
+          Error(error) -> Ok(fail_with(describe_query_error(error)))
+        }
       }),
     ],
   )

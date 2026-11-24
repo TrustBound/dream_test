@@ -45,7 +45,7 @@ Record HTTP calls and database queries one time, then play them back in each run
 | 🎙️ **Recorded HTTP calls**    | Tests of an API client with no network, from files that `dream_http_client` writes |
 | 🐘 **Recorded queries**       | Tests of database code with no PostgreSQL, from files that `dream_postgres` writes |
 | 🔁 **One command to refresh** | `RECORDER_MODE=record gleam test` records, and `gleam test` plays back          |
-| 🚫 **Clear misses**           | A request or a query with no recording fails, and the report names it           |
+| 🚫 **Clear misses**           | A request or a query with no recording fails, and the report shows the nearest recording and what differs |
 
 ### Test Styles
 

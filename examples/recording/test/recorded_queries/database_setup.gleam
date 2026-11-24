@@ -75,11 +75,11 @@ fn create_schema(db: Connection) -> Result(Nil, String) {
   })
 }
 
-/// The `RecorderError` of a query that the recorder failed, or the query
-/// error of the database.
+/// The text of the `RecorderError` of a query that the recorder failed,
+/// or the query error of the database.
 pub fn describe_query_error(error: dream_postgres_client.QueryError) -> String {
   case recorder.error(error) {
-    Ok(recorder_error) -> string.inspect(recorder_error)
+    Ok(recorder_error) -> recorder.describe_error(recorder_error)
     Error(Nil) -> string.inspect(error)
   }
 }
