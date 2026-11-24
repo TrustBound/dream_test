@@ -16,8 +16,8 @@ import dream_test/unit_context
 import gleam/list
 
 pub fn tests() {
-  describe("steps.SuiteChild next to dream_test/types.Group", [
-    it("builds and runs a suite from every kind of child", fn() {
+  describe("steps.SuiteTest next to dream_test/types.Group", [
+    it("builds and runs a suite from every kind of test", fn() {
       steps.to_suite(registry: registry(), name: "Shop", tags: [], tests: [
         steps.Feature(shop_feature("Cart")),
         steps.Scenarios(shop_feature("Stock")),
@@ -39,7 +39,7 @@ pub fn tests() {
         #(["Shop", "Billing", "Invoice", "has 3 items"], Passed),
         #(["Shop", "Plain", "starts from 3"], Passed),
       ])
-      |> or_fail_with("every child should run and pass")
+      |> or_fail_with("every test should run and pass")
     }),
   ])
 }

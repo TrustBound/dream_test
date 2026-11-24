@@ -82,7 +82,7 @@ hook starts now lives for the tests of its group. A test runs its
   and `context.setup(setup, teardown:)` for a value from a setup.
 - `steps.to_suite` makes one suite from several Features with one
   registry, so one setup serves all of them. Its tests
-  (`steps.SuiteChild`) are `Feature`, `Scenarios`, `Group`
+  (`steps.SuiteTest`) are `Feature`, `Scenarios`, `Group`
   and `Node`.
 - `suite.from_tree` turns a tree that you build by hand (`types.Tree`)
   into a `TestSuite`.

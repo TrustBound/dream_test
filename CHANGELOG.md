@@ -470,7 +470,7 @@ the guide labels them.
     runs the setup one time for the scenarios of all its files.
     `steps.to_suite(registry:, name:, tags:, tests:)` makes a suite
     that starts as the registry says. Its tests are
-    `steps.SuiteChild` values: `Feature(feature)`,
+    `steps.SuiteTest` values: `Feature(feature)`,
     `Scenarios(feature)`, `Group(name:, tags:, tests:)` and
     `Node(node)`. The scenarios of every Feature run with the steps
     of that registry, so a suite of Features cannot mix the steps of one
@@ -490,7 +490,7 @@ the guide labels them.
     stops is a `SetupStopped` with the new hook `types.ContextSetupHook`,
     named `context setup`, and each test that did not start gets
     `not run: the context setup of "<tree>" stopped (<reason>)`
-  - `steps.SuiteChild` puts several Features in one suite with one
+  - `steps.SuiteTest` puts several Features in one suite with one
     setup: `Feature(feature)` is a group with the tests of a Feature
 
 - **Line coverage** (`dream_test/coverage`, `runner.coverage`)

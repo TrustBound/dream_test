@@ -296,7 +296,7 @@ Look for these in your code:
 - `steps.step`, `steps.when_` and `steps.then_`: use `steps.given`, `steps.when` or `steps.then`.
 - `result.unwrap` on a capture: use `result.try`. Then a wrong capture fails the scenario with a clear message.
 
-If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_setup`. Its setup runs one time, and each scenario starts from its value. To share one setup between several Features, give them to `steps.to_suite` as `steps.SuiteChild` values. See [A setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#step-6-start-a-server-once-for-all-scenarios).
+If `world` held a resource for all scenarios, for example a server or a connection pool, make the registry with `steps.new_with_setup`. Its setup runs one time, and each scenario starts from its value. To share one setup between several Features, give them to `steps.to_suite` as `steps.SuiteTest` values. See [A setup for all scenarios](https://github.com/TrustBound/dream_test/blob/main/docs/guides/gherkin-bdd.md#step-6-start-a-server-once-for-all-scenarios).
 
 ### A record for more than one value
 

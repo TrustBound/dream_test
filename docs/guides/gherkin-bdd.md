@@ -606,7 +606,7 @@ Summary: 4 run, 0 failed, 4 passed in 0ms
 
 The BDD reporter prints `Feature: <name>` on the group of a Feature, and plain names on other groups.
 
-To share one setup between several Features that you parse yourself, give each one to `steps.to_suite` as a `steps.Feature` child. The setup runs once for the scenarios of all of them:
+To share one setup between several Features that you parse yourself, give each one to `steps.to_suite` as a `steps.Feature` test. The setup runs once for the scenarios of all of them:
 
 ### Two Features, one setup <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/gherkin/gherkin_shared_setup.gleam#L39-L52"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -627,7 +627,7 @@ fn shop_suite(cart: types.Feature, stock: types.Feature) -> TestSuite {
 }
 ```
 
-`types` here is `dream_test/gherkin/types`. `steps.to_suite` takes these tests (`steps.SuiteChild`):
+`types` here is `dream_test/gherkin/types`. `steps.to_suite` takes these tests (`steps.SuiteTest`):
 
 - `Feature(feature)`: a group named after the Feature, with a test for each scenario.
 - `Scenarios(feature)`: the tests of the scenarios, with no group for the Feature. The Feature's tags don't reach them, and their result kind has `feature: None`. The Gherkin reporter prints the groups around them, joined with ` > `, as their heading, such as `Shop > Billing`.

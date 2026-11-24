@@ -417,12 +417,12 @@ pub fn new_with_setup(
   )
 }
 
-/// One child of the suite of `to_suite`.
+/// One test of the suite of `to_suite`.
 ///
 /// `Group` and `Feature` have the same names as `dream_test/types.Group`
 /// and `dream_test/gherkin/types.Feature`. When a module imports two of
 /// these names unqualified, the compiler reports the clash as an error.
-/// Then write the child qualified, for example `steps.Feature(cart)` or
+/// Then write the test qualified, for example `steps.Feature(cart)` or
 /// `steps.Group(...)`.
 ///
 /// - `Feature(feature)`: a group named after the Feature, with its tags and
@@ -438,10 +438,10 @@ pub fn new_with_setup(
 /// - `Node(node)`: a test, a hook or a group that you make, for example
 ///   with `unit_context.it` or `unit_context.before_each`. It gets the same
 ///   start as the scenarios.
-pub type SuiteChild(state) {
+pub type SuiteTest(state) {
   Feature(feature: types.Feature)
   Scenarios(feature: types.Feature)
-  Group(name: String, tags: List(String), tests: List(SuiteChild(state)))
+  Group(name: String, tags: List(String), tests: List(SuiteTest(state)))
   Node(node: dream_types.Node(state))
 }
 
@@ -452,7 +452,7 @@ pub type SuiteChild(state) {
 ///
 /// `gherkin/discover.to_suite` uses it. Use it
 /// to run several Features with one start, for example one server for all
-/// of them. The scenarios of every `Feature` and `Scenarios` child run with
+/// of them. The scenarios of every `Feature` and `Scenarios` test run with
 /// the steps of `registry`.
 ///
 /// ## Parameters
@@ -460,7 +460,7 @@ pub type SuiteChild(state) {
 /// - `registry`: the steps, and where each test starts
 /// - `name`: the name of the top-level group
 /// - `tags`: the tags of the top-level group
-/// - `tests`: the Features, groups, tests and hooks (see `SuiteChild`)
+/// - `tests`: the Features, groups, tests and hooks (see `SuiteTest`)
 ///
 /// ## Example
 ///
@@ -499,7 +499,7 @@ pub fn to_suite(
   registry registry: StepRegistry(state),
   name name: String,
   tags tags: List(String),
-  tests tests: List(SuiteChild(state)),
+  tests tests: List(SuiteTest(state)),
 ) -> TestSuite {
   suite.new(
     name: name,
@@ -607,24 +607,24 @@ pub fn feature_suite(
 }
 
 fn tests_to_nodes(
-  tests: List(SuiteChild(state)),
+  tests: List(SuiteTest(state)),
   registry: StepRegistry(state),
 ) -> List(dream_types.Node(state)) {
   case tests {
     [] -> []
-    [child, ..rest] ->
+    [suite_test, ..rest] ->
       list.append(
-        child_to_nodes(child, registry),
+        suite_test_to_nodes(suite_test, registry),
         tests_to_nodes(rest, registry),
       )
   }
 }
 
-fn child_to_nodes(
-  child: SuiteChild(state),
+fn suite_test_to_nodes(
+  suite_test: SuiteTest(state),
   registry: StepRegistry(state),
 ) -> List(dream_types.Node(state)) {
-  case child {
+  case suite_test {
     Feature(feature) -> [
       dream_types.Group(
         name: feature.name,

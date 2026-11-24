@@ -4,14 +4,14 @@ import gleam/list
 import gleam/option.{None}
 
 // Gherkin is the primary subject → unqualified
-import dream_test/gherkin/steps.{type SuiteChild, Group, Scenarios}
+import dream_test/gherkin/steps.{type SuiteTest, Group, Scenarios}
 import dream_test/gherkin/types.{type Feature, type Scenario}
 
 // Core test types are supporting → alias the conflicting `Group`,
 // alias the module (both modules are named `types`)
 import dream_test/types.{type Node, Group as NodeGroup} as test_types
 
-pub fn checkout_group(feature: Feature) -> SuiteChild(Nil) {
+pub fn checkout_group(feature: Feature) -> SuiteTest(Nil) {
   Group(name: "Checkout", tags: [], tests: [Scenarios(feature)])
 }
 
