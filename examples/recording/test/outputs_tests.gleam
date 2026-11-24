@@ -10,6 +10,7 @@ import dream_test/runner.{type RunBuilder}
 import dream_test/suite.{type TestSuite}
 import dream_test/types.{type RunReport, TestResult}
 import dream_test/unit.{describe, it}
+import envoy
 import gleam/list
 import gleam/result
 import gleam/string
@@ -71,7 +72,39 @@ pub fn tests() -> TestSuite {
       |> be_equal(expected)
       |> or_fail_with("the output should be the recording file")
     }),
+    it("shows the report of the Forecast suite in playback", fn() {
+      runner.new([forecast_tests.tests()])
+      |> matches_output("forecast_playback")
+    }),
   ])
+}
+
+/// Runs the Forecast suite live, as `RECORDER_MODE=passthrough gleam test`
+/// does: the requests go to the mock server, and the recorder writes
+/// nothing. The variable is the same for the whole BEAM, so this suite runs
+/// after the other suites, and gives the variable its old value again.
+pub fn live_tests() -> TestSuite {
+  describe("The live run in the guides", [
+    it("shows the report of the Forecast suite in a live run", fn() {
+      let old_mode = envoy.get("RECORDER_MODE")
+      envoy.set("RECORDER_MODE", "passthrough")
+      let builder = runner.new([forecast_tests.tests()])
+      let report = report_text(builder)
+      restore_mode(old_mode)
+      use expected <- result.try(read_text("test/outputs/forecast_live.txt"))
+      report
+      |> should
+      |> be_equal(expected)
+      |> or_fail_with("the report should match test/outputs/forecast_live.txt")
+    }),
+  ])
+}
+
+fn restore_mode(old_mode: Result(String, Nil)) -> Nil {
+  case old_mode {
+    Ok(text) -> envoy.set("RECORDER_MODE", text)
+    Error(Nil) -> envoy.unset("RECORDER_MODE")
+  }
 }
 
 fn read_text(path: String) -> Result(String, String) {

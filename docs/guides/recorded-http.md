@@ -1,5 +1,7 @@
 # Test HTTP calls with recordings
 
+Why this approach: [Mock at the system boundary](https://github.com/TrustBound/dream_test/blob/main/docs/guides/mock-at-the-boundary.md).
+
 A test that calls a real API is slow. It fails when the network is down, when the API has a bad day, or when the API changes its data. Some APIs also cost money for each call. A mock server is fast and stable, but it answers what you told it, not what the API really says. A recording sits between the two. You run the tests one time against the real API, and the HTTP client saves each request and its response to a file. After that, the tests play the files back with no network at all. This guide builds a test suite for a small weather client with the recorder of [dream_http_client](https://github.com/TrustBound/dream_http_client). The suite records with one command, and plays back in CI.
 
 ## Table of Contents
@@ -524,7 +526,7 @@ fn without_date(headers: List(#(String, String))) -> List(#(String, String)) {
 
 A test makes sure that no file holds the token. It reads all the files, and fails if one of them holds `authorization` or the token:
 
-### Make sure that no recording holds the token <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs_tests.gleam#L42-L51"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Make sure that no recording holds the token <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs_tests.gleam#L43-L52"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```gleam
     it("keeps the token out of the HTTP recordings", fn() {

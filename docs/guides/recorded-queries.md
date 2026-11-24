@@ -1,5 +1,7 @@
 # Test database code with recorded queries
 
+Why this approach: [Mock at the system boundary](https://github.com/TrustBound/dream_test/blob/main/docs/guides/mock-at-the-boundary.md).
+
 A test against a real database needs a PostgreSQL server on each machine that runs it, CI included. The server must start before the tests, and each run must start from the same data. When the server is not there, every test fails. A recording removes that need. You run the tests one time against PostgreSQL, and the recorder of [dream_postgres](https://github.com/TrustBound/dream_postgres) writes each query and its real result to a file. After that, the tests play the file back with no database at all. This guide builds a test suite for a small to-do list. The suite records with one command against a PostgreSQL server in Docker, and plays back in CI, where no database runs.
 
 ## Table of Contents

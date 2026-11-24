@@ -112,10 +112,11 @@ Dream Test splits reporting into:
 10. [Run a large suite fast and predictably](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md): concurrency, timeouts, suites with their own settings, and every case that gives exit status 1.
 11. [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md): the coverage table, minimums, exclusions with reasons, report files and coverage from servers.
 12. [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md): a live badge from your own GitHub Actions workflow, with no outside service.
-13. [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md): record the calls of an API client one time, play them back in CI with no network, and keep the token out of the files.
-14. [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md): record PostgreSQL queries one time, play them back with no database, and test a transaction.
-15. [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md): every breaking change, with the 2.x code and the 3.0.0 code.
-16. [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md): every matcher, the runner settings, the rules of hook processes, the Gherkin rules and the helper modules.
+13. [Mock at the system boundary](https://github.com/TrustBound/dream_test/blob/main/docs/guides/mock-at-the-boundary.md): why the tests keep the real code and change only what answers at the dependency boundary, and what a recording proves.
+14. [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md): record the calls of an API client one time, play them back in CI with no network, and keep the token out of the files.
+15. [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md): record PostgreSQL queries one time, play them back with no database, and test a transaction.
+16. [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md): every breaking change, with the 2.x code and the 3.0.0 code.
+17. [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md): every matcher, the runner settings, the rules of hook processes, the Gherkin rules and the helper modules.
 
 ## Unit Tests
 
@@ -294,7 +295,28 @@ fn start_weather_api() -> Result(Api, String) {
 }
 ```
 
-`RECORDER_MODE=record gleam test` records the calls, and `gleam test` plays them back. In CI, the tests need no network and no API token. The same pattern records PostgreSQL queries with `dream_postgres`, and plays them back with no database.
+`RECORDER_MODE=record gleam test` records the calls, and `gleam test` plays them back. In CI, the tests need no network and no API token. The same pattern records PostgreSQL queries with `dream_postgres`, and plays them back with no database. The setup gives each test a connection from the recorder:
+
+### A suite that plays back recorded queries <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_queries/tasks_tests.gleam#L19-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/docs/guides/recorded-queries.md#the-task-suite-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+
+```gleam
+pub fn tests() -> TestSuite {
+  describe_with_setup(
+    "Tasks",
+    setup: start_task_database,
+    teardown: stop_database,
+    children: [
+      it("lists a new task as open", fn(database: Database) {
+        use id <- result.try(add(database, "Buy milk"))
+        tasks.open_tasks(database.db)
+        |> should
+        |> be_ok()
+        |> contain(Task(id, "Buy milk"))
+        |> or_fail_with("the new task should be open")
+      }),
+```
+
+The tests and the code stay the same in each mode, and only what answers at the boundary changes. [Mock at the system boundary](https://github.com/TrustBound/dream_test/blob/main/docs/guides/mock-at-the-boundary.md) explains why.
 
 <sub>📖 [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md) · [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md)</sub>
 

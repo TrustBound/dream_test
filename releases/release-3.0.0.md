@@ -141,7 +141,7 @@ shows a real report.
 
 The guides moved from `documentation/` to `docs/guides/`. Their file names
 have no number now, for example `docs/guides/writing-tests.md`. They are
-rewritten by reader task: 15 guides and one reference page. Each guide
+rewritten by reader task: 16 guides and one reference page. Each guide
 starts with a table of contents, walks through numbered steps with the
 real output of each one, passing and failing, and ends with its failure
 cases, a "Test your code" section and common pitfalls. A test compares
@@ -157,6 +157,11 @@ PostgreSQL queries with `dream_postgres`. Both play back in CI with no
 network and no database. Their steps are tests, so they end with the CI
 job in place of a "Test your code" section. Their code is the new project
 `examples/recording`, and a new CI job runs its tests in playback mode.
+A third new guide, "Mock at the system boundary"
+(`mock-at-the-boundary.md`), explains the idea behind both: keep the
+application code and the test assertions, and change what answers at
+the dependency boundary. It shows the same suite in a live run and an
+offline run, and what a recording proves.
 Each example in the README has a guide badge. The badge links to the
 guide section that shows the same example. HexDocs shows each guide as a
 page.
@@ -321,6 +326,7 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
 - [Upgrade from Dream Test 2.x to 3.0.0](https://github.com/TrustBound/dream_test/blob/main/docs/guides/upgrading-to-3.md)
 - [Measure line coverage and gate CI on it](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage.md)
 - [Publish a coverage badge from your own CI](https://github.com/TrustBound/dream_test/blob/main/docs/guides/coverage-badge.md)
+- [Mock at the system boundary](https://github.com/TrustBound/dream_test/blob/main/docs/guides/mock-at-the-boundary.md)
 - [Test HTTP calls with recordings](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-http.md)
 - [Test database code with recorded queries](https://github.com/TrustBound/dream_test/blob/main/docs/guides/recorded-queries.md)
 - [Reference](https://github.com/TrustBound/dream_test/blob/main/docs/guides/reference.md)

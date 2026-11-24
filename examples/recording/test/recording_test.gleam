@@ -26,6 +26,6 @@ fn one_at_a_time() -> parallel.ParallelConfig {
 fn output_checks() {
   case envoy.get("RECORDER_MODE") {
     Ok("record") -> []
-    _ -> [outputs_tests.tests()]
+    _ -> [outputs_tests.tests(), outputs_tests.live_tests()]
   }
 }

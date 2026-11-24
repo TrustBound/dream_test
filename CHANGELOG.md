@@ -743,7 +743,8 @@ the guide labels them.
     it. With `runner.exit_on_failure()`, the exit status is 1
 
 - **Guides for tests with recordings** (`docs/guides/recorded-http.md`,
-  `docs/guides/recorded-queries.md`, `examples/recording`, `README.md`)
+  `docs/guides/recorded-queries.md`, `docs/guides/mock-at-the-boundary.md`,
+  `examples/recording`, `README.md`)
 
   - "Test HTTP calls with recordings" shows a Dream Test suite that
     records the calls of an API client with the recorder of
@@ -762,7 +763,15 @@ the guide labels them.
     playback mode, with no network and no database. Its tests compare
     each output that the guides show with the real report.
     `make record` in the project records again, with PostgreSQL in Docker
-  - The README has a new section, "Record once, test offline"
+  - "Mock at the system boundary" explains the idea behind both guides:
+    keep the application code and the test assertions, and change what
+    answers at the dependency boundary. It shows the same suite in a live
+    run (`make live` in `examples/recording`, with `RECORDER_MODE=passthrough`)
+    and an offline run, how to scrub a recording, how to catch changes in
+    an external system before deployment, and where a recording can drift
+  - The README has a new section, "Record once, test offline", with the
+    HTTP example, the database example and a link to "Mock at the system
+    boundary"
 
 ### Changed
 
