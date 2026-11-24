@@ -264,6 +264,8 @@ The test name holds the problem. Discovery has five of them, and each one is a f
 | `<module>: tests() crashed: <class>:<reason>` | Your `tests()` function crashed while it built the suite. |
 | `<module>: tests() did not return a test suite: <value>` | `tests()` returned something else. |
 
+A run that finds its modules but runs no test fails too, for example a filter with a typo in a tag. That run has no failing test: the report ends with the line `No tests ran. The filter or the suites selected no test. To allow an empty run, use runner.allow_no_tests().` and the exit status is 1. [When a filter keeps nothing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md#when-a-filter-keeps-nothing) shows that run, and `runner.allow_no_tests()` for a run that is empty on purpose.
+
 ## Test your code
 
 Your tests are code too, and the check that matters most is that a broken test really breaks the run. You can test that with Dream Test itself: build the suite, run it with `runner.silent()` so it prints nothing, and check the report that `runner.run` returns. This module checks the failing suite from Step 3:

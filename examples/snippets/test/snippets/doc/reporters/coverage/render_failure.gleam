@@ -10,6 +10,7 @@ pub fn no_source_files_block() -> String {
       teardown_failed: 0,
       setup_stopped: 0,
       reporters_crashed: 0,
+      no_tests_ran: False,
       exit_on_failure: True,
     ),
   )

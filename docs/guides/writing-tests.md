@@ -211,16 +211,49 @@ pub fn main_with_typo() {
 }
 ```
 
-It runs no test at all, and the exit status is 0:
+It runs no test at all. A run that tests nothing proves nothing, so the run fails, and the exit status is 1:
 
 ### The run with the typo <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_writing_tests_typo.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 
 Summary: 0 run, 0 failed, 0 passed in 0ms
+No tests ran. The filter or the suites selected no test. To allow an empty run, use runner.allow_no_tests().
 ```
 
-A run with no test passes. That's the right answer for a filter that selects nothing on purpose, but on CI it hides a broken filter. Watch for `0 run` in a CI log, and test your filters.
+A skipped or a pending test counts as a test that ran, so a run where every test is skipped still passes. Only a run with no test at all fails.
+
+Sometimes a filter selects nothing on purpose, for example a CI job that runs only the migration tests of a project that has none yet. Add `runner.allow_no_tests()` to that runner:
+
+### Allow a run with no test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/writing_tests_filter.gleam#L36-L49"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// A filter for the migration tests. The cart suite has none, and this
+/// runner allows a run with no test.
+pub fn only_migrations(info: TestInfo) -> Bool {
+  list.contains(info.tags, "migration")
+}
+
+pub fn main_allowing_no_tests() {
+  runner.new([writing_tests_cart.tests()])
+  |> runner.filter_tests(only_migrations)
+  |> runner.results_reporters([bdd.new()])
+  |> runner.allow_no_tests()
+  |> runner.exit_on_failure()
+  |> runner.run()
+}
+```
+
+The run passes with exit status 0, and the report has no `No tests ran` line:
+
+### The run that allows no test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/outputs/guide_writing_tests_no_tests_allowed.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+
+Summary: 0 run, 0 failed, 0 passed in 0ms
+```
+
+`runner.allow_no_tests()` also lets a typo through, so keep it off the runners that guard your main branch, and test your filters.
 
 ## Test your code
 
@@ -303,7 +336,7 @@ If someone renames the `smoke` tag, the first check fails and says which tests r
 
 **A tag on the wrong level.** *Symptom:* a filter on `integration` keeps one test of a group, not all of them. *Fix:* put the tag on the `group`, and every test inside gets it, also in nested groups.
 
-**A filter that keeps nothing.** *Symptom:* `Summary: 0 run, 0 failed, 0 passed` and a green CI job. *Fix:* test each filter as in [Test your code](#test-your-code).
+**A filter that keeps nothing behind `allow_no_tests`.** *Symptom:* `Summary: 0 run, 0 failed, 0 passed` and a green CI job. *Fix:* use `runner.allow_no_tests()` only on a runner that can be empty on purpose, and test each filter as in [Test your code](#test-your-code).
 
 **Long setup in every test body.** *Symptom:* each `it` starts with ten lines of setup, and the assertion gets lost. *Fix:* move the setup to a named helper, or to a `before_each` hook in the group.
 

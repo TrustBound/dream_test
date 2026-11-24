@@ -316,7 +316,7 @@ pub fn tests() {
       it("writes the hook failures in colour", fn() {
         bdd.render(
           config(True, reporter_types.BddFailuresOnly),
-          report_with_cleanup_failure([]),
+          report_with_cleanup_failure([]) |> types.allow_no_tests,
         )
         |> should
         |> be_equal(

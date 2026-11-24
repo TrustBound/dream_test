@@ -45,7 +45,7 @@ pub fn tests() -> TestSuite {
       |> be_equal(snippets_outputs.expected_run(0, "guide_writing_tests_smoke"))
       |> or_fail_with("expected test/outputs/guide_writing_tests_smoke.txt")
     }),
-    it_runs_in_child_vm("a filter with a typo runs no test and passes", fn() {
+    it_runs_in_child_vm("a filter with a typo runs no test and fails", fn() {
       // Act
       let run =
         snippets_outputs.child_output(
@@ -56,8 +56,27 @@ pub fn tests() -> TestSuite {
       // Assert
       run
       |> should
-      |> be_equal(snippets_outputs.expected_run(0, "guide_writing_tests_typo"))
+      |> be_equal(snippets_outputs.expected_run(1, "guide_writing_tests_typo"))
       |> or_fail_with("expected test/outputs/guide_writing_tests_typo.txt")
+    }),
+    it_runs_in_child_vm("allow_no_tests lets a run with no test pass", fn() {
+      // Act
+      let run =
+        snippets_outputs.child_output(
+          "snippets/guides/writing_tests_filter",
+          "main_allowing_no_tests",
+        )
+
+      // Assert
+      run
+      |> should
+      |> be_equal(snippets_outputs.expected_run(
+        0,
+        "guide_writing_tests_no_tests_allowed",
+      ))
+      |> or_fail_with(
+        "expected test/outputs/guide_writing_tests_no_tests_allowed.txt",
+      )
     }),
   ])
 }

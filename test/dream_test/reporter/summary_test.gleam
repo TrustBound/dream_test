@@ -100,7 +100,9 @@ pub fn tests() {
       |> or_fail_with("the line should end with the teardown failures")
     }),
     it("format counts failed teardown hooks and stopped setups apart", fn() {
-      summary.format(teardown_failed_and_setup_stopped())
+      summary.format(
+        teardown_failed_and_setup_stopped() |> types.allow_no_tests,
+      )
       |> should
       |> be_equal(
         "Summary: 0 run, 0 failed, 0 passed, 1 teardown failed, 1 setup stopped in 0ms\n",
@@ -108,7 +110,9 @@ pub fn tests() {
       |> or_fail_with("a stopped setup should not count as a failed hook")
     }),
     it("format_in_color shows the teardown failures in red", fn() {
-      summary.format_in_color(report_with_cleanup_failure([]))
+      summary.format_in_color(
+        report_with_cleanup_failure([]) |> types.allow_no_tests,
+      )
       |> should
       |> be_equal(
         "\u{1b}[1m\u{1b}[36mSummary: \u{1b}[0m\u{1b}[0m\u{1b}[36m0\u{1b}[0m run, \u{1b}[31m0\u{1b}[0m failed, \u{1b}[32m0\u{1b}[0m passed, \u{1b}[31m1\u{1b}[0m\u{1b}[2m teardown failed\u{1b}[0m in \u{1b}[36m0ms\u{1b}[0m\n",

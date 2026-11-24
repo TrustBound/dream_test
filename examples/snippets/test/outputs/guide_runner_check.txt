@@ -1,4 +1,5 @@
 The run report
   ✓ fails a run whose cleanup failed
+  ✓ fails a run that ran no test
 
-Summary: 1 run, 0 failed, 1 passed in 0ms
+Summary: 2 run, 0 failed, 2 passed in 0ms

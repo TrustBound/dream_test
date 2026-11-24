@@ -26,5 +26,19 @@ pub fn tests() {
       |> be_true()
       |> or_fail_with("a failed teardown should fail the run")
     }),
+    it("fails a run that ran no test", fn() {
+      // Act
+      let report =
+        runner.new([suite_with_a_failed_cleanup()])
+        |> runner.filter_tests(fn(_info) { False })
+        |> runner.silent()
+        |> runner.run()
+
+      // Assert
+      types.failed(report)
+      |> should
+      |> be_true()
+      |> or_fail_with("a run with no test should fail")
+    }),
   ])
 }

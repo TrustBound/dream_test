@@ -54,7 +54,7 @@ Most projects need only Steps 1 to 4. Do the steps in order. The first ones affe
 | Your code uses | What changed | Step |
 |:---|:---|:---|
 | Gherkin steps | Each step gets the scenario state and returns it. `world` is removed. `steps.when_` and `steps.then_` are now `steps.when` and `steps.then`. `feature.to_test_suite` and `FeatureConfig` are removed: use `steps.feature_suite`. | [Step 3](#step-3-port-the-gherkin-step-definitions) |
-| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases. `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
+| Suites, the runner, `parallel` | A suite has the type `TestSuite` from `dream_test/suite`, with no type parameter. The runner test hooks get only the `TestInfo`. `runner.run` returns a `types.RunReport`. `runner.has_failures` is now `types.failed`. `runner.exit_on_failure` exits with status 1 in more cases, also for a run with no test (`runner.allow_no_tests()` allows one). `runner.silent` still writes errors. `types.Root` is now `types.Tree`. The `parallel` names say "tree", and their label `suite:` is now `tree:`. `RunTreeParallelWithReporterConfig` has the new field `outer_setups`. The label `seed` is now `initial`. `AssertionResult` has the new variant `AssertionPending`. The discovery errors have new texts. | [Step 4](#step-4-update-suites-and-the-run-report) |
 | Hooks | A failed setup hook gives `SetupFailed`. A failed teardown hook goes into the run report, not into the test results. | [Step 5](#step-5-check-the-hook-failures) |
 | Reporters | The functions that format a whole run take a `RunReport`. `GherkinScenario` has the fields `scenario_id`, `feature` and `rule`. The progress event API is removed. `ResultsReporter` has the new variant `Custom`, and `FailurePayload` the new variant `StepFailure`. | [Step 6](#step-6-update-the-reporters) |
 | The JSON report | The JSON report has schema version `2.0`. | [Step 7](#step-7-update-the-tools-that-read-the-json-report) |
@@ -779,7 +779,12 @@ In 2.x, `runner.exit_on_failure` looked only at the test results. In 3.0.0, it a
 - a teardown hook failed
 - a setup stopped (`SetupStopped`)
 - the `render` function of a `reporter_types.Custom` reporter crashed
+- the run ran no test, for example a filter that keeps nothing or `runner.new([])`
 - coverage failed
+
+A run with no test passed in 2.x. In 3.0.0, it fails, and the report ends with a `No tests ran` line. A skipped or pending test is a test that ran. If a runner of yours is empty on purpose, pipe it through `runner.allow_no_tests()` before `runner.run()`, as [When a filter keeps nothing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md#when-a-filter-keeps-nothing) shows.
+
+`types.failed` is `True` for a report with no test result, also one from `types.run_report(tests: [], ...)` or `parallel.run_tree_parallel`. `types.allow_no_tests(report)` makes such a report pass in a custom runner.
 
 [Exit status](https://github.com/TrustBound/dream_test/blob/main/docs/guides/runner-and-execution.md#step-6-decide-the-exit-status) lists every case.
 
@@ -2417,7 +2422,7 @@ Do the same for the counts that matter to you. `summary.count(report)` from `dre
 
 **A green run with a failed cleanup.** *Symptom:* every test passes, and CI is red. *Fix:* a failed teardown hook now fails the run, and is in `types.report_hook_failures(report)`. Fix the hook, or read the `Setup and teardown failures:` section of the report.
 
-**Name filters that match nothing.** *Symptom:* a filtered run passes with `0 run`. *Fix:* test names of Gherkin examples changed, and `full_name` is now `groups` plus `name`. Use `types.full_name(info.groups, info.name)`, and test your filters.
+**Name filters that match nothing.** *Symptom:* a filtered run fails with `0 run` and `No tests ran`. *Fix:* test names of Gherkin examples changed, and `full_name` is now `groups` plus `name`. Use `types.full_name(info.groups, info.name)`, and test your filters.
 
 **A discovery pattern that used to pass silently.** *Symptom:* `no test module matches the pattern` after the upgrade. *Fix:* 2.x passed when a pattern found nothing. 3.0.0 fails, on purpose. Fix the pattern.
 

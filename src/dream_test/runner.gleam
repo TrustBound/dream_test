@@ -136,6 +136,7 @@ pub opaque type RunBuilder {
     config: parallel.ParallelConfig,
     test_filter: Option(fn(TestInfo) -> Bool),
     should_exit_on_failure: Bool,
+    no_tests_allowed: Bool,
     progress_reporter: Option(progress.ProgressReporter),
     results_reporters: List(reporter_types.ResultsReporter),
     output: Option(Output),
@@ -223,6 +224,7 @@ pub fn new(suites suites: List(TestSuite)) -> RunBuilder {
     config: config,
     test_filter: None,
     should_exit_on_failure: False,
+    no_tests_allowed: False,
     progress_reporter: None,
     results_reporters: [],
     output: None,
@@ -547,6 +549,60 @@ pub fn default_timeout_ms(
 /// The updated `RunBuilder`.
 pub fn exit_on_failure(builder builder: RunBuilder) -> RunBuilder {
   RunBuilder(..builder, should_exit_on_failure: True)
+}
+
+/// Allow a run that runs no test.
+///
+/// By default, a run that runs no test fails: a filter that keeps no
+/// test, or `runner.new([])`. The BDD and Gherkin reporters then write a
+/// `No tests ran` line after the summary line, `types.failed` is `True`
+/// for the report, and with `exit_on_failure` the program ends with exit
+/// status 1. A test that is skipped or pending is a test that ran.
+///
+/// With `allow_no_tests`, a run with no test passes: the reporters write
+/// no `No tests ran` line, and the exit status is 0. Use it when a run is
+/// empty on purpose, for example a filter that a CI job sets and that can
+/// select nothing.
+///
+/// ## Example
+///
+/// ### Allow a filter that can select nothing <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/runner/allow_no_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{succeed}
+/// import dream_test/reporters/bdd
+/// import dream_test/runner.{type TestInfo}
+/// import dream_test/types.{type RunReport}
+/// import dream_test/unit.{describe, it}
+/// import gleam/list
+///
+/// pub fn only_migrations(info: TestInfo) -> Bool {
+///   list.contains(info.tags, "migration")
+/// }
+///
+/// pub fn main() -> RunReport {
+///   runner.new([
+///     describe("Cart", [
+///       it("starts empty", fn() { Ok(succeed()) }),
+///     ]),
+///   ])
+///   |> runner.filter_tests(only_migrations)
+///   |> runner.results_reporters([bdd.new()])
+///   |> runner.allow_no_tests()
+///   |> runner.exit_on_failure()
+///   |> runner.run()
+/// }
+/// ```
+///
+/// ## Parameters
+///
+/// - `builder`: the runner builder you’re configuring
+///
+/// ## Returns
+///
+/// The updated `RunBuilder`.
+pub fn allow_no_tests(builder builder: RunBuilder) -> RunBuilder {
+  RunBuilder(..builder, no_tests_allowed: True)
 }
 
 /// Attach a progress reporter (live output during the run).
@@ -1180,6 +1236,11 @@ pub fn after_all_suites(
 /// With `exit_on_failure`, a failed run does not return: it writes all its
 /// output and then ends the program with exit status 1.
 ///
+/// A run that runs no test fails: a filter that keeps no test, or no
+/// suites. The BDD and Gherkin reporters write a `No tests ran` line after
+/// the summary line. Use `allow_no_tests` when a run can be empty on
+/// purpose.
+///
 /// If the `render` function of a `reporter_types.Custom` reporter crashes,
 /// the runner writes a `Results reporter failed` error to the error output
 /// and goes on with the next reporter and with coverage. The error names
@@ -1231,7 +1292,8 @@ pub fn after_all_suites(
 /// order, and the teardown hooks that failed. Read it with
 /// `types.report_tests` and `types.report_hook_failures`, and check it
 /// with `types.failed`. With `exit_on_failure`, the BEAM stops with status 1
-/// when `types.failed(report)` is `True`, when a `reporter_types.Custom`
+/// when `types.failed(report)` is `True` (a run with no test, without
+/// `allow_no_tests`, is one), when a `reporter_types.Custom`
 /// reporter crashes, or when coverage fails (a total or a file below a
 /// minimum, or coverage that did not complete).
 pub fn run(builder builder: RunBuilder) -> RunReport {
@@ -1335,6 +1397,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
       hook_failures: hook_failures,
       reporter_crashes: [],
     )
+    |> with_no_tests_allowed(builder.no_tests_allowed)
 
   let counts = summary.count(report)
   case progress_reporter0 {
@@ -1362,6 +1425,7 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
         output,
       ),
     )
+    |> with_no_tests_allowed(builder.no_tests_allowed)
 
   let coverage_succeeded =
     finish_coverage(
@@ -1377,6 +1441,14 @@ pub fn run(builder builder: RunBuilder) -> RunReport {
   )
 
   report
+}
+
+/// `report`, with a run of no test allowed when `allowed` is `True`.
+fn with_no_tests_allowed(report: RunReport, allowed: Bool) -> RunReport {
+  case allowed {
+    True -> types.allow_no_tests(report)
+    False -> report
+  }
 }
 
 /// The test results and the hook failures of the suites that ran so
@@ -2541,6 +2613,7 @@ fn run_outcome(
     teardown_failed: counts.teardown_failed,
     setup_stopped: counts.setup_stopped,
     reporters_crashed: list.length(types.report_reporter_crashes(report)),
+    no_tests_ran: types.failed_with_no_tests(report),
     exit_on_failure: exit_on_failure,
   )
 }

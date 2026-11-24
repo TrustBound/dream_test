@@ -70,6 +70,27 @@ pub fn tests() -> TestSuite {
         |> or_fail_with("expected the full report, then the summary line")
       },
     ),
+    it_runs_in_child_vm(
+      "allow_no_tests main prints what the example shows",
+      fn() {
+        // Act
+        let result =
+          snippets_child_vm.run("snippets/doc/runner/allow_no_tests", "main")
+          |> result.map(snippets_child_vm.without_progress_and_durations_in)
+
+        // Assert
+        result
+        |> should
+        |> be_equal(
+          Ok(ChildRun(
+            status: 0,
+            output: "\nSummary: 0 run, 0 failed, 0 passed in <duration>\n",
+            error_output: "",
+          )),
+        )
+        |> or_fail_with("expected an empty run that passes")
+      },
+    ),
     it_runs_in_child_vm("silent main prints what the example shows", fn() {
       // Act
       let result =

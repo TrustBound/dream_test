@@ -154,7 +154,7 @@ example. HexDocs shows each guide as a page.
 
 ## Testing
 
-- 1220 tests run, 0 failed, in about 48 seconds of wall time (measured with a load average of about 4 from other programs), with 100.0% line coverage of `src` (3926 of 3926 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
+- 1244 tests run, 0 failed, in about 50 seconds of wall time (measured with a load average of about 9 from other programs), with 100.0% line coverage of `src` (3943 of 3943 lines). Apple M1 Max, OTP 29, Gleam 1.19.2
 
 ## Upgrading
 
@@ -209,8 +209,14 @@ Each item that needs a code change has a 2.x and a 3.0.0 example in
   runs, and the runner writes all its output first. Then it ends the
   program with status 1 when a test fails, times out or has a failed
   setup, when a teardown hook fails, when a setup stops
-  (`SetupStopped`), when a `reporter_types.Custom` reporter crashes, and
-  when coverage fails.
+  (`SetupStopped`), when a `reporter_types.Custom` reporter crashes, when
+  the run ran no test, and when coverage fails.
+- A run that runs no test fails. In 2.x it passed. A filter that keeps no
+  test, or `runner.new([])`, gives such a run: the BDD and Gherkin
+  reporters end with a `No tests ran` line, `types.failed(report)` is
+  `True`, and with `exit_on_failure` the exit status is 1. A skipped or
+  pending test is a test that ran. Add `runner.allow_no_tests()` to a
+  runner that is empty on purpose.
 - A crashed `reporter_types.Custom` reporter is in the run report, so
   `types.failed(report)` is `True`. `types.report_reporter_crashes` gives
   its position and the full reason.

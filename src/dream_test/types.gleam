@@ -994,17 +994,19 @@ pub type ReporterCrash {
 }
 
 /// The result of a run: the result of each test, the teardown hooks that
-/// failed, and the results reporters that crashed.
+/// failed, the results reporters that crashed, and whether a run with no
+/// test is allowed.
 ///
 /// `runner.run` and `parallel.run_tree_parallel` give a `RunReport`, and the
 /// reporters take one. Use `run_report` to make one, `report_tests`,
 /// `report_hook_failures` and `report_reporter_crashes` to read it, and
-/// `failed` to check it.
+/// `failed` and `failed_with_no_tests` to check it.
 pub opaque type RunReport {
   RunReport(
     tests: List(TestResult),
     hook_failures: List(HookFailure),
     reporter_crashes: List(ReporterCrash),
+    no_tests_allowed: Bool,
   )
 }
 
@@ -1024,7 +1026,8 @@ pub opaque type RunReport {
 /// ## Returns
 ///
 /// A `RunReport` with these tests, hook failures and crashed results
-/// reporters.
+/// reporters. A report with no test result has failed, until you give it
+/// to `allow_no_tests`.
 ///
 /// ## Example
 ///
@@ -1034,12 +1037,12 @@ pub opaque type RunReport {
 /// import dream_test/matchers.{be_equal, or_fail_with, should}
 /// import dream_test/types.{type AssertionResult}
 ///
-/// pub fn empty_run_does_not_fail() -> Result(AssertionResult, String) {
+/// pub fn empty_run_fails() -> Result(AssertionResult, String) {
 ///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
 ///   |> types.failed
 ///   |> should
-///   |> be_equal(False)
-///   |> or_fail_with("an empty run should not fail")
+///   |> be_equal(True)
+///   |> or_fail_with("a run with no test should fail")
 /// }
 /// ```
 pub fn run_report(
@@ -1051,7 +1054,44 @@ pub fn run_report(
     tests: tests,
     hook_failures: hook_failures,
     reporter_crashes: reporter_crashes,
+    no_tests_allowed: False,
   )
+}
+
+/// Allow a run with no test result: `failed` and `failed_with_no_tests`
+/// then do not count it as a failure, and the reporters show no
+/// `No tests ran` line.
+///
+/// `runner.allow_no_tests` calls it on the report of the run. Call it
+/// yourself in a custom runner.
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// The same report, with a run of no test allowed.
+///
+/// ## Example
+///
+/// ### Allow an empty run report <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/allow_no_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn allowed_empty_run_passes() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.allow_no_tests
+///   |> types.failed
+///   |> should
+///   |> be_equal(False)
+///   |> or_fail_with("an allowed empty run should not fail")
+/// }
+/// ```
+pub fn allow_no_tests(report report: RunReport) -> RunReport {
+  RunReport(..report, no_tests_allowed: True)
 }
 
 /// The result of each test of a run, in the order of the run.
@@ -1157,7 +1197,8 @@ pub fn report_reporter_crashes(
 }
 
 /// Whether a run failed: a test has a failure status (see `is_failure`), a
-/// teardown hook failed, or a results reporter crashed.
+/// teardown hook failed, a results reporter crashed, or the run ran no
+/// test (see `failed_with_no_tests`).
 ///
 /// `runner.exit_on_failure` ends the program with status 1 when this is
 /// `True`.
@@ -1169,8 +1210,8 @@ pub fn report_reporter_crashes(
 /// ## Returns
 ///
 /// `True` when a test is `Failed`, `SetupFailed` or `TimedOut`, when the
-/// report has a teardown failure, or when it has a crashed results
-/// reporter.
+/// report has a teardown failure, when it has a crashed results
+/// reporter, or when `failed_with_no_tests` is `True`.
 ///
 /// ## Example
 ///
@@ -1202,6 +1243,46 @@ pub fn failed(report report: RunReport) -> Bool {
   !list.is_empty(report.hook_failures)
   || !list.is_empty(report.reporter_crashes)
   || list.any(report.tests, has_failure_status)
+  || failed_with_no_tests(report)
+}
+
+/// Whether a run failed because it ran no test: the report has no test
+/// result, and `allow_no_tests` was not called on it.
+///
+/// A test that is `Skipped` or `Pending` is a test result: the run
+/// selected it. So a run where every test is skipped or pending did not
+/// fail this way. A filter that keeps no test, and `runner.new([])`, give
+/// a run with no test result.
+///
+/// The BDD and Gherkin reporters show a `No tests ran` line after the
+/// summary line when this is `True` (see `summary.format`).
+///
+/// ## Parameters
+///
+/// - `report`: the report of a run
+///
+/// ## Returns
+///
+/// `True` when the report has no test result and does not allow that.
+///
+/// ## Example
+///
+/// ### Fail a run that ran no test <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/doc/types/failed_with_no_tests.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_test/matchers.{be_equal, or_fail_with, should}
+/// import dream_test/types.{type AssertionResult}
+///
+/// pub fn empty_run_failed_with_no_tests() -> Result(AssertionResult, String) {
+///   types.run_report(tests: [], hook_failures: [], reporter_crashes: [])
+///   |> types.failed_with_no_tests
+///   |> should
+///   |> be_equal(True)
+///   |> or_fail_with("a run with no test should fail with no tests")
+/// }
+/// ```
+pub fn failed_with_no_tests(report report: RunReport) -> Bool {
+  list.is_empty(report.tests) && !report.no_tests_allowed
 }
 
 fn has_failure_status(result: TestResult) -> Bool {

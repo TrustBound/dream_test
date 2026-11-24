@@ -3,10 +3,12 @@ import dream_test/runner
 import dream_test/types.{AssertionOk}
 import dream_test/unit.{describe, it}
 import gleam/list
+import snippets/doc/types/allow_no_tests
 import snippets/doc/types/assertion_result
 import snippets/doc/types/call
 import snippets/doc/types/callback
 import snippets/doc/types/failed
+import snippets/doc/types/failed_with_no_tests
 import snippets/doc/types/full_name
 import snippets/doc/types/hook_failure
 import snippets/doc/types/is_failure
@@ -210,15 +212,35 @@ pub fn tests() {
         "expected second_reporter_crash to give the expected value",
       )
     }),
-    it("empty_run_does_not_fail passes", fn() {
+    it("empty_run_fails passes", fn() {
       // Act
-      let result = run_report.empty_run_does_not_fail()
+      let result = run_report.empty_run_fails()
 
       // Assert
       result
       |> should
       |> be_equal(Ok(AssertionOk))
-      |> or_fail_with("expected empty_run_does_not_fail to pass")
+      |> or_fail_with("expected empty_run_fails to pass")
+    }),
+    it("allowed_empty_run_passes passes", fn() {
+      // Act
+      let result = allow_no_tests.allowed_empty_run_passes()
+
+      // Assert
+      result
+      |> should
+      |> be_equal(Ok(AssertionOk))
+      |> or_fail_with("expected allowed_empty_run_passes to pass")
+    }),
+    it("empty_run_failed_with_no_tests passes", fn() {
+      // Act
+      let result = failed_with_no_tests.empty_run_failed_with_no_tests()
+
+      // Assert
+      result
+      |> should
+      |> be_equal(Ok(AssertionOk))
+      |> or_fail_with("expected empty_run_failed_with_no_tests to pass")
     }),
     it("empty_run_has_no_tests passes", fn() {
       // Act

@@ -149,6 +149,8 @@ Summary: 4 run, 1 failed, 1 passed, 1 skipped, 1 pending in 0ms
 
 Leave out the progress reporter on CI. A CI log isn't a terminal: it keeps each redraw of the progress line, so you'd get one partial line for every test.
 
+A run that runs no test fails. In every mode, the BDD and Gherkin reports then end with a `No tests ran` line after the summary line. The JSON report gets no extra line, so it stays valid JSON: its `summary.total` is 0. The progress bar shows `0/0`. [When a filter keeps nothing](https://github.com/TrustBound/dream_test/blob/main/docs/guides/writing-tests.md#when-a-filter-keeps-nothing) shows the run.
+
 ## Step 3: Write JSON for tools
 
 `json.new()` prints one JSON object for the whole run, and `json.new() |> json.pretty()` indents it. Here's the pretty report of the checkout suite:

@@ -41,9 +41,22 @@ store. This release has breaking changes. Read
   `runner.run`: no code after `runner.run` runs. In 3.0.0 it also writes
   the coverage files first. It also stops with status 1 when a teardown
   hook failed and every test passed, when a setup stopped
-  (`SetupStopped`), when a `reporter_types.Custom` reporter crashed, and
-  when coverage failed. 2.x had no teardown failures in the report, no
-  stopped setups, no custom reporters and no coverage.
+  (`SetupStopped`), when a `reporter_types.Custom` reporter crashed, when
+  the run ran no test, and when coverage failed. 2.x had no teardown
+  failures in the report, no stopped setups, no custom reporters and no
+  coverage.
+- A run that runs no test fails. In 2.x it passed with
+  `Summary: 0 run, 0 failed, 0 passed`. A filter that keeps no test, or
+  `runner.new([])`, gives such a run. The BDD and Gherkin reporters write
+  `No tests ran. The filter or the suites selected no test. To allow an empty run, use runner.allow_no_tests().`
+  after the summary line, `types.failed(report)` is `True`, and with
+  `exit_on_failure` the exit status is 1. A skipped or pending test is a
+  test that ran, so a run where every test is skipped passes. Add
+  `runner.allow_no_tests()` to a runner that is empty on purpose: it
+  restores the output and the exit status of 2.x. `types.failed` is also
+  `True` for a report with no test result from `types.run_report` or
+  `parallel.run_tree_parallel`. `types.allow_no_tests` allows it, and
+  `types.failed_with_no_tests` tells this failure apart.
 - `types.Root` is now `types.Tree`, and `types.root` is now `types.tree`.
   A tree is one top-level group with its children and one context; a
   suite holds one or more trees. The tree holds the top-level group
@@ -336,6 +349,8 @@ the guide labels them.
 - A `discover.features` pattern that matches no files fails the run.
 - A module discovery pattern that matches no test module fails the run,
   and so does a test module that does not load.
+- A run that runs no test fails. Add `runner.allow_no_tests()` to a runner
+  that is empty on purpose.
 - `runner.run` and `parallel.run_tree_parallel` return a `types.RunReport`.
 - `runner.has_failures` is now `types.failed`.
 - `TestResult` and `TestInfo` hold `groups` in place of `full_name`.
@@ -492,8 +507,9 @@ the guide labels them.
   - `dream_test/reporters/coverage.RunOutcome` gives the last line of a
     coverage failure: the passed and failed tests, the teardown hooks that
     failed (`teardown_failed`), the setups that stopped (`setup_stopped`),
-    the results reporters that crashed (`reporters_crashed`), and whether
-    the runner exits on failure, for example
+    the results reporters that crashed (`reporters_crashed`), whether the
+    run ran no test (`no_tests_ran`), and whether the runner exits on
+    failure, for example
     `Tests: 3 passed, 1 setup stopped. Exit status 1, because a setup stopped and coverage did not complete.`
   - dream_test measures itself: its own tests cover 100% of the lines in
     `src`, with no exclusions
@@ -567,6 +583,10 @@ the guide labels them.
     it with `types.report_tests`, `types.report_hook_failures` and
     `types.report_reporter_crashes`, and check it with `types.failed`.
     `RunReport` is opaque, so it can grow without a breaking change
+  - `runner.allow_no_tests()` lets a run with no test pass. Without it, a
+    run with no test fails. `types.failed_with_no_tests(report)` is `True`
+    for that failure, and `types.allow_no_tests(report)` allows it in a
+    custom runner
   - `types.HookFailure`, a teardown hook that failed or a setup that
     stopped. Its variant `types.TeardownFailed(hook:, path:, message:)`
     is a teardown hook that failed, with

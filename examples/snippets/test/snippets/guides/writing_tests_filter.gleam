@@ -32,3 +32,18 @@ pub fn main_with_typo() {
   |> runner.exit_on_failure()
   |> runner.run()
 }
+
+/// A filter for the migration tests. The cart suite has none, and this
+/// runner allows a run with no test.
+pub fn only_migrations(info: TestInfo) -> Bool {
+  list.contains(info.tags, "migration")
+}
+
+pub fn main_allowing_no_tests() {
+  runner.new([writing_tests_cart.tests()])
+  |> runner.filter_tests(only_migrations)
+  |> runner.results_reporters([bdd.new()])
+  |> runner.allow_no_tests()
+  |> runner.exit_on_failure()
+  |> runner.run()
+}

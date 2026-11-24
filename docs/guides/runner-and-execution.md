@@ -220,17 +220,18 @@ The run fails when one of these is true:
 2. A teardown hook failed, also when every test passed.
 3. The process of a setup stopped while its tests ran (`types.SetupStopped`).
 4. The `render` function of a `reporter_types.Custom` results reporter crashed.
-5. Coverage failed, for example a total below `coverage.minimum_percent`.
+5. The run ran no test, for example a filter that keeps nothing, and `runner.allow_no_tests()` is not set. A skipped or pending test is a test that ran.
+6. Coverage failed, for example a total below `coverage.minimum_percent`.
 
 `exit_on_failure` doesn't stop the run at the first failure. Every test runs, and the runner writes all its output, the reports and the coverage files. Then it ends the program with exit status 1, and `runner.run` doesn't return, so no code after it runs. When the run passes, `runner.run` returns the report, and the exit status is 0.
 
-`types.failed(report)` is `True` in the first four cases. `types.report_tests(report)` gives the test results, `types.report_hook_failures(report)` the failed teardowns and stopped setups, and `types.report_reporter_crashes(report)` the position and the full reason of each crashed results reporter. Use them when your code picks its own exit status from the report.
+`types.failed(report)` is `True` in the first five cases, and `types.failed_with_no_tests(report)` in the fifth. `types.report_tests(report)` gives the test results, `types.report_hook_failures(report)` the failed teardowns and stopped setups, and `types.report_reporter_crashes(report)` the position and the full reason of each crashed results reporter. Use them when your code picks its own exit status from the report.
 
 A silent run, `runner.silent()`, writes nothing to the standard output: no progress, no reports and no coverage table. It still writes two kinds of error to the standard error stream: the `Results reporter failed` error of a custom reporter that crashed, and a coverage error.
 
 ## Test your code
 
-The second case surprises people: a run where every test passed can still fail. That's on purpose, because a cleanup that didn't happen leaves a mess for the next run. If your CI depends on that policy, pin it with a test. Run a suite with a failing teardown silently, and check `types.failed`:
+The second case surprises people: a run where every test passed can still fail. That's on purpose, because a cleanup that didn't happen leaves a mess for the next run. The fifth case is on purpose too: a run that tested nothing proves nothing. If your CI depends on that policy, pin it with a test. Run a suite with a failing teardown silently, and check `types.failed`. Then run it with a filter that keeps nothing:
 
 ### Check that a failed cleanup fails the run <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/snippets/test/snippets/guides/runner_failure_policy.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -263,6 +264,20 @@ pub fn tests() {
       |> be_true()
       |> or_fail_with("a failed teardown should fail the run")
     }),
+    it("fails a run that ran no test", fn() {
+      // Act
+      let report =
+        runner.new([suite_with_a_failed_cleanup()])
+        |> runner.filter_tests(fn(_info) { False })
+        |> runner.silent()
+        |> runner.run()
+
+      // Assert
+      types.failed(report)
+      |> should
+      |> be_true()
+      |> or_fail_with("a run with no test should fail")
+    }),
   ])
 }
 ```
@@ -272,8 +287,9 @@ pub fn tests() {
 ```text
 The run report
   ✓ fails a run whose cleanup failed
+  ✓ fails a run that ran no test
 
-Summary: 1 run, 0 failed, 1 passed in 0ms
+Summary: 2 run, 0 failed, 2 passed in 0ms
 ```
 
 ## Common pitfalls

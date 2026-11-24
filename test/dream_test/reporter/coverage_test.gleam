@@ -161,6 +161,7 @@ fn passing_outcome() {
     teardown_failed: 0,
     setup_stopped: 0,
     reporters_crashed: 0,
+    no_tests_ran: False,
     exit_on_failure: True,
   )
 }
@@ -1225,6 +1226,7 @@ pub fn tests() {
             teardown_failed: 0,
             setup_stopped: 0,
             reporters_crashed: 0,
+            no_tests_ran: False,
             exit_on_failure: True,
           ),
         )
@@ -1247,6 +1249,7 @@ pub fn tests() {
             teardown_failed: 1,
             setup_stopped: 0,
             reporters_crashed: 0,
+            no_tests_ran: False,
             exit_on_failure: True,
           ),
         )
@@ -1269,6 +1272,7 @@ pub fn tests() {
             teardown_failed: 1,
             setup_stopped: 0,
             reporters_crashed: 0,
+            no_tests_ran: False,
             exit_on_failure: True,
           ),
         )
@@ -1333,6 +1337,7 @@ pub fn tests() {
               teardown_failed: 1,
               setup_stopped: 0,
               reporters_crashed: 2,
+              no_tests_ran: False,
               exit_on_failure: True,
             ),
           )
@@ -1356,6 +1361,7 @@ pub fn tests() {
             teardown_failed: 0,
             setup_stopped: 0,
             reporters_crashed: 1,
+            no_tests_ran: False,
             exit_on_failure: True,
           ),
         )
@@ -1367,6 +1373,32 @@ pub fn tests() {
         ))
         |> or_fail_with("expected a results reporter crashed")
       }),
+      it("names a run that ran no test as the first cause", fn() {
+        // Act
+        let block =
+          coverage_reporter.render_failure(
+            error: NoSourceFiles("lib"),
+            outcome: RunOutcome(
+              passed: 0,
+              failed: 0,
+              teardown_failed: 0,
+              setup_stopped: 0,
+              reporters_crashed: 0,
+              no_tests_ran: True,
+              exit_on_failure: True,
+            ),
+          )
+
+        // Assert
+        block
+        |> string.split("\n\n")
+        |> list.last
+        |> should
+        |> be_equal(Ok(
+          "Tests: 0 passed. Exit status 1, because no tests ran and coverage did not complete.\n",
+        ))
+        |> or_fail_with("expected no tests ran as a cause")
+      }),
       it("says the exit status is unchanged without exit_on_failure", fn() {
         coverage_reporter.render_failure(
           error: NoSourceFiles("lib"),
@@ -1376,6 +1408,7 @@ pub fn tests() {
             teardown_failed: 0,
             setup_stopped: 0,
             reporters_crashed: 0,
+            no_tests_ran: False,
             exit_on_failure: False,
           ),
         )
@@ -1443,6 +1476,7 @@ pub fn tests() {
             teardown_failed: 0,
             setup_stopped: 0,
             reporters_crashed: 0,
+            no_tests_ran: False,
             exit_on_failure: True,
           ),
         )
@@ -1475,6 +1509,7 @@ fn last_line(
       teardown_failed: teardown_failed,
       setup_stopped: setup_stopped,
       reporters_crashed: 0,
+      no_tests_ran: False,
       exit_on_failure: True,
     ),
   )

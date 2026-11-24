@@ -75,14 +75,15 @@ pub fn tests() {
         |> be_equal(
           Ok(ChildRun(
             status: 1,
-            output: "\nSummary: 0 run, 0 failed, 0 passed in <duration>\n\n"
+            output: "\nSummary: 0 run, 0 failed, 0 passed in <duration>\n"
+              <> "No tests ran. The filter or the suites selected no test. To allow an empty run, use runner.allow_no_tests().\n\n"
               <> missing_lines_table
               <> "LCOV: build/coverage/lcov.info\n",
             error_output: "\nCoverage failed\n"
               <> "  Coverage 0.0% is below the minimum 80.0% (needs 8 more lines).\n"
               <> "  Reason: 0 of 9 executable lines ran, and the minimum needs 8.\n"
               <> "  Fix: add tests for the lines that did not run (coverage.show_missing() lists them), or lower coverage.minimum_percent(...).\n"
-              <> "\nTests: 0 passed. Exit status 1, because coverage is below the minimum.\n",
+              <> "\nTests: 0 passed. Exit status 1, because no tests ran and coverage is below the minimum.\n",
           )),
         )
         |> or_fail_with("expected module_with_runner to fail below 80%")

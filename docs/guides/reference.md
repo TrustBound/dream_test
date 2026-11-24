@@ -165,6 +165,7 @@ pub fn tests() {
 | `runner.output(runner.Output(out:, error:))` | the standard output and error | Where the runner writes. |
 | `runner.silent()` | off | Writes nothing to the standard output. Errors still go to the error stream. |
 | `runner.exit_on_failure()` | off | Exit status 1 when the run fails, after all output. |
+| `runner.allow_no_tests()` | off | A run with no test passes. Without it, such a run fails, and the report ends with a `No tests ran` line. |
 | `runner.coverage(config)`, `runner.coverage_from_environment(config)` | off | Line coverage. |
 | `runner.before_all_suites`, `after_all_suites`, `before_each_suite`, `after_each_suite`, `before_each_test`, `after_each_test` | none | Runner hooks. |
 

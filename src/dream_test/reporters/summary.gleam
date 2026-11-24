@@ -20,6 +20,11 @@
 //// is the tests with the status `Failed` only. It adds the
 //// skipped, pending, timed out, setup failed, teardown failed and setup
 //// stopped counts, in that order, only when they are not zero.
+////
+//// A run that ran no test fails (see `types.failed_with_no_tests`). For
+//// that run, a second line follows the summary line: `No tests ran. The
+//// filter or the suites selected no test. To allow an empty run, use
+//// runner.allow_no_tests().`
 
 import dream_test/reporters/ansi
 import dream_test/timing
@@ -128,7 +133,9 @@ pub fn count(report report: RunReport) -> Counts {
 ///
 /// ## Returns
 ///
-/// One line, with a trailing newline.
+/// One line, with a trailing newline. When `types.failed_with_no_tests`
+/// is `True` for the report, a second line follows: the `No tests ran`
+/// line, with a trailing newline.
 ///
 /// ## Example
 ///
@@ -144,7 +151,7 @@ pub fn count(report report: RunReport) -> Counts {
 /// }
 /// ```
 pub fn format(report report: RunReport) -> String {
-  format_counts(count(report), False)
+  format_counts(count(report), False) <> format_no_tests(report, False)
 }
 
 /// Format the summary line with ANSI colour codes.
@@ -152,7 +159,8 @@ pub fn format(report report: RunReport) -> String {
 /// The word `Summary:` is bold cyan. The run count and the duration are
 /// cyan, the failed count is red and the passed count is green. The skipped
 /// and pending counts are yellow, the timed out, setup failed, teardown
-/// failed and setup stopped counts are red, and their labels are dim.
+/// failed and setup stopped counts are red, and their labels are dim. The
+/// `No tests ran` line is red.
 ///
 /// ## Parameters
 ///
@@ -160,7 +168,9 @@ pub fn format(report report: RunReport) -> String {
 ///
 /// ## Returns
 ///
-/// One line, with a trailing newline.
+/// One line, with a trailing newline. When `types.failed_with_no_tests`
+/// is `True` for the report, a second line follows: the `No tests ran`
+/// line, with a trailing newline.
 ///
 /// ## Example
 ///
@@ -176,7 +186,19 @@ pub fn format(report report: RunReport) -> String {
 /// }
 /// ```
 pub fn format_in_color(report report: RunReport) -> String {
-  format_counts(count(report), True)
+  format_counts(count(report), True) <> format_no_tests(report, True)
+}
+
+/// The text of the line for a run that failed because it ran no test.
+const no_tests_text =
+  "No tests ran. The filter or the suites selected no test. To allow an empty run, use runner.allow_no_tests()."
+
+/// The `No tests ran` line, or `""` when the run did not fail that way.
+fn format_no_tests(report: RunReport, color: Bool) -> String {
+  case types.failed_with_no_tests(report) {
+    True -> ansi.apply_if(color, ansi.red, no_tests_text) <> "\n"
+    False -> ""
+  }
 }
 
 fn empty_counts() -> Counts {

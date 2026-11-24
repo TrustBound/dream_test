@@ -162,6 +162,9 @@ import gleam/string
 ///   The `Tests:` part does not show this count. With `exit_on_failure` on
 ///   and no failed test, the causes say `a results reporter crashed` for
 ///   one, and `<count> results reporters crashed` for more.
+/// - `no_tests_ran`: whether the run failed because it ran no test (see
+///   `types.failed_with_no_tests`). The `Tests:` part does not show it.
+///   With `exit_on_failure` on, the causes say `no tests ran` first.
 /// - `exit_on_failure`: whether the runner exits with status 1 on failure
 pub type RunOutcome {
   RunOutcome(
@@ -170,6 +173,7 @@ pub type RunOutcome {
     teardown_failed: Int,
     setup_stopped: Int,
     reporters_crashed: Int,
+    no_tests_ran: Bool,
     exit_on_failure: Bool,
   )
 }
@@ -745,6 +749,7 @@ fn render_inexact_line_warning(source_paths: List(String)) -> String {
 ///       teardown_failed: 0,
 ///       setup_stopped: 0,
 ///       reporters_crashed: 0,
+///       no_tests_ran: False,
 ///       exit_on_failure: True,
 ///     ),
 ///   )
@@ -810,8 +815,8 @@ fn outcome_line(outcome: RunOutcome, reason: ExitReason) -> String {
 }
 
 /// The causes of the exit status 1, in a sentence. Failed tests come
-/// first and alone; else each failed teardown hook, stopped setup and
-/// crashed results reporter.
+/// first and alone; else a run with no test, each failed teardown hook,
+/// stopped setup and crashed results reporter.
 fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
   case outcome.failed, other_causes(outcome) {
     0, [] -> reason.alone
@@ -822,6 +827,7 @@ fn causes(outcome: RunOutcome, reason: ExitReason) -> String {
 
 fn other_causes(outcome: RunOutcome) -> List(String) {
   list.flatten([
+    no_tests_cause(outcome.no_tests_ran),
     counted_cause(
       outcome.teardown_failed,
       "a teardown hook failed",
@@ -834,6 +840,14 @@ fn other_causes(outcome: RunOutcome) -> List(String) {
       "results reporters crashed",
     ),
   ])
+}
+
+/// The cause `no tests ran` when the run failed because it ran no test.
+fn no_tests_cause(no_tests_ran: Bool) -> List(String) {
+  case no_tests_ran {
+    True -> ["no tests ran"]
+    False -> []
+  }
 }
 
 /// No cause for a count of 0, `one` for 1, and `<count> <more>` for more,
