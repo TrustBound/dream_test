@@ -312,7 +312,7 @@ The HTTP suites of the other guide keep the default concurrency. `output_checks`
 
 The record script of the project starts the database, runs the tests with `RECORDER_MODE=record`, and stops the database when the run ends, also when it fails:
 
-### Record with the database up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/scripts/record.sh#L12-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Record with the database up <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/scripts/record.sh#L8-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```sh
 docker compose up -d --wait postgres

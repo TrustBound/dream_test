@@ -43,7 +43,7 @@ The code of this guide is the project `examples/recording` in the Dream Test rep
 
 ```toml
 # Switched to a Hex version range once it is published.
-dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "bea1b785bba9d6b88b7eb1696fd30ddcd2deb564" }
+dream_http_client = { git = "https://github.com/TrustBound/dream_http_client.git", ref = "e21fed7cb8758443caf1def60db6bb0356fed8a3" }
 ```
 
 The tests also need the mock server for the record run, and `envoy` to read an environment variable. These lines are under `[dev-dependencies]`:
@@ -295,23 +295,17 @@ The tests of the HTTP calls can run in parallel: each request has its own file. 
 
 ## Step 5: Record one time
 
-The project has a script that records again. It removes the old HTTP recordings, starts the database for the other guide, and runs the tests with `RECORDER_MODE=record`:
+The project has a script that records again. It starts the database for the other guide, and runs the tests with `RECORDER_MODE=record`. It removes no files: a record run replaces the recording of each request that it records again, and keeps the files of the requests that it does not record. So a record run of one test keeps the recordings of the other tests.
 
-### Record the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/scripts/record.sh#L6-L14"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### Record the tests <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/scripts/record.sh#L8-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```sh
-# The HTTP recorder keeps old files. A response that changed, such as its
-# date header, goes to a new file, and two different files for one request
-# make playback fail. So remove the old files first.
-rm -rf test/recordings/http
-mkdir -p test/recordings/http
-
 docker compose up -d --wait postgres
 trap 'docker compose down -v' EXIT
 RECORDER_MODE=record gleam test
 ```
 
-In your own project, the HTTP part is one line: `RECORDER_MODE=record gleam test`. The tests pass as they do in playback, and the recorder writes one file for each request. The name of a file starts with the method, the host and the path. Two hashes follow: one of the match key, and one of the content. This is the file of the Oslo forecast, `GET_localhost__v1_forecast_oslo_e37e68_e41681.json`:
+In your own project, the HTTP part is one line: `RECORDER_MODE=record gleam test`. The tests pass as they do in playback, and the recorder writes one file for each request. The name of a file starts with the method, the host and the path. A hash of the match key follows. The name does not depend on the response, so a request keeps its file name in each record run, and `git diff` shows only what changed. This is the file of the Oslo forecast, `GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json`:
 
 ### The recording of the Oslo forecast <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/outputs/http_oslo_recording.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -472,7 +466,7 @@ Know what playback of a stream does:
 
 - It gives the recorded chunks with the same boundaries.
 - It waits the recorded time before each chunk. So this test takes about 800 ms in playback too. The timeout of the request applies as it does live.
-- A record run writes the times again. Each new recording of a stream is a new file, so remove the old files before you record. The record script of [Step 5](#step-5-record-one-time) does it.
+- A record run writes the times again. The file keeps its name, and the record run replaces its content, so `git diff` shows the new times. Commit them, or restore the file if only the times changed.
 
 [Streaming a response](https://github.com/TrustBound/dream_http_client/blob/main/docs/guides/streaming.md#test-your-streaming-code) of `dream_http_client` shows how to write a stream recording by hand, for example one that cuts a line in two.
 
@@ -503,7 +497,7 @@ pub fn drop_authorization(request: RecordedRequest) -> RecordedRequest {
 
 The request transformer runs in each mode, before the recorder computes the key. So the file never holds the token, and a playback request with any token still finds its file.
 
-A response transformer runs in record mode only, before the recorder writes the response. Use it for secrets in responses, such as a `set-cookie` header, and for data that changes on each run. The `date` header changes on each run, so a new recording of the same response would be a new file. Without the header, it is the same file:
+A response transformer runs in record mode only, before the recorder writes the response. Use it for secrets in responses, such as a `set-cookie` header, and for data that changes on each run. The `date` header changes on each run, so each record run would change the file of a request whose response is the same. Without the header, the file stays the same:
 
 ### Remove the date from each response <a href="https://github.com/TrustBound/dream_test/blob/3.0.0/examples/recording/test/recorded_http/api_setup.gleam#L88-L105"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
@@ -592,7 +586,7 @@ To refresh the recordings, a developer runs the record script on their machine, 
 
 **A recording that is not committed.** *Symptom:* the tests pass on your machine, and fail in CI with `No recording matches`. *Fix:* commit the directory of the recordings with the tests.
 
-**A record run on top of old files.** *Symptom:* after a record run, playback fails for a request that has a file. *Fix:* a record run writes a new file when a response changed, and keeps the old file. Two different files for one key make playback fail. Remove the old files before you record, as the record script does.
+**Two files for one request.** *Symptom:* playback fails with `Ambiguous recording match` for a request. *Fix:* a record run replaces the files of each request that it records, so the second file came from somewhere else, such as a file written by hand or copied in. Remove one of the files, or record that request again.
 
 **A different port in playback.** *Symptom:* `No recording matches` for a URL that has a file, with another port. *Fix:* the default key holds the port. Keep the port of the tests in a constant, and use it in both modes.
 

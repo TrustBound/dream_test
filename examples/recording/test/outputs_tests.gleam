@@ -60,7 +60,7 @@ pub fn tests() -> TestSuite {
     it("shows the recording of the Oslo forecast", fn() {
       // The recorder writes no newline at the end of the file
       use recording <- result.try(read_text(
-        "test/recordings/http/GET_localhost__v1_forecast_oslo_e37e68_e41681.json",
+        "test/recordings/http/GET_localhost__v1_forecast_oslo_e37e6826285e2b49.json",
       ))
       use expected <- result.try(read_text(
         "test/outputs/http_oslo_recording.txt",
