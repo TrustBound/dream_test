@@ -143,7 +143,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 | `ci`       | CI configuration                                        |
 | `chore`    | Other changes that don't modify src or test             |
 
-**Scope:** If your branch has an issue number (e.g., `feature/SVC-123`), use it as the scope, as in `feat(SVC-123): add timeout support to test runner`.
+**Scope:** If the change has an issue in the project's tracker, use the issue's identifier as the scope. Otherwise, name the part of the project that the change touches, as in `feat(runner): add timeout support to test runner`.
 
 **Example:**
 
