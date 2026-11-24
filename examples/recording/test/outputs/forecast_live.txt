@@ -1,6 +1,6 @@
 Forecast
-  ✓ gives the forecast for Oslo
-  ✓ gives the forecast for Lisbon
-  ✓ reports a city that the API does not know
+  ✓ gives the forecast for Oslo (43ms)
+  ✓ gives the forecast for Lisbon (43ms)
+  ✓ reports a city that the API does not know (41ms)
 
-Summary: 3 run, 0 failed, 3 passed in 0ms
+Summary: 3 run, 0 failed, 3 passed in 127ms

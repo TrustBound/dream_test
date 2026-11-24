@@ -2,7 +2,7 @@
 
 Keep the application code and the test assertions. Change what answers at the dependency boundary.
 
-This guide explains the idea behind the two recording guides of Dream Test. It is not a list of steps. Each code block and each output is from the project `examples/recording` in the Dream Test repository, and a test of that project compares each output with the real report.
+This guide explains the idea behind the two recording guides of Dream Test. It is not a list of steps. Each code block and each output is from the project `examples/recording` in the Dream Test repository, and a test of that project compares each output with the real report, with the times left out.
 
 ## Table of Contents
 
@@ -66,11 +66,11 @@ RECORDER_MODE=passthrough gleam test
 
 ```text
 Forecast
-  ✓ gives the forecast for Oslo
-  ✓ gives the forecast for Lisbon
-  ✓ reports a city that the API does not know
+  ✓ gives the forecast for Oslo (43ms)
+  ✓ gives the forecast for Lisbon (43ms)
+  ✓ reports a city that the API does not know (41ms)
 
-Summary: 3 run, 0 failed, 3 passed in 0ms
+Summary: 3 run, 0 failed, 3 passed in 127ms
 ```
 
 The offline run sends nothing. The recorder answers each request from a file:
@@ -85,14 +85,14 @@ gleam test
 
 ```text
 Forecast
-  ✓ gives the forecast for Oslo
-  ✓ gives the forecast for Lisbon
-  ✓ reports a city that the API does not know
+  ✓ gives the forecast for Oslo (2ms)
+  ✓ gives the forecast for Lisbon (2ms)
+  ✓ reports a city that the API does not know (2ms)
 
-Summary: 3 run, 0 failed, 3 passed in 0ms
+Summary: 3 run, 0 failed, 3 passed in 6ms
 ```
 
-The two reports are the same. The tests, the assertions and the weather client are the same in both runs. Only the environment variable is different. The outputs show the Forecast suite of each run, with every time set to 0. A test of the project runs the Forecast suite in each mode and compares its report with these outputs.
+The two reports are the same, except for the times. The tests, the assertions and the weather client are the same in both runs. Only the environment variable is different. The outputs show the Forecast suite of each run, with the times of one real run of each mode. Measured on an Apple M1 Max, 64 GB, macOS 26.5.1, 2026-11-24. The times are different for each run and each machine. A test of the project runs the Forecast suite in each mode and compares its report with these outputs, with the times left out.
 
 ## Two boundaries
 
