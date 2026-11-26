@@ -19,6 +19,8 @@ gleam add --dev dream_test
 
 Current version: `3.0.0`
 
+**Erlang target only.** Dream Test 3.0.0 runs on the Erlang target. It does not support the JavaScript target yet. JavaScript support is planned for a future release.
+
 ## Why Dream Test?
 
 Rapid application development needs testing tools that scale and support the growing needs of the application without slowing down progress. Dream test was designed to help engineers write expressive unit and integration tests for their applications using the tools and techniques they know from other ecosystems; adapted properly to gleam and the beam.
