@@ -1,6 +1,6 @@
 name = "dream_test"
 version = "3.0.0"
-description = "A testing framework for Gleam that gets out of your way"
+description = "Testing for Gleam, with coverage and recorded tests built in."
 licences = ["MIT"]
 repository = { type = "github", user = "TrustBound", repo = "dream_test" }
 links = [{ title = "Documentation", href = "https://hexdocs.pm/dream_test" }]
