@@ -13,7 +13,7 @@
 
 ## What is Dream Test?
 
-Dream Test is a testing framework for Gleam that measures line coverage and plays back recorded HTTP calls and database queries without extra tools. Turn coverage on with one line in your test `main`, and the run prints a per-file table of the lines your tests never ran. Record an API client or a PostgreSQL query one time, and every later run needs no network and no database. Unit tests, Gherkin features and snapshots all run in the same runner.
+Dream Test is testing for Gleam with everything you need built in. Write tests in the style that fits, from quick checks to plain-language feature specs. See exactly which lines your tests never reach, without adding another tool. Record real API calls and database queries once, and every run after that is fast, offline and the same.
 
 ## Features
 
