@@ -571,6 +571,12 @@ To show a live coverage badge in your README, see [Coverage badge on GitHub](htt
 Use Gleam 1.19 or later for exact line numbers. Older Gleam versions map only the first line of each function to its source line, so other lines can show the wrong number in the `Missing` column, the LCOV file and the markers. When an older Gleam built a measured file, the table prints a warning that names the file. The warning does not fail the run.
 
 
+## About Dream
+
+[Dream](https://github.com/TrustBound/dream) is a collection of Gleam packages for building production web applications. Each package implements its standards completely, shares the same naming and style as the others, and is fully tested. TrustBound builds Dream for its own production systems and shares it in the hope that it helps yours.
+
+dream_test works on its own. You don't need the rest of Dream to use it.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
